@@ -1,9 +1,9 @@
 import { Dir, Kind, MirrorOri, dirDelta, type Vec2 } from "./cellKind";
 import { Channel } from "./cellData";
-import { Module as M, makeTable } from "./tableDef";
+import { Module as M, makeTable, type TableDef } from "./tableDef";
 import { cell, move, table, type LevelData, type MoveStep } from "./levelData";
 import { buildState } from "./levelData";
-import { setTableRotation } from "./rotateOps";
+import { applyPlayerRotation, setTableRotation } from "./rotateOps";
 import { loadLevel, pulse, tryRotate } from "./puzzleSession";
 import { entryPortFromIncoming, exitsFrom } from "./portWiring";
 import { solve } from "./beamSolver";
@@ -101,12 +101,106 @@ export function levelTitle(diff: number): string {
 
 function profile(diff: number) {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, diff));
-  const t = (d - 1) / (DIFFICULTY_COUNT - 1);
 
-  // Levels 11–20: genius cliff — scarce pulses, deep traps, tight coupling.
-  // Pipe lengths stay ≤3/2/3 so a third channel still fits on 12×12.
-  if (d >= 11) {
-    const g = (d - 11) / Math.max(1, DIFFICULTY_COUNT - 11);
+  // Progressive climb → brutal cliff. Early teaches the language; late is cold,
+  // scarce-pulse, heavily trapped, and rejects soft fallbacks.
+  // Pipe lengths stay ≤3/3/3 so a third channel still fits on 12×12.
+
+  if (d <= 3) {
+    // Apprentice: learn gate/cross/worm with room to probe.
+    return {
+      diff: d,
+      size: 12,
+      solidBefore: 2,
+      solidAfter: 2,
+      keyBefore: 2,
+      channels: 2,
+      requireChannels: 2,
+      structuralLocks: 2,
+      doubleChance: 0.55,
+      undoLimit: 3,
+      pulseLimit: 4,
+      falseCorridors: 0,
+      mirrors: 0,
+      sinks: 0,
+      wormPairs: 1,
+      requireWorm: true,
+      decoyWorms: 0,
+      barriers: 2,
+      requireBarriers: 2,
+      filters: 0,
+      minMoves: 5 + d,
+      minCritical: 4,
+      gearPairs: 0,
+      maxOneMoveSolves: true,
+    };
+  }
+
+  if (d <= 7) {
+    // Journeyman: third channel arrives, hazards open, pulses tighten.
+    const j = (d - 4) / 3;
+    return {
+      diff: d,
+      size: 12,
+      solidBefore: 2 + Math.floor(j),
+      solidAfter: 2,
+      keyBefore: 2 + Math.floor(j),
+      channels: d <= 5 ? 2 : 3,
+      requireChannels: d <= 5 ? 2 : 3,
+      structuralLocks: 1,
+      doubleChance: 0.7 + j * 0.15,
+      undoLimit: 2,
+      pulseLimit: 3,
+      falseCorridors: j > 0.5 ? 1 : 0,
+      mirrors: d >= 7 ? 1 : 0,
+      sinks: 1,
+      wormPairs: 1,
+      requireWorm: true,
+      decoyWorms: 0,
+      barriers: 2 + Math.floor(j),
+      requireBarriers: 2,
+      filters: d >= 6 ? 1 : 0,
+      minMoves: 8 + Math.floor(j * 3),
+      minCritical: 5,
+      gearPairs: d >= 7 ? 1 : 0,
+      maxOneMoveSolves: true,
+    };
+  }
+
+  if (d <= 10) {
+    // Adept: full kit, scarce probes, longer plans.
+    const a = (d - 8) / 2;
+    return {
+      diff: d,
+      size: 12,
+      solidBefore: 3,
+      solidAfter: 2 + Math.floor(a),
+      keyBefore: 3,
+      channels: 3,
+      requireChannels: 3,
+      structuralLocks: 0,
+      doubleChance: 0.88,
+      undoLimit: 1,
+      pulseLimit: 2,
+      falseCorridors: 1,
+      mirrors: 1,
+      sinks: 1 + Math.floor(a),
+      wormPairs: 1,
+      requireWorm: true,
+      decoyWorms: 0,
+      barriers: 3,
+      requireBarriers: 3,
+      filters: 1,
+      minMoves: 11 + Math.floor(a * 2),
+      minCritical: 6,
+      gearPairs: 1,
+      maxOneMoveSolves: true,
+    };
+  }
+
+  if (d <= 15) {
+    // Genius: one or two pulses, decoys, deep traps — no hand-holding.
+    const g = (d - 11) / 4;
     return {
       diff: d,
       size: 12,
@@ -115,46 +209,53 @@ function profile(diff: number) {
       keyBefore: 3,
       channels: 3,
       requireChannels: 3,
-      structuralLocks: 1,
-      doubleChance: 0.9 + g * 0.08,
+      structuralLocks: 0,
+      doubleChance: 0.95,
       undoLimit: 1,
-      pulseLimit: g < 0.5 ? 2 : 1,
-      falseCorridors: 1 + Math.floor(g * 2),
-      mirrors: 1 + Math.floor(g * 2),
-      sinks: 1 + Math.floor(g * 2),
+      pulseLimit: g < 0.6 ? 2 : 1,
+      falseCorridors: 2,
+      mirrors: 2,
+      sinks: 2,
       wormPairs: 1,
       requireWorm: true,
-      decoyWorms: g < 0.35 ? 0 : 1,
-      barriers: 3 + Math.floor(g),
+      decoyWorms: 1,
+      barriers: 3,
       requireBarriers: 3,
-      filters: g < 0.4 ? 1 : 2,
-      minMoves: 11 + Math.floor(g * 7),
+      filters: 2,
+      minMoves: 12 + Math.floor(g * 3),
+      minCritical: 6,
+      gearPairs: 2,
+      maxOneMoveSolves: true,
     };
   }
 
-  // Levels 1–10: climb toward the cliff without soft-capping depth.
+  // Masterpiece (16–20): one pulse. Wrong once = restart. Extreme coupling.
+  const m = (d - 16) / Math.max(1, DIFFICULTY_COUNT - 16);
   return {
     diff: d,
     size: 12,
-    solidBefore: 2 + Math.floor(t * 1.5),
-    solidAfter: 2 + Math.floor(t),
-    keyBefore: 2 + Math.floor(t * 1.5),
-    channels: d <= 5 ? 2 : 3,
-    requireChannels: d <= 5 ? 2 : 3,
-    structuralLocks: 1 + Math.min(2, Math.floor(t * 2)),
-    doubleChance: 0.85,
+    solidBefore: 3,
+    solidAfter: 2,
+    keyBefore: 3,
+    channels: 3,
+    requireChannels: 3,
+    structuralLocks: 0,
+    doubleChance: 1,
     undoLimit: 1,
-    pulseLimit: 2 + Math.floor(t * 2),
-    falseCorridors: t > 0.55 ? 1 : 0,
-    mirrors: d >= 8 ? 1 : 0,
-    sinks: d >= 4 ? 1 : 0,
+    pulseLimit: 1,
+    falseCorridors: 2,
+    mirrors: 2,
+    sinks: 2 + Math.floor(m),
     wormPairs: 1,
     requireWorm: true,
-    decoyWorms: 0,
-    barriers: 2 + Math.floor(t * 2),
-    requireBarriers: 2,
-    filters: d >= 7 ? 1 : 0,
-    minMoves: 6 + Math.floor(((d - 1) / 9) * 8),
+    decoyWorms: 1,
+    barriers: 4,
+    requireBarriers: 3,
+    filters: 2,
+    minMoves: 13 + Math.floor(m * 3),
+    minCritical: 7,
+    gearPairs: 2,
+    maxOneMoveSolves: true,
   };
 }
 
@@ -1272,6 +1373,65 @@ function sharedHubIsCoupled(level: LevelData, sharedId: number): boolean {
   return criticalElbow;
 }
 
+/** How many free tables must sit at the solved rotation (any wrong quarter breaks the win). */
+function countCriticalTables(solved: LevelData): number {
+  let n = 0;
+  for (const t of solved.tables) {
+    if (t.locked) continue;
+    let critical = false;
+    for (let dq = 1; dq <= 3; dq++) {
+      const g = buildState(solved);
+      g.tables.find((x) => x.id === t.id)!.rotationQ = (t.rotationQ + dq) % 4;
+      if (!solve(g).won) {
+        critical = true;
+        break;
+      }
+    }
+    if (critical) n++;
+  }
+  return n;
+}
+
+/**
+ * From the scrambled start, no single player action (which also turns a geared
+ * partner) may win — forces multi-table planning instead of lucky one-twists.
+ */
+function rejectsOneMoveSolves(scrambled: LevelData): boolean {
+  if (solve(buildState(scrambled)).won) return false;
+  for (const t of scrambled.tables) {
+    if (t.locked) continue;
+    for (let q = 0; q < 4; q++) {
+      if (q === t.rotationQ) continue;
+      const g = buildState(scrambled);
+      applyPlayerRotation(g, t.id, q);
+      if (solve(g).won) return false;
+    }
+  }
+  return true;
+}
+
+/** Link pairs of free elbows into gears (each turns the other). Returns linked ids. */
+function assignGears(hubs: TableDef[], sharedId: number, pairs: number, rng: Rng): Set<number> {
+  const linked = new Set<number>();
+  if (pairs <= 0) return linked;
+  const eligible = shuffle(
+    rng,
+    hubs.filter((t) => !t.locked && t.module === M.ELBOW && t.id !== sharedId && !t.link),
+  );
+  let made = 0;
+  for (let i = 0; i + 1 < eligible.length && made < pairs; i += 2) {
+    const a = eligible[i];
+    const b = eligible[i + 1];
+    const sign: 1 | -1 = rng() < 0.5 ? 1 : -1;
+    a.link = { partner: b.id, sign };
+    b.link = { partner: a.id, sign };
+    linked.add(a.id);
+    linked.add(b.id);
+    made++;
+  }
+  return linked;
+}
+
 function scrambleAndVerify(
   bp: Blueprint,
   grid: CellData[],
@@ -1309,6 +1469,7 @@ function scrambleAndVerify(
   if (!hubs.some((t) => t.module === M.TEE)) return null;
   if (!hubs.some((t) => t.module === M.CROSS)) return null;
   if (!sharedHubIsCoupled(solved, bp.sharedHubIndex)) return null;
+  if (countCriticalTables(solved) < opts.minCritical) return null;
   if (opts.requireWorm) {
     const worms = solved.cells.filter((c) => c.kind === Kind.WORMHOLE).length;
     if (worms < 2) return null;
@@ -1322,10 +1483,31 @@ function scrambleAndVerify(
     if (ch.size < 3) return null;
   }
 
+  // Gears: link free elbow pairs so one action turns both. Assigned on the solved
+  // hubs so buildState carries the coupling into the scramble and final level.
+  assignGears(hubs, bp.sharedHubIndex, opts.gearPairs, rng);
+
   const g = buildState(solved);
   const solution: MoveStep[] = [];
+  const scrambled = new Set<number>();
+
+  // Geared pairs share one degree of freedom: one offset moves both, and the
+  // player solves the pair by turning the lead disc (partner follows via gears).
   for (const t of g.tables) {
-    if (t.locked) continue;
+    if (t.locked || !t.link || scrambled.has(t.id)) continue;
+    const partner = g.tables.find((x) => x.id === t.link!.partner);
+    if (!partner) continue;
+    scrambled.add(t.id);
+    scrambled.add(partner.id);
+    const o = 1 + Math.floor(rng() * 3); // 1..3
+    setTableRotation(g, t.id, t.rotationQ + o);
+    setTableRotation(g, partner.id, partner.rotationQ + o * t.link.sign);
+    const steps = o === 3 ? [1] : Array.from({ length: o }, () => -1);
+    for (const d of steps) solution.push(move(t.id, d as -1 | 1));
+  }
+
+  for (const t of g.tables) {
+    if (t.locked || scrambled.has(t.id)) continue;
     // Never scramble the shared CROSS into an accidental still-solved dual axis —
     // always move it, and prefer single steps so undoing stays tractable.
     const isShared = t.id === bp.sharedHubIndex;
@@ -1335,7 +1517,7 @@ function scrambleAndVerify(
     for (let k = 0; k < amount; k++) solution.push(move(t.id, (-sign) as -1 | 1));
   }
   for (const t of g.tables) {
-    if (t.locked) continue;
+    if (t.locked || scrambled.has(t.id)) continue;
     const sol = hubs.find((x) => x.id === t.id)!;
     if (((t.rotationQ % 4) + 4) % 4 === ((sol.rotationQ % 4) + 4) % 4) {
       setTableRotation(g, t.id, t.rotationQ + 1);
@@ -1347,6 +1529,21 @@ function scrambleAndVerify(
     [solution[i], solution[j]] = [solution[j], solution[i]];
   }
   if (solution.length < opts.minMoves) return null;
+  if (opts.maxOneMoveSolves) {
+    const probe: LevelData = {
+      id: `diff_${difficulty}`,
+      title: levelTitle(difficulty),
+      width: bp.size,
+      height: bp.size,
+      par: solution.length,
+      undoLimit: opts.undoLimit,
+      pulseLimit: opts.pulseLimit,
+      tables: g.tables.map((t) => ({ ...t, hub: { ...t.hub } })),
+      cells: g.cells.map((c) => ({ ...c })),
+      solution,
+    };
+    if (!rejectsOneMoveSolves(probe)) return null;
+  }
 
   const level: LevelData = {
     id: `diff_${difficulty}`,
@@ -1362,8 +1559,10 @@ function scrambleAndVerify(
     tutorial: false,
     hint:
       difficulty === 1
-        ? "Rings teleport. Shutter arrows pass one way. PULSE only when your route is ready."
-        : undefined,
+        ? "Learn the language. Rings teleport. Shutters pass one way. PULSE only when ready."
+        : difficulty === 7
+          ? "Cog-toothed discs are geared — turning one turns its partner. Align both at once."
+          : undefined,
   };
 
   if (!allReceiversGeometricallyReachable(level)) return null;
@@ -1393,95 +1592,148 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, difficulty));
   const rng = mulberry32((seed >>> 0) ^ Math.imul(d, 0x9e3779b9));
   const opts = profile(d);
+  const masterpiece = d >= 16;
   const genius = d >= 11;
 
-  // Prefer full depth; genius tiers may shed garnish but never drop to 2-channel soft puzzles.
-  const plans: ReturnType<typeof profile>[] = genius
+  // Soft fallbacks only early/mid. Genius+ may shed garnish but never pulses,
+  // channels, or the multi-table plan length that makes them hard.
+  const plans: ReturnType<typeof profile>[] = masterpiece
     ? [
         opts,
-        { ...opts, decoyWorms: 0, mirrors: Math.max(1, opts.mirrors) },
+        { ...opts, decoyWorms: 0, mirrors: 2, filters: 1 },
         {
           ...opts,
           decoyWorms: 0,
           falseCorridors: 1,
           filters: 1,
-          sinks: Math.max(1, opts.sinks - 1),
+          sinks: 2,
           mirrors: 1,
+          barriers: 3,
+          requireBarriers: 3,
+          minMoves: Math.max(12, opts.minMoves - 2),
+          minCritical: 6,
+          pulseLimit: 1,
+          doubleChance: 0.95,
         },
         {
           ...opts,
           decoyWorms: 0,
           falseCorridors: 1,
           filters: 1,
+          sinks: 1,
+          mirrors: 1,
           barriers: 3,
-          requireBarriers: 3,
+          requireBarriers: 2,
           solidBefore: 3,
           solidAfter: 2,
           keyBefore: 3,
-          minMoves: Math.max(11, opts.minMoves - 3),
-          pulseLimit: Math.max(1, opts.pulseLimit),
+          minMoves: 12,
+          minCritical: 5,
+          pulseLimit: 1,
+          doubleChance: 0.92,
         },
         {
+          // Last-resort masterpiece: still one pulse, 3-channel, long plan.
           ...opts,
           decoyWorms: 0,
           falseCorridors: 1,
-          filters: 1,
+          filters: 0,
+          sinks: 1,
+          mirrors: 1,
           barriers: 3,
           requireBarriers: 2,
           solidBefore: 2,
           solidAfter: 2,
           keyBefore: 3,
-          minMoves: 10,
-          pulseLimit: 2,
-          doubleChance: 0.88,
-        },
-        {
-          // Last-resort genius: still 3-channel + scarce pulses, slightly shorter solution.
-          ...opts,
-          decoyWorms: 0,
-          falseCorridors: 1,
-          filters: 1,
-          barriers: 2,
-          requireBarriers: 2,
-          solidBefore: 2,
-          solidAfter: 2,
-          keyBefore: 2,
-          minMoves: 9,
-          pulseLimit: Math.max(1, opts.pulseLimit),
-          mirrors: 1,
-          sinks: 1,
+          minMoves: 11,
+          minCritical: 5,
+          pulseLimit: 1,
+          doubleChance: 0.9,
         },
       ]
-    : [
-        opts,
-        { ...opts, decoyWorms: 0 },
-        { ...opts, decoyWorms: 0, filters: 0 },
-        {
-          ...opts,
-          decoyWorms: 0,
-          filters: 0,
-          solidBefore: 2,
-          solidAfter: 2,
-          keyBefore: 2,
-          structuralLocks: 1,
-          minMoves: Math.min(opts.minMoves, 8),
-          falseCorridors: 1,
-        },
-        {
-          ...opts,
-          decoyWorms: 0,
-          filters: 0,
-          solidBefore: 2,
-          solidAfter: 2,
-          keyBefore: 2,
-          structuralLocks: 1,
-          minMoves: Math.min(opts.minMoves, 8),
-          requireChannels: 2,
-          channels: 2,
-        },
-      ];
+    : genius
+      ? [
+          opts,
+          { ...opts, decoyWorms: 0, mirrors: Math.max(1, opts.mirrors - 1) },
+          {
+            ...opts,
+            decoyWorms: 0,
+            falseCorridors: 1,
+            filters: 1,
+            sinks: Math.max(1, opts.sinks - 1),
+            mirrors: 1,
+            minMoves: Math.max(10, opts.minMoves - 2),
+            minCritical: Math.max(5, opts.minCritical - 1),
+            pulseLimit: Math.max(1, opts.pulseLimit),
+          },
+          {
+            ...opts,
+            decoyWorms: 0,
+            falseCorridors: 1,
+            filters: 1,
+            barriers: 3,
+            requireBarriers: 2,
+            solidBefore: 3,
+            solidAfter: 2,
+            keyBefore: 3,
+            minMoves: 10,
+            minCritical: 5,
+            pulseLimit: Math.max(1, opts.pulseLimit),
+            mirrors: 1,
+            sinks: 1,
+          },
+          {
+            ...opts,
+            decoyWorms: 0,
+            falseCorridors: 1,
+            filters: 0,
+            barriers: 2,
+            requireBarriers: 2,
+            solidBefore: 2,
+            solidAfter: 2,
+            keyBefore: 2,
+            minMoves: 9,
+            minCritical: 4,
+            pulseLimit: Math.max(1, opts.pulseLimit),
+            mirrors: 1,
+            sinks: 1,
+            doubleChance: 0.88,
+          },
+        ]
+      : [
+          opts,
+          { ...opts, decoyWorms: 0, filters: Math.max(0, opts.filters - 1) },
+          {
+            ...opts,
+            decoyWorms: 0,
+            filters: 0,
+            falseCorridors: 0,
+            mirrors: 0,
+            sinks: Math.min(opts.sinks, 1),
+            minMoves: Math.max(4, opts.minMoves - 2),
+            minCritical: Math.max(3, opts.minCritical - 1),
+          },
+          {
+            ...opts,
+            decoyWorms: 0,
+            filters: 0,
+            falseCorridors: 0,
+            mirrors: 0,
+            sinks: 0,
+            solidBefore: 2,
+            solidAfter: 2,
+            keyBefore: 2,
+            structuralLocks: Math.max(opts.structuralLocks, 1),
+            minMoves: Math.max(4, Math.min(opts.minMoves, 6)),
+            minCritical: 3,
+            requireChannels: Math.min(opts.requireChannels, 2),
+            channels: Math.min(opts.channels, 2),
+            barriers: 2,
+            requireBarriers: 2,
+          },
+        ];
 
-  const attempts = genius ? 1200 : 500;
+  const attempts = masterpiece ? 2000 : genius ? 1400 : 600;
   for (const cfg of plans) {
     for (let attempt = 0; attempt < attempts; attempt++) {
       const bp = tryBlueprint(rng, cfg);

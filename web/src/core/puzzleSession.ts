@@ -158,6 +158,14 @@ export function commitRotationQ(session: PuzzleSession, tableId: number, rotatio
   const before = cloneGrid(session.state);
   const prevQ = table.rotationQ;
   setTableRotation(session.state, tableId, next);
+  // Geared partner follows the same delta as a single player action.
+  if (table.link) {
+    const partner = getTable(session.state, table.link.partner);
+    if (partner && !partner.locked) {
+      let d = ((next - prevQ) % 4 + 4) % 4;
+      setTableRotation(session.state, partner.id, partner.rotationQ + d * table.link.sign);
+    }
+  }
   session.history.push(before);
   session.moves += 1;
   session.selectedTable = tableId;

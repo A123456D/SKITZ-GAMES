@@ -41,7 +41,7 @@ function pushRing(x: number, y: number, now: number, color: string, maxR: number
   rings.push({ x, y, born: now, life, maxR, color, width });
 }
 
-/** Soft pulse on optics the latent route now uses — shown right after a turn. */
+/** Soft pulse on optics the *visible* route uses — call only after PULSE reveals beams. */
 export function triggerRouteAck(state: GridState, layout: Layout, latent: TurnResult, now: number): void {
   const seen = new Set<string>();
   const pulseKinds: ReadonlySet<number> = new Set([

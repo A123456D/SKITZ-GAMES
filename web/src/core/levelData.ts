@@ -31,6 +31,7 @@ export function buildState(level: LevelData): GridState {
     module: t.module,
     locked: t.locked,
     tint: t.tint,
+    link: t.link ? { ...t.link } : undefined,
   }));
   const expected = level.width * level.height;
   for (let i = 0; i < Math.min(level.cells.length, expected); i++) {

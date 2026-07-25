@@ -117,6 +117,7 @@ export function drawWheel(
   visualRot: number,
   time: number,
   settled = false,
+  showPreview = false,
 ): void {
   const hub = cellCenter(layout, table.hub);
   const r = Math.max(layout.cell * 0.52, step(layout) * 0.34);
@@ -195,9 +196,22 @@ export function drawWheel(
     ctx.fill();
   }
 
+  // Cog teeth mark a geared disc — turning it turns its partner too.
+  if (table.link) {
+    ctx.fillStyle = P.TABLE;
+    const teeth = 12;
+    for (let i = 0; i < teeth; i++) {
+      const a = (Math.PI * 2 * i) / teeth;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * r * 0.97, Math.sin(a) * r * 0.97, r * 0.055, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   // Route preview on the selected table: dashed stubs + arrowheads on connected
   // ports, drawn in the rotated frame so they turn live while dragging.
-  if (selected && !table.locked) {
+  // Tutorial-only — in real play this is a solution tell, so it's disabled.
+  if (showPreview && selected && !table.locked) {
     const connected = new Set<number>();
     for (const [a, b] of pairs) {
       connected.add(a);
@@ -524,6 +538,24 @@ function drawBarrier(ctx: CanvasRenderingContext2D, c: Vec2, size: number, passD
   ctx.beginPath();
   ctx.arc(d.x * r * 0.2, d.y * r * 0.2, Math.max(2, size * 0.032), 0, Math.PI * 2);
   ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+/** Faint tie-line between two geared discs so the coupling reads at a glance. */
+export function drawGearLink(ctx: CanvasRenderingContext2D, layout: Layout, a: Vec2, b: Vec2): void {
+  const pa = cellCenter(layout, a);
+  const pb = cellCenter(layout, b);
+  ctx.save();
+  ctx.strokeStyle = P.TABLE_OUTLINE;
+  ctx.globalAlpha = 0.3;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([3, 6]);
+  ctx.beginPath();
+  ctx.moveTo(pa.x, pa.y);
+  ctx.lineTo(pb.x, pb.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
   ctx.globalAlpha = 1;
   ctx.restore();
 }

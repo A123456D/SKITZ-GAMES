@@ -53,6 +53,7 @@ import {
   drawBeams,
   drawCoachHint,
   drawFingerPointer,
+  drawGearLink,
   drawGlassButton,
   drawHairlineGrid,
   drawHudStats,
@@ -225,6 +226,14 @@ const TUTORIAL_PAGES: { title: string; body: string[] }[] = [
       "Wormholes teleport beams to their twin.",
       "Barriers pass only one direction — follow the arrow.",
       "Walls, sinks, filters, and mirrors all rewrite the route.",
+    ],
+  },
+  {
+    title: "GEARS",
+    body: [
+      "Cog-toothed discs are geared to a partner.",
+      "Turning one turns the other — you cannot set them apart.",
+      "Find the single offset that lines up both lanes at once.",
     ],
   },
   {
@@ -581,9 +590,10 @@ function drawPointTourOverlay(): void {
   buttons.push(coach.skip);
 }
 
-function ackRoute(): void {
-  if (!session || !layout) return;
-  triggerRouteAck(session.state, layout, session.latent, time);
+/** Only ack optics when beams are actually visible (after PULSE) — never leak latent routes. */
+function ackVisibleRoute(): void {
+  if (!session || !layout || !session.beamsVisible) return;
+  triggerRouteAck(session.state, layout, session.result, time);
 }
 
 function fireVictoryFeel(): void {
@@ -603,15 +613,12 @@ function playEvents(before: TurnResult, after: TurnResult): void {
 function doRotate(dq: number): void {
   if (!session || victory || pendingWin) return;
   if (session.selectedTable < 0) return;
-  const before = session.result;
   const rotatedId = session.selectedTable;
   if (!tryRotate(session, session.selectedTable, dq)) return;
   settledTables.add(rotatedId);
   displayResult = session.result;
   beamProgress = 1;
   sfxSnap();
-  playEvents(before, session.result);
-  ackRoute();
   persistRun();
 }
 
@@ -623,6 +630,7 @@ function doPulse(): void {
   displayResult = session.result;
   beamProgress = 0;
   playEvents(before, session.result);
+  ackVisibleRoute();
   if (session.result.won) {
     pendingWin = true;
     winRevealAt = 0;
@@ -631,8 +639,14 @@ function doPulse(): void {
 }
 
 function visualRot(tableId: number): number {
-  if (drag && drag.tableId === tableId) return drag.liveAngle;
   const t = session!.state.tables.find((x) => x.id === tableId)!;
+  if (drag && drag.tableId === tableId) return drag.liveAngle;
+  // A geared partner spins live while the other disc is dragged.
+  if (drag && t.link && t.link.partner === drag.tableId) {
+    const dragged = session!.state.tables.find((x) => x.id === drag!.tableId)!;
+    const delta = drag.liveAngle - dragged.rotationQ * (Math.PI / 2);
+    return t.rotationQ * (Math.PI / 2) + delta * t.link.sign;
+  }
   return t.rotationQ * (Math.PI / 2);
 }
 
@@ -767,7 +781,6 @@ canvas.addEventListener("pointerup", () => {
   if (changed) {
     settledTables.add(tableId);
     sfxSnap();
-    ackRoute();
     persistRun();
   }
 });
@@ -1437,9 +1450,18 @@ function drawPlay(): void {
   }
   drawHairlineGrid(ctx, session.state, layout);
 
+  // Gear tie-lines sit under the discs.
+  for (const t of session.state.tables) {
+    if (t.link && t.id < t.link.partner) {
+      const p = session.state.tables.find((x) => x.id === t.link!.partner);
+      if (p) drawGearLink(ctx, layout, t.hub, p.hub);
+    }
+  }
+
   for (const t of session.state.tables) {
     const settled = settledTables.has(t.id) || t.locked || tutorialPhase === "point";
-    drawWheel(ctx, t, layout, t.id === session.selectedTable && tutorialPhase !== "point", visualRot(t.id), time, settled);
+    // Route-preview stubs are a solution tell — only show them while teaching.
+    drawWheel(ctx, t, layout, t.id === session.selectedTable && tutorialPhase !== "point", visualRot(t.id), time, settled, inTutorial);
   }
   if (session.beamsVisible) {
     drawBeams(ctx, layout, result, beamProgress);

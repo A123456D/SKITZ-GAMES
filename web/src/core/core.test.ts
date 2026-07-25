@@ -129,6 +129,24 @@ describe("rotateTable only spins", () => {
   });
 });
 
+describe("geared tables", () => {
+  it("turning one turns its partner by delta*sign", () => {
+    const g = createGrid(4, 4);
+    const a = makeTable(0, { x: 1, y: 1 }, M.ELBOW);
+    const b = makeTable(1, { x: 2, y: 2 }, M.ELBOW);
+    a.link = { partner: 1, sign: -1 };
+    b.link = { partner: 0, sign: -1 };
+    g.tables.push(a, b);
+    rotateTable(g, 0, 1);
+    expect(g.tables[0].rotationQ).toBe(1);
+    expect(g.tables[1].rotationQ).toBe(3); // -1 mod 4
+    // Turning the partner moves the first one too (symmetric gear).
+    rotateTable(g, 1, 1);
+    expect(g.tables[1].rotationQ).toBe(0);
+    expect(g.tables[0].rotationQ).toBe(0);
+  });
+});
+
 describe("optics hazards", () => {
   it("sink absorbs a beam", () => {
     const level = L({
@@ -274,15 +292,15 @@ describe("gate+channel procedural levels", () => {
     expect(DIFFICULTY_COUNT).toBe(20);
   });
 
-  it("level 1 has shared cross, wormholes, tight pulses, and coupling", () => {
+  it("level 1 teaches the kit with room to probe", () => {
     for (const seed of [1, 7, 42]) {
       const level = generateLevel(1, seed);
       expect(level.tables.some((t) => t.module === M.CROSS)).toBe(true);
       expect(level.tables.some((t) => t.module === M.GATE)).toBe(true);
       expect(level.cells.filter((c) => c.kind === Kind.WORMHOLE).length).toBeGreaterThanOrEqual(2);
       expect(level.cells.filter((c) => c.kind === Kind.BARRIER).length).toBeGreaterThanOrEqual(2);
-      expect(level.pulseLimit).toBeLessThanOrEqual(2);
-      expect(level.undoLimit).toBe(1);
+      expect(level.pulseLimit).toBeGreaterThanOrEqual(3);
+      expect(level.undoLimit).toBeGreaterThanOrEqual(2);
       const session = loadLevel(level);
       for (const step of level.solution) {
         expect(tryRotate(session, step.tableId, step.delta)).toBe(true);
@@ -319,13 +337,15 @@ describe("gate+channel procedural levels", () => {
     }
   });
 
-  it("late levels keep multi-channel and hazards", () => {
+  it("late levels keep multi-channel and scarce pulses", () => {
     for (const seed of [7, 99]) {
       const level = generateLevel(20, seed);
       const emits = level.cells.filter((c) => c.kind === Kind.EMITTER);
-      expect(new Set(emits.map((c) => c.channel ?? 0)).size).toBeGreaterThanOrEqual(2);
+      expect(new Set(emits.map((c) => c.channel ?? 0)).size).toBe(3);
       expect(level.tables.some((t) => t.module === M.CROSS)).toBe(true);
-      expect(level.pulseLimit).toBeLessThanOrEqual(5);
+      expect(level.pulseLimit).toBe(1);
+      expect(level.undoLimit).toBe(1);
+      expect(level.par).toBeGreaterThanOrEqual(13);
     }
   });
 
@@ -338,7 +358,8 @@ describe("gate+channel procedural levels", () => {
         expect(level.tables.some((t) => t.module === M.CROSS)).toBe(true);
         expect(level.cells.some((c) => c.kind === Kind.CRATE)).toBe(false);
         const emits = level.cells.filter((c) => c.kind === Kind.EMITTER);
-        expect(new Set(emits.map((c) => c.channel ?? 0)).size).toBeGreaterThanOrEqual(2);
+        const minCh = d <= 5 ? 2 : 3;
+        expect(new Set(emits.map((c) => c.channel ?? 0)).size).toBeGreaterThanOrEqual(minCh);
       }
     }
   });
@@ -419,12 +440,67 @@ describe("gate+channel procedural levels", () => {
       const level = generateLevel(15, seed);
       expect(level.pulseLimit).toBeLessThanOrEqual(2);
       expect(level.undoLimit).toBe(1);
-      expect(level.par).toBeGreaterThanOrEqual(10);
+      expect(level.par).toBeGreaterThanOrEqual(11);
       const emits = level.cells.filter((c) => c.kind === Kind.EMITTER);
       expect(new Set(emits.map((c) => c.channel ?? 0)).size).toBe(3);
-      expect(level.cells.filter((c) => c.kind === Kind.BARRIER).length).toBeGreaterThanOrEqual(2);
+      expect(level.cells.filter((c) => c.kind === Kind.BARRIER).length).toBeGreaterThanOrEqual(3);
     }
-  }, 90000);
+  }, 120000);
+
+  it("masterpiece levels are one-pulse multi-table cold solves", () => {
+    for (const seed of [5, 77]) {
+      const level = generateLevel(18, seed);
+      expect(level.pulseLimit).toBe(1);
+      expect(level.undoLimit).toBe(1);
+      expect(level.par).toBeGreaterThanOrEqual(13);
+      const free = level.tables.filter((t) => !t.locked).length;
+      expect(free).toBeGreaterThanOrEqual(8);
+      // No lucky single-twist win from the scramble.
+      for (const t of level.tables) {
+        if (t.locked) continue;
+        for (let q = 0; q < 4; q++) {
+          if (q === t.rotationQ) continue;
+          const g = buildState(level);
+          g.tables.find((x) => x.id === t.id)!.rotationQ = q;
+          expect(solve(g).won).toBe(false);
+        }
+      }
+    }
+  }, 180000);
+
+  it("mid+ levels ship geared discs that stay solvable", () => {
+    for (const d of [8, 12, 18]) {
+      for (const seed of [4, 88]) {
+        const level = generateLevel(d, seed);
+        const linked = level.tables.filter((t) => t.link);
+        expect(linked.length).toBeGreaterThanOrEqual(2); // ≥1 symmetric pair
+        // Links are symmetric and point at real partners.
+        for (const t of linked) {
+          const p = level.tables.find((x) => x.id === t.link!.partner);
+          expect(p).toBeTruthy();
+          expect(p!.link?.partner).toBe(t.id);
+        }
+        // Gear-aware solution still wins.
+        const session = loadLevel(level);
+        for (const step of level.solution) {
+          expect(tryRotate(session, step.tableId, step.delta)).toBe(true);
+        }
+        expect(pulse(session)).toBe(true);
+        expect(session.result.won).toBe(true);
+      }
+    }
+  }, 120000);
+
+  it("difficulty ramps: early generous, late brutal", () => {
+    const early = generateLevel(2, 11);
+    const mid = generateLevel(9, 11);
+    const late = generateLevel(17, 11);
+    expect(early.pulseLimit).toBeGreaterThan(mid.pulseLimit);
+    expect(mid.pulseLimit).toBeGreaterThanOrEqual(late.pulseLimit);
+    expect(late.pulseLimit).toBe(1);
+    expect(late.par).toBeGreaterThan(early.par);
+    expect(early.undoLimit).toBeGreaterThan(late.undoLimit);
+  }, 120000);
 
   for (const d of [1, 5, 10, 15, 20]) {
     it(`diff ${d} solvable via pulse and requires gate key`, () => {

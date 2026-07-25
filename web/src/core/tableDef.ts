@@ -9,6 +9,9 @@ export const Module = {
   GATE: 4, // N↔S only while a side port is energized
 } as const;
 
+/** Geared coupling: turning this table also turns `partner` by `delta * sign`. */
+export type TableLink = { partner: number; sign: 1 | -1 };
+
 export type TableDef = {
   id: number;
   hub: Vec2;
@@ -18,6 +21,8 @@ export type TableDef = {
   module: number;
   locked: boolean;
   tint: number;
+  /** Optional gear link to another table (symmetric partner turns too). */
+  link?: TableLink;
 };
 
 export function makeTable(
@@ -48,6 +53,7 @@ export function cloneTable(t: TableDef): TableDef {
     module: t.module,
     locked: t.locked,
     tint: t.tint,
+    link: t.link ? { ...t.link } : undefined,
   };
 }
 
