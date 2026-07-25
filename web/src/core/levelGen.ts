@@ -1,0 +1,1411 @@
+import { Dir, Kind, MirrorOri, dirDelta, type Vec2 } from "./cellKind";
+import { Channel } from "./cellData";
+import { Module as M, makeTable } from "./tableDef";
+import { cell, move, table, type LevelData, type MoveStep } from "./levelData";
+import { buildState } from "./levelData";
+import { setTableRotation } from "./rotateOps";
+import { loadLevel, pulse, tryRotate } from "./puzzleSession";
+import { entryPortFromIncoming, exitsFrom } from "./portWiring";
+import { solve } from "./beamSolver";
+import type { CellData } from "./cellData";
+
+const e = cell.empty;
+const emit = cell.emit;
+const recv = cell.recv;
+const wall = cell.wall;
+
+export const DIFFICULTY_COUNT = 20;
+
+type Rng = () => number;
+
+function mulberry32(seed: number): Rng {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function pick<T>(rng: Rng, arr: T[]): T {
+  return arr[Math.floor(rng() * arr.length) % arr.length];
+}
+
+function shuffle<T>(rng: Rng, arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function rotForLink(module: number, entry: number, exit: number): number | null {
+  for (let r = 0; r < 4; r++) {
+    const t = makeTable(0, { x: 0, y: 0 }, module, 0, r);
+    if (exitsFrom(t, entry).includes(exit)) return r;
+  }
+  return null;
+}
+
+function rotForTee(entry: number, exitA: number, exitB: number): number | null {
+  const want = new Set([exitA, exitB]);
+  for (let r = 0; r < 4; r++) {
+    const t = makeTable(0, { x: 0, y: 0 }, M.TEE, 0, r);
+    const outs = exitsFrom(t, entry);
+    if (outs.length === 2 && want.has(outs[0]) && want.has(outs[1])) return r;
+  }
+  return null;
+}
+
+function dirBetween(a: Vec2, b: Vec2): number {
+  if (b.x > a.x) return Dir.E;
+  if (b.x < a.x) return Dir.W;
+  if (b.y > a.y) return Dir.S;
+  return Dir.N;
+}
+
+function step2(dir: number): Vec2 {
+  const d = dirDelta(dir);
+  return { x: d.x * 2, y: d.y * 2 };
+}
+
+function cellsOnSegment(a: Vec2, b: Vec2): Vec2[] {
+  const out: Vec2[] = [];
+  const dx = Math.sign(b.x - a.x);
+  const dy = Math.sign(b.y - a.y);
+  let x = a.x;
+  let y = a.y;
+  while (x !== b.x || y !== b.y) {
+    x += dx;
+    y += dy;
+    if (x === b.x && y === b.y) break;
+    out.push({ x, y });
+  }
+  return out;
+}
+
+function key(p: Vec2): string {
+  return `${p.x},${p.y}`;
+}
+
+function inInterior(p: Vec2, w: number, h: number): boolean {
+  return p.x >= 1 && p.y >= 1 && p.x < w - 1 && p.y < h - 1;
+}
+
+export function levelTitle(diff: number): string {
+  return `No. ${String(diff).padStart(3, "0")}`;
+}
+
+function profile(diff: number) {
+  const d = Math.max(1, Math.min(DIFFICULTY_COUNT, diff));
+  const t = (d - 1) / (DIFFICULTY_COUNT - 1);
+  return {
+    diff: d,
+    size: 12,
+    solidBefore: 2 + Math.floor(t * 1.5),
+    solidAfter: 2 + Math.floor(t),
+    keyBefore: 2 + Math.floor(t * 1.5),
+    channels: d <= 5 ? 2 : 3,
+    requireChannels: d <= 5 ? 2 : 3,
+    structuralLocks: 1 + Math.min(2, Math.floor(t * 2)),
+    doubleChance: 0.85,
+    undoLimit: 1,
+    // Scarce pulses — planning over probing
+    pulseLimit: 2 + Math.floor(t * 2),
+    // Minimal side-paths — every empty lane should still feel purposeful
+    falseCorridors: t > 0.55 ? 1 : 0,
+    // Only solution-adjacent hazards, not garnish
+    mirrors: d >= 10 ? 1 : 0,
+    sinks: d >= 4 ? 1 : 0,
+    // Wormhole fold on the solution path from level 1
+    wormPairs: 1,
+    requireWorm: true,
+    // No decoy wormholes — every portal on the board is meaningful
+    decoyWorms: 0,
+    barriers: 2 + Math.floor(t * 2),
+    requireBarriers: 2,
+    filters: d >= 8 ? 1 : 0,
+    minMoves: 8 + Math.floor(t * 6),
+  };
+}
+
+type HubSpec = { pos: Vec2; module: number; rot: number; locked: boolean };
+
+type Blueprint = {
+  emitA: Vec2;
+  dirA: number;
+  emitB: Vec2;
+  dirB: number;
+  emitC?: Vec2;
+  dirC?: number;
+  hubs: HubSpec[];
+  recvA: Vec2;
+  recvB: Vec2;
+  recvC?: Vec2;
+  beamCells: Set<string>;
+  size: number;
+  /** Table index of the shared CROSS (set after hubs array built). */
+  sharedHubIndex: number;
+};
+
+function rotForCross(
+  entrySolid: number,
+  exitSolid: number,
+  entryDash: number,
+  exitDash: number,
+): number | null {
+  for (let r = 0; r < 4; r++) {
+    const t = makeTable(0, { x: 0, y: 0 }, M.CROSS, 0, r);
+    if (
+      exitsFrom(t, entrySolid).includes(exitSolid) &&
+      exitsFrom(t, entryDash).includes(exitDash)
+    )
+      return r;
+  }
+  return null;
+}
+
+function wirePipe(prev: Vec2, hub: Vec2, next: Vec2): { module: number; rot: number } | null {
+  const entry = entryPortFromIncoming(dirBetween(prev, hub));
+  const exit = dirBetween(hub, next);
+  const opposite = (entry + 2) % 4 === exit;
+  const module = opposite ? M.STRAIGHT : M.ELBOW;
+  const rot = rotForLink(module, entry, exit);
+  if (rot === null) return null;
+  return { module, rot };
+}
+
+function growStraight(
+  start: Vec2,
+  dir: number,
+  count: number,
+  w: number,
+  h: number,
+  occupied: Set<string>,
+): Vec2[] | null {
+  const hubs: Vec2[] = [{ ...start }];
+  occupied.add(key(start));
+  let cur = { ...start };
+  for (let i = 1; i < count; i++) {
+    const d = step2(dir);
+    const next = { x: cur.x + d.x, y: cur.y + d.y };
+    const mid = { x: cur.x + d.x / 2, y: cur.y + d.y / 2 };
+    if (!inInterior(next, w, h)) return null;
+    if (occupied.has(key(next)) || occupied.has(key(mid))) return null;
+    occupied.add(key(mid));
+    occupied.add(key(next));
+    hubs.push(next);
+    cur = next;
+  }
+  return hubs;
+}
+
+function growFrom(
+  rng: Rng,
+  start: Vec2,
+  startDir: number,
+  count: number,
+  w: number,
+  h: number,
+  occupied: Set<string>,
+): { hubs: Vec2[]; facing: number } | null {
+  const hubs: Vec2[] = [{ ...start }];
+  occupied.add(key(start));
+  let cur = { ...start };
+  let facing = startDir;
+  for (let i = 1; i < count; i++) {
+    let placed = false;
+    const ordered = shuffle(
+      rng,
+      [Dir.N, Dir.E, Dir.S, Dir.W].filter((d) => d !== (facing + 2) % 4),
+    );
+    for (const nd of ordered) {
+      const d = step2(nd);
+      const next = { x: cur.x + d.x, y: cur.y + d.y };
+      const mid = { x: cur.x + d.x / 2, y: cur.y + d.y / 2 };
+      if (!inInterior(next, w, h)) continue;
+      if (occupied.has(key(next)) || occupied.has(key(mid))) continue;
+      occupied.add(key(mid));
+      occupied.add(key(next));
+      hubs.push(next);
+      cur = next;
+      facing = nd;
+      placed = true;
+      break;
+    }
+    if (!placed) return null;
+  }
+  return { hubs, facing };
+}
+
+function placeEndpoint(
+  from: Vec2,
+  prefer: number,
+  w: number,
+  h: number,
+  occupied: Set<string>,
+  borderPreferred: boolean,
+): Vec2 | null {
+  const dirs = [prefer, Dir.E, Dir.S, Dir.N, Dir.W];
+  const dists = borderPreferred ? [2, 3, 1, 4] : [1, 2, 3];
+  for (const nd of dirs) {
+    for (const dist of dists) {
+      const d = dirDelta(nd);
+      const p = { x: from.x + d.x * dist, y: from.y + d.y * dist };
+      if (p.x < 0 || p.y < 0 || p.x >= w || p.y >= h) continue;
+      if (occupied.has(key(p))) continue;
+      if (cellsOnSegment(from, p).some((c) => occupied.has(key(c)))) continue;
+      if (borderPreferred && !(p.x === 0 || p.y === 0 || p.x === w - 1 || p.y === h - 1)) continue;
+      return p;
+    }
+  }
+  // Fall back: any free ray cell
+  for (const nd of dirs) {
+    for (const dist of [1, 2, 3]) {
+      const d = dirDelta(nd);
+      const p = { x: from.x + d.x * dist, y: from.y + d.y * dist };
+      if (p.x < 0 || p.y < 0 || p.x >= w || p.y >= h) continue;
+      if (occupied.has(key(p))) continue;
+      if (cellsOnSegment(from, p).some((c) => occupied.has(key(c)))) continue;
+      return p;
+    }
+  }
+  return null;
+}
+
+function markBeam(set: Set<string>, a: Vec2, b: Vec2): void {
+  set.add(key(a));
+  set.add(key(b));
+  for (const c of cellsOnSegment(a, b)) set.add(key(c));
+}
+
+/**
+ * Coupled topology: shared CROSS sits on both solid and dashed paths.
+ * Solid travels through CROSS → GATE; dashed crosses the CROSS then opens GATE
+ * from the side via a TEE that also feeds recvB.
+ */
+function tryBlueprint(rng: Rng, opts: ReturnType<typeof profile>): Blueprint | null {
+  const w = opts.size;
+  const h = opts.size;
+  const occupied = new Set<string>();
+  const beam = new Set<string>();
+
+  const thru = pick(rng, [Dir.S, Dir.E, Dir.N, Dir.W]);
+  const back = (thru + 2) % 4;
+  const left = (thru + 3) % 4;
+  const right = (thru + 1) % 4;
+
+  const margin = Math.min(
+    Math.floor(w / 2) - 1,
+    Math.max(5, (Math.max(opts.solidBefore, opts.keyBefore, opts.solidAfter) + 2) * 2),
+  );
+  const candidates: Vec2[] = [];
+  for (let y = margin; y < h - margin; y++) {
+    for (let x = margin; x < w - margin; x++) candidates.push({ x, y });
+  }
+  if (!candidates.length) return null;
+  const gate = pick(rng, candidates);
+
+  const dThru = dirDelta(thru);
+  const dBack = dirDelta(back);
+  const dLeft = dirDelta(left);
+  const dRight = dirDelta(right);
+
+  // Shared CROSS immediately before the gate on the solid axis
+  const cross = { x: gate.x + dBack.x * 2, y: gate.y + dBack.y * 2 };
+  if (!inInterior(cross, w, h)) return null;
+  const midCG = { x: gate.x + dBack.x, y: gate.y + dBack.y };
+
+  // TEE on the right side of the gate (dash approaches gate from right)
+  const tee = { x: gate.x + dRight.x * 2, y: gate.y + dRight.y * 2 };
+  if (!inInterior(tee, w, h)) return null;
+  const midTG = { x: gate.x + dRight.x, y: gate.y + dRight.y };
+
+  // Elbow/hub linking CROSS's right exit down to TEE (toward gate side)
+  const link = { x: cross.x + dRight.x * 2, y: cross.y + dRight.y * 2 };
+  if (!inInterior(link, w, h)) return null;
+  const midCL = { x: cross.x + dRight.x, y: cross.y + dRight.y };
+  const midLT = { x: tee.x + dBack.x, y: tee.y + dBack.y };
+  // link should sit at cross+right*2 and also tee+back*2
+  if (link.x !== tee.x + dBack.x * 2 || link.y !== tee.y + dBack.y * 2) return null;
+
+  const gateRot = rotForLink(M.GATE, back, thru);
+  if (gateRot === null) return null;
+  const crossRot = rotForCross(back, thru, left, right);
+  if (crossRot === null) return null;
+  // Dash into tee along thru (from link/back), exits left→gate and right→recvB branch
+  const teeRot = rotForTee(back, left, right);
+  if (teeRot === null) return null;
+
+  occupied.add(key(gate));
+  occupied.add(key(cross));
+  occupied.add(key(tee));
+  occupied.add(key(link));
+  occupied.add(key(midCG));
+  occupied.add(key(midTG));
+  occupied.add(key(midCL));
+  occupied.add(key(midLT));
+
+  // Solid BEFORE: optional hubs further back from CROSS (CROSS is the shared near-gate hub)
+  const beforeCount = Math.max(0, opts.solidBefore - 1);
+  let beforeOrdered: Vec2[] = [];
+  let emitA: Vec2;
+  let dirA: number;
+  if (beforeCount === 0) {
+    emitA = placeEndpoint(cross, back, w, h, occupied, false)!;
+    if (!emitA) return null;
+    occupied.add(key(emitA));
+    dirA = dirBetween(emitA, cross);
+  } else {
+    const beforeStart = { x: cross.x + dBack.x * 2, y: cross.y + dBack.y * 2 };
+    if (!inInterior(beforeStart, w, h)) return null;
+    occupied.add(key({ x: cross.x + dBack.x, y: cross.y + dBack.y }));
+    const beforeHubs = growStraight(beforeStart, back, beforeCount, w, h, occupied);
+    if (!beforeHubs) return null;
+    beforeOrdered = [...beforeHubs].reverse();
+    const ep = placeEndpoint(beforeOrdered[0], back, w, h, occupied, false);
+    if (!ep) return null;
+    emitA = ep;
+    occupied.add(key(emitA));
+    dirA = dirBetween(emitA, beforeOrdered[0]);
+  }
+
+  // Solid AFTER
+  const afterStart = { x: gate.x + dThru.x * 2, y: gate.y + dThru.y * 2 };
+  if (!inInterior(afterStart, w, h) || occupied.has(key(afterStart))) return null;
+  occupied.add(key({ x: gate.x + dThru.x, y: gate.y + dThru.y }));
+  const afterHubs = growStraight(afterStart, thru, opts.solidAfter, w, h, occupied);
+  if (!afterHubs) return null;
+  const recvA = placeEndpoint(afterHubs[afterHubs.length - 1], thru, w, h, occupied, false);
+  if (!recvA) return null;
+  if (thru === Dir.N || thru === Dir.S) {
+    if (recvA.x !== gate.x) return null;
+  } else if (recvA.y !== gate.y) return null;
+  occupied.add(key(recvA));
+
+  // Dash key chain approaches CROSS from the left
+  const keyStart = { x: cross.x + dLeft.x * 2, y: cross.y + dLeft.y * 2 };
+  if (!inInterior(keyStart, w, h) || occupied.has(key(keyStart))) return null;
+  occupied.add(key({ x: cross.x + dLeft.x, y: cross.y + dLeft.y }));
+  const keyChain = growFrom(rng, keyStart, left, opts.keyBefore, w, h, occupied);
+  if (!keyChain) return null;
+  const keyOrdered = [...keyChain.hubs].reverse();
+  const emitB = placeEndpoint(keyOrdered[0], left, w, h, occupied, false);
+  if (!emitB) return null;
+  occupied.add(key(emitB));
+  const dirB = dirBetween(emitB, keyOrdered[0]);
+
+  // RecvB further right from tee
+  const branchStart = { x: tee.x + dRight.x * 2, y: tee.y + dRight.y * 2 };
+  if (!inInterior(branchStart, w, h) || occupied.has(key(branchStart))) return null;
+  occupied.add(key({ x: tee.x + dRight.x, y: tee.y + dRight.y }));
+  const branch = growFrom(
+    rng,
+    branchStart,
+    right,
+    Math.max(1, Math.min(2, opts.keyBefore)),
+    w,
+    h,
+    occupied,
+  );
+  if (!branch) return null;
+  const recvB = placeEndpoint(branch.hubs[branch.hubs.length - 1], branch.facing, w, h, occupied, false);
+  if (!recvB) return null;
+  occupied.add(key(recvB));
+
+  const hubs: HubSpec[] = [];
+  const linkWired = wirePipe(cross, link, tee);
+  if (!linkWired) return null;
+
+  // Solid before → CROSS
+  const solidWay = [emitA, ...beforeOrdered, cross, gate, ...afterHubs, recvA];
+  for (let i = 0; i < beforeOrdered.length; i++) {
+    const wired = wirePipe(solidWay[i], beforeOrdered[i], solidWay[i + 2]);
+    if (!wired) return null;
+    hubs.push({ pos: beforeOrdered[i], ...wired, locked: false });
+  }
+  const sharedHubIndex = hubs.length;
+  hubs.push({ pos: cross, module: M.CROSS, rot: crossRot, locked: false });
+  hubs.push({ pos: gate, module: M.GATE, rot: gateRot, locked: false });
+  for (let i = 0; i < afterHubs.length; i++) {
+    const prev = i === 0 ? gate : afterHubs[i - 1];
+    const next = i === afterHubs.length - 1 ? recvA : afterHubs[i + 1];
+    const wired = wirePipe(prev, afterHubs[i], next);
+    if (!wired) return null;
+    hubs.push({ pos: afterHubs[i], ...wired, locked: false });
+  }
+
+  // Dash → CROSS → link → TEE → branch
+  const keyWay = [emitB, ...keyOrdered, cross];
+  for (let i = 0; i < keyOrdered.length; i++) {
+    const wired = wirePipe(keyWay[i], keyOrdered[i], keyWay[i + 2]);
+    if (!wired) return null;
+    hubs.push({ pos: keyOrdered[i], ...wired, locked: false });
+  }
+  hubs.push({ pos: link, ...linkWired, locked: false });
+  hubs.push({ pos: tee, module: M.TEE, rot: teeRot, locked: false });
+  const branchWay = [tee, ...branch.hubs, recvB];
+  for (let i = 0; i < branch.hubs.length; i++) {
+    const wired = wirePipe(branchWay[i], branch.hubs[i], branchWay[i + 2]);
+    if (!wired) return null;
+    hubs.push({ pos: branch.hubs[i], ...wired, locked: false });
+  }
+
+  const markChain = (pts: Vec2[]) => {
+    for (let i = 0; i < pts.length - 1; i++) markBeam(beam, pts[i], pts[i + 1]);
+  };
+  markChain([emitA, ...beforeOrdered, cross, gate, ...afterHubs, recvA]);
+  markChain([emitB, ...keyOrdered, cross, link, tee, gate]);
+  markChain([tee, ...branch.hubs, recvB]);
+
+  let emitC: Vec2 | undefined;
+  let dirC: number | undefined;
+  let recvC: Vec2 | undefined;
+  if (opts.channels >= 3 && afterHubs.length >= 1) {
+    // Third channel shares the first after-hub: approach from the left into that hub
+    const sharedAfter = afterHubs[0];
+    const sideStart = {
+      x: sharedAfter.x + dLeft.x * 2,
+      y: sharedAfter.y + dLeft.y * 2,
+    };
+    if (inInterior(sideStart, w, h) && !occupied.has(key(sideStart))) {
+      const local = new Set(occupied);
+      local.add(key({ x: sharedAfter.x + dLeft.x, y: sharedAfter.y + dLeft.y }));
+      const arm = growFrom(rng, sideStart, left, 2, w, h, local);
+      if (arm && arm.hubs.length >= 2) {
+        const ep = placeEndpoint(arm.hubs[0], left, w, h, local, false);
+        const rp = placeEndpoint(arm.hubs[arm.hubs.length - 1], arm.facing, w, h, local, false);
+        // Rewire sharedAfter as CROSS: solid back→thru, dotted left→right (or into recv)
+        // Simpler: keep dotted as its own 2-hub path that ends at a recv, but force it
+        // through sharedAfter by converting sharedAfter to CROSS.
+        if (ep && rp) {
+          const crossAfterRot = rotForCross(back, thru, left, right);
+          if (crossAfterRot !== null) {
+            const idx = hubs.findIndex((hh) => hh.pos.x === sharedAfter.x && hh.pos.y === sharedAfter.y);
+            if (idx >= 0) {
+              hubs[idx] = {
+                pos: sharedAfter,
+                module: M.CROSS,
+                rot: crossAfterRot,
+                locked: false,
+              };
+              const way = [ep, ...arm.hubs];
+              // last arm hub connects into sharedAfter
+              const lastArm = arm.hubs[arm.hubs.length - 1];
+              const toCross = wirePipe(
+                arm.hubs.length >= 2 ? arm.hubs[arm.hubs.length - 2] : ep,
+                lastArm,
+                sharedAfter,
+              );
+              let ok = true;
+              const specs: HubSpec[] = [];
+              for (let i = 0; i < arm.hubs.length - 1; i++) {
+                const wired = wirePipe(way[i], arm.hubs[i], way[i + 2] ?? sharedAfter);
+                if (!wired) {
+                  ok = false;
+                  break;
+                }
+                specs.push({ pos: arm.hubs[i], ...wired, locked: false });
+              }
+              if (ok && toCross) {
+                specs.push({ pos: lastArm, ...toCross, locked: false });
+                // Dotted receiver beyond sharedAfter to the right
+                const recvSide = {
+                  x: sharedAfter.x + dRight.x * 2,
+                  y: sharedAfter.y + dRight.y * 2,
+                };
+                if (
+                  inInterior(recvSide, w, h) &&
+                  !occupied.has(key(recvSide)) &&
+                  !local.has(key(recvSide))
+                ) {
+                  for (const hh of arm.hubs) occupied.add(key(hh));
+                  occupied.add(key(ep));
+                  occupied.add(key(recvSide));
+                  occupied.add(key({ x: sharedAfter.x + dRight.x, y: sharedAfter.y + dRight.y }));
+                  emitC = ep;
+                  dirC = dirBetween(ep, arm.hubs[0]);
+                  recvC = recvSide;
+                  hubs.push(...specs);
+                  markChain([ep, ...arm.hubs, sharedAfter, recvSide]);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    if (opts.requireChannels >= 3 && !emitC) {
+      // Fallback: independent third channel (still require 3 emitters)
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const free: Vec2[] = [];
+        for (let y = 2; y < h - 2; y++)
+          for (let x = 2; x < w - 2; x++) if (!occupied.has(`${x},${y}`)) free.push({ x, y });
+        if (!free.length) break;
+        const local = new Set(occupied);
+        const s = pick(rng, free);
+        const g3 = growFrom(rng, s, pick(rng, [Dir.N, Dir.E, Dir.S, Dir.W]), 2, w, h, local);
+        if (!g3 || g3.hubs.length < 2) continue;
+        const ep = placeEndpoint(g3.hubs[0], dirBetween(g3.hubs[1], g3.hubs[0]), w, h, local, false);
+        const rp = placeEndpoint(g3.hubs[1], g3.facing, w, h, local, false);
+        if (!ep || !rp) continue;
+        const way = [ep, ...g3.hubs, rp];
+        const specs: HubSpec[] = [];
+        let ok = true;
+        for (let i = 0; i < g3.hubs.length; i++) {
+          const wired = wirePipe(way[i], g3.hubs[i], way[i + 2]);
+          if (!wired) {
+            ok = false;
+            break;
+          }
+          specs.push({ pos: g3.hubs[i], ...wired, locked: false });
+        }
+        if (!ok) continue;
+        for (const hh of g3.hubs) occupied.add(key(hh));
+        occupied.add(key(ep));
+        occupied.add(key(rp));
+        emitC = ep;
+        dirC = dirBetween(ep, g3.hubs[0]);
+        recvC = rp;
+        hubs.push(...specs);
+        markChain([ep, ...g3.hubs, rp]);
+        break;
+      }
+      if (!emitC) return null;
+    }
+  }
+
+  return {
+    emitA,
+    dirA,
+    emitB,
+    dirB,
+    emitC,
+    dirC,
+    hubs,
+    recvA,
+    recvB,
+    recvC,
+    beamCells: beam,
+    size: w,
+    sharedHubIndex,
+  };
+}
+
+function paintGrid(bp: Blueprint, rng: Rng, falseCorridors: number): {
+  grid: CellData[];
+  trapEnds: Vec2[];
+  trapCells: Set<string>;
+} {
+  const w = bp.size;
+  const h = bp.size;
+  const open = new Set(bp.beamCells);
+  for (const p of [bp.emitA, bp.emitB, bp.recvA, bp.recvB]) open.add(key(p));
+  if (bp.emitC) open.add(key(bp.emitC));
+  if (bp.recvC) open.add(key(bp.recvC));
+  for (const hh of bp.hubs) open.add(key(hh.pos));
+
+  const trapEnds: Vec2[] = [];
+  const trapCells = new Set<string>();
+  let carved = 0;
+  for (const hh of shuffle(rng, bp.hubs)) {
+    if (carved >= falseCorridors) break;
+    if (hh.module === M.GATE || hh.module === M.TEE || hh.module === M.CROSS) continue;
+    const used = new Set<number>();
+    for (const dir of [Dir.N, Dir.E, Dir.S, Dir.W]) {
+      const d = dirDelta(dir);
+      if (open.has(`${hh.pos.x + d.x},${hh.pos.y + d.y}`)) used.add(dir);
+    }
+    for (const dir of shuffle(
+      rng,
+      [Dir.N, Dir.E, Dir.S, Dir.W].filter((d) => !used.has(d)),
+    )) {
+      const d = dirDelta(dir);
+      const cells: Vec2[] = [];
+      let x = hh.pos.x;
+      let y = hh.pos.y;
+      let ok = true;
+      for (let s = 0; s < 2 + Math.floor(rng() * 2); s++) {
+        x += d.x;
+        y += d.y;
+        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) {
+          ok = false;
+          break;
+        }
+        if (open.has(`${x},${y}`)) {
+          ok = false;
+          break;
+        }
+        cells.push({ x, y });
+      }
+      if (!ok || cells.length < 2) continue;
+      for (const c of cells) {
+        open.add(key(c));
+        trapCells.add(key(c));
+      }
+      trapEnds.push(cells[cells.length - 1]);
+      carved++;
+      break;
+    }
+  }
+
+  const grid: CellData[] = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (x === bp.emitA.x && y === bp.emitA.y) grid.push(emit(bp.dirA, Channel.SOLID));
+      else if (x === bp.emitB.x && y === bp.emitB.y) grid.push(emit(bp.dirB, Channel.DASH));
+      else if (bp.emitC && x === bp.emitC.x && y === bp.emitC.y)
+        grid.push(emit(bp.dirC!, Channel.DOT));
+      else if (x === bp.recvA.x && y === bp.recvA.y) grid.push(recv(Channel.SOLID));
+      else if (x === bp.recvB.x && y === bp.recvB.y) grid.push(recv(Channel.DASH));
+      else if (bp.recvC && x === bp.recvC.x && y === bp.recvC.y) grid.push(recv(Channel.DOT));
+      else if (open.has(`${x},${y}`)) grid.push(e());
+      else grid.push(wall());
+    }
+  }
+
+  for (const k of open) {
+    const [x, y] = k.split(",").map(Number);
+    const i = y * w + x;
+    if (grid[i].kind === Kind.WALL) grid[i] = e();
+  }
+  return { grid, trapEnds, trapCells };
+}
+
+function reservedCells(bp: Blueprint): Set<string> {
+  const s = new Set<string>();
+  for (const p of [bp.emitA, bp.emitB, bp.recvA, bp.recvB]) s.add(key(p));
+  if (bp.emitC) s.add(key(bp.emitC));
+  if (bp.recvC) s.add(key(bp.recvC));
+  for (const hh of bp.hubs) s.add(key(hh.pos));
+  return s;
+}
+
+function emptyOnBeam(grid: CellData[], w: number, bp: Blueprint): Vec2[] {
+  const reserved = reservedCells(bp);
+  const out: Vec2[] = [];
+  for (const k of bp.beamCells) {
+    if (reserved.has(k)) continue;
+    const [x, y] = k.split(",").map(Number);
+    if (grid[y * w + x].kind === Kind.EMPTY) out.push({ x, y });
+  }
+  return out;
+}
+
+/**
+ * Carve a guaranteed isolated bypass:
+ * emitter → one-way shutter → worm A → walls → worm B → receiver.
+ * The wall block makes pair 0 mechanically mandatory.
+ */
+function placeMandatoryWormChamber(
+  grid: CellData[],
+  bp: Blueprint,
+  rng: Rng,
+): boolean {
+  const w = bp.size;
+  const h = bp.size;
+  const idx = (p: Vec2) => p.y * w + p.x;
+  const candidates: { cells: Vec2[]; dir: number }[] = [];
+
+  for (const dir of [Dir.E, Dir.S, Dir.W, Dir.N]) {
+    const d = dirDelta(dir);
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const cells: Vec2[] = [];
+        let valid = true;
+        for (let n = 0; n < 7; n++) {
+          const p = { x: x + d.x * n, y: y + d.y * n };
+          if (
+            p.x < 1 ||
+            p.y < 1 ||
+            p.x >= w - 1 ||
+            p.y >= h - 1 ||
+            grid[idx(p)].kind !== Kind.WALL
+          ) {
+            valid = false;
+            break;
+          }
+          cells.push(p);
+        }
+        if (valid) candidates.push({ cells, dir });
+      }
+    }
+  }
+  if (!candidates.length) return false;
+
+  const { cells, dir } = pick(rng, candidates);
+  grid[idx(cells[0])] = emit(dir, Channel.DOT);
+  grid[idx(cells[1])] = cell.barrier(dir);
+  grid[idx(cells[2])] = cell.worm(0);
+  // cells 3 and 4 intentionally remain solid walls.
+  grid[idx(cells[5])] = cell.worm(0);
+  grid[idx(cells[6])] = recv(Channel.DOT);
+  return true;
+}
+
+/** Returns true if a solution-path wormhole pair was placed. */
+function placeSolutionWormhole(
+  grid: CellData[],
+  bp: Blueprint,
+  rng: Rng,
+): boolean {
+  const w = bp.size;
+  const reserved = reservedCells(bp);
+  const idx = (p: Vec2) => p.y * w + p.x;
+  const canPlace = (p: Vec2) =>
+    p.x >= 0 &&
+    p.y >= 0 &&
+    p.x < w &&
+    p.y < bp.size &&
+    !reserved.has(key(p)) &&
+    grid[idx(p)].kind === Kind.EMPTY;
+
+  // Prefer solid corridor empties; fall back to any beam empty
+  const solidAxis =
+    bp.emitA.x === bp.recvA.x
+      ? emptyOnBeam(grid, w, bp).filter((p) => p.x === bp.emitA.x && canPlace(p))
+      : bp.emitA.y === bp.recvA.y
+        ? emptyOnBeam(grid, w, bp).filter((p) => p.y === bp.emitA.y && canPlace(p))
+        : [];
+  const candidates = solidAxis.length >= 2 ? solidAxis : emptyOnBeam(grid, w, bp).filter(canPlace);
+  candidates.sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+
+  const tryPairs: [Vec2, Vec2][] = [];
+  for (let i = 0; i < candidates.length; i++) {
+    for (let j = i + 1; j < candidates.length; j++) {
+      tryPairs.push([candidates[i], candidates[j]]);
+    }
+  }
+  shuffle(rng, tryPairs);
+
+  for (const [a, b] of tryPairs) {
+    if (a.x !== b.x && a.y !== b.y) continue;
+    const between = cellsOnSegment(a, b);
+    if (between.length < 1) continue;
+    if (between.some((p) => reserved.has(key(p)))) continue;
+    if (between.some((p) => grid[idx(p)].kind !== Kind.EMPTY)) continue;
+
+    const snapshot: { i: number; c: CellData }[] = [];
+    const stamp = (p: Vec2, c: CellData) => {
+      const i = idx(p);
+      snapshot.push({ i, c: { ...grid[i] } });
+      grid[i] = c;
+    };
+    stamp(a, cell.worm(0));
+    stamp(b, cell.worm(0));
+    for (const mid of between) stamp(mid, wall());
+
+    const hubs = bp.hubs.map((hh, id) =>
+      table(id, hh.pos.x, hh.pos.y, hh.module, hh.rot, 0, hh.locked),
+    );
+    const trial: LevelData = {
+      id: "worm_trial",
+      title: "",
+      width: bp.size,
+      height: bp.size,
+      par: 0,
+      undoLimit: 1,
+      pulseLimit: 3,
+      tables: hubs,
+      cells: grid,
+      solution: [],
+    };
+    const result = solve(buildState(trial));
+    const withoutWorms = {
+      ...trial,
+      cells: grid.map((c) =>
+        c.kind === Kind.WORMHOLE && (c.channel ?? 0) === 0 ? cell.empty() : c,
+      ),
+    };
+    const wormRequired = !solve(buildState(withoutWorms)).won;
+    const ok =
+      allReceiversGeometricallyReachable(trial) &&
+      result.won &&
+      allHubsOnBeams(trial, result) &&
+      wormRequired;
+    if (ok) return true;
+    for (const s of snapshot) grid[s.i] = s.c;
+  }
+  return false;
+}
+
+/** Decoy wormhole: trap mouth teleports into a sink — looks useful, eats the beam. */
+function placeDecoyWormholes(
+  grid: CellData[],
+  bp: Blueprint,
+  trapEnds: Vec2[],
+  rng: Rng,
+  count: number,
+): void {
+  if (count <= 0) return;
+  const w = bp.size;
+  const h = bp.size;
+  const reserved = reservedCells(bp);
+  const idx = (p: Vec2) => p.y * w + p.x;
+  const used = new Set<string>();
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (grid[idx({ x, y })].kind === Kind.WORMHOLE) used.add(`${x},${y}`);
+    }
+  }
+
+  let pairId = 1;
+  let placed = 0;
+  for (const mouth of shuffle(rng, trapEnds)) {
+    if (placed >= count) break;
+    if (reserved.has(key(mouth)) || used.has(key(mouth))) continue;
+    if (grid[idx(mouth)].kind !== Kind.EMPTY && grid[idx(mouth)].kind !== Kind.SINK) continue;
+
+    // Twin in a dead pocket: adjacent wall-surrounded empty, then sink beyond twin exit
+    const free: Vec2[] = [];
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const p = { x, y };
+        if (reserved.has(key(p)) || used.has(key(p))) continue;
+        if (grid[idx(p)].kind !== Kind.EMPTY) continue;
+        if (bp.beamCells.has(key(p))) continue;
+        free.push(p);
+      }
+    }
+    if (!free.length) break;
+    const twin = pick(rng, free);
+
+    // Ensure twin has a neighboring cell we can turn into a sink (exit dump)
+    const dumpDirs = shuffle(rng, [Dir.N, Dir.E, Dir.S, Dir.W]);
+    let dump: Vec2 | null = null;
+    for (const d of dumpDirs) {
+      const dd = dirDelta(d);
+      const n = { x: twin.x + dd.x, y: twin.y + dd.y };
+      if (n.x < 0 || n.y < 0 || n.x >= w || n.y >= h) continue;
+      if (reserved.has(key(n)) || used.has(key(n))) continue;
+      if (grid[idx(n)].kind === Kind.EMPTY || grid[idx(n)].kind === Kind.WALL) {
+        dump = n;
+        break;
+      }
+    }
+    if (!dump) continue;
+
+    grid[idx(mouth)] = cell.worm(pairId);
+    grid[idx(twin)] = cell.worm(pairId);
+    grid[idx(dump)] = cell.sink();
+    // Wall off other exits from twin so the only continuation is the sink
+    for (const d of [Dir.N, Dir.E, Dir.S, Dir.W]) {
+      const dd = dirDelta(d);
+      const n = { x: twin.x + dd.x, y: twin.y + dd.y };
+      if (n.x === dump.x && n.y === dump.y) continue;
+      if (n.x < 0 || n.y < 0 || n.x >= w || n.y >= h) continue;
+      if (reserved.has(key(n)) || used.has(key(n))) continue;
+      if (grid[idx(n)].kind === Kind.EMPTY) grid[idx(n)] = wall();
+    }
+    used.add(key(mouth));
+    used.add(key(twin));
+    used.add(key(dump));
+    pairId++;
+    placed++;
+  }
+}
+
+/** Place one-way shutters on solved beam segments, retaining only placements that preserve the win. */
+function placeSolutionBarriers(
+  grid: CellData[],
+  bp: Blueprint,
+  rng: Rng,
+  count: number,
+): number {
+  if (count <= 0) return 0;
+  const w = bp.size;
+  const idx = (p: Vec2) => p.y * w + p.x;
+  const reserved = reservedCells(bp);
+  const hubs = bp.hubs.map((hh, id) =>
+    table(id, hh.pos.x, hh.pos.y, hh.module, hh.rot, 0, hh.locked),
+  );
+  const trial = (): LevelData => ({
+    id: "barrier_trial",
+    title: "",
+    width: bp.size,
+    height: bp.size,
+    par: 0,
+    undoLimit: 1,
+    pulseLimit: 3,
+    tables: hubs,
+    cells: grid,
+    solution: [],
+  });
+
+  let placed = 0;
+  while (placed < count) {
+    const result = solve(buildState(trial()));
+    if (!result.won) break;
+    const candidates: { pos: Vec2; dir: number }[] = [];
+    for (const beam of result.beams) {
+      for (const seg of beam.segments) {
+        const dist = Math.abs(seg.from.x - seg.to.x) + Math.abs(seg.from.y - seg.to.y);
+        if (dist !== 1) continue; // Ignore wormhole jump segments.
+        const p = seg.to;
+        if (reserved.has(key(p)) || grid[idx(p)].kind !== Kind.EMPTY) continue;
+        candidates.push({ pos: p, dir: dirBetween(seg.from, seg.to) });
+      }
+    }
+    if (!candidates.length) break;
+
+    let accepted = false;
+    for (const candidate of shuffle(rng, candidates)) {
+      const i = idx(candidate.pos);
+      const before = grid[i];
+      grid[i] = cell.barrier(candidate.dir);
+      const next = solve(buildState(trial()));
+      if (next.won && allHubsOnBeams(trial(), next)) {
+        placed++;
+        accepted = true;
+        break;
+      }
+      grid[i] = before;
+    }
+    if (!accepted) break;
+  }
+  return placed;
+}
+
+/** Seal side-leaks next to solution corridors (never seal intentional trap alleys). */
+function sealCorridorLeaks(
+  grid: CellData[],
+  bp: Blueprint,
+  trapCells: Set<string>,
+  rng: Rng,
+): void {
+  const w = bp.size;
+  const h = bp.size;
+  const reserved = reservedCells(bp);
+  const idx = (p: Vec2) => p.y * w + p.x;
+  const open = new Set(bp.beamCells);
+  for (const p of [bp.emitA, bp.emitB, bp.recvA, bp.recvB]) open.add(key(p));
+  if (bp.emitC) open.add(key(bp.emitC));
+  if (bp.recvC) open.add(key(bp.recvC));
+
+  for (const k of [...open]) {
+    const [x, y] = k.split(",").map(Number);
+    for (const d of [Dir.N, Dir.E, Dir.S, Dir.W]) {
+      const dd = dirDelta(d);
+      const n = { x: x + dd.x, y: y + dd.y };
+      if (n.x < 0 || n.y < 0 || n.x >= w || n.y >= h) continue;
+      const nk = key(n);
+      if (reserved.has(nk) || open.has(nk) || trapCells.has(nk)) continue;
+      if (grid[idx(n)].kind === Kind.EMPTY && rng() < 0.9) grid[idx(n)] = wall();
+    }
+  }
+}
+
+/** Place mirrors, sinks, wormholes, filters — structural depth, not garnish. */
+function placeHazards(
+  grid: CellData[],
+  bp: Blueprint,
+  trapEnds: Vec2[],
+  trapCells: Set<string>,
+  rng: Rng,
+  opts: ReturnType<typeof profile>,
+): boolean {
+  const w = bp.size;
+  const h = bp.size;
+  const reserved = reservedCells(bp);
+  const idx = (p: Vec2) => p.y * w + p.x;
+  const canPlace = (p: Vec2) => {
+    if (p.x < 0 || p.y < 0 || p.x >= w || p.y >= h) return false;
+    if (reserved.has(key(p))) return false;
+    return grid[idx(p)].kind === Kind.EMPTY;
+  };
+
+  let sinksLeft = opts.sinks;
+  for (const end of shuffle(rng, trapEnds)) {
+    if (sinksLeft <= 0) break;
+    if (!canPlace(end)) continue;
+    grid[idx(end)] = cell.sink();
+    sinksLeft--;
+  }
+
+  let mirrorsLeft = opts.mirrors;
+  for (const end of shuffle(rng, trapEnds)) {
+    if (mirrorsLeft <= 0) break;
+    if (!canPlace(end)) continue;
+    grid[idx(end)] = cell.mir(rng() < 0.5 ? MirrorOri.SLASH : MirrorOri.BACKSLASH);
+    mirrorsLeft--;
+  }
+
+  if (opts.filters > 0) {
+    const solidMids = emptyOnBeam(grid, w, bp).filter((p) => {
+      if (bp.emitA.x === bp.recvA.x) return p.x === bp.emitA.x;
+      if (bp.emitA.y === bp.recvA.y) return p.y === bp.emitA.y;
+      return false;
+    });
+    for (const p of shuffle(rng, solidMids)) {
+      if (!canPlace(p)) continue;
+      grid[idx(p)] = cell.filter(Channel.SOLID);
+      break;
+    }
+  }
+
+  let wormOk = opts.wormPairs <= 0;
+  if (opts.wormPairs > 0) {
+    wormOk = placeMandatoryWormChamber(grid, bp, rng);
+    if (!wormOk) wormOk = placeSolutionWormhole(grid, bp, rng);
+  }
+
+  const barriersPlaced = placeSolutionBarriers(grid, bp, rng, opts.barriers);
+  placeDecoyWormholes(grid, bp, trapEnds, rng, opts.decoyWorms);
+  sealCorridorLeaks(grid, bp, trapCells, rng);
+
+  return (!opts.requireWorm || wormOk) && barriersPlaced >= opts.requireBarriers;
+}
+
+/** Flood through non-wall cells; wormholes link their twin. Every receiver must be reachable. */
+function allReceiversGeometricallyReachable(level: LevelData): boolean {
+  const w = level.width;
+  const h = level.height;
+  const passable = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return false;
+    return level.cells[y * w + x].kind !== Kind.WALL;
+  };
+  const twinOf = (x: number, y: number): Vec2 | null => {
+    const c = level.cells[y * w + x];
+    if (c.kind !== Kind.WORMHOLE) return null;
+    const pairId = c.channel ?? 0;
+    for (let yy = 0; yy < h; yy++) {
+      for (let xx = 0; xx < w; xx++) {
+        if (xx === x && yy === y) continue;
+        const o = level.cells[yy * w + xx];
+        if (o.kind === Kind.WORMHOLE && (o.channel ?? 0) === pairId) return { x: xx, y: yy };
+      }
+    }
+    return null;
+  };
+  const starts: Vec2[] = [];
+  const recvs: Vec2[] = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const c = level.cells[y * w + x];
+      if (c.kind === Kind.EMITTER) starts.push({ x, y });
+      if (c.kind === Kind.RECEIVER) recvs.push({ x, y });
+    }
+  }
+  if (!starts.length || !recvs.length) return false;
+  const seen = new Set<string>();
+  const q = [...starts];
+  for (const s of starts) seen.add(key(s));
+  while (q.length) {
+    const p = q.pop()!;
+    const twin = twinOf(p.x, p.y);
+    if (twin && !seen.has(key(twin))) {
+      seen.add(key(twin));
+      q.push(twin);
+    }
+    for (const d of [Dir.N, Dir.E, Dir.S, Dir.W]) {
+      const dd = dirDelta(d);
+      const n = { x: p.x + dd.x, y: p.y + dd.y };
+      const k = key(n);
+      if (seen.has(k) || !passable(n.x, n.y)) continue;
+      seen.add(k);
+      q.push(n);
+    }
+  }
+  return recvs.every((r) => seen.has(key(r)));
+}
+
+function allHubsOnBeams(level: LevelData, result: ReturnType<typeof solve>): boolean {
+  const visited = new Set<string>();
+  for (const beam of result.beams) {
+    for (const seg of beam.segments) {
+      visited.add(key(seg.from));
+      visited.add(key(seg.to));
+    }
+  }
+  return level.tables.every((t) => visited.has(key(t.hub)));
+}
+
+function applyLocks(hubs: HubSpec[], count: number, rng: Rng): void {
+  if (count <= 0) return;
+  for (const h of shuffle(
+    rng,
+    hubs.filter((x) => x.module === M.ELBOW),
+  ).slice(0, count))
+    h.locked = true;
+}
+
+function gateIsRequired(level: LevelData): boolean {
+  const g = buildState(level);
+  for (let i = 0; i < g.cells.length; i++) {
+    if (g.cells[i].kind === Kind.EMITTER && (g.cells[i].channel ?? 0) !== Channel.SOLID) {
+      g.cells[i] = e();
+    }
+  }
+  return !solve(g).won;
+}
+
+function cropLevel(level: LevelData): LevelData {
+  const w = level.width;
+  const h = level.height;
+  let minX = w;
+  let minY = h;
+  let maxX = 0;
+  let maxY = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const c = level.cells[y * w + x];
+      if (c.kind === Kind.WALL) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  for (const t of level.tables) {
+    minX = Math.min(minX, t.hub.x);
+    minY = Math.min(minY, t.hub.y);
+    maxX = Math.max(maxX, t.hub.x);
+    maxY = Math.max(maxY, t.hub.y);
+  }
+  // One-cell frame so the puzzle doesn't touch the canvas edge
+  minX = Math.max(0, minX - 1);
+  minY = Math.max(0, minY - 1);
+  maxX = Math.min(w - 1, maxX + 1);
+  maxY = Math.min(h - 1, maxY + 1);
+
+  const nw = maxX - minX + 1;
+  const nh = maxY - minY + 1;
+  if (nw >= w && nh >= h) return level;
+
+  const cells = [];
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      cells.push({ ...level.cells[y * w + x] });
+    }
+  }
+  return {
+    ...level,
+    width: nw,
+    height: nh,
+    cells,
+    tables: level.tables.map((t) => ({
+      ...t,
+      hub: { x: t.hub.x - minX, y: t.hub.y - minY },
+    })),
+  };
+}
+
+/** Shared CROSS carries ≥2 channels; at least one free elbow is critical to the win. */
+function sharedHubIsCoupled(level: LevelData, sharedId: number): boolean {
+  const baseState = buildState(level);
+  const shared = baseState.tables.find((t) => t.id === sharedId);
+  if (!shared || shared.module !== M.CROSS) return false;
+  const base = solve(baseState);
+  if (!base.won) return false;
+
+  const channels = new Set<number>();
+  for (const beam of base.beams) {
+    for (const seg of beam.segments) {
+      if (
+        (seg.from.x === shared.hub.x && seg.from.y === shared.hub.y) ||
+        (seg.to.x === shared.hub.x && seg.to.y === shared.hub.y)
+      ) {
+        channels.add(beam.channel);
+      }
+    }
+  }
+  if (channels.size < 2) return false;
+
+  let criticalElbow = false;
+  for (const t of level.tables) {
+    if (t.module !== M.ELBOW || t.locked) continue;
+    for (let dq = 1; dq <= 3; dq++) {
+      const g = buildState(level);
+      g.tables.find((x) => x.id === t.id)!.rotationQ = (t.rotationQ + dq) % 4;
+      if (!solve(g).won) {
+        criticalElbow = true;
+        break;
+      }
+    }
+    if (criticalElbow) break;
+  }
+  return criticalElbow;
+}
+
+function scrambleAndVerify(
+  bp: Blueprint,
+  grid: CellData[],
+  rng: Rng,
+  opts: ReturnType<typeof profile>,
+  difficulty: number,
+): LevelData | null {
+  applyLocks(bp.hubs, opts.structuralLocks, rng);
+  for (const h of bp.hubs) {
+    if (h.module === M.GATE || h.module === M.TEE || h.module === M.CROSS) h.locked = false;
+  }
+
+  const hubs = bp.hubs.map((h, i) => table(i, h.pos.x, h.pos.y, h.module, h.rot, 0, h.locked));
+  const solved: LevelData = {
+    id: `diff_${difficulty}`,
+    title: levelTitle(difficulty),
+    width: bp.size,
+    height: bp.size,
+    par: 1,
+    undoLimit: opts.undoLimit,
+    pulseLimit: opts.pulseLimit,
+    tables: hubs,
+    cells: grid,
+    solution: [],
+  };
+
+  if (!allReceiversGeometricallyReachable(solved)) return null;
+
+  const solvedResult = solve(buildState(solved));
+  if (!solvedResult.won) return null;
+  if (solvedResult.spillReceivers.length > 0) return null;
+  if (!allHubsOnBeams(solved, solvedResult)) return null;
+  if (!gateIsRequired(solved)) return null;
+  if (!hubs.some((t) => t.module === M.GATE)) return null;
+  if (!hubs.some((t) => t.module === M.TEE)) return null;
+  if (!hubs.some((t) => t.module === M.CROSS)) return null;
+  if (!sharedHubIsCoupled(solved, bp.sharedHubIndex)) return null;
+  if (opts.requireWorm) {
+    const worms = solved.cells.filter((c) => c.kind === Kind.WORMHOLE).length;
+    if (worms < 2) return null;
+  }
+  const barriers = solved.cells.filter((c) => c.kind === Kind.BARRIER).length;
+  if (barriers < opts.requireBarriers) return null;
+  if (opts.requireChannels >= 3) {
+    const ch = new Set(
+      solved.cells.filter((c) => c.kind === Kind.EMITTER).map((c) => c.channel ?? 0),
+    );
+    if (ch.size < 3) return null;
+  }
+
+  const g = buildState(solved);
+  const solution: MoveStep[] = [];
+  for (const t of g.tables) {
+    if (t.locked) continue;
+    // Never scramble the shared CROSS into an accidental still-solved dual axis —
+    // always move it, and prefer single steps so undoing stays tractable.
+    const isShared = t.id === bp.sharedHubIndex;
+    const amount = isShared ? 1 : rng() < opts.doubleChance ? 2 : 1;
+    const sign = rng() < 0.5 ? 1 : -1;
+    setTableRotation(g, t.id, t.rotationQ + sign * amount);
+    for (let k = 0; k < amount; k++) solution.push(move(t.id, (-sign) as -1 | 1));
+  }
+  for (const t of g.tables) {
+    if (t.locked) continue;
+    const sol = hubs.find((x) => x.id === t.id)!;
+    if (((t.rotationQ % 4) + 4) % 4 === ((sol.rotationQ % 4) + 4) % 4) {
+      setTableRotation(g, t.id, t.rotationQ + 1);
+      solution.push(move(t.id, -1));
+    }
+  }
+  for (let i = solution.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [solution[i], solution[j]] = [solution[j], solution[i]];
+  }
+  if (solution.length < Math.min(opts.minMoves, 8)) return null;
+
+  const level: LevelData = {
+    id: `diff_${difficulty}`,
+    title: levelTitle(difficulty),
+    width: bp.size,
+    height: bp.size,
+    par: solution.length,
+    undoLimit: opts.undoLimit,
+    pulseLimit: opts.pulseLimit,
+    tables: g.tables.map((t) => ({ ...t, hub: { ...t.hub } })),
+    cells: g.cells.map((c) => ({ ...c })),
+    solution,
+    tutorial: false,
+    hint:
+      difficulty === 1
+        ? "Rings teleport. Shutter arrows pass one way. PULSE only when your route is ready."
+        : undefined,
+  };
+
+  if (!allReceiversGeometricallyReachable(level)) return null;
+  if (solve(buildState(level)).won) return null;
+  const session = loadLevel(level);
+  for (const step of solution) {
+    if (!tryRotate(session, step.tableId, step.delta)) return null;
+  }
+  if (!pulse(session)) return null;
+  if (!session.result.won || session.moves !== level.par) return null;
+  if (session.result.spillReceivers.length > 0) return null;
+  if (!allHubsOnBeams(level, session.result)) return null;
+  if (!gateIsRequired({ ...level, tables: hubs })) return null;
+  if (!sharedHubIsCoupled({ ...level, tables: hubs }, bp.sharedHubIndex)) return null;
+
+  const cropped = cropLevel(level);
+  const check = loadLevel(cropped);
+  for (const step of cropped.solution) {
+    if (!tryRotate(check, step.tableId, step.delta)) return null;
+  }
+  if (!pulse(check) || !check.result.won) return null;
+  if (!allReceiversGeometricallyReachable(cropped)) return null;
+  return cropped;
+}
+
+export function generateLevel(difficulty: number, seed: number): LevelData {
+  const d = Math.max(1, Math.min(DIFFICULTY_COUNT, difficulty));
+  const rng = mulberry32((seed >>> 0) ^ Math.imul(d, 0x9e3779b9));
+  const opts = profile(d);
+
+  // Prefer full depth (worms + decoys); only shed layers if generation stalls
+  const plans: ReturnType<typeof profile>[] = [
+    opts,
+    { ...opts, decoyWorms: 0 },
+    { ...opts, decoyWorms: 0, filters: 0 },
+    {
+      ...opts,
+      decoyWorms: 0,
+      filters: 0,
+      solidBefore: 2,
+      solidAfter: 2,
+      keyBefore: 2,
+      structuralLocks: 1,
+      minMoves: 8,
+      falseCorridors: 1,
+    },
+    {
+      ...opts,
+      decoyWorms: 0,
+      filters: 0,
+      solidBefore: 2,
+      solidAfter: 2,
+      keyBefore: 2,
+      structuralLocks: 1,
+      minMoves: 8,
+      requireChannels: 2,
+      channels: 2,
+    },
+  ];
+
+  for (const cfg of plans) {
+    for (let attempt = 0; attempt < 500; attempt++) {
+      const bp = tryBlueprint(rng, cfg);
+      if (!bp) continue;
+      const painted = paintGrid(bp, rng, cfg.falseCorridors);
+      const hazardsOk = placeHazards(
+        painted.grid,
+        bp,
+        painted.trapEnds,
+        painted.trapCells,
+        rng,
+        cfg,
+      );
+      if (!hazardsOk) continue;
+      const level = scrambleAndVerify(bp, painted.grid, rng, cfg, d);
+      if (level) return level;
+    }
+  }
+
+  throw new Error(`levelGen failed for difficulty ${d} seed ${seed}`);
+}
+
+export function allLevels(): LevelData[] {
+  return Array.from({ length: Math.min(8, DIFFICULTY_COUNT) }, (_, i) =>
+    generateLevel(i + 1, 1000 + i * 97),
+  );
+}
