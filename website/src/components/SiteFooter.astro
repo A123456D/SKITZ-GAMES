@@ -4,7 +4,9 @@ const year = new Date().getFullYear();
 
 <footer class="site-footer">
 	<div class="wrap site-footer__inner">
-		<img class="brand" src="/images/skitz-logo-v2.png" alt="SKITZ games & apps" width="200" height="110" />
+		<div class="brand-plate">
+			<img class="brand" src="/images/skitz-logo-v2.png" alt="SKITZ games & apps" width="200" height="110" />
+		</div>
 		<p class="note">Play free online. Download free. No accounts. No paywalls.</p>
 		<nav class="footer-nav" aria-label="Footer">
 			<a href="/games/">Games</a>
@@ -28,11 +30,19 @@ const year = new Date().getFullYear();
 		justify-items: start;
 	}
 
-	.brand {
-		height: 4.25rem;
-		width: auto;
+	.brand-plate {
+		background: #fff;
+		padding: 0.3rem 0.45rem;
+		clip-path: polygon(2% 6%, 96% 0%, 100% 92%, 4% 100%);
+		box-shadow: 3px 3px 0 var(--skitz-yellow);
 		transform: rotate(-1deg);
-		filter: drop-shadow(3px 3px 0 var(--skitz-yellow));
+	}
+
+	.brand {
+		height: 3.9rem;
+		width: auto;
+		transform: none;
+		filter: none;
 	}
 
 	.note {

@@ -9,7 +9,9 @@ const links = [
 <header class="site-header">
 	<div class="wrap site-header__inner">
 		<a class="logo" href="/" aria-label="SKITZ home">
-			<img src="/images/skitz-logo-v2.png" alt="SKITZ games & apps" width="220" height="120" />
+			<span class="logo-plate">
+				<img src="/images/skitz-logo-v2.png" alt="SKITZ games & apps" width="220" height="120" />
+			</span>
 		</a>
 		<nav class="nav" aria-label="Primary">
 			{
@@ -57,9 +59,19 @@ const links = [
 	}
 
 	.logo img {
-		height: 3.35rem;
+		height: 3.1rem;
 		width: auto;
-		filter: drop-shadow(3px 3px 0 var(--skitz-purple));
+		filter: none;
+	}
+
+	.logo-plate {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		background: #fff;
+		padding: 0.2rem 0.35rem;
+		clip-path: polygon(2% 6%, 96% 0%, 100% 92%, 4% 100%);
+		box-shadow: 3px 3px 0 var(--skitz-purple);
 	}
 
 	.nav {

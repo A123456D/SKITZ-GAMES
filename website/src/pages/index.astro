@@ -14,13 +14,15 @@ const games = (await getCollection('games'))
 	<main class="site-main">
 		<section class="hero">
 			<div class="wrap hero__inner">
-				<img
-					class="hero__logo"
-					src="/images/skitz-logo-v2.png"
-					alt="SKITZ games & apps"
-					width="1024"
-					height="1024"
-				/>
+				<div class="hero__logo-plate">
+					<img
+						class="hero__logo"
+						src="/images/skitz-logo-v2.png"
+						alt="SKITZ games & apps"
+						width="1024"
+						height="1024"
+					/>
+				</div>
 				<h1 class="sr-only">SKITZ games & apps</h1>
 				<p class="hero__line">slapped on the web — free to play, free to download.</p>
 				<div class="btn-row hero__cta">
@@ -56,12 +58,48 @@ const games = (await getCollection('games'))
 		padding: 2.5rem 0 3.5rem;
 	}
 
-	.hero__logo {
-		width: min(520px, 86vw);
-		height: auto;
+	.hero__logo-plate {
+		background: #fff;
+		padding: 0.85rem 1rem 1rem;
 		transform: rotate(-1.6deg);
-		filter: drop-shadow(10px 12px 0 rgba(0, 0, 0, 0.95));
+		box-shadow: 10px 12px 0 #000;
+		clip-path: polygon(
+			1.5% 2%,
+			8% 0%,
+			18% 2.5%,
+			32% 0.5%,
+			48% 2%,
+			62% 0%,
+			78% 2.2%,
+			92% 0.8%,
+			100% 3%,
+			98.5% 18%,
+			100% 34%,
+			98% 52%,
+			100% 68%,
+			98.5% 84%,
+			100% 97%,
+			86% 100%,
+			70% 98%,
+			52% 100%,
+			34% 98.5%,
+			18% 100%,
+			4% 97.5%,
+			0% 84%,
+			1.5% 68%,
+			0% 50%,
+			2% 32%,
+			0% 14%
+		);
 		animation: slap-in 700ms var(--ease) both;
+	}
+
+	.hero__logo {
+		width: min(480px, 82vw);
+		height: auto;
+		transform: none;
+		filter: none;
+		animation: none;
 	}
 
 	.hero__line {
