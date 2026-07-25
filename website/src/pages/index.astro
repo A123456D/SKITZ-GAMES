@@ -18,11 +18,11 @@ const games = (await getCollection('games'))
 					class="hero__logo"
 					src="/images/skitz-logo.png"
 					alt="SKITZ games & apps"
-					width="720"
-					height="400"
+					width="1024"
+					height="1024"
 				/>
 				<h1 class="sr-only">SKITZ games & apps</h1>
-				<p class="hero__line">games &amp; apps — slapped on the web, free to play and download.</p>
+				<p class="hero__line">slapped on the web — free to play, free to download.</p>
 				<div class="btn-row hero__cta">
 					<a class="btn" href="/games/">Browse games</a>
 					{
@@ -52,24 +52,24 @@ const games = (await getCollection('games'))
 	.hero__inner {
 		display: grid;
 		justify-items: center;
-		gap: 1.35rem;
-		padding: 3rem 0 4rem;
+		gap: 1.2rem;
+		padding: 2.5rem 0 3.5rem;
 	}
 
 	.hero__logo {
-		width: min(640px, 88vw);
+		width: min(520px, 86vw);
 		height: auto;
-		transform: rotate(-1.8deg);
-		filter: drop-shadow(8px 10px 0 #000);
+		transform: rotate(-1.6deg);
+		filter: drop-shadow(10px 12px 0 rgba(0, 0, 0, 0.95));
 		animation: slap-in 700ms var(--ease) both;
 	}
 
 	.hero__line {
-		max-width: 28rem;
+		max-width: 26rem;
 		margin: 0;
 		font-family: var(--font-type);
-		font-size: clamp(1.05rem, 2.4vw, 1.25rem);
-		color: var(--muted);
+		font-size: clamp(1.05rem, 2.4vw, 1.28rem);
+		color: var(--paper);
 		animation: rise 700ms var(--ease) 80ms both;
 	}
 

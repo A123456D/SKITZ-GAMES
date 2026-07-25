@@ -59,7 +59,7 @@ const links = [
 	.logo img {
 		height: 3.35rem;
 		width: auto;
-		filter: drop-shadow(3px 3px 0 rgba(0, 0, 0, 0.85));
+		filter: drop-shadow(3px 3px 0 var(--skitz-purple));
 	}
 
 	.nav {
@@ -81,6 +81,11 @@ const links = [
 		border-color: var(--paper);
 		background: var(--paper);
 		color: var(--mark);
-		box-shadow: 3px 3px 0 #000;
+		box-shadow: 3px 3px 0 var(--skitz-red);
+	}
+
+	.nav__link:nth-child(2):hover,
+	.nav__link:nth-child(2).is-active {
+		box-shadow: 3px 3px 0 var(--skitz-blue);
 	}
 </style>
