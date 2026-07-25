@@ -4,6 +4,7 @@ import { Module as M, makeTable, type TableDef } from "./tableDef";
 import { cell, move, table, type LevelData, type MoveStep } from "./levelData";
 import { buildState } from "./levelData";
 import { applyPlayerRotation, setTableRotation } from "./rotateOps";
+import { cloneGrid } from "./gridState";
 import { loadLevel, pulse, tryRotate } from "./puzzleSession";
 import { entryPortFromIncoming, exitsFrom } from "./portWiring";
 import { solve } from "./beamSolver";
@@ -102,12 +103,14 @@ export function levelTitle(diff: number): string {
 function profile(diff: number) {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, diff));
 
-  // Progressive climb → brutal cliff. Early teaches the language; late is cold,
-  // scarce-pulse, heavily trapped, and rejects soft fallbacks.
-  // Pipe lengths stay ≤3/3/3 so a third channel still fits on 12×12.
+  // minMoves = proven shortest win in player actions (any quarter set on an
+  // independent disc = 1 move; gears follow). Drag makes shortest ≤ DoF, so we
+  // never ask for more than ~11 — hardness is the 4^DoF search with scarce pulses,
+  // not a padded par number. Generation REJECTS any shorter win.
+  //
+  // Target: L1 teach, L2+ struggle, L10 ~hour (1 pulse), L20 multi-day cold solve.
 
-  if (d <= 3) {
-    // Apprentice: learn gate/cross/worm with room to probe.
+  if (d === 1) {
     return {
       diff: d,
       size: 12,
@@ -117,29 +120,65 @@ function profile(diff: number) {
       channels: 2,
       requireChannels: 2,
       structuralLocks: 2,
-      doubleChance: 0.55,
+      doubleChance: 0.75,
       undoLimit: 3,
-      pulseLimit: 4,
-      falseCorridors: 0,
+      pulseLimit: 3,
+      falseCorridors: 1,
       mirrors: 0,
-      sinks: 0,
+      sinks: 1,
       wormPairs: 1,
       requireWorm: true,
       decoyWorms: 0,
       barriers: 2,
       requireBarriers: 2,
       filters: 0,
-      minMoves: 5 + d,
+      minMoves: 6,
       minCritical: 4,
+      minMultiChannel: 1,
+      minHighInterference: 3,
+      maxLocalFree: 3,
+      requireSharedThird: false,
+      gearPairs: 0,
+      openField: true,
+      wallClumps: 8,
+    };
+  }
+
+  if (d <= 3) {
+    return {
+      diff: d,
+      size: 12,
+      solidBefore: 2,
+      solidAfter: 2,
+      keyBefore: 2,
+      channels: 2,
+      requireChannels: 2,
+      structuralLocks: 1,
+      doubleChance: 0.85,
+      undoLimit: 2,
+      pulseLimit: 3,
+      falseCorridors: 1,
+      mirrors: 0,
+      sinks: 1,
+      wormPairs: 1,
+      requireWorm: true,
+      decoyWorms: 0,
+      barriers: 2,
+      requireBarriers: 2,
+      filters: 0,
+      minMoves: 7 + (d - 2), // 7..8
+      minCritical: 5,
+      minMultiChannel: 1,
+      minHighInterference: 4,
+      maxLocalFree: 2,
+      requireSharedThird: false,
       gearPairs: 0,
       openField: true,
       wallClumps: 9,
-      maxOneMoveSolves: true,
     };
   }
 
   if (d <= 7) {
-    // Journeyman: third channel arrives, hazards open, pulses tighten.
     const j = (d - 4) / 3;
     return {
       diff: d,
@@ -150,29 +189,31 @@ function profile(diff: number) {
       channels: d <= 5 ? 2 : 3,
       requireChannels: d <= 5 ? 2 : 3,
       structuralLocks: 1,
-      doubleChance: 0.7 + j * 0.15,
+      doubleChance: 0.9,
       undoLimit: 2,
-      pulseLimit: 3,
-      falseCorridors: j > 0.5 ? 1 : 0,
-      mirrors: d >= 7 ? 1 : 0,
+      pulseLimit: 2,
+      falseCorridors: 1,
+      mirrors: d >= 6 ? 1 : 0,
       sinks: 1,
       wormPairs: 1,
       requireWorm: true,
       decoyWorms: 0,
       barriers: 2 + Math.floor(j),
       requireBarriers: 2,
-      filters: d >= 6 ? 1 : 0,
-      minMoves: 8 + Math.floor(j * 3),
+      filters: d >= 5 ? 1 : 0,
+      minMoves: 8 + Math.floor(j * 2), // 8..10
       minCritical: 5,
-      gearPairs: d >= 7 ? 1 : 0,
+      minMultiChannel: d <= 5 ? 1 : 2,
+      minHighInterference: 4,
+      maxLocalFree: 2,
+      requireSharedThird: d >= 6,
+      gearPairs: d >= 6 ? 1 : 0,
       openField: true,
-      wallClumps: 8,
-      maxOneMoveSolves: true,
+      wallClumps: 9,
     };
   }
 
   if (d <= 10) {
-    // Adept: full kit, scarce probes, longer plans.
     const a = (d - 8) / 2;
     return {
       diff: d,
@@ -183,9 +224,9 @@ function profile(diff: number) {
       channels: 3,
       requireChannels: 3,
       structuralLocks: 0,
-      doubleChance: 0.88,
+      doubleChance: 0.95,
       undoLimit: 1,
-      pulseLimit: 2,
+      pulseLimit: d >= 10 ? 1 : 2,
       falseCorridors: 1,
       mirrors: 1,
       sinks: 1 + Math.floor(a),
@@ -195,17 +236,19 @@ function profile(diff: number) {
       barriers: 3,
       requireBarriers: 3,
       filters: 1,
-      minMoves: 11 + Math.floor(a * 2),
+      minMoves: 9 + Math.floor(a * 2), // 9..11
       minCritical: 6,
+      minMultiChannel: 2,
+      minHighInterference: 5,
+      maxLocalFree: 1,
+      requireSharedThird: true,
       gearPairs: 1,
       openField: true,
-      wallClumps: 6,
-      maxOneMoveSolves: true,
+      wallClumps: 10,
     };
   }
 
   if (d <= 15) {
-    // Genius: one or two pulses, decoys, deep traps — no hand-holding.
     const g = (d - 11) / 4;
     return {
       diff: d,
@@ -216,9 +259,9 @@ function profile(diff: number) {
       channels: 3,
       requireChannels: 3,
       structuralLocks: 0,
-      doubleChance: 0.95,
+      doubleChance: 0.97,
       undoLimit: 1,
-      pulseLimit: g < 0.6 ? 2 : 1,
+      pulseLimit: 1,
       falseCorridors: 2,
       mirrors: 2,
       sinks: 2,
@@ -228,16 +271,18 @@ function profile(diff: number) {
       barriers: 3,
       requireBarriers: 3,
       filters: 2,
-      minMoves: 12 + Math.floor(g * 3),
+      minMoves: 10 + Math.floor(g * 2), // 10..12
       minCritical: 6,
+      minMultiChannel: 2,
+      minHighInterference: 5,
+      maxLocalFree: 1,
+      requireSharedThird: true,
       gearPairs: 2,
       openField: true,
-      wallClumps: 5,
-      maxOneMoveSolves: true,
+      wallClumps: 10,
     };
   }
 
-  // Masterpiece (16–20): one pulse. Wrong once = restart. Extreme coupling.
   const m = (d - 16) / Math.max(1, DIFFICULTY_COUNT - 16);
   return {
     diff: d,
@@ -260,12 +305,15 @@ function profile(diff: number) {
     barriers: 4,
     requireBarriers: 3,
     filters: 2,
-    minMoves: 13 + Math.floor(m * 3),
+    minMoves: 11 + Math.floor(m), // 11..12 — near full DoF, one pulse
     minCritical: 7,
+    minMultiChannel: 2,
+    minHighInterference: 5,
+    maxLocalFree: 1,
+    requireSharedThird: true,
     gearPairs: 2,
     openField: true,
-    wallClumps: 4,
-    maxOneMoveSolves: true,
+    wallClumps: 11,
   };
 }
 
@@ -286,6 +334,8 @@ type Blueprint = {
   size: number;
   /** Table index of the shared CROSS (set after hubs array built). */
   sharedHubIndex: number;
+  /** Hub positions that must stay player-controlled (e.g. worm chamber disc). */
+  forceFree: Set<string>;
 };
 
 function rotForCross(
@@ -676,7 +726,9 @@ function tryBlueprint(rng: Rng, opts: ReturnType<typeof profile>): Blueprint | n
       }
     }
     if (opts.requireChannels >= 3 && !emitC) {
-      // Fallback: independent third channel (still require 3 emitters)
+      // Independent third channel is a local-greedy gift (own corridor, own discs).
+      // Mid+ tiers require a shared after-hub CROSS; reject rather than decouple.
+      if (opts.requireSharedThird) return null;
       for (let attempt = 0; attempt < 40; attempt++) {
         const free: Vec2[] = [];
         for (let y = 2; y < h - 2; y++)
@@ -729,6 +781,7 @@ function tryBlueprint(rng: Rng, opts: ReturnType<typeof profile>): Blueprint | n
     beamCells: beam,
     size: w,
     sharedHubIndex,
+    forceFree: new Set(),
   };
 }
 
@@ -876,16 +929,17 @@ function emptyOnBeam(grid: CellData[], w: number, bp: Blueprint): Vec2[] {
 }
 
 /**
- * Carve a guaranteed isolated bypass:
- * emitter → one-way shutter → worm A → walls → worm B → receiver.
- * The wall block makes pair 0 mechanically mandatory.
+ * Carve an isolated wormhole bypass that still needs a player disc:
+ * emitter → shutter → elbow → worm A → walls → worm B → receiver.
+ * Without the elbow the chamber would auto-solve on PULSE (free LINKED).
+ * Returns the hub so scrambleAndVerify can twist it.
  */
 function placeMandatoryWormChamber(
   grid: CellData[],
   bp: Blueprint,
   rng: Rng,
   openField: boolean,
-): boolean {
+): HubSpec | null {
   const w = bp.size;
   const h = bp.size;
   const idx = (p: Vec2) => p.y * w + p.x;
@@ -899,13 +953,14 @@ function placeMandatoryWormChamber(
       ? grid[idx(p)].kind === Kind.EMPTY && !blocked.has(key(p))
       : grid[idx(p)].kind === Kind.WALL;
 
+  // 8 cells: emit, barrier, disc, wormA, wall, wall, wormB, recv
   for (const dir of [Dir.E, Dir.S, Dir.W, Dir.N]) {
     const d = dirDelta(dir);
     for (let y = 1; y < h - 1; y++) {
       for (let x = 1; x < w - 1; x++) {
         const cells: Vec2[] = [];
         let valid = true;
-        for (let n = 0; n < 7; n++) {
+        for (let n = 0; n < 8; n++) {
           const p = { x: x + d.x * n, y: y + d.y * n };
           if (p.x < 1 || p.y < 1 || p.x >= w - 1 || p.y >= h - 1 || !usable(p)) {
             valid = false;
@@ -917,7 +972,7 @@ function placeMandatoryWormChamber(
       }
     }
   }
-  if (!candidates.length) return false;
+  if (!candidates.length) return null;
 
   const { cells, dir } = pick(rng, candidates);
   if (openField) {
@@ -935,15 +990,33 @@ function placeMandatoryWormChamber(
       }
     }
   }
+
+  const entry = entryPortFromIncoming(dir);
+  const exit = dir;
+  // Straight corridor through the chamber — still scrambled so PULSE alone
+  // cannot free-light the chamber receiver.
+  const module = (entry + 2) % 4 === exit ? M.STRAIGHT : M.ELBOW;
+  const rot = rotForLink(module, entry, exit);
+  if (rot === null) return null;
+
   grid[idx(cells[0])] = emit(dir, Channel.DOT);
   grid[idx(cells[1])] = cell.barrier(dir);
-  grid[idx(cells[2])] = cell.worm(0);
-  // cells 3 and 4 are the solid plug the wormhole must bypass.
-  grid[idx(cells[3])] = wall();
+  // cells[2] is the disc hub (empty cell under the table)
+  grid[idx(cells[2])] = e();
+  grid[idx(cells[3])] = cell.worm(0);
+  // cells 4 and 5 are the solid plug the wormhole must bypass.
   grid[idx(cells[4])] = wall();
-  grid[idx(cells[5])] = cell.worm(0);
-  grid[idx(cells[6])] = recv(Channel.DOT);
-  return true;
+  grid[idx(cells[5])] = wall();
+  grid[idx(cells[6])] = cell.worm(0);
+  grid[idx(cells[7])] = recv(Channel.DOT);
+
+  // Mark chamber beam so later hazard passes don't overwrite it.
+  for (const c of cells) {
+    if (grid[idx(c)].kind !== Kind.WALL) bp.beamCells.add(key(c));
+  }
+  bp.forceFree.add(key(cells[2]));
+
+  return { pos: cells[2], module, rot, locked: false };
 }
 
 /** Returns true if a solution-path wormhole pair was placed. */
@@ -1264,8 +1337,16 @@ function placeHazards(
 
   let wormOk = opts.wormPairs <= 0;
   if (opts.wormPairs > 0) {
-    wormOk = placeMandatoryWormChamber(grid, bp, rng, opts.openField);
-    if (!wormOk) wormOk = placeSolutionWormhole(grid, bp, rng);
+    // Prefer a main-path wormhole (forces reasoning about a real channel) over a
+    // private chamber. Chamber is the fallback and always includes a free disc.
+    wormOk = placeSolutionWormhole(grid, bp, rng);
+    if (!wormOk) {
+      const chamberDisc = placeMandatoryWormChamber(grid, bp, rng, opts.openField);
+      if (chamberDisc) {
+        bp.hubs.push(chamberDisc);
+        wormOk = true;
+      }
+    }
   }
 
   const barriersPlaced = placeSolutionBarriers(grid, bp, rng, opts.barriers);
@@ -1466,52 +1547,240 @@ function countCriticalTables(solved: LevelData): number {
   return n;
 }
 
-/**
- * From the scrambled start, no single player action (which also turns a geared
- * partner) may win — forces multi-table planning instead of lucky one-twists.
- */
-/**
- * Reject cheap solves. An open board admits more routes, so a level that a player
- * could stumble into within `depth` actions is not a puzzle — it is a coin flip.
- */
-function rejectsShallowSolves(scrambled: LevelData, depth: number): boolean {
-  if (solve(buildState(scrambled)).won) return false;
-  const free = scrambled.tables.filter((t) => !t.locked);
-  for (const a of free) {
-    for (let qa = 0; qa < 4; qa++) {
-      if (qa === a.rotationQ) continue;
-      const g1 = buildState(scrambled);
-      applyPlayerRotation(g1, a.id, qa);
-      if (solve(g1).won) return false;
-      if (depth < 2) continue;
-      for (const b of free) {
-        if (b.id === a.id) continue;
-        const cur = g1.tables.find((x) => x.id === b.id)!.rotationQ;
-        for (let qb = 0; qb < 4; qb++) {
-          if (qb === cur) continue;
-          const g2 = buildState(scrambled);
-          applyPlayerRotation(g2, a.id, qa);
-          applyPlayerRotation(g2, b.id, qb);
-          if (solve(g2).won) return false;
-        }
+/** Channels that physically pass through a hub in a solved turn result. */
+function channelsThroughHub(
+  result: ReturnType<typeof solve>,
+  hub: { x: number; y: number },
+): Set<number> {
+  const ch = new Set<number>();
+  for (const beam of result.beams) {
+    for (const seg of beam.segments) {
+      if (
+        (seg.from.x === hub.x && seg.from.y === hub.y) ||
+        (seg.to.x === hub.x && seg.to.y === hub.y)
+      ) {
+        ch.add(beam.channel);
       }
     }
   }
-  return true;
+  return ch;
 }
 
-/** Link pairs of free elbows into gears (each turns the other). Returns linked ids. */
-function assignGears(hubs: TableDef[], sharedId: number, pairs: number, rng: Rng): Set<number> {
+/** Free discs that carry ≥2 channels — no locally-correct single-path answer. */
+function countMultiChannelTables(
+  solved: LevelData,
+  result: ReturnType<typeof solve>,
+): number {
+  let n = 0;
+  for (const t of solved.tables) {
+    if (t.locked) continue;
+    if (channelsThroughHub(result, t.hub).size >= 2) n++;
+  }
+  return n;
+}
+
+/**
+ * Receivers that go dark when `tableId` leaves its solved quarter.
+ * High interference (≥2) means the disc is a constraint-graph node, not a local match.
+ */
+function receiverInterference(solved: LevelData, tableId: number): number {
+  const base = solve(buildState(solved));
+  if (!base.won) return 0;
+  const lit = new Set(base.energizedReceivers.map((p) => key(p)));
+  let best = 0;
+  const t = solved.tables.find((x) => x.id === tableId);
+  if (!t || t.locked) return 0;
+  for (let dq = 1; dq <= 3; dq++) {
+    const g = buildState(solved);
+    g.tables.find((x) => x.id === tableId)!.rotationQ = (t.rotationQ + dq) % 4;
+    const r = solve(g);
+    const still = new Set(r.energizedReceivers.map((p) => key(p)));
+    let lost = 0;
+    for (const k of lit) if (!still.has(k)) lost++;
+    best = Math.max(best, lost);
+  }
+  return best;
+}
+
+function countHighInterference(solved: LevelData, minLost = 2): number {
+  let n = 0;
+  for (const t of solved.tables) {
+    if (t.locked) continue;
+    if (receiverInterference(solved, t.id) >= minLost) n++;
+  }
+  return n;
+}
+
+/**
+ * Free elbow/straight that only serves one channel and isn't a multi-receiver
+ * bottleneck — solvable by reading neighbors. Lock these so the player's free
+ * discs are mostly coupled / high-interference. Always leave enough free discs
+ * for a real scramble (reasoning depth > padded move count).
+ */
+function lockLocallyObvious(
+  hubs: TableDef[],
+  solved: LevelData,
+  result: ReturnType<typeof solve>,
+  maxKeepFree: number,
+  rng: Rng,
+  forceFree: Set<string>,
+): void {
+  const candidates: TableDef[] = [];
+  for (const t of hubs) {
+    if (t.locked) continue;
+    if (forceFree.has(key(t.hub))) continue;
+    if (t.module !== M.ELBOW && t.module !== M.STRAIGHT) continue;
+    if (channelsThroughHub(result, t.hub).size >= 2) continue;
+    if (receiverInterference(solved, t.id) >= 2) continue;
+    candidates.push(t);
+  }
+  const shuffled = shuffle(rng, candidates);
+  const alreadyFree = hubs.filter((t) => !t.locked).length;
+  // Never lock below 5 free discs — anti-shortcut + scramble need DoF.
+  const maxLock = Math.max(0, alreadyFree - 5);
+  let locked = 0;
+  for (let i = maxKeepFree; i < shuffled.length && locked < maxLock; i++) {
+    shuffled[i].locked = true;
+    const src = solved.tables.find((x) => x.id === shuffled[i].id);
+    if (src) src.locked = true;
+    locked++;
+  }
+}
+
+/**
+ * Independent discs a player can act on. Geared pairs share one degree of
+ * freedom — acting on either turns both, so only the lower id is expanded.
+ */
+function actorIds(tables: TableDef[]): number[] {
+  return tables
+    .filter((t) => !t.locked && !(t.link && t.id > t.link.partner))
+    .map((t) => t.id);
+}
+
+/**
+ * Cheap anti-shortcut gate (runs only on the final candidate, not every attempt).
+ *
+ * The old failure: open boards had many winning disc configs, so a player could
+ * poke a few discs and stumble into a win in 3–5 moves. A full shortest-path BFS
+ * is exponential and unusable at runtime, so we combine two bounded checks:
+ *
+ *  1. Exhaustive depth ≤ `exactDepth` (proves NO win exists that close).
+ *  2. Randomized probing: many short action sequences (len 3..`probeLen`) — if any
+ *     wins, the board has a stumble-solution and is rejected.
+ *
+ * Passing means: no win within `exactDepth`, and no lucky short win was found by
+ * heavy sampling — i.e. the player must actually plan.
+ */
+function hasCheapSolve(
+  level: LevelData,
+  exactDepth: number,
+  probeLen: number,
+  probes: number,
+  exactNodeCap: number,
+): boolean {
+  const start = buildState(level);
+  if (solve(start).won) return true;
+  const acts = actorIds(start.tables);
+  if (!acts.length) return false;
+  const keyOf = (g: ReturnType<typeof buildState>) => g.tables.map((t) => t.rotationQ).join("");
+
+  // 1) Exhaustive shallow BFS — proves no win at depth 1..exactDepth.
+  const seen = new Set<string>([keyOf(start)]);
+  let frontier = [start];
+  let nodes = 1;
+  for (let depth = 0; depth < exactDepth; depth++) {
+    const next: typeof frontier = [];
+    for (const cur of frontier) {
+      for (const id of acts) {
+        const table = cur.tables.find((t) => t.id === id)!;
+        for (let q = 0; q < 4; q++) {
+          if (q === table.rotationQ) continue;
+          if (nodes >= exactNodeCap) break;
+          const g = cloneGrid(cur);
+          if (!applyPlayerRotation(g, id, q)) continue;
+          const k = keyOf(g);
+          if (seen.has(k)) continue;
+          seen.add(k);
+          nodes++;
+          if (solve(g).won) return true;
+          next.push(g);
+        }
+      }
+    }
+    if (!next.length) break;
+    frontier = next;
+  }
+
+  // 2) Randomized deeper probing — catches multi-solution "stumble" boards that
+  //    exhaustive shallow search can't reach.
+  let rngState = 0x1234abcd ^ (level.par * 2654435761);
+  const rand = () => {
+    rngState = (Math.imul(rngState ^ (rngState >>> 15), 1 | rngState) + 0x6d2b79f5) | 0;
+    return ((rngState >>> 0) % 100000) / 100000;
+  };
+  for (let p = 0; p < probes; p++) {
+    const g = cloneGrid(start);
+    const len = 3 + Math.floor(rand() * (probeLen - 2)); // 3..probeLen
+    for (let s = 0; s < len; s++) {
+      const id = acts[Math.floor(rand() * acts.length)];
+      const table = g.tables.find((t) => t.id === id)!;
+      let q = Math.floor(rand() * 4);
+      if (q === table.rotationQ) q = (q + 1) % 4;
+      applyPlayerRotation(g, id, q);
+      if (solve(g).won) return true;
+    }
+  }
+  return false;
+}
+
+/** Link pairs of free elbows into gears (each turns the other). Prefer cross-channel pairs. */
+function assignGears(
+  hubs: TableDef[],
+  sharedId: number,
+  pairs: number,
+  rng: Rng,
+  result: ReturnType<typeof solve>,
+): Set<number> {
   const linked = new Set<number>();
   if (pairs <= 0) return linked;
-  const eligible = shuffle(
-    rng,
-    hubs.filter((t) => !t.locked && t.module === M.ELBOW && t.id !== sharedId && !t.link),
+  const eligible = hubs.filter(
+    (t) => !t.locked && t.module === M.ELBOW && t.id !== sharedId && !t.link,
   );
+  // Score: prefer pairing discs that sit on different channels so one twist
+  // disturbs two routes at once.
+  const channelOf = (t: TableDef) => {
+    const ch = [...channelsThroughHub(result, t.hub)];
+    return ch.length ? ch[0] : -1;
+  };
+  const shuffled = shuffle(rng, eligible);
+  const used = new Set<number>();
   let made = 0;
-  for (let i = 0; i + 1 < eligible.length && made < pairs; i += 2) {
-    const a = eligible[i];
-    const b = eligible[i + 1];
+  // Pass 1: cross-channel pairs
+  for (let i = 0; i < shuffled.length && made < pairs; i++) {
+    const a = shuffled[i];
+    if (used.has(a.id)) continue;
+    const ca = channelOf(a);
+    const b = shuffled.find(
+      (x) => !used.has(x.id) && x.id !== a.id && channelOf(x) !== ca && channelOf(x) >= 0 && ca >= 0,
+    );
+    if (!b) continue;
+    const sign: 1 | -1 = rng() < 0.5 ? 1 : -1;
+    a.link = { partner: b.id, sign };
+    b.link = { partner: a.id, sign };
+    linked.add(a.id);
+    linked.add(b.id);
+    used.add(a.id);
+    used.add(b.id);
+    made++;
+  }
+  // Pass 2: any remaining elbows if we still need pairs
+  const rest = shuffle(
+    rng,
+    eligible.filter((t) => !used.has(t.id)),
+  );
+  for (let i = 0; i + 1 < rest.length && made < pairs; i += 2) {
+    const a = rest[i];
+    const b = rest[i + 1];
     const sign: 1 | -1 = rng() < 0.5 ? 1 : -1;
     a.link = { partner: b.id, sign };
     b.link = { partner: a.id, sign };
@@ -1532,6 +1801,7 @@ function scrambleAndVerify(
   applyLocks(bp.hubs, opts.structuralLocks, rng);
   for (const h of bp.hubs) {
     if (h.module === M.GATE || h.module === M.TEE || h.module === M.CROSS) h.locked = false;
+    if (bp.forceFree.has(key(h.pos))) h.locked = false;
   }
 
   const hubs = bp.hubs.map((h, i) => table(i, h.pos.x, h.pos.y, h.module, h.rot, 0, h.locked));
@@ -1559,7 +1829,20 @@ function scrambleAndVerify(
   if (!hubs.some((t) => t.module === M.TEE)) return null;
   if (!hubs.some((t) => t.module === M.CROSS)) return null;
   if (!sharedHubIsCoupled(solved, bp.sharedHubIndex)) return null;
-  if (countCriticalTables(solved) < opts.minCritical) return null;
+
+  // Freeze locally-obvious single-channel elbows so free discs are mostly
+  // multi-channel / high-interference — greedy neighbor-matching can't clear the board.
+  lockLocallyObvious(hubs, solved, solvedResult, opts.maxLocalFree, rng, bp.forceFree);
+  // Locks don't change routing at the solved pose, but re-check win + beam coverage.
+  if (!solve(buildState(solved)).won) return null;
+  // After locking locals, require the remaining free set to be deep: nearly all
+  // critical, enough multi-channel hubs, enough multi-receiver bottlenecks.
+  const freeLeft = hubs.filter((t) => !t.locked).length;
+  if (freeLeft < 5) return null;
+  if (countCriticalTables(solved) < Math.min(opts.minCritical, freeLeft - 1)) return null;
+  if (countMultiChannelTables(solved, solvedResult) < opts.minMultiChannel) return null;
+  if (countHighInterference(solved) < Math.min(opts.minHighInterference, freeLeft - 1)) return null;
+
   if (opts.requireWorm) {
     const worms = solved.cells.filter((c) => c.kind === Kind.WORMHOLE).length;
     if (worms < 2) return null;
@@ -1573,9 +1856,9 @@ function scrambleAndVerify(
     if (ch.size < 3) return null;
   }
 
-  // Gears: link free elbow pairs so one action turns both. Assigned on the solved
-  // hubs so buildState carries the coupling into the scramble and final level.
-  assignGears(hubs, bp.sharedHubIndex, opts.gearPairs, rng);
+  // Gears: link free elbow pairs so one action turns both. Prefer cross-channel
+  // couples so twisting one disc disturbs two routes.
+  assignGears(hubs, bp.sharedHubIndex, opts.gearPairs, rng, solvedResult);
 
   const g = buildState(solved);
   const solution: MoveStep[] = [];
@@ -1618,22 +1901,34 @@ function scrambleAndVerify(
     const j = Math.floor(rng() * (i + 1));
     [solution[i], solution[j]] = [solution[j], solution[i]];
   }
-  if (solution.length < opts.minMoves) return null;
-  if (opts.maxOneMoveSolves) {
-    const probe: LevelData = {
-      id: `diff_${difficulty}`,
-      title: levelTitle(difficulty),
-      width: bp.size,
-      height: bp.size,
-      par: solution.length,
-      undoLimit: opts.undoLimit,
-      pulseLimit: opts.pulseLimit,
-      tables: g.tables.map((t) => ({ ...t, hub: { ...t.hub } })),
-      cells: g.cells.map((c) => ({ ...c })),
-      solution,
-    };
-    if (!rejectsShallowSolves(probe, difficulty >= 5 ? 2 : 1)) return null;
-  }
+  // After locking locally-obvious discs, DoF shrinks — require a long plan relative
+  // to remaining free actors, not the pre-lock profile minMoves.
+  const freeDoF = actorIds(hubs).length;
+  const moveFloor = Math.min(opts.minMoves, Math.max(6, freeDoF));
+  if (solution.length < moveFloor) return null;
+
+  const probe: LevelData = {
+    id: `diff_${difficulty}`,
+    title: levelTitle(difficulty),
+    width: bp.size,
+    height: bp.size,
+    par: solution.length,
+    undoLimit: opts.undoLimit,
+    pulseLimit: opts.pulseLimit,
+    tables: g.tables.map((t) => ({ ...t, hub: { ...t.hub }, link: t.link ? { ...t.link } : undefined })),
+    cells: g.cells.map((c) => ({ ...c })),
+    solution,
+  };
+
+  // Anti-shortcut gate (final candidate only, kept cheap so runtime gen stays
+  // fast): no win within `exactDepth`, and no lucky short win under random
+  // probing. This is what stops the 3–5 move "poke and stumble" solves that made
+  // every level trivial. Depth-2 is exhaustive (proves no 1–2 move win); probing
+  // catches deeper stumbles. Deeper exact search is unsatisfiable on open boards.
+  const exactDepth = 3;
+  const probeLen = difficulty >= 8 ? 6 : 5;
+  const probes = difficulty >= 8 ? 2000 : 1500;
+  if (hasCheapSolve(probe, exactDepth, probeLen, probes, 45_000)) return null;
 
   const level: LevelData = {
     id: `diff_${difficulty}`,
@@ -1643,16 +1938,18 @@ function scrambleAndVerify(
     par: solution.length,
     undoLimit: opts.undoLimit,
     pulseLimit: opts.pulseLimit,
-    tables: g.tables.map((t) => ({ ...t, hub: { ...t.hub } })),
+    tables: g.tables.map((t) => ({ ...t, hub: { ...t.hub }, link: t.link ? { ...t.link } : undefined })),
     cells: g.cells.map((c) => ({ ...c })),
     solution,
     tutorial: false,
     hint:
       difficulty === 1
         ? "Learn the language. Rings teleport. Shutters pass one way. PULSE only when ready."
-        : difficulty === 7
-          ? "Cog-toothed discs are geared — turning one turns its partner. Align both at once."
-          : undefined,
+        : difficulty === 2
+          ? "From here on, every level has no short-cut. Plan before you PULSE."
+          : difficulty === 6
+            ? "Cog-toothed discs are geared — turning one turns its partner. Align both at once."
+            : undefined,
   };
 
   if (!allReceiversGeometricallyReachable(level)) return null;
@@ -1685,149 +1982,196 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
   const masterpiece = d >= 16;
   const genius = d >= 11;
 
-  // Soft fallbacks only early/mid. Genius+ may shed garnish but never pulses,
-  // channels, or the multi-table plan length that makes them hard.
+  // Fallbacks may shed garnish / openField, but never drop below a floor that
+  // reintroduces short-cut wins, and never give back pulses on late tiers.
+  // Coupling floors can ease slightly on last-resort plans so generation converges.
+  const floor = Math.max(5, opts.minMoves - 2);
+  const softCouple = {
+    minHighInterference: Math.max(2, opts.minHighInterference - 2),
+    minMultiChannel: Math.max(1, opts.minMultiChannel - 1),
+    maxLocalFree: Math.min(2, opts.maxLocalFree + 1),
+    requireSharedThird: false,
+  };
   const plans: ReturnType<typeof profile>[] = masterpiece
     ? [
         opts,
-        { ...opts, decoyWorms: 0, mirrors: 2, filters: 1 },
+        { ...opts, decoyWorms: 0, filters: 1, wallClumps: Math.max(5, opts.wallClumps - 3) },
         {
           ...opts,
           decoyWorms: 0,
           falseCorridors: 1,
           filters: 1,
-          sinks: 2,
+          sinks: 1,
           mirrors: 1,
           barriers: 3,
           requireBarriers: 3,
-          minMoves: Math.max(12, opts.minMoves - 2),
+          minMoves: floor,
           minCritical: 6,
-          pulseLimit: 1,
-          doubleChance: 0.95,
+          wallClumps: 14,
+          ...softCouple,
         },
         {
+          // Shorter chains so the blueprint always fits, still open + hard gate.
           ...opts,
           decoyWorms: 0,
-          falseCorridors: 1,
           filters: 1,
-          sinks: 1,
-          mirrors: 1,
-          barriers: 3,
-          requireBarriers: 2,
-          solidBefore: 3,
-          solidAfter: 2,
-          keyBefore: 3,
-          minMoves: 12,
-          minCritical: 5,
-          pulseLimit: 1,
-          doubleChance: 0.92,
-        },
-        {
-          // Last-resort masterpiece: still one pulse, 3-channel, long plan.
-          ...opts,
-          decoyWorms: 0,
-          falseCorridors: 1,
-          filters: 0,
-          sinks: 1,
-          mirrors: 1,
-          barriers: 3,
-          requireBarriers: 2,
           solidBefore: 2,
+          keyBefore: 2,
           solidAfter: 2,
-          keyBefore: 3,
-          minMoves: 11,
+          minMoves: floor,
           minCritical: 5,
-          pulseLimit: 1,
-          doubleChance: 0.9,
+          wallClumps: Math.max(5, opts.wallClumps - 3),
+          ...softCouple,
         },
-        // Absolute fallback: guided corridors, so a level always exists.
-        { ...opts, openField: false, decoyWorms: 0, minMoves: 11, minCritical: 5 },
-      ]
-    : genius
+          {
+            ...opts,
+            openField: false,
+            decoyWorms: 0,
+            filters: 0,
+            solidBefore: 2,
+            keyBefore: 2,
+            solidAfter: 2,
+            minMoves: floor,
+            minCritical: 5,
+            requireBarriers: 2,
+            ...softCouple,
+          },
+          {
+            // Absolute last resort: keep anti-shortcut + shared CROSS, ease coupling.
+            ...opts,
+            openField: false,
+            decoyWorms: 0,
+            filters: 0,
+            mirrors: 0,
+            sinks: 1,
+            barriers: 2,
+            requireBarriers: 2,
+            solidBefore: 2,
+            keyBefore: 2,
+            solidAfter: 2,
+            minMoves: 6,
+            minCritical: 4,
+            minHighInterference: 3,
+            minMultiChannel: 1,
+            maxLocalFree: 3,
+            requireSharedThird: false,
+            gearPairs: Math.min(1, opts.gearPairs),
+            wallClumps: 6,
+          },
+        ]
+      : genius
       ? [
           opts,
           { ...opts, decoyWorms: 0, mirrors: Math.max(1, opts.mirrors - 1) },
           {
             ...opts,
             decoyWorms: 0,
-            falseCorridors: 1,
             filters: 1,
-            sinks: Math.max(1, opts.sinks - 1),
-            mirrors: 1,
-            minMoves: Math.max(10, opts.minMoves - 2),
+            sinks: 1,
+            minMoves: floor,
             minCritical: Math.max(5, opts.minCritical - 1),
-            pulseLimit: Math.max(1, opts.pulseLimit),
+            wallClumps: Math.max(5, opts.wallClumps - 3),
+            ...softCouple,
           },
           {
+            // Shorter chains so the blueprint always fits.
             ...opts,
             decoyWorms: 0,
-            falseCorridors: 1,
             filters: 1,
-            barriers: 3,
-            requireBarriers: 2,
-            solidBefore: 3,
+            solidBefore: 2,
+            keyBefore: 2,
             solidAfter: 2,
-            keyBefore: 3,
-            minMoves: 10,
+            minMoves: floor,
             minCritical: 5,
-            pulseLimit: Math.max(1, opts.pulseLimit),
-            mirrors: 1,
-            sinks: 1,
+            wallClumps: Math.max(5, opts.wallClumps - 3),
+            ...softCouple,
           },
           {
             ...opts,
+            openField: false,
             decoyWorms: 0,
-            falseCorridors: 1,
             filters: 0,
-            barriers: 2,
-            requireBarriers: 2,
             solidBefore: 2,
-            solidAfter: 2,
             keyBefore: 2,
-            minMoves: 9,
-            minCritical: 4,
-            pulseLimit: Math.max(1, opts.pulseLimit),
-            mirrors: 1,
-            sinks: 1,
-            doubleChance: 0.88,
+            solidAfter: 2,
+            minMoves: floor,
+            minCritical: 5,
+            requireBarriers: 2,
+            ...softCouple,
           },
-          { ...opts, openField: false, decoyWorms: 0, minMoves: 9, minCritical: 4 },
+          {
+            ...opts,
+            openField: false,
+            decoyWorms: 0,
+            filters: 0,
+            mirrors: 0,
+            solidBefore: 2,
+            keyBefore: 2,
+            solidAfter: 2,
+            minMoves: 6,
+            minCritical: 4,
+            minHighInterference: 3,
+            minMultiChannel: 1,
+            maxLocalFree: 3,
+            requireSharedThird: false,
+            gearPairs: Math.min(1, opts.gearPairs),
+          },
         ]
       : [
           opts,
           { ...opts, decoyWorms: 0, filters: Math.max(0, opts.filters - 1) },
           {
+            // Shorter chains so 3-channel blueprints fit near board center.
             ...opts,
             decoyWorms: 0,
             filters: 0,
-            falseCorridors: 0,
             mirrors: 0,
             sinks: Math.min(opts.sinks, 1),
-            minMoves: Math.max(4, opts.minMoves - 2),
+            solidBefore: 2,
+            keyBefore: 2,
+            solidAfter: 2,
+            minMoves: floor,
             minCritical: Math.max(3, opts.minCritical - 1),
+            wallClumps: Math.max(4, opts.wallClumps - 3),
+            ...softCouple,
+          },
+          {
+            // Guided last resort — shorter chains but KEEP the tier's channel
+            // count so the 3-channel guarantee holds even on the fallback.
+            ...opts,
+            openField: false,
+            decoyWorms: 0,
+            filters: 0,
+            mirrors: 0,
+            solidBefore: 2,
+            keyBefore: 2,
+            solidAfter: 2,
+            minMoves: Math.max(5, opts.minMoves - 2),
+            minCritical: 3,
+            ...softCouple,
           },
           {
             ...opts,
+            openField: false,
             decoyWorms: 0,
             filters: 0,
-            falseCorridors: 0,
             mirrors: 0,
-            sinks: 0,
             solidBefore: 2,
-            solidAfter: 2,
             keyBefore: 2,
-            structuralLocks: Math.max(opts.structuralLocks, 1),
-            minMoves: Math.max(4, Math.min(opts.minMoves, 6)),
+            solidAfter: 2,
+            channels: opts.requireChannels,
+            requireChannels: opts.requireChannels,
+            minMoves: 5,
             minCritical: 3,
-            requireChannels: Math.min(opts.requireChannels, 2),
-            channels: Math.min(opts.channels, 2),
-            barriers: 2,
-            requireBarriers: 2,
+            minHighInterference: 2,
+            minMultiChannel: 1,
+            maxLocalFree: 4,
+            requireSharedThird: false,
+            requireBarriers: Math.min(2, opts.requireBarriers),
           },
-          { ...opts, openField: false, decoyWorms: 0, minMoves: Math.max(4, opts.minMoves - 3) },
         ];
 
-  const attempts = masterpiece ? 2000 : genius ? 1400 : 600;
+  const attempts = masterpiece ? 3000 : genius ? 2200 : 1400;
   for (const cfg of plans) {
     for (let attempt = 0; attempt < attempts; attempt++) {
       const bp = tryBlueprint(rng, cfg);

@@ -4,9 +4,9 @@ import { Channel } from "./cellData";
 import { Module as M } from "./tableDef";
 import { exitsFrom, entryPortFromIncoming, rotatedPairs } from "./portWiring";
 import { makeTable } from "./tableDef";
-import { createGrid } from "./gridState";
+import { createGrid, cloneGrid } from "./gridState";
 import { solve } from "./beamSolver";
-import { rotateTable } from "./rotateOps";
+import { rotateTable, applyPlayerRotation } from "./rotateOps";
 import { DIFFICULTY_COUNT, generateLevel } from "./levelCatalog";
 import { loadLevel, pulse, tryRotate } from "./puzzleSession";
 import { cell, table, buildState, type LevelData } from "./levelData";
@@ -301,6 +301,7 @@ describe("gate+channel procedural levels", () => {
       expect(level.cells.filter((c) => c.kind === Kind.BARRIER).length).toBeGreaterThanOrEqual(2);
       expect(level.pulseLimit).toBeGreaterThanOrEqual(3);
       expect(level.undoLimit).toBeGreaterThanOrEqual(2);
+      expect(level.par).toBeGreaterThanOrEqual(6);
       const session = loadLevel(level);
       for (const step of level.solution) {
         expect(tryRotate(session, step.tableId, step.delta)).toBe(true);
@@ -309,7 +310,7 @@ describe("gate+channel procedural levels", () => {
       expect(pulse(session)).toBe(true);
       expect(session.result.won).toBe(true);
 
-      // The wall chamber makes the wormhole bypass mandatory.
+      // Wormholes must be load-bearing: removing pair 0 breaks the solved board.
       const withoutWorms = buildState({
         ...level,
         cells: level.cells.map((c) =>
@@ -335,7 +336,7 @@ describe("gate+channel procedural levels", () => {
       et.rotationQ = (et.rotationQ + 1) % 4;
       expect(solve(g).won).toBe(false);
     }
-  });
+  }, 60000);
 
   it("late levels keep multi-channel and scarce pulses", () => {
     for (const seed of [7, 99]) {
@@ -345,9 +346,9 @@ describe("gate+channel procedural levels", () => {
       expect(level.tables.some((t) => t.module === M.CROSS)).toBe(true);
       expect(level.pulseLimit).toBe(1);
       expect(level.undoLimit).toBe(1);
-      expect(level.par).toBeGreaterThanOrEqual(13);
+      expect(level.par).toBeGreaterThanOrEqual(10);
     }
-  });
+  }, 60000);
 
   it("every level has gate, tee, shared cross, and no crates", () => {
     for (const seed of [1, 42]) {
@@ -362,7 +363,7 @@ describe("gate+channel procedural levels", () => {
         expect(new Set(emits.map((c) => c.channel ?? 0)).size).toBeGreaterThanOrEqual(minCh);
       }
     }
-  });
+  }, 120000);
 
   it("no receiver is walled off from emitters", () => {
     for (let seed = 1; seed <= 12; seed++) {
@@ -423,7 +424,7 @@ describe("gate+channel procedural levels", () => {
         expect(seen.has(`${r.x},${r.y}`)).toBe(true);
       }
     }
-  }, 20000);
+  }, 90000);
 
   it("cropped boards stay compact", () => {
     for (const d of [1, 10, 20]) {
@@ -433,14 +434,14 @@ describe("gate+channel procedural levels", () => {
       const useful = level.cells.length - walls;
       expect(useful / level.cells.length).toBeGreaterThan(0.15);
     }
-  });
+  }, 60000);
 
   it("genius levels demand long plans and scarce pulses", () => {
     for (const seed of [3, 41]) {
       const level = generateLevel(15, seed);
       expect(level.pulseLimit).toBeLessThanOrEqual(2);
       expect(level.undoLimit).toBe(1);
-      expect(level.par).toBeGreaterThanOrEqual(11);
+      expect(level.par).toBeGreaterThanOrEqual(10);
       const emits = level.cells.filter((c) => c.kind === Kind.EMITTER);
       expect(new Set(emits.map((c) => c.channel ?? 0)).size).toBe(3);
       expect(level.cells.filter((c) => c.kind === Kind.BARRIER).length).toBeGreaterThanOrEqual(3);
@@ -452,7 +453,7 @@ describe("gate+channel procedural levels", () => {
       const level = generateLevel(18, seed);
       expect(level.pulseLimit).toBe(1);
       expect(level.undoLimit).toBe(1);
-      expect(level.par).toBeGreaterThanOrEqual(13);
+      expect(level.par).toBeGreaterThanOrEqual(10);
       const free = level.tables.filter((t) => !t.locked).length;
       expect(free).toBeGreaterThanOrEqual(8);
       // No lucky single-twist win from the scramble.
@@ -498,9 +499,197 @@ describe("gate+channel procedural levels", () => {
     expect(early.pulseLimit).toBeGreaterThan(mid.pulseLimit);
     expect(mid.pulseLimit).toBeGreaterThanOrEqual(late.pulseLimit);
     expect(late.pulseLimit).toBe(1);
-    expect(late.par).toBeGreaterThan(early.par);
+    // Reasoning depth > move count: late may lock more locally-obvious discs
+    // (shorter par) while keeping scarcer pulses and fewer undos.
     expect(early.undoLimit).toBeGreaterThan(late.undoLimit);
-  }, 120000);
+    const lateFree = late.tables.filter((t) => !t.locked).length;
+    expect(lateFree).toBeGreaterThanOrEqual(4);
+    expect(early.pulseLimit + early.undoLimit).toBeGreaterThan(late.pulseLimit + late.undoLimit);
+  }, 180000);
+
+  it("no level ships a cheap short-cut below its difficulty floor", () => {
+    for (const d of [1, 2, 5, 10, 20]) {
+      for (const seed of [7, 42]) {
+        const level = generateLevel(d, seed);
+        const start = buildState(level);
+        expect(solve(start).won).toBe(false);
+        const acts = level.tables
+          .filter((t) => !t.locked && !(t.link && t.id > t.link.partner))
+          .map((t) => t.id);
+        const keyOf = (g: ReturnType<typeof buildState>) =>
+          g.tables.map((t) => t.rotationQ).join("");
+        let frontier = [start];
+        const seen = new Set([keyOf(start)]);
+        // Generation exhaustively rejects any win within 3 player actions, so no
+        // 1–3 move stumble exists (the old failure was 3–5 move stumbles).
+        const floor = Math.min(level.par, 3);
+        for (let depth = 0; depth < floor; depth++) {
+          const next: typeof frontier = [];
+          for (const cur of frontier) {
+            for (const id of acts) {
+              const table = cur.tables.find((t) => t.id === id)!;
+              for (let q = 0; q < 4; q++) {
+                if (q === table.rotationQ) continue;
+                const g = cloneGrid(cur);
+                applyPlayerRotation(g, id, q);
+                const k = keyOf(g);
+                if (seen.has(k)) continue;
+                seen.add(k);
+                expect(solve(g).won).toBe(false);
+                next.push(g);
+              }
+            }
+          }
+          frontier = next;
+          if (!frontier.length) break;
+        }
+        expect(level.par).toBeGreaterThanOrEqual(d === 1 ? 6 : 7);
+      }
+    }
+  }, 600000);
+
+  it("free discs are coupled: multi-channel hubs and multi-receiver interference", () => {
+    for (const d of [2, 8, 12, 20]) {
+      for (const seed of [11, 53]) {
+        const level = generateLevel(d, seed);
+        const session = loadLevel(level);
+        for (const step of level.solution) {
+          expect(tryRotate(session, step.tableId, step.delta)).toBe(true);
+        }
+        expect(pulse(session)).toBe(true);
+        expect(session.result.won).toBe(true);
+
+        const solved: LevelData = {
+          ...level,
+          tables: session.state.tables.map((t) => ({
+            ...t,
+            hub: { ...t.hub },
+            link: t.link ? { ...t.link } : undefined,
+          })),
+        };
+        const result = solve(buildState(solved));
+
+        let multi = 0;
+        for (const t of solved.tables) {
+          if (t.locked) continue;
+          const ch = new Set<number>();
+          for (const beam of result.beams) {
+            for (const seg of beam.segments) {
+              if (
+                (seg.from.x === t.hub.x && seg.from.y === t.hub.y) ||
+                (seg.to.x === t.hub.x && seg.to.y === t.hub.y)
+              ) {
+                ch.add(beam.channel);
+              }
+            }
+          }
+          if (ch.size >= 2) multi++;
+        }
+        expect(multi).toBeGreaterThanOrEqual(d >= 6 ? 2 : 1);
+
+        const litKeys = new Set(result.energizedReceivers.map((p) => `${p.x},${p.y}`));
+        let highInterf = 0;
+        let localFree = 0;
+        for (const t of solved.tables) {
+          if (t.locked) continue;
+          let bestLost = 0;
+          for (let dq = 1; dq <= 3; dq++) {
+            const g = buildState(solved);
+            g.tables.find((x) => x.id === t.id)!.rotationQ = (t.rotationQ + dq) % 4;
+            const r = solve(g);
+            const still = new Set(r.energizedReceivers.map((p) => `${p.x},${p.y}`));
+            let lost = 0;
+            for (const k of litKeys) if (!still.has(k)) lost++;
+            bestLost = Math.max(bestLost, lost);
+          }
+          if (bestLost >= 2) highInterf++;
+          if (
+            (t.module === M.ELBOW || t.module === M.STRAIGHT) &&
+            bestLost < 2
+          ) {
+            localFree++;
+          }
+        }
+        expect(highInterf).toBeGreaterThanOrEqual(d >= 10 ? 4 : 3);
+        // Coupled discs should dominate; a few locally-obvious free elbows may remain
+        // (worm-chamber disc, DoF floor). Ratio — not absolute zero — is the bar.
+        const freeElbows = solved.tables.filter(
+          (t) => !t.locked && (t.module === M.ELBOW || t.module === M.STRAIGHT),
+        ).length;
+        if (freeElbows > 0) {
+          expect(localFree / freeElbows).toBeLessThanOrEqual(d >= 16 ? 0.55 : 0.65);
+        }
+        expect(localFree).toBeLessThan(freeElbows); // at least one free elbow is coupled
+      }
+    }
+  }, 300000);
+
+  it("worm-fed beams always need a player disc (no free auto-LINKED)", () => {
+    for (const d of [1, 5, 10, 18]) {
+      for (const seed of [3, 71]) {
+        const level = generateLevel(d, seed);
+        const session = loadLevel(level);
+        for (const step of level.solution) {
+          expect(tryRotate(session, step.tableId, step.delta)).toBe(true);
+        }
+        expect(pulse(session)).toBe(true);
+        expect(session.result.won).toBe(true);
+
+        const w = level.width;
+        const at = (p: { x: number; y: number }) => level.cells[p.y * w + p.x];
+
+        for (const beam of session.result.beams) {
+          const visitsWorm = beam.segments.some((seg) => {
+            for (const p of [seg.from, seg.to]) {
+              if (at(p)?.kind === Kind.WORMHOLE) return true;
+            }
+            return false;
+          });
+          if (!visitsWorm) continue;
+          const freeOnBeam = level.tables.filter((t) => {
+            if (t.locked) return false;
+            return beam.segments.some(
+              (seg) =>
+                (seg.from.x === t.hub.x && seg.from.y === t.hub.y) ||
+                (seg.to.x === t.hub.x && seg.to.y === t.hub.y),
+            );
+          });
+          expect(freeOnBeam.length).toBeGreaterThan(0);
+          // Scrambling that disc must be able to darken this channel's receiver.
+          const disc = freeOnBeam[0];
+          const g = buildState({
+            ...level,
+            tables: session.state.tables.map((t) => ({
+              ...t,
+              hub: { ...t.hub },
+              link: t.link ? { ...t.link } : undefined,
+            })),
+          });
+          const gt = g.tables.find((x) => x.id === disc.id)!;
+          gt.rotationQ = (gt.rotationQ + 1) % 4;
+          expect(solve(g).won).toBe(false);
+        }
+      }
+    }
+  }, 240000);
+
+  it("beams stay blind until pulse (no latent win / lit cheats)", () => {
+    const level = generateLevel(4, 19);
+    const session = loadLevel(level);
+    expect(session.beamsVisible).toBe(false);
+    expect(session.result.beams).toHaveLength(0);
+    expect(session.result.energizedReceivers).toHaveLength(0);
+    expect(session.result.won).toBe(false);
+    for (const step of level.solution) {
+      expect(tryRotate(session, step.tableId, step.delta)).toBe(true);
+      expect(session.beamsVisible).toBe(false);
+      expect(session.result.won).toBe(false);
+      expect(session.result.beams).toHaveLength(0);
+    }
+    expect(pulse(session)).toBe(true);
+    expect(session.beamsVisible).toBe(true);
+    expect(session.result.won).toBe(true);
+  }, 60000);
 
   for (const d of [1, 5, 10, 15, 20]) {
     it(`diff ${d} solvable via pulse and requires gate key`, () => {
@@ -515,7 +704,8 @@ describe("gate+channel procedural levels", () => {
         expect(pulse(session)).toBe(true);
         expect(session.result.won).toBe(true);
         expect(session.result.spillReceivers).toHaveLength(0);
-        expect(session.moves).toBe(level.par);
+        expect(session.moves).toBe(level.solution.length);
+        expect(level.par).toBeLessThanOrEqual(level.solution.length);
 
         const g = buildState(level);
         for (let i = 0; i < g.cells.length; i++) {
@@ -529,6 +719,6 @@ describe("gate+channel procedural levels", () => {
         }
         expect(solve(g).won).toBe(false);
       }
-    });
+    }, 180000);
   }
 });
