@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="800" viewBox="0 0 640 800" fill="none">
+  <rect width="640" height="800" fill="#0A0A0A"/>
+  <defs>
+    <radialGradient id="g" cx="50%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#1A1A1A"/>
+      <stop offset="100%" stop-color="#0A0A0A"/>
+    </radialGradient>
+  </defs>
+  <rect width="640" height="800" fill="url(#g)"/>
+  <text x="320" y="118" text-anchor="middle" fill="#F4F4F0" font-family="Impact, Haettenschweiler, Arial Black, sans-serif" font-size="72" font-weight="700" letter-spacing="2">SHIFTR</text>
+  <text x="320" y="158" text-anchor="middle" fill="#A8A8A0" font-family="Courier New, monospace" font-size="13" font-weight="600" letter-spacing="2.5">EVERY MOVE CHANGES EVERYTHING</text>
+  <circle cx="320" cy="430" r="148" fill="#111111" stroke="#F4F4F0" stroke-width="5"/>
+  <circle cx="320" cy="430" r="20" fill="#22D3EE"/>
+  <g stroke="#F4F4F0" stroke-width="3" opacity="0.85">
+    <line x1="320" y1="292" x2="320" y2="314"/>
+    <line x1="320" y1="546" x2="320" y2="568"/>
+    <line x1="182" y1="430" x2="204" y2="430"/>
+    <line x1="436" y1="430" x2="458" y2="430"/>
+  </g>
+  <line x1="118" y1="430" x2="320" y2="430" stroke="#22D3EE" stroke-width="5" opacity="0.95"/>
+  <line x1="320" y1="430" x2="428" y2="538" stroke="#22D3EE" stroke-width="5" opacity="0.95"/>
+  <circle cx="118" cy="430" r="11" fill="#22D3EE"/>
+  <circle cx="428" cy="538" r="18" fill="none" stroke="#F4F4F0" stroke-width="4"/>
+</svg>

@@ -4,11 +4,12 @@ import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import { getCollection } from 'astro:content';
 
-const games = (await getCollection('games')).sort((a, b) => a.data.title.localeCompare(b.data.title));
-const pulsefold = games.find((game) => game.id === 'pulsefold') ?? games[0];
+const games = (await getCollection('games'))
+	.filter((game) => game.data.released)
+	.sort((a, b) => a.data.title.localeCompare(b.data.title));
 ---
 
-<BaseLayout description="SKITZ games & apps — play Pulsefold free in the browser, including on iPhone, or download for desktop and Android.">
+<BaseLayout description="SKITZ games & apps — play Pulsefold and SHIFTR free in the browser, including on iPhone.">
 	<SiteHeader />
 	<main class="site-main">
 		<section class="hero">
@@ -23,16 +24,12 @@ const pulsefold = games.find((game) => game.id === 'pulsefold') ?? games[0];
 				<h1 class="sr-only">SKITZ games & apps</h1>
 				<p class="hero__line">games &amp; apps — slapped on the web, free to play and download.</p>
 				<div class="btn-row hero__cta">
+					<a class="btn" href="/games/">Browse games</a>
 					{
-						pulsefold && (
-							<>
-								<a class="btn" href={`/games/${pulsefold.id}/play/`}>
-									Play Pulsefold
-								</a>
-								<a class="btn btn-ghost" href={`/games/${pulsefold.id}/`}>
-									Game page
-								</a>
-							</>
+						games[0] && (
+							<a class="btn btn-ghost" href={`/games/${games[0].id}/play/`}>
+								Play {games[0].data.title}
+							</a>
 						)
 					}
 				</div>

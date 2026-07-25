@@ -2,10 +2,10 @@
 interface Props {
 	title: string;
 	src: string;
-	backHref: string;
+	backHref?: string;
 }
 
-const { title, src, backHref } = Astro.props;
+const { title, src, backHref = '/games/' } = Astro.props;
 ---
 
 <div class="play-shell">
