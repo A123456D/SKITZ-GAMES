@@ -1,4 +1,4 @@
-import { Dir, Kind, MirrorOri } from "./cellKind";
+import { Dir, Kind, MirrorOri, Phase } from "./cellKind";
 
 /** Paper channels: solid / dashed / dotted (B&W, not neon). */
 export const Channel = {
@@ -12,12 +12,28 @@ export type CellData = {
   dir: number;
   ori: number;
   tableId: number;
-  /** Emitter / receiver channel. Ignored for other kinds. */
+  /** Emitter / receiver / filter / worm pair id. */
   channel: number;
+  /**
+   * Polarity / armed / occupied:
+   * - emitters: starting beam phase
+   * - receivers: 0 = any phase, 1 = must arrive as phase B
+   * - PHASE_GATE: required phase
+   * - PHASE_SWITCH: 1 = armed (flips beams), 0 = inert
+   * - PAD: 1 = token present, 0 = empty socket
+   */
+  phase: number;
 };
 
 export function emptyCell(tableId = -1): CellData {
-  return { kind: Kind.EMPTY, dir: Dir.E, ori: MirrorOri.BACKSLASH, tableId, channel: 0 };
+  return {
+    kind: Kind.EMPTY,
+    dir: Dir.E,
+    ori: MirrorOri.BACKSLASH,
+    tableId,
+    channel: 0,
+    phase: Phase.A,
+  };
 }
 
 export function makeCell(
@@ -26,8 +42,9 @@ export function makeCell(
   ori: number = MirrorOri.BACKSLASH,
   tableId = -1,
   channel = 0,
+  phase: number = 0,
 ): CellData {
-  return { kind, dir, ori, tableId, channel };
+  return { kind, dir, ori, tableId, channel, phase };
 }
 
 export function cloneCell(c: CellData): CellData {

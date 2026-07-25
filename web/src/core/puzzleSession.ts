@@ -1,6 +1,7 @@
+import { Kind } from "./cellKind";
 import { solve, type TurnResult } from "./beamSolver";
-import { cloneGrid, getTable, type GridState } from "./gridState";
-import { buildState, type LevelData } from "./levelData";
+import { cloneGrid, getCell, getTable, inBounds, type GridState } from "./gridState";
+import { buildState, type LevelData, type MoveStep } from "./levelData";
 import { rotateTable, setTableRotation } from "./rotateOps";
 
 export type PuzzleSession = {
@@ -14,10 +15,14 @@ export type PuzzleSession = {
   moves: number;
   undosRemaining: number;
   pulsesUsed: number;
+  /** Tokens still in hand (not sitting on pads). */
+  tokensLeft: number;
   /** True after PULSE until the next rotate/undo/reset. */
   beamsVisible: boolean;
   selectedTable: number;
   history: GridState[];
+  /** Parallel to history: tokensLeft after each undoable action's prior state. */
+  tokenHistory: number[];
   prevLit: Set<string>;
 };
 
@@ -64,21 +69,42 @@ function syncLatent(session: PuzzleSession): void {
   session.latent.won = false;
 }
 
+function countPlacedTokens(state: GridState): number {
+  let n = 0;
+  for (const c of state.cells) {
+    if (c.kind === Kind.PAD && (c.phase ?? 0) === 1) n++;
+  }
+  return n;
+}
+
+function pushHistory(session: PuzzleSession): void {
+  session.history.push(cloneGrid(session.state));
+  session.tokenHistory.push(session.tokensLeft);
+}
+
 export function loadLevel(level: LevelData): PuzzleSession {
-  const initial = buildState(level);
+  const normalized: LevelData = {
+    ...level,
+    tokenBudget: level.tokenBudget ?? 0,
+  };
+  const initial = buildState(normalized);
   const state = cloneGrid(initial);
+  const placed = countPlacedTokens(state);
+  const budget = normalized.tokenBudget;
   const session: PuzzleSession = {
-    level,
+    level: normalized,
     state,
     initial,
     result: blankResult(),
     latent: solve(state),
     moves: 0,
-    undosRemaining: level.undoLimit > 0 ? level.undoLimit : 1,
+    undosRemaining: normalized.undoLimit > 0 ? normalized.undoLimit : 1,
     pulsesUsed: 0,
+    tokensLeft: Math.max(0, budget - placed),
     beamsVisible: false,
     selectedTable: -1,
     history: [],
+    tokenHistory: [],
     prevLit: new Set(),
   };
   session.latent.won = false;
@@ -96,6 +122,7 @@ export function canUndo(session: PuzzleSession): boolean {
 export function undo(session: PuzzleSession): void {
   if (!canUndo(session)) return;
   session.state = session.history.pop()!;
+  session.tokensLeft = session.tokenHistory.pop() ?? session.tokensLeft;
   session.moves = Math.max(0, session.moves - 1);
   session.undosRemaining -= 1;
   syncLatent(session);
@@ -131,9 +158,12 @@ export function pulse(session: PuzzleSession): boolean {
 export function tryRotate(session: PuzzleSession, tableId: number, deltaQ: number): boolean {
   if (session.result.won) return false;
   if (!getTable(session.state, tableId)) return false;
-  const before = cloneGrid(session.state);
-  if (!rotateTable(session.state, tableId, deltaQ)) return false;
-  session.history.push(before);
+  pushHistory(session);
+  if (!rotateTable(session.state, tableId, deltaQ)) {
+    session.history.pop();
+    session.tokenHistory.pop();
+    return false;
+  }
   session.moves += 1;
   session.selectedTable = tableId;
   syncLatent(session);
@@ -155,10 +185,9 @@ export function commitRotationQ(session: PuzzleSession, tableId: number, rotatio
     if (!session.beamsVisible) hideBeams(session);
     return false;
   }
-  const before = cloneGrid(session.state);
+  pushHistory(session);
   const prevQ = table.rotationQ;
   setTableRotation(session.state, tableId, next);
-  // Geared partner follows the same delta as a single player action.
   if (table.link) {
     const partner = getTable(session.state, table.link.partner);
     if (partner && !partner.locked) {
@@ -166,7 +195,6 @@ export function commitRotationQ(session: PuzzleSession, tableId: number, rotatio
       setTableRotation(session.state, partner.id, partner.rotationQ + d * table.link.sign);
     }
   }
-  session.history.push(before);
   session.moves += 1;
   session.selectedTable = tableId;
   syncLatent(session);
@@ -177,6 +205,85 @@ export function commitRotationQ(session: PuzzleSession, tableId: number, rotatio
   if (dq === 3) dq = -1;
   session.result.deltaQ = dq;
   return true;
+}
+
+/** Toggle a PHASE_SWITCH (armed ↔ inert). Counts as one move. */
+export function tryFlipPhase(session: PuzzleSession, x: number, y: number): boolean {
+  if (session.result.won) return false;
+  if (!inBounds(session.state, x, y)) return false;
+  const c = getCell(session.state, x, y);
+  if (c.kind !== Kind.PHASE_SWITCH) return false;
+  pushHistory(session);
+  c.phase = (c.phase ?? 0) ^ 1;
+  session.moves += 1;
+  session.selectedTable = -1;
+  syncLatent(session);
+  hideBeams(session);
+  session.result.moveApplied = true;
+  session.result.tableId = -1;
+  session.result.deltaQ = 0;
+  return true;
+}
+
+/** Place a held token onto an empty PAD. Counts as one move. */
+export function tryPlaceToken(session: PuzzleSession, x: number, y: number): boolean {
+  if (session.result.won) return false;
+  if (session.tokensLeft <= 0) return false;
+  if (!inBounds(session.state, x, y)) return false;
+  const c = getCell(session.state, x, y);
+  if (c.kind !== Kind.PAD || (c.phase ?? 0) === 1) return false;
+  pushHistory(session);
+  c.phase = 1;
+  session.tokensLeft -= 1;
+  session.moves += 1;
+  session.selectedTable = -1;
+  syncLatent(session);
+  hideBeams(session);
+  session.result.moveApplied = true;
+  session.result.tableId = -1;
+  session.result.deltaQ = 0;
+  return true;
+}
+
+/** Pick a token back up from a PAD. Counts as one move. */
+export function tryPickupToken(session: PuzzleSession, x: number, y: number): boolean {
+  if (session.result.won) return false;
+  if (!inBounds(session.state, x, y)) return false;
+  const c = getCell(session.state, x, y);
+  if (c.kind !== Kind.PAD || (c.phase ?? 0) !== 1) return false;
+  pushHistory(session);
+  c.phase = 0;
+  session.tokensLeft += 1;
+  session.moves += 1;
+  session.selectedTable = -1;
+  syncLatent(session);
+  hideBeams(session);
+  session.result.moveApplied = true;
+  session.result.tableId = -1;
+  session.result.deltaQ = 0;
+  return true;
+}
+
+/** Tap a PAD: place if empty and holding a token, else pick up if occupied. */
+export function tryTogglePad(session: PuzzleSession, x: number, y: number): boolean {
+  if (!inBounds(session.state, x, y)) return false;
+  const c = getCell(session.state, x, y);
+  if (c.kind !== Kind.PAD) return false;
+  if ((c.phase ?? 0) === 1) return tryPickupToken(session, x, y);
+  return tryPlaceToken(session, x, y);
+}
+
+/** Replay one authored solution step (rotate / flip / place). */
+export function applySolutionStep(session: PuzzleSession, step: MoveStep): boolean {
+  if (step.tableId === -1) {
+    if (step.x === undefined || step.y === undefined) return false;
+    return tryFlipPhase(session, step.x, step.y);
+  }
+  if (step.tableId === -2) {
+    if (step.x === undefined || step.y === undefined) return false;
+    return tryPlaceToken(session, step.x, step.y);
+  }
+  return tryRotate(session, step.tableId, step.delta);
 }
 
 export function previewSolve(session: PuzzleSession, tableId: number, rotationQ: number): TurnResult {

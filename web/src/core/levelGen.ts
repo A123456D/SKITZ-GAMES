@@ -1,11 +1,11 @@
 import { Dir, Kind, MirrorOri, dirDelta, type Vec2 } from "./cellKind";
 import { Channel } from "./cellData";
 import { Module as M, makeTable, type TableDef } from "./tableDef";
-import { cell, move, table, type LevelData, type MoveStep } from "./levelData";
+import { cell, move, flipAt, placeAt, table, type LevelData, type MoveStep } from "./levelData";
 import { buildState } from "./levelData";
 import { applyPlayerRotation, setTableRotation } from "./rotateOps";
 import { cloneGrid } from "./gridState";
-import { loadLevel, pulse, tryRotate } from "./puzzleSession";
+import { applySolutionStep, loadLevel, pulse, tryRotate } from "./puzzleSession";
 import { entryPortFromIncoming, exitsFrom } from "./portWiring";
 import { solve } from "./beamSolver";
 import type { CellData } from "./cellData";
@@ -1082,6 +1082,7 @@ function placeSolutionWormhole(
       par: 0,
       undoLimit: 1,
       pulseLimit: 3,
+      tokenBudget: 0,
       tables: hubs,
       cells: grid,
       solution: [],
@@ -1203,6 +1204,7 @@ function placeSolutionBarriers(
     par: 0,
     undoLimit: 1,
     pulseLimit: 3,
+    tokenBudget: 0,
     tables: hubs,
     cells: grid,
     solution: [],
@@ -1440,6 +1442,210 @@ function gateIsRequired(level: LevelData): boolean {
   return !solve(g).won;
 }
 
+/** True if disarming every phase switch breaks the win. */
+function phaseIsRequired(level: LevelData): boolean {
+  const g = buildState(level);
+  let any = false;
+  for (const c of g.cells) {
+    if (c.kind === Kind.PHASE_SWITCH && (c.phase ?? 0) === 1) {
+      c.phase = 0;
+      any = true;
+    }
+  }
+  if (!any) return false;
+  return !solve(g).won;
+}
+
+/** True if clearing every token pad breaks the win. */
+function tokenIsRequired(level: LevelData): boolean {
+  const g = buildState(level);
+  let any = false;
+  for (const c of g.cells) {
+    if (c.kind === Kind.PAD && (c.phase ?? 0) === 1) {
+      c.phase = 0;
+      any = true;
+    }
+  }
+  if (!any) return false;
+  return !solve(g).won;
+}
+
+/**
+ * Install co-equal systems on the solved board.
+ * Phase: mark a solid receiver as phase-locked and arm a switch on its beam —
+ * alternate open-field routes still arrive at the wrong polarity, so the switch
+ * is load-bearing without needing a geometric choke.
+ * Tokens: seal the approach to a dash (else solid) receiver and put a door on
+ * the last EMPTY step so the pad/token is required.
+ */
+function placePhaseTokenKit(
+  grid: CellData[],
+  bp: Blueprint,
+  rng: Rng,
+  requirePhase: boolean,
+  requireTokens: boolean,
+  tokenBudget: number,
+): boolean {
+  const w = bp.size;
+  const h = bp.size;
+  const idx = (p: Vec2) => p.y * w + p.x;
+  const hubs = bp.hubs.map((h0, i) => table(i, h0.pos.x, h0.pos.y, h0.module, h0.rot, 0, h0.locked));
+  const snapshot = grid.map((c) => ({ ...c }));
+
+  const trialLevel = (): LevelData => ({
+    id: "kit_trial",
+    title: "",
+    width: w,
+    height: h,
+    par: 0,
+    undoLimit: 1,
+    pulseLimit: 3,
+    tokenBudget,
+    tables: hubs,
+    cells: grid,
+    solution: [],
+  });
+
+  const canPlace = (p: Vec2) =>
+    p.x >= 0 &&
+    p.y >= 0 &&
+    p.x < w &&
+    p.y < h &&
+    grid[idx(p)].kind === Kind.EMPTY &&
+    !bp.hubs.some((hb) => hb.pos.x === p.x && hb.pos.y === p.y);
+
+  const neighbors4 = (p: Vec2): Vec2[] =>
+    [
+      { x: p.x + 1, y: p.y },
+      { x: p.x - 1, y: p.y },
+      { x: p.x, y: p.y + 1 },
+      { x: p.x, y: p.y - 1 },
+    ].filter((q) => q.x >= 0 && q.y >= 0 && q.x < w && q.y < h);
+
+  const sealApproaches = (target: Vec2, keep: Set<string>): void => {
+    for (const n of neighbors4(target)) {
+      if (!canPlace(n) || keep.has(key(n))) continue;
+      grid[idx(n)] = wall();
+    }
+  };
+
+  const lightingPaths = (
+    channel: number,
+  ): { empties: Vec2[]; receiver: Vec2 }[] => {
+    const r = solve(buildState(trialLevel()));
+    if (!r.won) return [];
+    const out: { empties: Vec2[]; receiver: Vec2 }[] = [];
+    for (const beam of r.beams) {
+      if (beam.channel !== channel || !beam.segments.length) continue;
+      const last = beam.segments[beam.segments.length - 1].to;
+      const hit = grid[idx(last)];
+      if (hit.kind !== Kind.RECEIVER || (hit.channel ?? 0) !== channel) continue;
+      const empties: Vec2[] = [];
+      const seen = new Set<string>();
+      for (const seg of beam.segments) {
+        const p = seg.to;
+        if (p.x === last.x && p.y === last.y) continue;
+        const k = key(p);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        if (canPlace(p)) empties.push(p);
+      }
+      if (empties.length >= 1) out.push({ empties, receiver: last });
+    }
+    return shuffle(rng, out);
+  };
+
+  const restore = () => {
+    for (let i = 0; i < grid.length; i++) grid[i] = { ...snapshot[i] };
+  };
+
+  if (requirePhase) {
+    const paths = lightingPaths(Channel.SOLID);
+    let placed = false;
+    for (const { empties, receiver } of paths) {
+      // Switch ~1/3 along the path (readable); receiver demands phase B.
+      const si = Math.min(empties.length - 1, Math.max(0, Math.floor(empties.length / 3)));
+      const sw = empties[si];
+      // Optional teaching gate just after the switch when space allows.
+      const gi = si + 1 < empties.length ? si + 1 : -1;
+      grid[idx(sw)] = cell.phaseSwitch(1);
+      if (gi >= 0) grid[idx(empties[gi])] = cell.phaseGate(1);
+      const recv = grid[idx(receiver)];
+      grid[idx(receiver)] = { ...recv, phase: 1 };
+      const lvl = trialLevel();
+      if (solve(buildState(lvl)).won && phaseIsRequired(lvl)) {
+        placed = true;
+        break;
+      }
+      restore();
+    }
+    if (!placed) {
+      restore();
+      return false;
+    }
+    for (let i = 0; i < grid.length; i++) snapshot[i] = { ...grid[i] };
+  }
+
+  if (requireTokens && tokenBudget > 0) {
+    const preferDash = lightingPaths(Channel.DASH);
+    const paths = preferDash.length ? preferDash : lightingPaths(Channel.SOLID);
+    let placed = false;
+    for (const { empties, receiver } of paths) {
+      // Prefer last empty; skip if phase kit already claimed it.
+      let doorSpot: Vec2 | null = null;
+      for (let i = empties.length - 1; i >= 0; i--) {
+        if (grid[idx(empties[i])].kind === Kind.EMPTY) {
+          doorSpot = empties[i];
+          break;
+        }
+      }
+      if (!doorSpot) continue;
+      const keep = new Set<string>([key(doorSpot)]);
+      grid[idx(doorSpot)] = cell.tokenDoor(1);
+      sealApproaches(receiver, new Set([key(doorSpot)]));
+      sealApproaches(doorSpot, new Set([key(receiver), ...keep]));
+      const padPool = shuffle(
+        rng,
+        trapEndsAround(bp, grid, rng).filter(
+          (p) => canPlace(p) && !(p.x === doorSpot!.x && p.y === doorSpot!.y),
+        ),
+      ).slice(0, 16);
+      for (const padPos of padPool) {
+        grid[idx(padPos)] = cell.pad(1, 1);
+        const lvl = trialLevel();
+        if (solve(buildState(lvl)).won && tokenIsRequired(lvl)) {
+          placed = true;
+          break;
+        }
+        grid[idx(padPos)] = e();
+      }
+      if (placed) break;
+      restore();
+    }
+    if (!placed) {
+      restore();
+      return false;
+    }
+  }
+
+  if (!solve(buildState(trialLevel())).won) {
+    restore();
+    return false;
+  }
+  return true;
+}
+
+function trapEndsAround(bp: Blueprint, grid: CellData[], rng: Rng): Vec2[] {
+  const w = bp.size;
+  const out: Vec2[] = [];
+  for (let y = 1; y < bp.size - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      if (grid[y * w + x].kind === Kind.EMPTY) out.push({ x, y });
+    }
+  }
+  return shuffle(rng, out).slice(0, 40);
+}
+
 function cropLevel(level: LevelData): LevelData {
   const w = level.width;
   const h = level.height;
@@ -1488,6 +1694,11 @@ function cropLevel(level: LevelData): LevelData {
       ...t,
       hub: { x: t.hub.x - minX, y: t.hub.y - minY },
     })),
+    solution: level.solution.map((s) =>
+      s.x !== undefined && s.y !== undefined
+        ? { ...s, x: s.x - minX, y: s.y - minY }
+        : { ...s },
+    ),
   };
 }
 
@@ -1681,8 +1892,44 @@ function hasCheapSolve(
   const start = buildState(level);
   if (solve(start).won) return true;
   const acts = actorIds(start.tables);
-  if (!acts.length) return false;
-  const keyOf = (g: ReturnType<typeof buildState>) => g.tables.map((t) => t.rotationQ).join("");
+  const keyOf = (g: ReturnType<typeof buildState>) =>
+    g.tables.map((t) => t.rotationQ).join("") +
+    "|" +
+    g.cells
+      .map((c) =>
+        c.kind === Kind.PHASE_SWITCH || c.kind === Kind.PAD ? String(c.phase ?? 0) : "",
+      )
+      .join("");
+
+  type Extra = { kind: "flip" | "place"; x: number; y: number };
+  const extrasOf = (g: ReturnType<typeof buildState>): Extra[] => {
+    const out: Extra[] = [];
+    for (let y = 0; y < g.height; y++) {
+      for (let x = 0; x < g.width; x++) {
+        const c = g.cells[y * g.width + x];
+        if (c.kind === Kind.PHASE_SWITCH) out.push({ kind: "flip", x, y });
+        if (c.kind === Kind.PAD && (c.phase ?? 0) === 0 && level.tokenBudget > 0)
+          out.push({ kind: "place", x, y });
+      }
+    }
+    return out;
+  };
+  const applyExtra = (g: ReturnType<typeof buildState>, ex: Extra): boolean => {
+    const c = g.cells[ex.y * g.width + ex.x];
+    if (ex.kind === "flip") {
+      if (c.kind !== Kind.PHASE_SWITCH) return false;
+      c.phase = (c.phase ?? 0) ^ 1;
+      return true;
+    }
+    if (c.kind !== Kind.PAD || (c.phase ?? 0) === 1) return false;
+    let used = 0;
+    for (const x of g.cells) if (x.kind === Kind.PAD && (x.phase ?? 0) === 1) used++;
+    if (used >= level.tokenBudget) return false;
+    c.phase = 1;
+    return true;
+  };
+
+  if (!acts.length && !extrasOf(start).length) return false;
 
   // 1) Exhaustive shallow BFS — proves no win at depth 1..exactDepth.
   const seen = new Set<string>([keyOf(start)]);
@@ -1706,6 +1953,17 @@ function hasCheapSolve(
           next.push(g);
         }
       }
+      for (const ex of extrasOf(cur)) {
+        if (nodes >= exactNodeCap) break;
+        const g = cloneGrid(cur);
+        if (!applyExtra(g, ex)) continue;
+        const k = keyOf(g);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        nodes++;
+        if (solve(g).won) return true;
+        next.push(g);
+      }
     }
     if (!next.length) break;
     frontier = next;
@@ -1722,11 +1980,19 @@ function hasCheapSolve(
     const g = cloneGrid(start);
     const len = 3 + Math.floor(rand() * (probeLen - 2)); // 3..probeLen
     for (let s = 0; s < len; s++) {
-      const id = acts[Math.floor(rand() * acts.length)];
-      const table = g.tables.find((t) => t.id === id)!;
-      let q = Math.floor(rand() * 4);
-      if (q === table.rotationQ) q = (q + 1) % 4;
-      applyPlayerRotation(g, id, q);
+      const extras = extrasOf(g);
+      const pool = acts.length + extras.length;
+      if (!pool) break;
+      const pick = Math.floor(rand() * pool);
+      if (pick < acts.length) {
+        const id = acts[pick];
+        const table = g.tables.find((t) => t.id === id)!;
+        let q = Math.floor(rand() * 4);
+        if (q === table.rotationQ) q = (q + 1) % 4;
+        applyPlayerRotation(g, id, q);
+      } else {
+        applyExtra(g, extras[pick - acts.length]!);
+      }
       if (solve(g).won) return true;
     }
   }
@@ -1744,7 +2010,11 @@ function assignGears(
   const linked = new Set<number>();
   if (pairs <= 0) return linked;
   const eligible = hubs.filter(
-    (t) => !t.locked && t.module === M.ELBOW && t.id !== sharedId && !t.link,
+    (t) =>
+      !t.locked &&
+      (t.module === M.ELBOW || t.module === M.STRAIGHT) &&
+      t.id !== sharedId &&
+      !t.link,
   );
   // Score: prefer pairing discs that sit on different channels so one twist
   // disturbs two routes at once.
@@ -1797,6 +2067,11 @@ function scrambleAndVerify(
   rng: Rng,
   opts: ReturnType<typeof profile>,
   difficulty: number,
+  extras: { requirePhase: boolean; requireTokens: boolean; tokenBudget: number } = {
+    requirePhase: false,
+    requireTokens: false,
+    tokenBudget: 0,
+  },
 ): LevelData | null {
   applyLocks(bp.hubs, opts.structuralLocks, rng);
   for (const h of bp.hubs) {
@@ -1813,6 +2088,7 @@ function scrambleAndVerify(
     par: 1,
     undoLimit: opts.undoLimit,
     pulseLimit: opts.pulseLimit,
+    tokenBudget: extras.tokenBudget,
     tables: hubs,
     cells: grid,
     solution: [],
@@ -1825,6 +2101,8 @@ function scrambleAndVerify(
   if (solvedResult.spillReceivers.length > 0) return null;
   if (!allHubsOnBeams(solved, solvedResult)) return null;
   if (!gateIsRequired(solved)) return null;
+  if (extras.requirePhase && !phaseIsRequired(solved)) return null;
+  if (extras.requireTokens && !tokenIsRequired(solved)) return null;
   if (!hubs.some((t) => t.module === M.GATE)) return null;
   if (!hubs.some((t) => t.module === M.TEE)) return null;
   if (!hubs.some((t) => t.module === M.CROSS)) return null;
@@ -1858,11 +2136,28 @@ function scrambleAndVerify(
 
   // Gears: link free elbow pairs so one action turns both. Prefer cross-channel
   // couples so twisting one disc disturbs two routes.
-  assignGears(hubs, bp.sharedHubIndex, opts.gearPairs, rng, solvedResult);
+  const geared = assignGears(hubs, bp.sharedHubIndex, opts.gearPairs, rng, solvedResult);
+  if (opts.gearPairs > 0 && geared.size < opts.gearPairs * 2) return null;
 
   const g = buildState(solved);
   const solution: MoveStep[] = [];
   const scrambled = new Set<number>();
+
+  // Scramble co-equal systems first: disarm switches, clear tokens.
+  // Solving requires flipping / placing these before (or with) disc work.
+  for (let y = 0; y < g.height; y++) {
+    for (let x = 0; x < g.width; x++) {
+      const c = g.cells[y * g.width + x];
+      if (c.kind === Kind.PHASE_SWITCH && (c.phase ?? 0) === 1) {
+        c.phase = 0;
+        solution.push(flipAt(x, y));
+      }
+      if (c.kind === Kind.PAD && (c.phase ?? 0) === 1) {
+        c.phase = 0;
+        solution.push(placeAt(x, y));
+      }
+    }
+  }
 
   // Geared pairs share one degree of freedom: one offset moves both, and the
   // player solves the pair by turning the lead disc (partner follows via gears).
@@ -1915,6 +2210,7 @@ function scrambleAndVerify(
     par: solution.length,
     undoLimit: opts.undoLimit,
     pulseLimit: opts.pulseLimit,
+    tokenBudget: extras.tokenBudget,
     tables: g.tables.map((t) => ({ ...t, hub: { ...t.hub }, link: t.link ? { ...t.link } : undefined })),
     cells: g.cells.map((c) => ({ ...c })),
     solution,
@@ -1938,6 +2234,7 @@ function scrambleAndVerify(
     par: solution.length,
     undoLimit: opts.undoLimit,
     pulseLimit: opts.pulseLimit,
+    tokenBudget: extras.tokenBudget,
     tables: g.tables.map((t) => ({ ...t, hub: { ...t.hub }, link: t.link ? { ...t.link } : undefined })),
     cells: g.cells.map((c) => ({ ...c })),
     solution,
@@ -1946,29 +2243,34 @@ function scrambleAndVerify(
       difficulty === 1
         ? "Learn the language. Rings teleport. Shutters pass one way. PULSE only when ready."
         : difficulty === 2
-          ? "From here on, every level has no short-cut. Plan before you PULSE."
-          : difficulty === 6
-            ? "Cog-toothed discs are geared — turning one turns its partner. Align both at once."
-            : undefined,
+          ? "Phase switches flip polarity. Phase gates only pass the matching phase."
+          : difficulty === 3
+            ? "Tokens sit on pads. A token door stays shut until its pad holds a token."
+            : difficulty === 6
+              ? "Cog-toothed discs are geared — turning one turns its partner. Align both at once."
+              : undefined,
   };
 
   if (!allReceiversGeometricallyReachable(level)) return null;
   if (solve(buildState(level)).won) return null;
   const session = loadLevel(level);
   for (const step of solution) {
-    if (!tryRotate(session, step.tableId, step.delta)) return null;
+    if (!applySolutionStep(session, step)) return null;
   }
   if (!pulse(session)) return null;
   if (!session.result.won || session.moves !== level.par) return null;
   if (session.result.spillReceivers.length > 0) return null;
   if (!allHubsOnBeams(level, session.result)) return null;
-  if (!gateIsRequired({ ...level, tables: hubs })) return null;
-  if (!sharedHubIsCoupled({ ...level, tables: hubs }, bp.sharedHubIndex)) return null;
+  // Structural checks need the solved cell state (armed switches / filled pads).
+  // Scramble mutates those cells; mixing them with solved hub rotations falsely fails.
+  if (!gateIsRequired({ ...level, tables: hubs, cells: solved.cells })) return null;
+  if (!sharedHubIsCoupled({ ...level, tables: hubs, cells: solved.cells }, bp.sharedHubIndex))
+    return null;
 
   const cropped = cropLevel(level);
   const check = loadLevel(cropped);
   for (const step of cropped.solution) {
-    if (!tryRotate(check, step.tableId, step.delta)) return null;
+    if (!applySolutionStep(check, step)) return null;
   }
   if (!pulse(check) || !check.result.won) return null;
   if (!allReceiversGeometricallyReachable(cropped)) return null;
@@ -2172,22 +2474,56 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
         ];
 
   const attempts = masterpiece ? 3000 : genius ? 2200 : 1400;
-  for (const cfg of plans) {
-    for (let attempt = 0; attempt < attempts; attempt++) {
-      const bp = tryBlueprint(rng, cfg);
-      if (!bp) continue;
-      const painted = paintGrid(bp, rng, cfg.falseCorridors, cfg.openField, cfg.wallClumps);
-      const hazardsOk = placeHazards(
-        painted.grid,
-        bp,
-        painted.trapEnds,
-        painted.trapCells,
-        rng,
-        cfg,
-      );
-      if (!hazardsOk) continue;
-      const level = scrambleAndVerify(bp, painted.grid, rng, cfg, d);
-      if (level) return level;
+  // Try full kit first; if it never lands, degrade so a level still ships.
+  // Kit placement seals a local corridor, so it lands on most blueprints.
+  // Keep kit attempts modest; fall back only if sealing keeps breaking the win.
+  const kitPlans: { requirePhase: boolean; requireTokens: boolean; tokenBudget: number; maxAttempts: number }[] =
+    d >= 3
+      ? [
+          { requirePhase: true, requireTokens: true, tokenBudget: d >= 12 ? 2 : 1, maxAttempts: 60 },
+          { requirePhase: true, requireTokens: false, tokenBudget: 0, maxAttempts: 40 },
+          { requirePhase: false, requireTokens: false, tokenBudget: 0, maxAttempts: attempts },
+        ]
+      : d >= 2
+        ? [
+            { requirePhase: true, requireTokens: false, tokenBudget: 0, maxAttempts: 60 },
+            { requirePhase: false, requireTokens: false, tokenBudget: 0, maxAttempts: attempts },
+          ]
+        : [{ requirePhase: false, requireTokens: false, tokenBudget: 0, maxAttempts: attempts }];
+
+  for (const kit of kitPlans) {
+    for (const cfg of plans) {
+      for (let attempt = 0; attempt < kit.maxAttempts; attempt++) {
+        const bp = tryBlueprint(rng, cfg);
+        if (!bp) continue;
+        const painted = paintGrid(bp, rng, cfg.falseCorridors, cfg.openField, cfg.wallClumps);
+        const hazardsOk = placeHazards(
+          painted.grid,
+          bp,
+          painted.trapEnds,
+          painted.trapCells,
+          rng,
+          cfg,
+        );
+        if (!hazardsOk) continue;
+        if (kit.requirePhase || kit.requireTokens) {
+          const kitOk = placePhaseTokenKit(
+            painted.grid,
+            bp,
+            rng,
+            kit.requirePhase,
+            kit.requireTokens,
+            kit.tokenBudget,
+          );
+          if (!kitOk) continue;
+        }
+        const level = scrambleAndVerify(bp, painted.grid, rng, cfg, d, {
+          requirePhase: kit.requirePhase,
+          requireTokens: kit.requireTokens,
+          tokenBudget: kit.tokenBudget,
+        });
+        if (level) return level;
+      }
     }
   }
 

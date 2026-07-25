@@ -13,7 +13,24 @@ export const Kind = {
   FILTER: 8,
   /** One-way shutter. A beam only passes while travelling in `dir`. */
   BARRIER: 9,
+  /**
+   * Player toggle. When armed (`cell.phase === 1`), beams that pass through
+   * flip polarity (0↔1). When off, beams pass unchanged.
+   */
+  PHASE_SWITCH: 10,
+  /** Pass only if the beam's phase matches `cell.phase`. */
+  PHASE_GATE: 11,
+  /**
+   * Token socket. Beams pass through. `cell.phase === 1` means a token sits
+   * here; opens any TOKEN_DOOR sharing `cell.channel`.
+   */
+  PAD: 12,
+  /** Blocks beams unless a PAD with the same channel holds a token. */
+  TOKEN_DOOR: 13,
 } as const;
+
+/** Beam polarity — orthogonal to Channel. */
+export const Phase = { A: 0, B: 1 } as const;
 
 export const Dir = { N: 0, E: 1, S: 2, W: 3 } as const;
 export const MirrorOri = { BACKSLASH: 0, SLASH: 1 } as const;

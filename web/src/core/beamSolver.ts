@@ -4,13 +4,14 @@ import { Module, tableAtHub, type TableDef } from "./tableDef";
 import { entryPortFromIncoming, exitsFrom, rotatedPairs } from "./portWiring";
 
 export type BeamSeg = { from: Vec2; to: Vec2 };
-export type Beam = { segments: BeamSeg[]; origin: Vec2; channel: number };
+export type Beam = { segments: BeamSeg[]; origin: Vec2; channel: number; phase: number };
 
 export type BeamEvent =
   | { type: "portEnter"; tableId: number; pos: Vec2 }
   | { type: "portExit"; tableId: number; pos: Vec2 }
-  | { type: "receiverLit"; pos: Vec2; channel: number; match: boolean }
-  | { type: "blocked"; pos: Vec2 };
+  | { type: "receiverLit"; pos: Vec2; channel: number; phase: number; match: boolean }
+  | { type: "blocked"; pos: Vec2 }
+  | { type: "phaseFlip"; pos: Vec2; phase: number };
 
 export type TurnResult = {
   beams: Beam[];
@@ -35,6 +36,7 @@ type Ray = {
   origin: Vec2;
   segs: BeamSeg[];
   channel: number;
+  phase: number;
 };
 
 function effectiveTable(table: TableDef, preview?: Map<number, number>): TableDef {
@@ -49,6 +51,32 @@ function isGateSide(table: TableDef, entryPort: number): boolean {
     axis.add(b);
   }
   return !axis.has(entryPort);
+}
+
+/** A token on a PAD opens every TOKEN_DOOR that shares its channel id. */
+function tokenDoorOpen(state: GridState, linkId: number): boolean {
+  for (const c of state.cells) {
+    if (c.kind === Kind.PAD && (c.channel ?? 0) === linkId && (c.phase ?? 0) === 1) return true;
+  }
+  return false;
+}
+
+/** A token on a PAD adjacent to a GATE hub also opens that gate (legacy side-key). */
+function openGatesFromTokens(state: GridState, gateOpen: Set<number>): void {
+  for (const table of state.tables) {
+    if (table.module !== Module.GATE) continue;
+    for (const d of [Dir.N, Dir.E, Dir.S, Dir.W]) {
+      const dd = dirDelta(d);
+      const nx = table.hub.x + dd.x;
+      const ny = table.hub.y + dd.y;
+      if (!inBounds(state, nx, ny)) continue;
+      const c = getCell(state, nx, ny);
+      if (c.kind === Kind.PAD && (c.phase ?? 0) === 1) {
+        gateOpen.add(table.id);
+        break;
+      }
+    }
+  }
 }
 
 export function solve(state: GridState, previewRot?: Map<number, number>): TurnResult {
@@ -68,12 +96,14 @@ export function solve(state: GridState, previewRot?: Map<number, number>): TurnR
   const spill = new Map<string, Vec2>();
   const gateOpen = new Set<number>();
 
+  openGatesFromTokens(state, gateOpen);
   propagate(state, result, correct, spill, gateOpen, previewRot, true);
   if (gateOpen.size > 0) {
     result.beams = [];
     result.events = [];
     correct.clear();
     spill.clear();
+    openGatesFromTokens(state, gateOpen);
     propagate(state, result, correct, spill, gateOpen, previewRot, false);
   }
 
@@ -108,6 +138,7 @@ function propagate(
         origin: { x, y },
         segs: [],
         channel: cell.channel ?? 0,
+        phase: cell.phase ?? 0,
       });
     }
   }
@@ -115,6 +146,7 @@ function propagate(
   while (queue.length) {
     const ray = queue.shift()!;
     let { x, y, dir } = ray;
+    let phase = ray.phase;
     const segs = [...ray.segs];
     let steps = 0;
 
@@ -127,7 +159,7 @@ function propagate(
         break;
       }
 
-      const edgeKey = `${nx},${ny},${dir},${ray.channel}`;
+      const edgeKey = `${nx},${ny},${dir},${ray.channel},${phase}`;
       if (visited.has(edgeKey)) break;
       visited.add(edgeKey);
 
@@ -165,6 +197,7 @@ function propagate(
               origin: ray.origin,
               segs: segs.map((s) => ({ from: { ...s.from }, to: { ...s.to } })),
               channel: ray.channel,
+              phase,
             });
           }
         }
@@ -172,7 +205,29 @@ function propagate(
       }
 
       const hit = getCell(state, x, y);
-      if (hit.kind === Kind.EMPTY) continue;
+      if (hit.kind === Kind.EMPTY || hit.kind === Kind.PAD) continue;
+      if (hit.kind === Kind.TOKEN_DOOR) {
+        if (!tokenDoorOpen(state, hit.channel ?? 0)) {
+          result.events.push({ type: "blocked", pos: { x, y } });
+          break;
+        }
+        continue;
+      }
+      if (hit.kind === Kind.PHASE_SWITCH) {
+        // Armed switch flips polarity; off switch is inert glass.
+        if ((hit.phase ?? 0) === 1) {
+          phase ^= 1;
+          result.events.push({ type: "phaseFlip", pos: { x, y }, phase });
+        }
+        continue;
+      }
+      if (hit.kind === Kind.PHASE_GATE) {
+        if ((hit.phase ?? 0) !== phase) {
+          result.events.push({ type: "blocked", pos: { x, y } });
+          break;
+        }
+        continue;
+      }
       if (hit.kind === Kind.MIRROR) {
         dir = reflect(dir, hit.ori);
         continue;
@@ -197,8 +252,7 @@ function propagate(
           result.events.push({ type: "blocked", pos: { x, y } });
           break;
         }
-        // Exit from twin, same direction; mark visit so we don't loop
-        const exitKey = `${twin.x},${twin.y},${dir},${ray.channel}`;
+        const exitKey = `${twin.x},${twin.y},${dir},${ray.channel},${phase}`;
         if (visited.has(exitKey)) break;
         visited.add(exitKey);
         segs.push({ from: { x, y }, to: { x: twin.x, y: twin.y } });
@@ -212,8 +266,19 @@ function propagate(
       }
       if (hit.kind === Kind.RECEIVER) {
         const k = `${x},${y}`;
-        const match = (hit.channel ?? 0) === ray.channel;
-        result.events.push({ type: "receiverLit", pos: { x, y }, channel: ray.channel, match });
+        // Channel must match. If the receiver encodes a required phase
+        // (phase 0 = any, phase 1 = must arrive as B), enforce it here so
+        // open-field alternate routes can't skip a mid-path PHASE_GATE.
+        const needPhase = hit.phase ?? 0;
+        const phaseOk = needPhase === 0 || needPhase === phase;
+        const match = (hit.channel ?? 0) === ray.channel && phaseOk;
+        result.events.push({
+          type: "receiverLit",
+          pos: { x, y },
+          channel: ray.channel,
+          phase,
+          match,
+        });
         if (match) {
           if (!correct.has(k)) correct.set(k, { x, y });
         } else {
@@ -225,7 +290,12 @@ function propagate(
       break;
     }
 
-    result.beams.push({ segments: segs, origin: ray.origin, channel: ray.channel });
+    result.beams.push({
+      segments: segs,
+      origin: ray.origin,
+      channel: ray.channel,
+      phase,
+    });
   }
 }
 

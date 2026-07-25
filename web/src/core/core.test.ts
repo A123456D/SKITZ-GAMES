@@ -8,15 +8,18 @@ import { createGrid, cloneGrid } from "./gridState";
 import { solve } from "./beamSolver";
 import { rotateTable, applyPlayerRotation } from "./rotateOps";
 import { DIFFICULTY_COUNT, generateLevel } from "./levelCatalog";
-import { loadLevel, pulse, tryRotate } from "./puzzleSession";
+import { loadLevel, pulse, tryRotate, tryFlipPhase, tryPlaceToken, applySolutionStep } from "./puzzleSession";
 import { cell, table, buildState, type LevelData } from "./levelData";
 
 const e = cell.empty;
 
 function L(
-  partial: Omit<LevelData, "pulseLimit"> & { pulseLimit?: number },
+  partial: Omit<LevelData, "pulseLimit" | "tokenBudget"> & {
+    pulseLimit?: number;
+    tokenBudget?: number;
+  },
 ): LevelData {
-  return { pulseLimit: 3, ...partial };
+  return { pulseLimit: 3, tokenBudget: 0, ...partial };
 }
 
 describe("rotateOffset still CW", () => {
@@ -264,6 +267,103 @@ describe("optics hazards", () => {
   });
 });
 
+describe("phase + tokens", () => {
+  it("phase switch flips beam through a phase gate", () => {
+    // Emit → switch → gate(B) → recv. Switch starts off → blocked; arm → win.
+    const level = L({
+      id: "phase",
+      title: "phase",
+      width: 5,
+      height: 1,
+      par: 1,
+      undoLimit: 2,
+      tables: [],
+      cells: [
+        cell.emit(Dir.E),
+        cell.phaseSwitch(0),
+        cell.phaseGate(1),
+        e(),
+        cell.recv(),
+      ],
+      solution: [],
+    });
+    expect(solve(buildState(level)).won).toBe(false);
+    const session = loadLevel(level);
+    expect(tryFlipPhase(session, 1, 0)).toBe(true);
+    expect(pulse(session)).toBe(true);
+    expect(session.result.won).toBe(true);
+  });
+
+  it("phase-locked receiver rejects wrong polarity on any route", () => {
+    const level = L({
+      id: "phase-recv",
+      title: "phase-recv",
+      width: 4,
+      height: 1,
+      par: 1,
+      undoLimit: 2,
+      tables: [],
+      cells: [cell.emit(Dir.E), cell.phaseSwitch(0), e(), cell.recv(0, -1, 1)],
+      solution: [],
+    });
+    expect(solve(buildState(level)).won).toBe(false);
+    const session = loadLevel(level);
+    expect(tryFlipPhase(session, 1, 0)).toBe(true);
+    expect(pulse(session)).toBe(true);
+    expect(session.result.won).toBe(true);
+  });
+
+  it("token door stays shut until pad holds a token", () => {
+    const level = L({
+      id: "token",
+      title: "token",
+      width: 5,
+      height: 2,
+      par: 1,
+      undoLimit: 2,
+      tokenBudget: 1,
+      tables: [],
+      cells: [
+        cell.emit(Dir.E),
+        cell.tokenDoor(1),
+        e(),
+        e(),
+        cell.recv(),
+        e(),
+        cell.pad(0, 1),
+        e(),
+        e(),
+        e(),
+      ],
+      solution: [],
+    });
+    expect(solve(buildState(level)).won).toBe(false);
+    const session = loadLevel(level);
+    expect(session.tokensLeft).toBe(1);
+    expect(tryPlaceToken(session, 1, 1)).toBe(true);
+    expect(session.tokensLeft).toBe(0);
+    expect(pulse(session)).toBe(true);
+    expect(session.result.won).toBe(true);
+  });
+
+  it("mid levels require phase and tokens", () => {
+    for (const seed of [7, 42]) {
+      const level = generateLevel(5, seed);
+      expect(level.cells.some((c) => c.kind === Kind.PHASE_SWITCH)).toBe(true);
+      expect(level.cells.some((c) => c.kind === Kind.PHASE_GATE)).toBe(true);
+      expect(level.cells.some((c) => c.kind === Kind.PAD)).toBe(true);
+      expect(level.cells.some((c) => c.kind === Kind.TOKEN_DOOR)).toBe(true);
+      expect(level.tokenBudget).toBeGreaterThanOrEqual(1);
+      const session = loadLevel(level);
+      for (const step of level.solution) {
+        expect(applySolutionStep(session, step)).toBe(true);
+      }
+      expect(pulse(session)).toBe(true);
+      expect(session.result.won).toBe(true);
+    }
+  }, 180000);
+});
+
 describe("pulse win gate", () => {
   it("solved board does not win until pulse", () => {
     const level = L({
@@ -304,7 +404,7 @@ describe("gate+channel procedural levels", () => {
       expect(level.par).toBeGreaterThanOrEqual(6);
       const session = loadLevel(level);
       for (const step of level.solution) {
-        expect(tryRotate(session, step.tableId, step.delta)).toBe(true);
+        expect(applySolutionStep(session, step)).toBe(true);
       }
       expect(session.result.won).toBe(false);
       expect(pulse(session)).toBe(true);
@@ -484,7 +584,7 @@ describe("gate+channel procedural levels", () => {
         // Gear-aware solution still wins.
         const session = loadLevel(level);
         for (const step of level.solution) {
-          expect(tryRotate(session, step.tableId, step.delta)).toBe(true);
+          expect(applySolutionStep(session, step)).toBe(true);
         }
         expect(pulse(session)).toBe(true);
         expect(session.result.won).toBe(true);
@@ -554,13 +654,14 @@ describe("gate+channel procedural levels", () => {
         const level = generateLevel(d, seed);
         const session = loadLevel(level);
         for (const step of level.solution) {
-          expect(tryRotate(session, step.tableId, step.delta)).toBe(true);
+          expect(applySolutionStep(session, step)).toBe(true);
         }
         expect(pulse(session)).toBe(true);
         expect(session.result.won).toBe(true);
 
         const solved: LevelData = {
           ...level,
+          cells: session.state.cells.map((c) => ({ ...c })),
           tables: session.state.tables.map((t) => ({
             ...t,
             hub: { ...t.hub },
@@ -630,7 +731,7 @@ describe("gate+channel procedural levels", () => {
         const level = generateLevel(d, seed);
         const session = loadLevel(level);
         for (const step of level.solution) {
-          expect(tryRotate(session, step.tableId, step.delta)).toBe(true);
+          expect(applySolutionStep(session, step)).toBe(true);
         }
         expect(pulse(session)).toBe(true);
         expect(session.result.won).toBe(true);
@@ -681,7 +782,7 @@ describe("gate+channel procedural levels", () => {
     expect(session.result.energizedReceivers).toHaveLength(0);
     expect(session.result.won).toBe(false);
     for (const step of level.solution) {
-      expect(tryRotate(session, step.tableId, step.delta)).toBe(true);
+      expect(applySolutionStep(session, step)).toBe(true);
       expect(session.beamsVisible).toBe(false);
       expect(session.result.won).toBe(false);
       expect(session.result.beams).toHaveLength(0);
@@ -698,7 +799,7 @@ describe("gate+channel procedural levels", () => {
         const session = loadLevel(level);
         expect(session.result.won).toBe(false);
         for (const step of level.solution) {
-          expect(tryRotate(session, step.tableId, step.delta)).toBe(true);
+          expect(applySolutionStep(session, step)).toBe(true);
         }
         expect(session.result.won).toBe(false);
         expect(pulse(session)).toBe(true);

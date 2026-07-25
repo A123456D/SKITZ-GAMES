@@ -10,11 +10,13 @@ import {
   restart,
   selectTable,
   stars,
+  tryFlipPhase,
   tryRotate,
+  tryTogglePad,
   undo,
   type PuzzleSession,
 } from "./core/puzzleSession";
-import { buildTutorialBasics, buildTutorialChannels, buildTutorialDepth, buildTutorialShowcase, buildThemePreviewLevel, SHOWCASE_POINTS, type PointBeat } from "./core/tutorialLevel";
+import { buildTutorialBasics, buildTutorialChannels, buildTutorialDepth, buildTutorialPhaseTokens, buildTutorialShowcase, buildThemePreviewLevel, SHOWCASE_POINTS, type PointBeat } from "./core/tutorialLevel";
 import { buildState, type LevelData } from "./core/levelData";
 import { solve } from "./core/beamSolver";
 import { tableContains } from "./core/tableDef";
@@ -135,7 +137,7 @@ const TUTORIAL_FLOW: TutStep[] = [
     body: [
       "Pulse Shifter is a laser routing puzzle.",
       "We’ll point at every symbol and explain it,",
-      "then you’ll solve three short practice boards.",
+      "then you’ll solve four short practice boards.",
     ],
     nextLabel: "MEET THE BOARD",
   },
@@ -149,12 +151,12 @@ const TUTORIAL_FLOW: TutStep[] = [
     title: "YOUR TURN",
     body: [
       "Time to play. Turn discs, then PULSE.",
-      "Three lessons — basics, channels, then depth.",
+      "Four lessons — basics, channels, depth, then phase & tokens.",
       "Take your time. Undo and Reset are there to help.",
     ],
     nextLabel: "TRY LESSON 1",
   },
-  { kind: "play", build: buildTutorialBasics, lesson: "1 / 3 · Turn & Pulse" },
+  { kind: "play", build: buildTutorialBasics, lesson: "1 / 4 · Turn & Pulse" },
   {
     kind: "card",
     title: "CHANNELS NEXT",
@@ -165,7 +167,7 @@ const TUTORIAL_FLOW: TutStep[] = [
     ],
     nextLabel: "TRY LESSON 2",
   },
-  { kind: "play", build: buildTutorialChannels, lesson: "2 / 3 · Channels" },
+  { kind: "play", build: buildTutorialChannels, lesson: "2 / 4 · Channels" },
   {
     kind: "card",
     title: "DEPTH NEXT",
@@ -175,7 +177,18 @@ const TUTORIAL_FLOW: TutStep[] = [
     ],
     nextLabel: "TRY LESSON 3",
   },
-  { kind: "play", build: buildTutorialDepth, lesson: "3 / 3 · Depth" },
+  { kind: "play", build: buildTutorialDepth, lesson: "3 / 4 · Depth" },
+  {
+    kind: "card",
+    title: "PHASE & TOKENS",
+    body: [
+      "From Level 2 on, polarity and tokens matter as much as discs.",
+      "Arm phase switches. Place tokens on pads to open doors.",
+      "Discs alone won’t clear those boards.",
+    ],
+    nextLabel: "TRY LESSON 4",
+  },
+  { kind: "play", build: buildTutorialPhaseTokens, lesson: "4 / 4 · Phase & Tokens" },
   {
     kind: "card",
     title: "YOU’RE READY",
@@ -320,6 +333,22 @@ const SYMBOL_INFO: Record<number, { title: string; body: string }> = {
   [Kind.BARRIER]: {
     title: "BARRIER",
     body: "A one-way gate. A beam only passes while travelling through the open lane.",
+  },
+  [Kind.PHASE_SWITCH]: {
+    title: "PHASE SWITCH",
+    body: "Tap to arm or disarm. An armed switch flips a beam's polarity as it passes. Phase gates only accept the matching polarity.",
+  },
+  [Kind.PHASE_GATE]: {
+    title: "PHASE GATE",
+    body: "Only a beam with the matching polarity may pass. Use a phase switch upstream to flip the beam first.",
+  },
+  [Kind.PAD]: {
+    title: "TOKEN PAD",
+    body: "A socket for a token. Tap to place or pick up. A token door stays shut until its linked pad holds a token.",
+  },
+  [Kind.TOKEN_DOOR]: {
+    title: "TOKEN DOOR",
+    body: "Blocks every beam until a token sits on the matching pad. Discs alone cannot open it.",
   },
 };
 
@@ -742,6 +771,33 @@ canvas.addEventListener("pointerdown", (e) => {
       };
       canvas.setPointerCapture(e.pointerId);
       return;
+    }
+    // Phase switches + token pads are co-equal verbs with disc turns.
+    if (layout) {
+      const s = layout.cell + layout.gap;
+      const cx = Math.floor((p.x - layout.origin.x) / s);
+      const cy = Math.floor((p.y - layout.origin.y) / s);
+      if (cx >= 0 && cy >= 0 && cx < session.state.width && cy < session.state.height) {
+        const cell = getCell(session.state, cx, cy);
+        if (cell.kind === Kind.PHASE_SWITCH) {
+          if (tryFlipPhase(session, cx, cy)) {
+            displayResult = session.result;
+            beamProgress = 1;
+            sfxSnap();
+            persistRun();
+          }
+          return;
+        }
+        if (cell.kind === Kind.PAD) {
+          if (tryTogglePad(session, cx, cy)) {
+            displayResult = session.result;
+            beamProgress = 1;
+            sfxSnap();
+            persistRun();
+          }
+          return;
+        }
+      }
     }
     inspectCellAt(p.x, p.y);
   }
@@ -1420,7 +1476,17 @@ function drawPlay(): void {
         : "TUTORIAL";
   drawTitle(ctx, inTutorial ? tutLabel : levelTitle(levelIndex + 1).toUpperCase());
   if (tutorialPhase !== "point") {
-    drawHudStats(ctx, session.moves, session.level.par, lit, need, spill, pLeft, pLim);
+    drawHudStats(
+      ctx,
+      session.moves,
+      session.level.par,
+      lit,
+      need,
+      spill,
+      pLeft,
+      pLim,
+      session.level.tokenBudget > 0 ? session.tokensLeft : -1,
+    );
     const music: SliderRect = {
       x: W / 2 - 140,
       y: 158,

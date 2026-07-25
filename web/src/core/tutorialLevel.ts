@@ -25,6 +25,7 @@ export function buildTutorialBasics(): LevelData {
     par: 1,
     undoLimit: 4,
     pulseLimit: 5,
+    tokenBudget: 0,
     tables: [table(0, 2, 1, Module.STRAIGHT, 0, 0, false)],
     cells,
     solution: [{ tableId: 0, delta: 1 }],
@@ -55,6 +56,7 @@ export function buildTutorialChannels(): LevelData {
     par: 2,
     undoLimit: 5,
     pulseLimit: 5,
+    tokenBudget: 0,
     tables: [
       table(0, 2, 1, Module.STRAIGHT, 0, 0, false),
       table(1, 2, 3, Module.STRAIGHT, 0, 0, false),
@@ -95,10 +97,45 @@ export function buildTutorialDepth(): LevelData {
     par: 1,
     undoLimit: 5,
     pulseLimit: 5,
+    tokenBudget: 0,
     tables: [table(0, 2, 2, Module.STRAIGHT, 0, 0, false)],
     cells,
     solution: [{ tableId: 0, delta: 1 }],
     hint: "Turn the disc. The beam jumps through the wormhole, then passes the one-way barrier. Tap symbols to learn them.",
+    tutorial: true,
+  };
+}
+
+/**
+ * Lesson 4 — Phase & Tokens (co-equal verbs with disc turns).
+ * Flip the phase switch and place a token so the door opens and the
+ * phase-locked receiver accepts the beam.
+ */
+export function buildTutorialPhaseTokens(): LevelData {
+  const width = 5;
+  const height = 2;
+  const cells = Array.from({ length: width * height }, () => e());
+  cells[0 * width + 0] = cell.emit(Dir.E);
+  cells[0 * width + 1] = cell.phaseSwitch(0);
+  cells[0 * width + 2] = cell.tokenDoor(1);
+  cells[0 * width + 4] = cell.recv(0, -1, 1);
+  cells[1 * width + 1] = cell.pad(0, 1);
+  return {
+    id: "tutorial_phase_tokens",
+    title: "Lesson 4 · Phase & Tokens",
+    width,
+    height,
+    par: 2,
+    undoLimit: 5,
+    pulseLimit: 5,
+    tokenBudget: 1,
+    tables: [],
+    cells,
+    solution: [
+      { tableId: -1, delta: 0, x: 1, y: 0 },
+      { tableId: -2, delta: 0, x: 1, y: 1 },
+    ],
+    hint: "Tap the phase switch to arm it. Tap the pad to place your token. Then PULSE.",
     tutorial: true,
   };
 }
@@ -149,6 +186,7 @@ export function buildTutorialShowcase(): LevelData {
     par: 1,
     undoLimit: 0,
     pulseLimit: 0,
+    tokenBudget: 0,
     tables: [table(0, 2, 1, Module.STRAIGHT, 1, 0, true)],
     cells,
     solution: [],
@@ -233,6 +271,7 @@ export function buildThemePreviewLevel(): LevelData {
     par: 1,
     undoLimit: 1,
     pulseLimit: 3,
+    tokenBudget: 0,
     tables: [table(0, 2, 1, Module.STRAIGHT, 1, 0, false)],
     cells,
     solution: [],

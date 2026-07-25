@@ -542,6 +542,109 @@ function drawBarrier(ctx: CanvasRenderingContext2D, c: Vec2, size: number, passD
   ctx.restore();
 }
 
+/** Half-moon: empty = inert, filled = armed (flips beam polarity). */
+function drawPhaseSwitch(ctx: CanvasRenderingContext2D, c: Vec2, size: number, armed: boolean): void {
+  const r = size * 0.28;
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.strokeStyle = P.INK;
+  ctx.fillStyle = P.INK;
+  ctx.lineWidth = lw(size, 0.05);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+  if (armed) {
+    ctx.beginPath();
+    ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
+    ctx.lineTo(0, 0);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    ctx.globalAlpha = 0.25;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+/** Diamond lock — only the matching polarity passes. */
+function drawPhaseGate(ctx: CanvasRenderingContext2D, c: Vec2, size: number, needPhase: number): void {
+  const s = size * 0.28;
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.strokeStyle = P.INK;
+  ctx.lineWidth = lw(size, 0.055);
+  ctx.beginPath();
+  ctx.moveTo(0, -s);
+  ctx.lineTo(s, 0);
+  ctx.lineTo(0, s);
+  ctx.lineTo(-s, 0);
+  ctx.closePath();
+  ctx.stroke();
+  if (needPhase === 1) {
+    ctx.fillStyle = P.INK;
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.45);
+    ctx.lineTo(s * 0.45, 0);
+    ctx.lineTo(0, s * 0.45);
+    ctx.lineTo(-s * 0.45, 0);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** Empty ring = socket; filled disc = token seated. */
+function drawPad(ctx: CanvasRenderingContext2D, c: Vec2, size: number, hasToken: boolean): void {
+  const r = size * 0.26;
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.strokeStyle = P.INK;
+  ctx.fillStyle = P.INK;
+  ctx.lineWidth = lw(size, 0.05);
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  if (hasToken) {
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** Bracket door — shut until its linked pad holds a token. */
+function drawTokenDoor(ctx: CanvasRenderingContext2D, c: Vec2, size: number): void {
+  const s = size * 0.32;
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.strokeStyle = P.INK;
+  ctx.lineWidth = lw(size, 0.06);
+  ctx.beginPath();
+  ctx.moveTo(-s, -s * 0.7);
+  ctx.lineTo(-s * 0.35, -s * 0.7);
+  ctx.moveTo(-s, s * 0.7);
+  ctx.lineTo(-s * 0.35, s * 0.7);
+  ctx.moveTo(s, -s * 0.7);
+  ctx.lineTo(s * 0.35, -s * 0.7);
+  ctx.moveTo(s, s * 0.7);
+  ctx.lineTo(s * 0.35, s * 0.7);
+  ctx.stroke();
+  ctx.globalAlpha = 0.35;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.15, -s * 0.5);
+  ctx.lineTo(-s * 0.15, s * 0.5);
+  ctx.moveTo(s * 0.15, -s * 0.5);
+  ctx.lineTo(s * 0.15, s * 0.5);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 /** Faint tie-line between two geared discs so the coupling reads at a glance. */
 export function drawGearLink(ctx: CanvasRenderingContext2D, layout: Layout, a: Vec2, b: Vec2): void {
   const pa = cellCenter(layout, a);
@@ -630,6 +733,18 @@ export function drawOptics(
         case Kind.BARRIER:
           drawBarrier(ctx, c, layout.cell, cell.dir);
           break;
+        case Kind.PHASE_SWITCH:
+          drawPhaseSwitch(ctx, c, layout.cell, (cell.phase ?? 0) === 1);
+          break;
+        case Kind.PHASE_GATE:
+          drawPhaseGate(ctx, c, layout.cell, cell.phase ?? 1);
+          break;
+        case Kind.PAD:
+          drawPad(ctx, c, layout.cell, (cell.phase ?? 0) === 1);
+          break;
+        case Kind.TOKEN_DOOR:
+          drawTokenDoor(ctx, c, layout.cell);
+          break;
       }
       ctx.restore();
     }
@@ -691,16 +806,21 @@ export function drawHudStats(
   spill = 0,
   pulsesLeft = -1,
   pulseLimit = -1,
+  tokensLeft = -1,
 ): void {
   ctx.fillStyle = P.INK;
   ctx.font = "700 16px Georgia, serif";
   ctx.textAlign = "center";
-  ctx.fillText(`MOVES  ${moves}`, W / 2 - 220, 148);
+  ctx.fillText(`MOVES  ${moves}`, W / 2 - 240, 148);
   if (pulsesLeft >= 0 && pulseLimit >= 0) {
-    ctx.fillText(`PULSES  ${pulsesLeft}/${pulseLimit}`, W / 2 - 50, 148);
+    ctx.fillText(`PULSES  ${pulsesLeft}/${pulseLimit}`, W / 2 - 70, 148);
   }
-  ctx.fillText(`LINKED  ${lit}/${need}`, W / 2 + 100, 148);
-  ctx.fillText(spill > 0 ? `SPILL  ${spill}` : `PAR  ${par}`, W / 2 + 230, 148);
+  ctx.fillText(`LINKED  ${lit}/${need}`, W / 2 + 80, 148);
+  if (tokensLeft >= 0) {
+    ctx.fillText(`TOKENS  ${tokensLeft}`, W / 2 + 200, 148);
+  } else {
+    ctx.fillText(spill > 0 ? `SPILL  ${spill}` : `PAR  ${par}`, W / 2 + 220, 148);
+  }
 }
 
 export function drawCoachHint(ctx: CanvasRenderingContext2D, text: string, y = 1048): void {
