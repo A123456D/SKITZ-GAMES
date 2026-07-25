@@ -19,11 +19,14 @@ import { buildState, type LevelData } from "./core/levelData";
 import { solve } from "./core/beamSolver";
 import { tableContains } from "./core/tableDef";
 import {
+  clearActiveRun,
   completeTutorial,
   loadSave,
   recordClear,
   setTheme,
   setVolumes,
+  storeActiveRun,
+  type ActiveRunData,
   type SaveData,
 } from "./app/save";
 import { onMusicScreen, unlockMusic } from "./audio/music";
@@ -355,7 +358,81 @@ function startLevel(i: number, newSeed = true): void {
   clearWinState();
   clearFeel();
   screen = "play";
+  persistRun();
 }
+
+function runRotations(): number[] {
+  return session?.state.tables.map((t) => t.rotationQ) ?? [];
+}
+
+function persistRun(): void {
+  if (!session || inTutorial) return;
+  const run: ActiveRunData = {
+    levelIndex,
+    seed: playSeed,
+    rotations: runRotations(),
+    historyRotations: session.history.map((state) => state.tables.map((t) => t.rotationQ)),
+    moves: session.moves,
+    undosRemaining: session.undosRemaining,
+    pulsesUsed: session.pulsesUsed,
+    beamsVisible: session.beamsVisible,
+    selectedTable: session.selectedTable,
+  };
+  storeActiveRun(save, run);
+}
+
+function restoreSavedRun(): boolean {
+  const run = save.activeRun;
+  if (!run) return false;
+  if (
+    !Number.isInteger(run.levelIndex) ||
+    run.levelIndex < 0 ||
+    run.levelIndex >= DIFFICULTY_COUNT ||
+    !Number.isFinite(run.seed) ||
+    !Array.isArray(run.rotations)
+  ) {
+    clearActiveRun(save);
+    return false;
+  }
+
+  levelIndex = run.levelIndex;
+  playSeed = run.seed >>> 0;
+  session = loadLevel(generateLevel(levelIndex + 1, playSeed));
+  const applyRotations = (tables: PuzzleSession["state"]["tables"], rotations: number[]): void => {
+    tables.forEach((table, i) => {
+      const q = rotations[i];
+      if (Number.isFinite(q)) table.rotationQ = ((Math.round(q) % 4) + 4) % 4;
+    });
+  };
+  applyRotations(session.state.tables, run.rotations);
+  session.history = (Array.isArray(run.historyRotations) ? run.historyRotations : []).map((rotations) => {
+    const snapshot = buildState(session!.level);
+    applyRotations(snapshot.tables, rotations);
+    return snapshot;
+  });
+  session.moves = Math.max(0, Number(run.moves) || 0);
+  session.undosRemaining = Math.max(0, Number(run.undosRemaining) || 0);
+  session.pulsesUsed = Math.max(0, Number(run.pulsesUsed) || 0);
+  session.selectedTable = Number.isInteger(run.selectedTable) ? run.selectedTable : -1;
+  session.beamsVisible = !!run.beamsVisible;
+  session.latent = solve(session.state);
+  session.latent.won = false;
+  if (session.beamsVisible) {
+    session.result = solve(session.state);
+    session.prevLit = new Set(session.result.energizedReceivers.map((p) => `${p.x},${p.y}`));
+  }
+  layout = boardLayout(session.state);
+  displayResult = session.result;
+  beamProgress = 1;
+  settledTables = new Set(session.state.tables.map((t) => t.id));
+  clearWinState();
+  if (session.result.won) pendingWin = true;
+  screen = "play";
+  return true;
+}
+
+// A normal puzzle resumes exactly where the player closed the tab.
+if (save.tutorialDone) restoreSavedRun();
 
 function beginTutorial(): void {
   inTutorial = true;
@@ -535,6 +612,7 @@ function doRotate(dq: number): void {
   sfxSnap();
   playEvents(before, session.result);
   ackRoute();
+  persistRun();
 }
 
 function doPulse(): void {
@@ -549,6 +627,7 @@ function doPulse(): void {
     pendingWin = true;
     winRevealAt = 0;
   }
+  persistRun();
 }
 
 function visualRot(tableId: number): number {
@@ -689,6 +768,7 @@ canvas.addEventListener("pointerup", () => {
     settledTables.add(tableId);
     sfxSnap();
     ackRoute();
+    persistRun();
   }
 });
 
@@ -699,10 +779,20 @@ canvas.addEventListener("pointercancel", () => {
   displayResult = session.result;
 });
 
+window.addEventListener("pagehide", persistRun);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") persistRun();
+});
+
 function onButton(id: string): void {
   unlockAllAudio();
   if (id === "play") {
-    const first = Math.min(save.unlocked - 1, DIFFICULTY_COUNT - 1);
+    if (session && !inTutorial) {
+      screen = "play";
+      return;
+    }
+    if (restoreSavedRun()) return;
+    const first = Math.min(save.lastLevelIndex, DIFFICULTY_COUNT - 1);
     startLevel(Math.max(0, first), true);
     return;
   }
@@ -743,7 +833,7 @@ function onButton(id: string): void {
     screen = "levels";
     return;
   }
-  if (id === "home") {
+  if (id === "home" || id === "main_menu") {
     goHome();
     return;
   }
@@ -850,6 +940,7 @@ function onButton(id: string): void {
     clearWinState();
     displayResult = session.result;
     beamProgress = 1;
+    persistRun();
   }
   if (id === "reset") {
     restart(session);
@@ -859,6 +950,7 @@ function onButton(id: string): void {
     displayResult = session.result;
     beamProgress = 1;
     drag = null;
+    persistRun();
   }
   if (id === "next") {
     if (inTutorial) {
@@ -1033,13 +1125,13 @@ function drawInfoPages(
 }
 
 function goHome(): void {
-  const target = "/games/";
-  try {
-    const win = window.top ?? window;
-    win.location.href = target;
-  } catch {
-    window.location.href = target;
-  }
+  // Always the in-game Pulse Shifter menu (PLAY / LEVELS / …). Never leave the iframe.
+  persistRun();
+  dismissInspect();
+  inTutorial = false;
+  tutorialPhase = "intro";
+  clearWinState();
+  screen = "menu";
 }
 
 function drawMenu(): void {
@@ -1053,7 +1145,7 @@ function drawMenu(): void {
   const tutBtn: ButtonRect = { x: 120, y: 610, w: 480, h: 60, id: "tutorial" };
   const howBtn: ButtonRect = { x: 120, y: 685, w: 480, h: 60, id: "how" };
   const settingsBtn: ButtonRect = { x: 120, y: 760, w: 480, h: 60, id: "settings" };
-  drawGlassButton(ctx, play, "PLAY", true, time);
+  drawGlassButton(ctx, play, session && !inTutorial ? "RESUME" : "PLAY", true, time);
   drawGlassButton(ctx, levelsBtn, `LEVELS · ${DIFFICULTY_COUNT}`, false, time);
   drawGlassButton(ctx, tutBtn, "TUTORIAL", false, time);
   drawGlassButton(ctx, howBtn, "HOW TO PLAY", false, time);
@@ -1101,12 +1193,13 @@ function drawSettings(): void {
   ctx.fillStyle = P.INK;
   ctx.font = "700 18px Georgia, serif";
   ctx.textAlign = "center";
-  ctx.fillText("THEME", W / 2, 140);
-  drawThemeGrid(170);
+  ctx.fillText("THEME · LIVE PREVIEW", W / 2, 125);
+  drawThemeGamePreview(145);
+  drawThemeGrid(405);
   ctx.fillStyle = P.INK;
   ctx.font = "700 18px Georgia, serif";
-  ctx.fillText("VOLUME", W / 2, 400);
-  pushVolumeSliders(440);
+  ctx.fillText("VOLUME", W / 2, 625);
+  pushVolumeSliders(665);
   const back: ButtonRect = { x: 120, y: 1100, w: 480, h: 64, id: "settings_back" };
   drawGlassButton(
     ctx,
@@ -1286,11 +1379,11 @@ function drawPause(): void {
   const resume: ButtonRect = { x: 120, y: 420, w: 480, h: 68, id: "pause_resume" };
   const settingsBtn: ButtonRect = { x: 120, y: 510, w: 480, h: 64, id: "settings" };
   const levelsBtn: ButtonRect = { x: 120, y: 595, w: 480, h: 64, id: "pause_levels" };
-  const homeBtn: ButtonRect = { x: 120, y: 680, w: 480, h: 64, id: "home" };
+  const homeBtn: ButtonRect = { x: 120, y: 680, w: 480, h: 64, id: "main_menu" };
   drawGlassButton(ctx, resume, "RESUME", true, time);
   drawGlassButton(ctx, settingsBtn, "SETTINGS", false, time);
   drawGlassButton(ctx, levelsBtn, "LEVELS", false, time);
-  drawGlassButton(ctx, homeBtn, "HOME", false, time);
+  drawGlassButton(ctx, homeBtn, "MAIN MENU", false, time);
   buttons.push(resume, settingsBtn, levelsBtn, homeBtn);
 }
 

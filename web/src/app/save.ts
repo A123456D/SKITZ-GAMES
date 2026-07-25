@@ -9,11 +9,25 @@ export type SaveData = {
   unlocked: number;
   bestStars: Record<string, number>;
   bestMoves: Record<string, number>;
+  lastLevelIndex: number;
+  activeRun: ActiveRunData | null;
   theme: ThemeId;
   musicVol: number;
   sfxVol: number;
   tutorialDone: boolean;
   themePicked: boolean;
+};
+
+export type ActiveRunData = {
+  levelIndex: number;
+  seed: number;
+  rotations: number[];
+  historyRotations: number[][];
+  moves: number;
+  undosRemaining: number;
+  pulsesUsed: number;
+  beamsVisible: boolean;
+  selectedTable: number;
 };
 
 function clamp01(v: unknown, fallback: number): number {
@@ -31,6 +45,8 @@ function freshSave(firstRun: boolean): SaveData {
     unlocked: DIFFICULTY_COUNT,
     bestStars: {},
     bestMoves: {},
+    lastLevelIndex: 0,
+    activeRun: null,
     theme: "paper",
     musicVol: 0.7,
     sfxVol: 0.85,
@@ -61,6 +77,8 @@ export function loadSave(): SaveData {
         unlocked: Math.max(d.unlocked ?? 1, DIFFICULTY_COUNT),
         bestStars: d.bestStars ?? {},
         bestMoves: d.bestMoves ?? {},
+        lastLevelIndex: Math.max(0, Number(d.lastLevelIndex) || 0),
+        activeRun: null,
         theme: migrateTheme(d.theme),
         musicVol: clamp01(d.musicVol, 0.7),
         sfxVol: clamp01(d.sfxVol, 0.85),
@@ -76,6 +94,10 @@ export function loadSave(): SaveData {
       unlocked: Math.max(d.unlocked ?? 1, DIFFICULTY_COUNT),
       bestStars: d.bestStars ?? {},
       bestMoves: d.bestMoves ?? {},
+      lastLevelIndex: Math.max(0, Number(d.lastLevelIndex) || 0),
+      activeRun: d.activeRun && typeof d.activeRun === "object"
+        ? d.activeRun as ActiveRunData
+        : null,
       theme: migrateTheme(d.theme),
       musicVol: clamp01(d.musicVol, 0.7),
       sfxVol: clamp01(d.sfxVol, 0.85),
@@ -110,6 +132,17 @@ export function setVolumes(save: SaveData, music: number, sfx: number): void {
   writeSave(save);
 }
 
+export function storeActiveRun(save: SaveData, run: ActiveRunData): void {
+  save.lastLevelIndex = run.levelIndex;
+  save.activeRun = run;
+  writeSave(save);
+}
+
+export function clearActiveRun(save: SaveData): void {
+  save.activeRun = null;
+  writeSave(save);
+}
+
 export function completeTutorial(save: SaveData): void {
   save.tutorialDone = true;
   writeSave(save);
@@ -126,6 +159,8 @@ export function recordClear(
   if (stars > prevS) save.bestStars[levelId] = stars;
   const prevM = save.bestMoves[levelId] ?? 9999;
   if (moves < prevM) save.bestMoves[levelId] = moves;
+  save.lastLevelIndex = levelIndex;
+  save.activeRun = null;
   save.unlocked = Math.max(save.unlocked, levelIndex + 2, DIFFICULTY_COUNT);
   writeSave(save);
 }

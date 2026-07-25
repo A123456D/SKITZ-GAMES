@@ -414,6 +414,18 @@ describe("gate+channel procedural levels", () => {
     }
   });
 
+  it("genius levels demand long plans and scarce pulses", () => {
+    for (const seed of [3, 41]) {
+      const level = generateLevel(15, seed);
+      expect(level.pulseLimit).toBeLessThanOrEqual(2);
+      expect(level.undoLimit).toBe(1);
+      expect(level.par).toBeGreaterThanOrEqual(10);
+      const emits = level.cells.filter((c) => c.kind === Kind.EMITTER);
+      expect(new Set(emits.map((c) => c.channel ?? 0)).size).toBe(3);
+      expect(level.cells.filter((c) => c.kind === Kind.BARRIER).length).toBeGreaterThanOrEqual(2);
+    }
+  }, 90000);
+
   for (const d of [1, 5, 10, 15, 20]) {
     it(`diff ${d} solvable via pulse and requires gate key`, () => {
       for (const seed of [1, 99]) {

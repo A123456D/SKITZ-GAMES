@@ -102,6 +102,37 @@ export function levelTitle(diff: number): string {
 function profile(diff: number) {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, diff));
   const t = (d - 1) / (DIFFICULTY_COUNT - 1);
+
+  // Levels 11–20: genius cliff — scarce pulses, deep traps, tight coupling.
+  // Pipe lengths stay ≤3/2/3 so a third channel still fits on 12×12.
+  if (d >= 11) {
+    const g = (d - 11) / Math.max(1, DIFFICULTY_COUNT - 11);
+    return {
+      diff: d,
+      size: 12,
+      solidBefore: 3,
+      solidAfter: 2,
+      keyBefore: 3,
+      channels: 3,
+      requireChannels: 3,
+      structuralLocks: 1,
+      doubleChance: 0.9 + g * 0.08,
+      undoLimit: 1,
+      pulseLimit: g < 0.5 ? 2 : 1,
+      falseCorridors: 1 + Math.floor(g * 2),
+      mirrors: 1 + Math.floor(g * 2),
+      sinks: 1 + Math.floor(g * 2),
+      wormPairs: 1,
+      requireWorm: true,
+      decoyWorms: g < 0.35 ? 0 : 1,
+      barriers: 3 + Math.floor(g),
+      requireBarriers: 3,
+      filters: g < 0.4 ? 1 : 2,
+      minMoves: 11 + Math.floor(g * 7),
+    };
+  }
+
+  // Levels 1–10: climb toward the cliff without soft-capping depth.
   return {
     diff: d,
     size: 12,
@@ -113,22 +144,17 @@ function profile(diff: number) {
     structuralLocks: 1 + Math.min(2, Math.floor(t * 2)),
     doubleChance: 0.85,
     undoLimit: 1,
-    // Scarce pulses — planning over probing
     pulseLimit: 2 + Math.floor(t * 2),
-    // Minimal side-paths — every empty lane should still feel purposeful
     falseCorridors: t > 0.55 ? 1 : 0,
-    // Only solution-adjacent hazards, not garnish
-    mirrors: d >= 10 ? 1 : 0,
+    mirrors: d >= 8 ? 1 : 0,
     sinks: d >= 4 ? 1 : 0,
-    // Wormhole fold on the solution path from level 1
     wormPairs: 1,
     requireWorm: true,
-    // No decoy wormholes — every portal on the board is meaningful
     decoyWorms: 0,
     barriers: 2 + Math.floor(t * 2),
     requireBarriers: 2,
-    filters: d >= 8 ? 1 : 0,
-    minMoves: 8 + Math.floor(t * 6),
+    filters: d >= 7 ? 1 : 0,
+    minMoves: 6 + Math.floor(((d - 1) / 9) * 8),
   };
 }
 
@@ -1039,10 +1065,26 @@ function placeHazards(
       if (bp.emitA.y === bp.recvA.y) return p.y === bp.emitA.y;
       return false;
     });
+    let filtersLeft = opts.filters;
     for (const p of shuffle(rng, solidMids)) {
+      if (filtersLeft <= 0) break;
       if (!canPlace(p)) continue;
       grid[idx(p)] = cell.filter(Channel.SOLID);
-      break;
+      filtersLeft--;
+    }
+    // Second filter can gate the dashed approach so channel mistakes hurt harder.
+    if (filtersLeft > 0 && bp.emitB) {
+      const dashMids = emptyOnBeam(grid, w, bp).filter((p) => {
+        if (bp.emitB.x === bp.recvB.x) return p.x === bp.emitB.x;
+        if (bp.emitB.y === bp.recvB.y) return p.y === bp.emitB.y;
+        return false;
+      });
+      for (const p of shuffle(rng, dashMids)) {
+        if (filtersLeft <= 0) break;
+        if (!canPlace(p)) continue;
+        grid[idx(p)] = cell.filter(Channel.DASH);
+        filtersLeft--;
+      }
     }
   }
 
@@ -1304,7 +1346,7 @@ function scrambleAndVerify(
     const j = Math.floor(rng() * (i + 1));
     [solution[i], solution[j]] = [solution[j], solution[i]];
   }
-  if (solution.length < Math.min(opts.minMoves, 8)) return null;
+  if (solution.length < opts.minMoves) return null;
 
   const level: LevelData = {
     id: `diff_${difficulty}`,
@@ -1351,39 +1393,97 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, difficulty));
   const rng = mulberry32((seed >>> 0) ^ Math.imul(d, 0x9e3779b9));
   const opts = profile(d);
+  const genius = d >= 11;
 
-  // Prefer full depth (worms + decoys); only shed layers if generation stalls
-  const plans: ReturnType<typeof profile>[] = [
-    opts,
-    { ...opts, decoyWorms: 0 },
-    { ...opts, decoyWorms: 0, filters: 0 },
-    {
-      ...opts,
-      decoyWorms: 0,
-      filters: 0,
-      solidBefore: 2,
-      solidAfter: 2,
-      keyBefore: 2,
-      structuralLocks: 1,
-      minMoves: 8,
-      falseCorridors: 1,
-    },
-    {
-      ...opts,
-      decoyWorms: 0,
-      filters: 0,
-      solidBefore: 2,
-      solidAfter: 2,
-      keyBefore: 2,
-      structuralLocks: 1,
-      minMoves: 8,
-      requireChannels: 2,
-      channels: 2,
-    },
-  ];
+  // Prefer full depth; genius tiers may shed garnish but never drop to 2-channel soft puzzles.
+  const plans: ReturnType<typeof profile>[] = genius
+    ? [
+        opts,
+        { ...opts, decoyWorms: 0, mirrors: Math.max(1, opts.mirrors) },
+        {
+          ...opts,
+          decoyWorms: 0,
+          falseCorridors: 1,
+          filters: 1,
+          sinks: Math.max(1, opts.sinks - 1),
+          mirrors: 1,
+        },
+        {
+          ...opts,
+          decoyWorms: 0,
+          falseCorridors: 1,
+          filters: 1,
+          barriers: 3,
+          requireBarriers: 3,
+          solidBefore: 3,
+          solidAfter: 2,
+          keyBefore: 3,
+          minMoves: Math.max(11, opts.minMoves - 3),
+          pulseLimit: Math.max(1, opts.pulseLimit),
+        },
+        {
+          ...opts,
+          decoyWorms: 0,
+          falseCorridors: 1,
+          filters: 1,
+          barriers: 3,
+          requireBarriers: 2,
+          solidBefore: 2,
+          solidAfter: 2,
+          keyBefore: 3,
+          minMoves: 10,
+          pulseLimit: 2,
+          doubleChance: 0.88,
+        },
+        {
+          // Last-resort genius: still 3-channel + scarce pulses, slightly shorter solution.
+          ...opts,
+          decoyWorms: 0,
+          falseCorridors: 1,
+          filters: 1,
+          barriers: 2,
+          requireBarriers: 2,
+          solidBefore: 2,
+          solidAfter: 2,
+          keyBefore: 2,
+          minMoves: 9,
+          pulseLimit: Math.max(1, opts.pulseLimit),
+          mirrors: 1,
+          sinks: 1,
+        },
+      ]
+    : [
+        opts,
+        { ...opts, decoyWorms: 0 },
+        { ...opts, decoyWorms: 0, filters: 0 },
+        {
+          ...opts,
+          decoyWorms: 0,
+          filters: 0,
+          solidBefore: 2,
+          solidAfter: 2,
+          keyBefore: 2,
+          structuralLocks: 1,
+          minMoves: Math.min(opts.minMoves, 8),
+          falseCorridors: 1,
+        },
+        {
+          ...opts,
+          decoyWorms: 0,
+          filters: 0,
+          solidBefore: 2,
+          solidAfter: 2,
+          keyBefore: 2,
+          structuralLocks: 1,
+          minMoves: Math.min(opts.minMoves, 8),
+          requireChannels: 2,
+          channels: 2,
+        },
+      ];
 
+  const attempts = genius ? 1200 : 500;
   for (const cfg of plans) {
-    for (let attempt = 0; attempt < 500; attempt++) {
+    for (let attempt = 0; attempt < attempts; attempt++) {
       const bp = tryBlueprint(rng, cfg);
       if (!bp) continue;
       const painted = paintGrid(bp, rng, cfg.falseCorridors);
