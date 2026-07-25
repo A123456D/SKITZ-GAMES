@@ -28,9 +28,25 @@ const src = `/games/${game.id}/${game.data.webPlayPath}`;
 <style is:global>
 	.play-page {
 		background: #000;
+		margin: 0;
+		overflow: hidden;
+		height: 100%;
+		min-height: 100dvh;
+	}
+
+	html:has(.play-page) {
+		height: 100%;
+		overflow: hidden;
 	}
 
 	.play-page::before {
 		opacity: 0.04;
+	}
+
+	@media (max-width: 820px), (pointer: coarse) {
+		.play-page::before,
+		.play-page::after {
+			display: none;
+		}
 	}
 </style>
