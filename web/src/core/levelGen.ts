@@ -132,6 +132,8 @@ function profile(diff: number) {
       minMoves: 5 + d,
       minCritical: 4,
       gearPairs: 0,
+      openField: true,
+      wallClumps: 9,
       maxOneMoveSolves: true,
     };
   }
@@ -163,6 +165,8 @@ function profile(diff: number) {
       minMoves: 8 + Math.floor(j * 3),
       minCritical: 5,
       gearPairs: d >= 7 ? 1 : 0,
+      openField: true,
+      wallClumps: 8,
       maxOneMoveSolves: true,
     };
   }
@@ -194,6 +198,8 @@ function profile(diff: number) {
       minMoves: 11 + Math.floor(a * 2),
       minCritical: 6,
       gearPairs: 1,
+      openField: true,
+      wallClumps: 6,
       maxOneMoveSolves: true,
     };
   }
@@ -225,6 +231,8 @@ function profile(diff: number) {
       minMoves: 12 + Math.floor(g * 3),
       minCritical: 6,
       gearPairs: 2,
+      openField: true,
+      wallClumps: 5,
       maxOneMoveSolves: true,
     };
   }
@@ -255,6 +263,8 @@ function profile(diff: number) {
     minMoves: 13 + Math.floor(m * 3),
     minCritical: 7,
     gearPairs: 2,
+    openField: true,
+    wallClumps: 4,
     maxOneMoveSolves: true,
   };
 }
@@ -722,7 +732,13 @@ function tryBlueprint(rng: Rng, opts: ReturnType<typeof profile>): Blueprint | n
   };
 }
 
-function paintGrid(bp: Blueprint, rng: Rng, falseCorridors: number): {
+function paintGrid(
+  bp: Blueprint,
+  rng: Rng,
+  falseCorridors: number,
+  openField: boolean,
+  wallClumps: number,
+): {
   grid: CellData[];
   trapEnds: Vec2[];
   trapCells: Set<string>;
@@ -790,7 +806,9 @@ function paintGrid(bp: Blueprint, rng: Rng, falseCorridors: number): {
       else if (x === bp.recvB.x && y === bp.recvB.y) grid.push(recv(Channel.DASH));
       else if (bp.recvC && x === bp.recvC.x && y === bp.recvC.y) grid.push(recv(Channel.DOT));
       else if (open.has(`${x},${y}`)) grid.push(e());
-      else grid.push(wall());
+      // Open field: off-path cells stay passable so the board no longer paints
+      // the solution as the only corridor. Walls become real obstacles instead.
+      else grid.push(openField ? e() : wall());
     }
   }
 
@@ -798,6 +816,41 @@ function paintGrid(bp: Blueprint, rng: Rng, falseCorridors: number): {
     const [x, y] = k.split(",").map(Number);
     const i = y * w + x;
     if (grid[i].kind === Kind.WALL) grid[i] = e();
+  }
+
+  if (openField && wallClumps > 0) {
+    const protectedCells = new Set(open);
+    for (const p of [bp.emitA, bp.emitB, bp.recvA, bp.recvB]) protectedCells.add(key(p));
+    if (bp.emitC) protectedCells.add(key(bp.emitC));
+    if (bp.recvC) protectedCells.add(key(bp.recvC));
+    for (const hh of bp.hubs) protectedCells.add(key(hh.pos));
+
+    const free: Vec2[] = [];
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        if (!protectedCells.has(`${x},${y}`)) free.push({ x, y });
+      }
+    }
+    let placed = 0;
+    for (const seed of shuffle(rng, free)) {
+      if (placed >= wallClumps) break;
+      if (grid[seed.y * w + seed.x].kind !== Kind.EMPTY) continue;
+      // Grow a small blob so obstacles read as intentional, not confetti.
+      const size = 2 + Math.floor(rng() * 3);
+      let cur = seed;
+      for (let s = 0; s < size; s++) {
+        if (protectedCells.has(key(cur))) break;
+        const i = cur.y * w + cur.x;
+        if (grid[i].kind !== Kind.EMPTY) break;
+        grid[i] = wall();
+        const dir = pick(rng, [Dir.N, Dir.E, Dir.S, Dir.W]);
+        const d = dirDelta(dir);
+        const next = { x: cur.x + d.x, y: cur.y + d.y };
+        if (next.x < 1 || next.y < 1 || next.x >= w - 1 || next.y >= h - 1) break;
+        cur = next;
+      }
+      placed++;
+    }
   }
   return { grid, trapEnds, trapCells };
 }
@@ -831,11 +884,20 @@ function placeMandatoryWormChamber(
   grid: CellData[],
   bp: Blueprint,
   rng: Rng,
+  openField: boolean,
 ): boolean {
   const w = bp.size;
   const h = bp.size;
   const idx = (p: Vec2) => p.y * w + p.x;
   const candidates: { cells: Vec2[]; dir: number }[] = [];
+  // On an open field there is no wall mass to hollow out, so the chamber must be
+  // free-standing: it may sit on empty cells as long as it clears the solution.
+  const blocked = new Set(bp.beamCells);
+  for (const k of reservedCells(bp)) blocked.add(k);
+  const usable = (p: Vec2) =>
+    openField
+      ? grid[idx(p)].kind === Kind.EMPTY && !blocked.has(key(p))
+      : grid[idx(p)].kind === Kind.WALL;
 
   for (const dir of [Dir.E, Dir.S, Dir.W, Dir.N]) {
     const d = dirDelta(dir);
@@ -845,13 +907,7 @@ function placeMandatoryWormChamber(
         let valid = true;
         for (let n = 0; n < 7; n++) {
           const p = { x: x + d.x * n, y: y + d.y * n };
-          if (
-            p.x < 1 ||
-            p.y < 1 ||
-            p.x >= w - 1 ||
-            p.y >= h - 1 ||
-            grid[idx(p)].kind !== Kind.WALL
-          ) {
+          if (p.x < 1 || p.y < 1 || p.x >= w - 1 || p.y >= h - 1 || !usable(p)) {
             valid = false;
             break;
           }
@@ -864,10 +920,27 @@ function placeMandatoryWormChamber(
   if (!candidates.length) return false;
 
   const { cells, dir } = pick(rng, candidates);
+  if (openField) {
+    // Shell the tube in so the pair stays mechanically mandatory and stray
+    // channels cannot wander in and spill on the chamber's own receiver.
+    const inChamber = new Set(cells.map(key));
+    for (const c of cells) {
+      for (const nd of [Dir.N, Dir.E, Dir.S, Dir.W]) {
+        const dd = dirDelta(nd);
+        const n = { x: c.x + dd.x, y: c.y + dd.y };
+        if (n.x < 0 || n.y < 0 || n.x >= w || n.y >= h) continue;
+        const nk = key(n);
+        if (inChamber.has(nk) || blocked.has(nk)) continue;
+        if (grid[idx(n)].kind === Kind.EMPTY) grid[idx(n)] = wall();
+      }
+    }
+  }
   grid[idx(cells[0])] = emit(dir, Channel.DOT);
   grid[idx(cells[1])] = cell.barrier(dir);
   grid[idx(cells[2])] = cell.worm(0);
-  // cells 3 and 4 intentionally remain solid walls.
+  // cells 3 and 4 are the solid plug the wormhole must bypass.
+  grid[idx(cells[3])] = wall();
+  grid[idx(cells[4])] = wall();
   grid[idx(cells[5])] = cell.worm(0);
   grid[idx(cells[6])] = recv(Channel.DOT);
   return true;
@@ -1191,13 +1264,14 @@ function placeHazards(
 
   let wormOk = opts.wormPairs <= 0;
   if (opts.wormPairs > 0) {
-    wormOk = placeMandatoryWormChamber(grid, bp, rng);
+    wormOk = placeMandatoryWormChamber(grid, bp, rng, opts.openField);
     if (!wormOk) wormOk = placeSolutionWormhole(grid, bp, rng);
   }
 
   const barriersPlaced = placeSolutionBarriers(grid, bp, rng, opts.barriers);
   placeDecoyWormholes(grid, bp, trapEnds, rng, opts.decoyWorms);
-  sealCorridorLeaks(grid, bp, trapCells, rng);
+  // Sealing leaks re-outlines the solution path — only do it on guided tiers.
+  if (!opts.openField) sealCorridorLeaks(grid, bp, trapCells, rng);
 
   return (!opts.requireWorm || wormOk) && barriersPlaced >= opts.requireBarriers;
 }
@@ -1396,15 +1470,31 @@ function countCriticalTables(solved: LevelData): number {
  * From the scrambled start, no single player action (which also turns a geared
  * partner) may win — forces multi-table planning instead of lucky one-twists.
  */
-function rejectsOneMoveSolves(scrambled: LevelData): boolean {
+/**
+ * Reject cheap solves. An open board admits more routes, so a level that a player
+ * could stumble into within `depth` actions is not a puzzle — it is a coin flip.
+ */
+function rejectsShallowSolves(scrambled: LevelData, depth: number): boolean {
   if (solve(buildState(scrambled)).won) return false;
-  for (const t of scrambled.tables) {
-    if (t.locked) continue;
-    for (let q = 0; q < 4; q++) {
-      if (q === t.rotationQ) continue;
-      const g = buildState(scrambled);
-      applyPlayerRotation(g, t.id, q);
-      if (solve(g).won) return false;
+  const free = scrambled.tables.filter((t) => !t.locked);
+  for (const a of free) {
+    for (let qa = 0; qa < 4; qa++) {
+      if (qa === a.rotationQ) continue;
+      const g1 = buildState(scrambled);
+      applyPlayerRotation(g1, a.id, qa);
+      if (solve(g1).won) return false;
+      if (depth < 2) continue;
+      for (const b of free) {
+        if (b.id === a.id) continue;
+        const cur = g1.tables.find((x) => x.id === b.id)!.rotationQ;
+        for (let qb = 0; qb < 4; qb++) {
+          if (qb === cur) continue;
+          const g2 = buildState(scrambled);
+          applyPlayerRotation(g2, a.id, qa);
+          applyPlayerRotation(g2, b.id, qb);
+          if (solve(g2).won) return false;
+        }
+      }
     }
   }
   return true;
@@ -1542,7 +1632,7 @@ function scrambleAndVerify(
       cells: g.cells.map((c) => ({ ...c })),
       solution,
     };
-    if (!rejectsOneMoveSolves(probe)) return null;
+    if (!rejectsShallowSolves(probe, difficulty >= 5 ? 2 : 1)) return null;
   }
 
   const level: LevelData = {
@@ -1650,6 +1740,8 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
           pulseLimit: 1,
           doubleChance: 0.9,
         },
+        // Absolute fallback: guided corridors, so a level always exists.
+        { ...opts, openField: false, decoyWorms: 0, minMoves: 11, minCritical: 5 },
       ]
     : genius
       ? [
@@ -1699,6 +1791,7 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
             sinks: 1,
             doubleChance: 0.88,
           },
+          { ...opts, openField: false, decoyWorms: 0, minMoves: 9, minCritical: 4 },
         ]
       : [
           opts,
@@ -1731,6 +1824,7 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
             barriers: 2,
             requireBarriers: 2,
           },
+          { ...opts, openField: false, decoyWorms: 0, minMoves: Math.max(4, opts.minMoves - 3) },
         ];
 
   const attempts = masterpiece ? 2000 : genius ? 1400 : 600;
@@ -1738,7 +1832,7 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
     for (let attempt = 0; attempt < attempts; attempt++) {
       const bp = tryBlueprint(rng, cfg);
       if (!bp) continue;
-      const painted = paintGrid(bp, rng, cfg.falseCorridors);
+      const painted = paintGrid(bp, rng, cfg.falseCorridors, cfg.openField, cfg.wallClumps);
       const hazardsOk = placeHazards(
         painted.grid,
         bp,
