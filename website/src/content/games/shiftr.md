@@ -2,7 +2,7 @@
 title: SHIFTR
 tagline: Every move changes everything.
 summary: Turn precision wheels to aim lasers into receivers. A mobile-first laser puzzle — play free in the browser, including on iPhone.
-cover: /images/shiftr-cover.svg
+cover: /images/shiftr-logo.png
 screenshots: []
 featured: true
 released: true
