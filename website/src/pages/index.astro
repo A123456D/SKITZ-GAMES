@@ -1,0 +1,83 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { getCollection } from 'astro:content';
+
+const games = (await getCollection('games')).sort((a, b) => a.data.title.localeCompare(b.data.title));
+const pulsefold = games.find((game) => game.id === 'pulsefold') ?? games[0];
+---
+
+<BaseLayout description="SKITZ games & apps — play Pulsefold free in the browser, including on iPhone, or download for desktop and Android.">
+	<SiteHeader />
+	<main class="site-main">
+		<section class="hero">
+			<div class="wrap hero__inner">
+				<img
+					class="hero__logo"
+					src="/images/skitz-logo.png"
+					alt="SKITZ games & apps"
+					width="720"
+					height="400"
+				/>
+				<h1 class="sr-only">SKITZ games & apps</h1>
+				<p class="hero__line">games &amp; apps — slapped on the web, free to play and download.</p>
+				<div class="btn-row hero__cta">
+					{
+						pulsefold && (
+							<>
+								<a class="btn" href={`/games/${pulsefold.id}/play/`}>
+									Play Pulsefold
+								</a>
+								<a class="btn btn-ghost" href={`/games/${pulsefold.id}/`}>
+									Game page
+								</a>
+							</>
+						)
+					}
+				</div>
+			</div>
+		</section>
+	</main>
+	<SiteFooter />
+</BaseLayout>
+
+<style>
+	.hero {
+		min-height: calc(100vh - var(--header-h));
+		min-height: calc(100dvh - var(--header-h));
+		display: grid;
+		place-items: center;
+		text-align: center;
+		overflow: hidden;
+	}
+
+	.hero__inner {
+		display: grid;
+		justify-items: center;
+		gap: 1.35rem;
+		padding: 3rem 0 4rem;
+	}
+
+	.hero__logo {
+		width: min(640px, 88vw);
+		height: auto;
+		transform: rotate(-1.8deg);
+		filter: drop-shadow(8px 10px 0 #000);
+		animation: slap-in 700ms var(--ease) both;
+	}
+
+	.hero__line {
+		max-width: 28rem;
+		margin: 0;
+		font-family: var(--font-type);
+		font-size: clamp(1.05rem, 2.4vw, 1.25rem);
+		color: var(--muted);
+		animation: rise 700ms var(--ease) 80ms both;
+	}
+
+	.hero__cta {
+		justify-content: center;
+		animation: rise 700ms var(--ease) 140ms both;
+	}
+</style>

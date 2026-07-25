@@ -1,0 +1,47 @@
+WARNING: GENERAL - Message Id Number: 0 | Message Id Name: Loader Message
+	windows_read_data_files_in_registry: Registry lookup failed to get layer manifest files.
+	Objects - 1
+		Object[0] - VK_OBJECT_TYPE_INSTANCE, Handle 2593387762816
+   at: _debug_messenger_callback (drivers/vulkan/rendering_context_driver_vulkan.cpp:654)
+ERROR: Failed loading resource: res://localization/shiftr.csv.
+   at: _load (core/io/resource_loader.cpp:317)
+SCRIPT ERROR: Parse Error: Identifier "ShaderFx" not declared in the current scope.
+   at: GDScript::reload (res://scripts/presentation/ui/visual_director.gd:205)
+SCRIPT ERROR: Parse Error: Cannot infer the type of "bloom_mat" variable because the value doesn't have a set type.
+   at: GDScript::reload (res://scripts/presentation/ui/visual_director.gd:205)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/presentation/ui/ui_settings_state.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/services/save/save_service.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/singletons/game_services.gd:0)
+ERROR: Failed to load script "res://scripts/singletons/game_services.gd" with error "Compilation failed".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+SCRIPT ERROR: Parse Error: Identifier "ShaderFx" not declared in the current scope.
+   at: GDScript::reload (res://scripts/utils/shared_atlas.gd:55)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/presentation/board/board_tile_view.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/presentation/board/board_view.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/presentation/feel/satisfaction_director.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/presentation/feel/ui_feel.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/presentation/ui/ui_router.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/presentation/ui/main_shell.gd:0)
+ERROR: Failed to load script "res://scripts/presentation/ui/main_shell.gd" with error "Compilation failed".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+SCRIPT ERROR: Trying to assign value of type 'Node' to a variable of type 'visual_director.gd'.
+   at: AestheticRoot.@implicit_ready (res://scripts/presentation/ui/aesthetic_root.gd:11)
+   GDScript backtrace (most recent call first):
+       [0] @implicit_ready (res://scripts/presentation/ui/aesthetic_root.gd:11)
+SCRIPT ERROR: Invalid call. Nonexistent function 'get_theme' in base 'Nil'.
+   at: MainShell._ready (res://scripts/presentation/ui/main_shell.gd:34)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://scripts/presentation/ui/main_shell.gd:34)
+WARNING: 12 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 6 resources still in use at exit.
+   at: clear (core/io/resource.cpp:817)

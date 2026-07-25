@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3 uid="uid://biconbuttonfx"]
+
+[ext_resource type="Script" path="res://scripts/presentation/ui/icon_button_fx.gd" id="1"]
+
+[node name="IconButton" type="Button"]
+custom_minimum_size = Vector2(48, 48)
+offset_right = 48.0
+offset_bottom = 48.0
+focus_mode = 2
+flat = true
+script = ExtResource("1")
+icon_text = "◀"

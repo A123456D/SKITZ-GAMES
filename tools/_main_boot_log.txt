@@ -1,0 +1,40 @@
+﻿Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+Godot_v4.7.1-stable_win64_console.exe : ERROR: Failed loading resource: res://localization/shiftr.csv.
+At C:\Users\PC\AppData\Local\Temp\ps-script-d1bbfc95-9a04-4133-9889-7aa437968fae.ps1:107 char:214
++ ... nsole.exe"; & $g --path "C:\Users\PC\Projects\SHIFTR" --headless --qu ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ERROR: Failed l...ion/shiftr.csv.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   at: _load (core/io/resource_loader.cpp:317)
+[breadcrumb:boot] CrashService ready
+[breadcrumb:boot] GameServices ready
+ERROR: The object does not have any 'meta' values with the key 'icon_base_scale'.
+   at: get_meta (core/object/object.cpp:1053)
+   GDScript backtrace (most recent call first):
+       [0] play_focus (res://scripts/presentation/ui/icon_motion.gd:43)
+       [1] _on_focus (res://scripts/presentation/ui/glass_button.gd:83)
+       [2] focus_first (res://scripts/services/controller_nav.gd:47)
+       [3] _focus_menu (res://scripts/presentation/ui/screens/main_menu_screen.gd:109)
+ERROR: 1 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/accessibility_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/accessibility_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/inventory_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/inventory_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/daily_challenge_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/daily_challenge_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/leaderboards_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/leaderboards_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+WARNING: 37 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 8 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

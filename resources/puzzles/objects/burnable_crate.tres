@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="PuzzleObjectDef" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://resources/configs/puzzle/puzzle_object_def.gd" id="1"]
+[ext_resource type="Script" path="res://resources/configs/puzzle/puzzle_component_spec.gd" id="2"]
+
+[sub_resource type="Resource" id="spec_0"]
+script = ExtResource("2")
+component_id = &"movable"
+params = {}
+
+[sub_resource type="Resource" id="spec_1"]
+script = ExtResource("2")
+component_id = &"presser"
+params = {}
+
+[sub_resource type="Resource" id="spec_2"]
+script = ExtResource("2")
+component_id = &"burnable"
+params = {
+"hp": 1
+}
+
+[sub_resource type="Resource" id="spec_3"]
+script = ExtResource("2")
+component_id = &"blocking"
+params = {
+"blocks": true
+}
+
+[resource]
+script = ExtResource("1")
+id = &"burnable_crate"
+display_name = "Burnable Crate"
+tags = PackedStringArray("presser")
+components = Array[ExtResource("2")]([SubResource("spec_0"), SubResource("spec_1"), SubResource("spec_2"), SubResource("spec_3")])

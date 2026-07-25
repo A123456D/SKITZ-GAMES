@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="PuzzleObjectDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://resources/configs/puzzle/puzzle_object_def.gd" id="1"]
+[ext_resource type="Script" path="res://resources/configs/puzzle/puzzle_component_spec.gd" id="2"]
+
+[sub_resource type="Resource" id="spec_0"]
+script = ExtResource("2")
+component_id = &"teleporter"
+params = {
+"link_id": "tp_a",
+"cooldown_ticks": 1
+}
+
+[resource]
+script = ExtResource("1")
+id = &"teleporter"
+display_name = "Teleporter"
+tags = PackedStringArray("floor")
+components = Array[ExtResource("2")]([SubResource("spec_0")])

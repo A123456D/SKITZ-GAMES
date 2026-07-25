@@ -1,0 +1,52 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+---
+
+<BaseLayout title="Privacy" description="SKITZ privacy — what we collect and what we do not.">
+	<SiteHeader />
+	<main class="site-main">
+		<section class="section">
+			<div class="wrap privacy">
+				<p class="eyebrow">legal</p>
+				<h1 class="section-title">Privacy</h1>
+				<div class="sticker privacy-card">
+					<p>
+						This site is a static catalog. We do not run user accounts, and we do not ask you to
+						sign in to play or download.
+					</p>
+					<p>
+						Hosting providers may collect standard request logs (IP address, user agent,
+						timestamps) needed to serve and secure the site. Individual games may process data
+						according to their own privacy notices once you run them.
+					</p>
+				</div>
+			</div>
+		</section>
+	</main>
+	<SiteFooter />
+</BaseLayout>
+
+<style>
+	.privacy {
+		max-width: 40rem;
+		animation: rise 500ms var(--ease);
+	}
+
+	.privacy-card {
+		padding: 1.6rem 1.5rem 1.4rem;
+		transform: rotate(0.6deg);
+	}
+
+	.privacy-card p {
+		font-family: var(--font-type);
+		font-size: 1.05rem;
+		color: var(--mark);
+		margin-bottom: 0.85rem;
+	}
+
+	.privacy-card p:last-child {
+		margin-bottom: 0;
+	}
+</style>

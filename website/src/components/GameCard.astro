@@ -1,0 +1,73 @@
+---
+interface Props {
+	href: string;
+	title: string;
+	summary: string;
+	cover: string;
+	genre?: string;
+}
+
+const { href, title, summary, cover, genre } = Astro.props;
+---
+
+<a class="game-link" href={href}>
+	<article class="game-item">
+		<div class="game-item__media">
+			<img src={cover} alt="" width="640" height="640" loading="lazy" />
+		</div>
+		<div class="game-item__body">
+			{genre && <p class="eyebrow">{genre}</p>}
+			<h2>{title}</h2>
+			<p class="muted">{summary}</p>
+			<span class="cta">view game →</span>
+		</div>
+	</article>
+</a>
+
+<style>
+	.game-link {
+		display: block;
+		text-decoration: none;
+		color: inherit;
+	}
+
+	.game-item {
+		display: grid;
+		gap: 1.25rem;
+		align-items: center;
+		padding: 1.5rem 0;
+		border-bottom: 1px dashed var(--line);
+		transition: transform 180ms var(--ease);
+	}
+
+	@media (min-width: 720px) {
+		.game-item {
+			grid-template-columns: 210px 1fr;
+			gap: 1.75rem;
+		}
+	}
+
+	.game-link:hover .game-item {
+		transform: translateX(6px);
+	}
+
+	.game-item__media {
+		max-width: 210px;
+	}
+
+	.game-item__media img {
+		width: 100%;
+		height: auto;
+		display: block;
+	}
+
+	.game-item__body h2 {
+		font-size: clamp(1.8rem, 4vw, 2.4rem);
+		margin-bottom: 0.35rem;
+	}
+
+	.cta {
+		font-family: var(--font-type);
+		color: var(--paper);
+	}
+</style>

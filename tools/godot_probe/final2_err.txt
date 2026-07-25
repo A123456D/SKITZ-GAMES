@@ -1,0 +1,41 @@
+ERROR: Failed loading resource: res://localization/shiftr.csv.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: The object does not have any 'meta' values with the key 'icon_base_scale'.
+   at: get_meta (core/object/object.cpp:1053)
+   GDScript backtrace (most recent call first):
+       [0] play_focus (res://scripts/presentation/ui/icon_motion.gd:43)
+       [1] _on_focus (res://scripts/presentation/ui/glass_button.gd:83)
+       [2] focus_first (res://scripts/services/controller_nav.gd:47)
+       [3] _focus_menu (res://scripts/presentation/ui/screens/main_menu_screen.gd:102)
+SCRIPT ERROR: Parse Error: Cannot infer the type of "live" variable because the value doesn't have a set type.
+   at: GDScript::reload (res://scripts/presentation/ui/screens/achievements_screen.gd:26)
+ERROR: Failed to load script "res://scripts/presentation/ui/screens/achievements_screen.gd" with error "Parse error".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+SCRIPT ERROR: Parse Error: Cannot infer the type of "is_floor" variable because the value doesn't have a set type.
+   at: GDScript::reload (res://scripts/systems/puzzle/puzzle_world.gd:139)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/systems/puzzle/puzzle_context.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/systems/puzzle/puzzle_object.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/systems/puzzle/puzzle_engine.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://tools/puzzle_editor/editor_test_session.gd:0)
+SCRIPT ERROR: Parse Error: Cannot assign a value of type Error to variable "result" with specified type Dictionary.
+   at: GDScript::reload (res://tools/puzzle_editor/editor_difficulty_analyzer.gd:188)
+SCRIPT ERROR: Parse Error: Cannot assign a value of type Error to variable "result2" with specified type Dictionary.
+   at: GDScript::reload (res://tools/puzzle_editor/editor_difficulty_analyzer.gd:194)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://tools/puzzle_editor/level_editor_controller.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/tools/level_editor/editor_board_view.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/tools/level_editor/level_editor_screen.gd:0)
+ERROR: Failed to load script "res://scripts/tools/level_editor/level_editor_screen.gd" with error "Compilation failed".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+WARNING: 2 RIDs of type "Texture" were leaked.
+   at: finalize (servers/rendering/rendering_device.cpp:8900)
+WARNING: 120 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 76 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

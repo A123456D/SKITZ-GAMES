@@ -1,0 +1,42 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+  PASS row_shift_right_wrap
+  PASS row_shift_left_restore
+  PASS col_shift_down_wrap
+  PASS shift_pair_undo
+  PASS rotate_cw_2x2
+  PASS rotate_inverse
+  PASS rotate_dims
+  PASS rotate_3x2
+  PASS can_undo
+  PASS undo_one
+  PASS can_redo
+  PASS undo_all
+  PASS load_json_ok
+  PASS serialize_state
+  PASS serialize_meta
+  PASS occ
+  PASS state
+  PASS mod
+  PASS conn
+  PASS payload
+  PASS hist_cap
+  PASS hist_mem
+  PASS hist_undo
+  PASS locked_reject
+  PASS locked_unchanged
+  PASS size_3x8_row
+  PASS size_3x8_col
+  PASS size_3x8_dims
+  PASS size_8x3_row
+  PASS size_8x3_col
+  PASS size_8x3_dims
+  PASS size_1x1_dims
+  PASS size_7x7_row
+  PASS size_7x7_col
+  PASS size_7x7_dims
+  PASS rng_det
+  PASS conn_row_shift
+BoardSystemValidation: 37 passed, 0 failed
+[breadcrumb:boot] CrashService ready
+[breadcrumb:boot] GameServices ready

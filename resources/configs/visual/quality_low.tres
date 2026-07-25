@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="VisualQualityConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/configs/visual/visual_quality.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+tier = 2
+bloom_enabled = false
+bloom_strength = 0.0
+bloom_threshold = 1.0
+bloom_samples = 1
+bloom_resolution_scale = 0.5
+soft_glow_enabled = false
+animated_background = true
+parallax_enabled = false
+light_beams_enabled = false
+background_intensity = 0.45
+ambient_particles = false
+ambient_amount = 0
+ui_confirm_particles = true
+ui_confirm_amount = 4
+board_burst_cap = 8
+particle_preprocess = false
+glass_blur_enabled = false
+glass_blur_samples = 1
+icon_shimmer_enabled = false
+reduce_motion = false
+battery_saver = false

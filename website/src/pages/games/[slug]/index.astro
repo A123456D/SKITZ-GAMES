@@ -1,0 +1,118 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import DownloadPanel from '../../../components/DownloadPanel.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+	const games = await getCollection('games');
+	return games.map((game) => ({
+		params: { slug: game.id },
+		props: { game },
+	}));
+}
+
+const { game } = Astro.props;
+const { Content } = await render(game);
+const { title, summary, tagline, cover, platforms, downloads, appStoreUrl, playStoreUrl, genre } =
+	game.data;
+---
+
+<BaseLayout title={title} description={summary}>
+	<SiteHeader />
+	<main class="site-main">
+		<section class="detail-hero">
+			<div class="wrap detail-hero__grid">
+				<div class="detail-hero__copy">
+					{genre && <p class="eyebrow">{genre}</p>}
+					<h1>{title}</h1>
+					{tagline && <p class="tagline">{tagline}</p>}
+					<p class="muted">{summary}</p>
+					<div class="btn-row">
+						{
+							platforms.web && (
+								<a class="btn" href={`/games/${game.id}/play/`}>
+									Play online
+								</a>
+							)
+						}
+						<a class="btn btn-ghost" href="#downloads">Download</a>
+					</div>
+				</div>
+				<div class="detail-hero__art">
+					<img src={cover} alt={`${title} cover art`} width="640" height="640" />
+				</div>
+			</div>
+		</section>
+
+		<section class="section">
+			<div class="wrap prose">
+				<h2 class="section-title">About</h2>
+				<Content />
+			</div>
+		</section>
+
+		<section class="section" id="downloads">
+			<div class="wrap">
+				<DownloadPanel
+					slug={game.id}
+					downloads={downloads}
+					appStoreUrl={appStoreUrl}
+					playStoreUrl={playStoreUrl}
+					platforms={platforms}
+				/>
+			</div>
+		</section>
+	</main>
+	<SiteFooter />
+</BaseLayout>
+
+<style>
+	.detail-hero {
+		padding: 2.5rem 0 1rem;
+		animation: rise 550ms var(--ease);
+	}
+
+	.detail-hero__grid {
+		display: grid;
+		gap: 2rem;
+		align-items: center;
+	}
+
+	@media (min-width: 860px) {
+		.detail-hero__grid {
+			grid-template-columns: 1.1fr 0.9fr;
+			gap: 2.5rem;
+		}
+	}
+
+	.detail-hero h1 {
+		font-size: clamp(2.8rem, 8vw, 5rem);
+		margin-bottom: 0.35rem;
+	}
+
+	.tagline {
+		font-family: var(--font-type);
+		font-size: 1.2rem;
+		margin-bottom: 0.75rem;
+		color: var(--paper);
+	}
+
+	.detail-hero__art {
+		max-width: 340px;
+		margin-inline: auto;
+	}
+
+	.detail-hero__art img {
+		width: 100%;
+		height: auto;
+		display: block;
+	}
+
+	.prose :global(p) {
+		max-width: 40rem;
+		color: var(--muted);
+		font-family: var(--font-type);
+	}
+</style>

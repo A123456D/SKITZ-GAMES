@@ -1,0 +1,58 @@
+﻿Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+Godot_v4.7.1-stable_win64_console.exe : ERROR: Failed loading resource: res://localization/shiftr.csv.
+At C:\Users\PC\AppData\Local\Temp\ps-script-376e4f26-7834-43a9-9de3-7c0a3d0323ba.ps1:107 char:111
++ ... nsole.exe"; & $g --path "C:\Users\PC\Projects\SHIFTR" --headless --qu ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ERROR: Failed l...ion/shiftr.csv.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   at: _load (core/io/resource_loader.cpp:317)
+SCRIPT ERROR: Parse Error: Could not find type "LaserBeamLayer" in the current scope.
+   at: GDScript::reload (res://scripts/presentation/board/board_view.gd:22)
+SCRIPT ERROR: Parse Error: Identifier "LaserBeamLayer" not declared in the current scope.
+   at: GDScript::reload (res://scripts/presentation/board/board_view.gd:33)
+SCRIPT ERROR: Parse Error: Identifier "PuzzleVisuals" not declared in the current scope.
+   at: GDScript::reload (res://scripts/presentation/board/board_view.gd:235)
+SCRIPT ERROR: Parse Error: Identifier "PuzzleVisuals" not declared in the current scope.
+   at: GDScript::reload (res://scripts/presentation/board/board_tile_view.gd:141)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/presentation/feel/satisfaction_director.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/presentation/feel/ui_feel.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/presentation/ui/ui_router.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/presentation/ui/main_shell.gd:0)
+ERROR: Failed to load script "res://scripts/presentation/ui/main_shell.gd" with error "Compilation failed".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+[breadcrumb:boot] CrashService ready
+[breadcrumb:boot] GameServices ready
+ERROR: The object does not have any 'meta' values with the key 'icon_base_scale'.
+   at: get_meta (core/object/object.cpp:1053)
+   GDScript backtrace (most recent call first):
+       [0] play_focus (res://scripts/presentation/ui/icon_motion.gd:43)
+       [1] _on_focus (res://scripts/presentation/ui/glass_button.gd:83)
+       [2] focus_first (res://scripts/services/controller_nav.gd:47)
+       [3] _focus_menu (res://scripts/presentation/ui/screens/main_menu_screen.gd:109)
+ERROR: 1 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/settings_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/settings_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/world_map_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/world_map_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/daily_challenge_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/daily_challenge_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/leaderboards_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/leaderboards_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+WARNING: 33 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 8 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

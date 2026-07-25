@@ -1,0 +1,77 @@
+ERROR: Failed loading resource: res://localization/shiftr.csv.
+   at: _load (core/io/resource_loader.cpp:317)
+SHADER ERROR: Tokenizer: Unknown character #35: '#'
+   at: (null) (:2)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://scripts/presentation/ui/animated_shift_background.gd:21)
+       [1] _apply_background (res://scripts/presentation/ui/visual_director.gd:189)
+       [2] _apply_all (res://scripts/presentation/ui/visual_director.gd:179)
+       [3] _ready (res://scripts/presentation/ui/visual_director.gd:37)
+ERROR: Shader compilation failed.
+   at: shader_set_code (servers/rendering/dummy/storage/material_storage.cpp:192)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://scripts/presentation/ui/animated_shift_background.gd:21)
+       [1] _apply_background (res://scripts/presentation/ui/visual_director.gd:189)
+       [2] _apply_all (res://scripts/presentation/ui/visual_director.gd:179)
+       [3] _ready (res://scripts/presentation/ui/visual_director.gd:37)
+SHADER ERROR: Tokenizer: Unknown character #35: '#'
+   at: (null) (:3)
+   GDScript backtrace (most recent call first):
+       [0] _apply_bloom (res://scripts/presentation/ui/visual_director.gd:218)
+       [1] _apply_all (res://scripts/presentation/ui/visual_director.gd:180)
+       [2] _ready (res://scripts/presentation/ui/visual_director.gd:37)
+ERROR: Shader compilation failed.
+   at: shader_set_code (servers/rendering/dummy/storage/material_storage.cpp:192)
+   GDScript backtrace (most recent call first):
+       [0] _apply_bloom (res://scripts/presentation/ui/visual_director.gd:218)
+       [1] _apply_all (res://scripts/presentation/ui/visual_director.gd:180)
+       [2] _ready (res://scripts/presentation/ui/visual_director.gd:37)
+SHADER ERROR: Tokenizer: Unknown character #35: '#'
+   at: (null) (:2)
+   GDScript backtrace (most recent call first):
+       [0] _ensure_glow (res://scripts/presentation/ui/glass_button.gd:53)
+       [1] _ready (res://scripts/presentation/ui/glass_button.gd:20)
+       [2] _add_cta (res://scripts/presentation/ui/screens/main_menu_screen.gd:125)
+       [3] _build (res://scripts/presentation/ui/screens/main_menu_screen.gd:65)
+       [4] setup (res://scripts/presentation/ui/ui_screen.gd:32)
+       [5] push (res://scripts/presentation/ui/ui_router.gd:134)
+       [6] start (res://scripts/presentation/ui/ui_router.gd:113)
+       [7] _ready (res://scripts/presentation/ui/main_shell.gd:48)
+ERROR: Shader compilation failed.
+   at: shader_set_code (servers/rendering/dummy/storage/material_storage.cpp:192)
+   GDScript backtrace (most recent call first):
+       [0] _ensure_glow (res://scripts/presentation/ui/glass_button.gd:53)
+       [1] _ready (res://scripts/presentation/ui/glass_button.gd:20)
+       [2] _add_cta (res://scripts/presentation/ui/screens/main_menu_screen.gd:125)
+       [3] _build (res://scripts/presentation/ui/screens/main_menu_screen.gd:65)
+       [4] setup (res://scripts/presentation/ui/ui_screen.gd:32)
+       [5] push (res://scripts/presentation/ui/ui_router.gd:134)
+       [6] start (res://scripts/presentation/ui/ui_router.gd:113)
+       [7] _ready (res://scripts/presentation/ui/main_shell.gd:48)
+ERROR: The object does not have any 'meta' values with the key 'icon_base_scale'.
+   at: get_meta (core/object/object.cpp:1053)
+   GDScript backtrace (most recent call first):
+       [0] play_focus (res://scripts/presentation/ui/icon_motion.gd:43)
+       [1] _on_focus (res://scripts/presentation/ui/glass_button.gd:83)
+       [2] focus_first (res://scripts/services/controller_nav.gd:47)
+       [3] _focus_menu (res://scripts/presentation/ui/screens/main_menu_screen.gd:102)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/accessibility_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/accessibility_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/inventory_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/inventory_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/settings_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/settings_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/world_map_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/world_map_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+WARNING: 32 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 7 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

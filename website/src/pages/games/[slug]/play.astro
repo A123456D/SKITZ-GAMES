@@ -1,0 +1,36 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PlayFrame from '../../../components/PlayFrame.astro';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+	const games = await getCollection('games');
+	return games
+		.filter((game) => game.data.platforms.web)
+		.map((game) => ({
+			params: { slug: game.id },
+			props: { game },
+		}));
+}
+
+const { game } = Astro.props;
+const src = `/games/${game.id}/${game.data.webPlayPath}`;
+---
+
+<BaseLayout
+	title={`Play ${game.data.title}`}
+	description={`Play ${game.data.title} free in your browser — works on desktop, Android, and iPhone.`}
+	bodyClass="play-page"
+>
+	<PlayFrame title={game.data.title} src={src} backHref={`/games/${game.id}/`} />
+</BaseLayout>
+
+<style is:global>
+	.play-page {
+		background: #000;
+	}
+
+	.play-page::before {
+		opacity: 0.04;
+	}
+</style>

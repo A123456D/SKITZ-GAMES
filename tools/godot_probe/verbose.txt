@@ -1,0 +1,519 @@
+WorkerThreadPool: 16 threads, 4 max low-priority.
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+TextServer: Added interface "Dummy"
+TextServer: Added interface "ICU / HarfBuzz / Graphite (Built-in)"
+Accessibility: AccessKit driver loaded.
+Accessibility: window 0 adapter created.
+Devices:
+  #0: NVIDIA NVIDIA GeForce RTX 3060 Laptop GPU - Supported, Discrete
+  #1: AMD AMD Radeon(TM) Graphics - Supported, Integrated
+Optional Vulkan device extension VK_EXT_fragment_density_map not found
+Optional Vulkan device extension VK_EXT_fragment_density_map2 not found
+Optional Vulkan device extension VK_QCOM_fragment_density_map_offset not found
+Optional Vulkan device extension VK_EXT_astc_decode_mode not found
+Optional Vulkan device extension VK_EXT_texture_compression_astc_hdr not found
+Optional Vulkan device extension VK_NV_ray_tracing_validation not found
+Optional Vulkan device extension VK_KHR_external_memory_fd not found
+Optional Vulkan device extension VK_EXT_debug_marker not found
+- Vulkan Fragment Shading Rate supported:
+  Pipeline fragment shading rate
+  Primitive fragment shading rate
+  Attachment fragment shading rate, min texel size: (16, 16), max texel size: (16, 16), max fragment size: (4, 4)
+- Vulkan Fragment Density Map not supported
+- Vulkan multiview supported:
+  max view count: 32
+  max instances: 134217727
+- Vulkan subgroup:
+  size: 32
+  min size: 32
+  max size: 32
+  stages: STAGE_VERTEX, STAGE_TESSELLATION_CONTROL, STAGE_TESSELLATION_EVALUATION, STAGE_GEOMETRY, STAGE_FRAGMENT, STAGE_COMPUTE, STAGE_RAYGEN_KHR, STAGE_ANY_HIT_KHR, STAGE_CLOSEST_HIT_KHR, STAGE_MISS_KHR, STAGE_INTERSECTION_KHR, STAGE_CALLABLE_KHR, STAGE_TASK_NV, STAGE_MESH_NV
+  supported ops: FEATURE_BASIC, FEATURE_VOTE, FEATURE_ARITHMETIC, FEATURE_BALLOT, FEATURE_SHUFFLE, FEATURE_SHUFFLE_RELATIVE, FEATURE_CLUSTERED, FEATURE_QUAD, FEATURE_PARTITIONED_NV
+  quad operations in all stages
+- Vulkan Acceleration Structure supported
+  min acceleration structure scratch offset alignment: 128
+- Vulkan Raytracing supported
+  shader group handle size: 32
+  shader group handle alignment: 32
+  shader group handle size aligned: 32
+  shader group base alignment: 64
+Vulkan 1.4.341 - Forward Mobile - Using Device #0: NVIDIA - NVIDIA GeForce RTX 3060 Laptop GPU
+Startup PSO cache (1.3 MiB)
+SDL: Init OK!
+Using "winink" pen tablet driver...
+Creating VMA small objects pool for memory type index 1
+Shader 'CanvasSdfShaderRD' (group 0) SHA256: 54b47da3ce58bfeb483acea9e9e45b5de11793d45b2a38279aa17b08296ef514
+Loading cache for shader CanvasSdfShaderRD, variant 0
+Loading cache for shader CanvasSdfShaderRD, variant 1
+Loading cache for shader CanvasSdfShaderRD, variant 2
+Loading cache for shader CanvasSdfShaderRD, variant 3
+Loading cache for shader CanvasSdfShaderRD, variant 4
+Loading cache for shader CanvasSdfShaderRD, variant 5
+Shader 'SkeletonShaderRD' (group 0) SHA256: 08b4464d16133f4db97a8df4663b95b2b956ecd3e7addf44a16e644f488157c2
+Loading cache for shader SkeletonShaderRD, variant 0
+Loading cache for shader SkeletonShaderRD, variant 1
+Shader 'SortShaderRD' (group 0) SHA256: 8e4ebbbb19fcd734c6f15656afbe1bcd5eb3acdfdae9cab023ebd6f54c901ef8
+Loading cache for shader SortShaderRD, variant 0
+Loading cache for shader SortShaderRD, variant 1
+Loading cache for shader SortShaderRD, variant 2
+Shader 'ParticlesShaderRD' (group 0) SHA256: 8f4c25caa97a2f74d5fa5f299aabdd514f57d9737b8642ed65c20e846dad5db0
+Loading cache for shader ParticlesShaderRD, variant 0
+Shader 'ParticlesCopyShaderRD' (group 0) SHA256: 688d10aec3c2e17e8c578ba3e2db1ea2f054eedd511b1e1647952c0acaeeab72
+Loading cache for shader ParticlesCopyShaderRD, variant 0
+Loading cache for shader ParticlesCopyShaderRD, variant 1
+Loading cache for shader ParticlesCopyShaderRD, variant 2
+Loading cache for shader ParticlesCopyShaderRD, variant 3
+Loading cache for shader ParticlesCopyShaderRD, variant 4
+Loading cache for shader ParticlesCopyShaderRD, variant 5
+Loading cache for shader ParticlesCopyShaderRD, variant 6
+Loading cache for shader ParticlesCopyShaderRD, variant 7
+Loading cache for shader ParticlesCopyShaderRD, variant 8
+Loading cache for shader ParticlesCopyShaderRD, variant 9
+Loading cache for shader ParticlesCopyShaderRD, variant 10
+Loading cache for shader ParticlesCopyShaderRD, variant 11
+Loading cache for shader ParticlesCopyShaderRD, variant 12
+Loading cache for shader ParticlesCopyShaderRD, variant 13
+Loading cache for shader ParticlesCopyShaderRD, variant 14
+Loading cache for shader ParticlesCopyShaderRD, variant 15
+Loading cache for shader ParticlesCopyShaderRD, variant 16
+Loading cache for shader ParticlesCopyShaderRD, variant 17
+Loading cache for shader ParticlesCopyShaderRD, variant 18
+Loading cache for shader ParticlesCopyShaderRD, variant 19
+Loading cache for shader ParticlesCopyShaderRD, variant 20
+Shader 'CanvasShaderRD' (group 0) SHA256: 1ac5f6c8d534ebab572b3f886e38134784245fbd5fa01c7cbb6cc452e5400080
+Loading cache for shader CanvasShaderRD, variant 0
+Loading cache for shader CanvasShaderRD, variant 1
+Loading cache for shader CanvasShaderRD, variant 2
+Loading cache for shader CanvasShaderRD, variant 3
+Loading cache for shader CanvasShaderRD, variant 4
+Loading cache for shader CanvasShaderRD, variant 5
+Shader 'CanvasOcclusionShaderRD' (group 0) SHA256: 3b765d5624135f9fbf3199b6660b8387d5b904f48be0914a622e5da9b906b504
+Loading cache for shader CanvasOcclusionShaderRD, variant 0
+Loading cache for shader CanvasOcclusionShaderRD, variant 1
+Loading cache for shader CanvasOcclusionShaderRD, variant 2
+Loading cache for shader CanvasShaderRD, variant 0
+Loading cache for shader CanvasShaderRD, variant 1
+Loading cache for shader CanvasShaderRD, variant 2
+Loading cache for shader CanvasShaderRD, variant 3
+Loading cache for shader CanvasShaderRD, variant 4
+Loading cache for shader CanvasShaderRD, variant 5
+Loading cache for shader CanvasShaderRD, variant 0
+Loading cache for shader CanvasShaderRD, variant 1
+Loading cache for shader CanvasShaderRD, variant 2
+Loading cache for shader CanvasShaderRD, variant 3
+Loading cache for shader CanvasShaderRD, variant 4
+Loading cache for shader CanvasShaderRD, variant 5
+Shader 'TexBlitShaderRD' (group 0) SHA256: ce377a6d54cd54d45abdd915ec4cf3877fef3cbace94de3df4ed73ec0124ea0c
+Loading cache for shader TexBlitShaderRD, variant 0
+Loading cache for shader TexBlitShaderRD, variant 1
+Loading cache for shader TexBlitShaderRD, variant 2
+Loading cache for shader TexBlitShaderRD, variant 3
+Ubershaders: Enabled
+Shader 'SceneForwardMobileShaderRD' (group 0) SHA256: 34688661501bf8d3456dc67ebb9a159ba4fcc2484c5a0d80ef3a1a49064c0832
+Shader 'SceneForwardMobileShaderRD' (group 1) SHA256: 9455ad1d446fef51eb0552c7e523782169cfd1ef48749d60a394233a2747ee26
+Shader 'SceneForwardMobileShaderRD' (group 2) SHA256: 93c7c9e19baed68ba13cb6b3b6c803f036efbd994347ef022b44e0acfb385c82
+Shader 'SceneForwardMobileShaderRD' (group 3) SHA256: ee1de0deb960a58fd4a1e40a2c1ee60a420293303d391ac820a8b11576a9c40a
+Loading cache for shader SceneForwardMobileShaderRD, variant 0
+Loading cache for shader SceneForwardMobileShaderRD, variant 1
+Loading cache for shader SceneForwardMobileShaderRD, variant 2
+Loading cache for shader SceneForwardMobileShaderRD, variant 3
+Loading cache for shader SceneForwardMobileShaderRD, variant 4
+Loading cache for shader SceneForwardMobileShaderRD, variant 5
+Loading cache for shader SceneForwardMobileShaderRD, variant 6
+Loading cache for shader SceneForwardMobileShaderRD, variant 7
+Loading cache for shader SceneForwardMobileShaderRD, variant 8
+Loading cache for shader SceneForwardMobileShaderRD, variant 9
+Loading cache for shader SceneForwardMobileShaderRD, variant 0
+Loading cache for shader SceneForwardMobileShaderRD, variant 1
+Loading cache for shader SceneForwardMobileShaderRD, variant 2
+Loading cache for shader SceneForwardMobileShaderRD, variant 3
+Loading cache for shader SceneForwardMobileShaderRD, variant 4
+Loading cache for shader SceneForwardMobileShaderRD, variant 5
+Loading cache for shader SceneForwardMobileShaderRD, variant 6
+Loading cache for shader SceneForwardMobileShaderRD, variant 7
+Loading cache for shader SceneForwardMobileShaderRD, variant 8
+Loading cache for shader SceneForwardMobileShaderRD, variant 9
+Loading cache for shader SceneForwardMobileShaderRD, variant 0
+Loading cache for shader SceneForwardMobileShaderRD, variant 1
+Loading cache for shader SceneForwardMobileShaderRD, variant 2
+Loading cache for shader SceneForwardMobileShaderRD, variant 3
+Loading cache for shader SceneForwardMobileShaderRD, variant 4
+Loading cache for shader SceneForwardMobileShaderRD, variant 5
+Loading cache for shader SceneForwardMobileShaderRD, variant 6
+Loading cache for shader SceneForwardMobileShaderRD, variant 7
+Loading cache for shader SceneForwardMobileShaderRD, variant 8
+Loading cache for shader SceneForwardMobileShaderRD, variant 9
+Shader 'SkyShaderRD' (group 0) SHA256: 9be8c23dcd20154e4a1ab0bef919421f8c51853d47c2fe6dc91221f8cfc74997
+Loading cache for shader SkyShaderRD, variant 0
+Loading cache for shader SkyShaderRD, variant 1
+Loading cache for shader SkyShaderRD, variant 2
+Loading cache for shader SkyShaderRD, variant 3
+Loading cache for shader SkyShaderRD, variant 4
+Loading cache for shader SkyShaderRD, variant 5
+Loading cache for shader SkyShaderRD, variant 0
+Loading cache for shader SkyShaderRD, variant 1
+Loading cache for shader SkyShaderRD, variant 2
+Loading cache for shader SkyShaderRD, variant 3
+Loading cache for shader SkyShaderRD, variant 4
+Loading cache for shader SkyShaderRD, variant 5
+Shader 'BokehDofRasterShaderRD' (group 0) SHA256: 1f380e57658651c8d60ef77451714d9b94193105ebddfbdf453e7e81e0542a44
+Loading cache for shader BokehDofRasterShaderRD, variant 0
+Loading cache for shader BokehDofRasterShaderRD, variant 1
+Loading cache for shader BokehDofRasterShaderRD, variant 2
+Loading cache for shader BokehDofRasterShaderRD, variant 3
+Loading cache for shader BokehDofRasterShaderRD, variant 4
+Loading cache for shader BokehDofRasterShaderRD, variant 5
+Loading cache for shader BokehDofRasterShaderRD, variant 6
+Shader 'BlurRasterShaderRD' (group 0) SHA256: bf2535c6ce146bb6ed9a8594798f1e933ab97b1ad787d88c265e8409f6fee565
+Loading cache for shader BlurRasterShaderRD, variant 0
+Loading cache for shader BlurRasterShaderRD, variant 1
+Loading cache for shader BlurRasterShaderRD, variant 2
+Loading cache for shader BlurRasterShaderRD, variant 3
+Loading cache for shader BlurRasterShaderRD, variant 4
+Loading cache for shader BlurRasterShaderRD, variant 5
+Loading cache for shader BlurRasterShaderRD, variant 6
+Shader 'CopyShaderRD' (group 0) SHA256: 23f6cf7986b46c68792dfd3f087267f14eebc49382f0c0fd265b45462b58afcf
+Loading cache for shader CopyShaderRD, variant 0
+Loading cache for shader CopyShaderRD, variant 1
+Loading cache for shader CopyShaderRD, variant 2
+Loading cache for shader CopyShaderRD, variant 3
+Loading cache for shader CopyShaderRD, variant 4
+Loading cache for shader CopyShaderRD, variant 5
+Loading cache for shader CopyShaderRD, variant 6
+Loading cache for shader CopyShaderRD, variant 7
+Loading cache for shader CopyShaderRD, variant 8
+Loading cache for shader CopyShaderRD, variant 9
+Loading cache for shader CopyShaderRD, variant 10
+Loading cache for shader CopyShaderRD, variant 11
+Loading cache for shader CopyShaderRD, variant 12
+Shader 'CopyToFbShaderRD' (group 0) SHA256: d00e29e632391ed3791124b988da290d922da3d9e2083273523bd8173b24ff97
+Loading cache for shader CopyToFbShaderRD, variant 0
+Loading cache for shader CopyToFbShaderRD, variant 1
+Loading cache for shader CopyToFbShaderRD, variant 2
+Loading cache for shader CopyToFbShaderRD, variant 3
+Shader 'CubeToDpShaderRD' (group 0) SHA256: 9825f5ee942047b6912a1b6fe49935a8c928598f40d2cdfc64a0f61134deed27
+Loading cache for shader CubeToDpShaderRD, variant 0
+Shader 'CubeToOctmapShaderRD' (group 0) SHA256: 8bf32929c5b41445f085dd302ccba233028481a94d43ce1b531bc8e2e66677a4
+Loading cache for shader CubeToOctmapShaderRD, variant 0
+Shader 'OctmapDownsamplerShaderRD' (group 0) SHA256: c79c7ea0ebc9a0833c5f465f1c555216a15727d2c4e3a227e9d5cd1e80f0669e
+Loading cache for shader OctmapDownsamplerShaderRD, variant 0
+Loading cache for shader OctmapDownsamplerShaderRD, variant 1
+Shader 'OctmapFilterShaderRD' (group 0) SHA256: a511f5ad922f5d701a26f801b4f9c96406071103345fa83fd394f8954c1dd7ac
+Loading cache for shader OctmapFilterShaderRD, variant 0
+Loading cache for shader OctmapFilterShaderRD, variant 1
+Loading cache for shader OctmapFilterShaderRD, variant 2
+Loading cache for shader OctmapFilterShaderRD, variant 3
+Loading cache for shader OctmapFilterShaderRD, variant 4
+Loading cache for shader OctmapFilterShaderRD, variant 5
+Loading cache for shader OctmapFilterShaderRD, variant 6
+Loading cache for shader OctmapFilterShaderRD, variant 7
+Shader 'OctmapRoughnessShaderRD' (group 0) SHA256: 9f66b38742366834aef44d557fed0d0753432ffb2cf24eebb14792092fc26b83
+Loading cache for shader OctmapRoughnessShaderRD, variant 0
+Loading cache for shader OctmapRoughnessShaderRD, variant 1
+Shader 'SpecularMergeShaderRD' (group 0) SHA256: 38d1cf8969e8f223baa218cbcd7ad415e6e945247fdb8cefddabba66acaab0e4
+Loading cache for shader SpecularMergeShaderRD, variant 0
+Loading cache for shader SpecularMergeShaderRD, variant 1
+Loading cache for shader SpecularMergeShaderRD, variant 2
+Loading cache for shader SpecularMergeShaderRD, variant 3
+Shader 'ShadowFrustumShaderRD' (group 0) SHA256: 7aba7a73f7499f30591bb36c54f106926052cdc0048232d9054de723408b1ea2
+Loading cache for shader ShadowFrustumShaderRD, variant 0
+Shader 'MotionVectorsShaderRD' (group 0) SHA256: 21fe2ffffa991405f5c0b4bb35dd8789b4049f8e56d80a5aa61aa8233992e3c1
+Loading cache for shader MotionVectorsShaderRD, variant 0
+Shader 'LuminanceReduceRasterShaderRD' (group 0) SHA256: c30b2789782a74a245eb2c403712b700e22f0a331dbd7f20cdeaff4331481520
+Loading cache for shader LuminanceReduceRasterShaderRD, variant 0
+Loading cache for shader LuminanceReduceRasterShaderRD, variant 1
+Loading cache for shader LuminanceReduceRasterShaderRD, variant 2
+Shader 'SmaaEdgeDetectionShaderRD' (group 0) SHA256: 749ffc0281a6ab411cf5a66f2560a2f33f9a258f57c513c67047f363e5e7ab33
+Loading cache for shader SmaaEdgeDetectionShaderRD, variant 0
+Shader 'SmaaWeightCalculationShaderRD' (group 0) SHA256: 510ed0d4e978b1a21f4e459da4ee2516c38f4460931e2a5714dae17c8b5547c2
+Loading cache for shader SmaaWeightCalculationShaderRD, variant 0
+Shader 'SmaaBlendingShaderRD' (group 0) SHA256: daa696d3938d7aadbc85111a68936e774199a2ded78d364782d43ef580b5296d
+Loading cache for shader SmaaBlendingShaderRD, variant 0
+Shader 'TonemapMobileShaderRD' (group 0) SHA256: 2ec4e4112fe9380f41247c1f7000cbb8b341b42bd3843e4410e96b245445ed8c
+Loading cache for shader TonemapMobileShaderRD, variant 0
+Loading cache for shader TonemapMobileShaderRD, variant 1
+Loading cache for shader TonemapMobileShaderRD, variant 2
+Loading cache for shader TonemapMobileShaderRD, variant 3
+Shader 'VrsShaderRD' (group 0) SHA256: 9df305f4045418de07830cd11c3be6abf40ea73a66b1fc87b5e04821ac4f402c
+Loading cache for shader VrsShaderRD, variant 0
+Loading cache for shader VrsShaderRD, variant 2
+Loading cache for shader VrsShaderRD, variant 3
+Shader 'ResolveRasterShaderRD' (group 0) SHA256: 919d2b60f5aa1b0320eec81a5e401ee189ede55df21d4174ce5f7c6e0b1a40e1
+Loading cache for shader ResolveRasterShaderRD, variant 0
+Shader 'BlitShaderRD' (group 0) SHA256: 29b32016e1c23e0db5906fbe9b87108e39e7f5965c0016eb53fc5e1c03293243
+WASAPI: Activated output_device using IAudioClient3 interface
+WASAPI: wFormatTag = 65534
+WASAPI: nChannels = 2
+WASAPI: nSamplesPerSec = 48000
+WASAPI: nAvgBytesPerSec = 384000
+WASAPI: nBlockAlign = 8
+WASAPI: wBitsPerSample = 32
+WASAPI: cbSize = 22
+WASAPI: mix_rate = 48000
+WASAPI: fundamental_period_frames = 480
+WASAPI: min_period_frames = 480
+WASAPI: max_period_frames = 480
+WASAPI: selected a period frame size of 480
+WASAPI: detected 2 channels
+WASAPI: audio buffer frames: 480 calculated latency: 10ms
+
+Loading cache for shader BlitShaderRD, variant 0
+Loading cache for shader BlitShaderRD, variant 1
+Loading cache for shader BlitShaderRD, variant 2
+Loading cache for shader BlitShaderRD, variant 3
+Loading resource: res://localization/shiftr.csv remapped: res://localization/shiftr.csv
+Failed loading resource: res://localization/shiftr.csv
+Completed load for: 'res://localization/shiftr.csv' remapped 'res://localization/shiftr.csv' at thread -1
+TextServer: Primary interface set to: "ICU / HarfBuzz / Graphite (Built-in)".
+Loading cache for shader CanvasShaderRD, variant 0
+Loading cache for shader CanvasShaderRD, variant 1
+Loading cache for shader CanvasShaderRD, variant 2
+Loading cache for shader CanvasShaderRD, variant 3
+Loading cache for shader CanvasShaderRD, variant 4
+Loading cache for shader CanvasShaderRD, variant 5
+Loading resource: res://assets/audio/default_bus_layout.tres remapped: res://assets/audio/default_bus_layout.tres
+Completed load for: 'res://assets/audio/default_bus_layout.tres' remapped 'res://assets/audio/default_bus_layout.tres' at thread -1
+CORE API HASH: 3769296884
+EDITOR API HASH: 3146738256
+SceneTreeFTI: traversal method DEFAULT
+Loading resource: res://scripts/managers/audio/audio_director.gd remapped: res://scripts/managers/audio/audio_director.gd
+Completed load for: 'res://scripts/managers/audio/audio_director.gd' remapped 'res://scripts/managers/audio/audio_director.gd' at thread -1
+Loading resource: res://scripts/singletons/game_services.gd remapped: res://scripts/singletons/game_services.gd
+Completed load for: 'res://scripts/singletons/game_services.gd' remapped 'res://scripts/singletons/game_services.gd' at thread -1
+Loaded system CA certificates
+Loading resource: res://scenes/ui/main_shell.tscn remapped: res://scenes/ui/main_shell.tscn
+Loading resource: res://scripts/presentation/ui/main_shell.gd remapped: res://scripts/presentation/ui/main_shell.gd
+Completed load for: 'res://scripts/presentation/ui/main_shell.gd' remapped 'res://scripts/presentation/ui/main_shell.gd' at thread -1
+Loading resource: res://scenes/ui/aesthetic_root.tscn remapped: res://scenes/ui/aesthetic_root.tscn
+Completed load for: 'res://scenes/ui/aesthetic_root.tscn' remapped 'res://scenes/ui/aesthetic_root.tscn' at thread -1
+Completed load for: 'res://scenes/ui/main_shell.tscn' remapped 'res://scenes/ui/main_shell.tscn' at thread -1
+Loading resource: res://resources/configs/audio/default_audio_catalog.tres remapped: res://resources/configs/audio/default_audio_catalog.tres
+Completed load for: 'res://resources/configs/audio/default_audio_catalog.tres' remapped 'res://resources/configs/audio/default_audio_catalog.tres' at thread -1
+Loading resource: res://assets/audio/sfx/shift_whoosh.wav remapped: res://assets/audio/sfx/shift_whoosh.wav
+Loading resource: res://.godot/imported/shift_whoosh.wav-dbc194efd54b13585f900f21c3d91e97.sample remapped: res://.godot/imported/shift_whoosh.wav-dbc194efd54b13585f900f21c3d91e97.sample
+Completed load for: 'res://assets/audio/sfx/shift_whoosh.wav' remapped 'res://assets/audio/sfx/shift_whoosh.wav' at thread -1
+Loading resource: res://assets/audio/sfx/shift_tick.wav remapped: res://assets/audio/sfx/shift_tick.wav
+Loading resource: res://.godot/imported/shift_tick.wav-d2707bf12caae0aac8a7c8e1302f7f27.sample remapped: res://.godot/imported/shift_tick.wav-d2707bf12caae0aac8a7c8e1302f7f27.sample
+Completed load for: 'res://assets/audio/sfx/shift_tick.wav' remapped 'res://assets/audio/sfx/shift_tick.wav' at thread -1
+Loading resource: res://assets/audio/sfx/shift_land.wav remapped: res://assets/audio/sfx/shift_land.wav
+Loading resource: res://.godot/imported/shift_land.wav-1cce319e411fc60d6c5d8db531ccbb5a.sample remapped: res://.godot/imported/shift_land.wav-1cce319e411fc60d6c5d8db531ccbb5a.sample
+Completed load for: 'res://assets/audio/sfx/shift_land.wav' remapped 'res://assets/audio/sfx/shift_land.wav' at thread -1
+Loading resource: res://assets/audio/sfx/shift_combo.wav remapped: res://assets/audio/sfx/shift_combo.wav
+Loading resource: res://.godot/imported/shift_combo.wav-ad61c9b99d87431c2063aae9ab5c3708.sample remapped: res://.godot/imported/shift_combo.wav-ad61c9b99d87431c2063aae9ab5c3708.sample
+Completed load for: 'res://assets/audio/sfx/shift_combo.wav' remapped 'res://assets/audio/sfx/shift_combo.wav' at thread -1
+Loading resource: res://assets/audio/ui/ui_click.wav remapped: res://assets/audio/ui/ui_click.wav
+Loading resource: res://.godot/imported/ui_click.wav-ba33935c68a0e0c560b344c4351006a9.sample remapped: res://.godot/imported/ui_click.wav-ba33935c68a0e0c560b344c4351006a9.sample
+Completed load for: 'res://assets/audio/ui/ui_click.wav' remapped 'res://assets/audio/ui/ui_click.wav' at thread -1
+Loading resource: res://assets/audio/ui/ui_error.wav remapped: res://assets/audio/ui/ui_error.wav
+Loading resource: res://.godot/imported/ui_error.wav-9dc010aff99ab1319387359dc6a5f43c.sample remapped: res://.godot/imported/ui_error.wav-9dc010aff99ab1319387359dc6a5f43c.sample
+Completed load for: 'res://assets/audio/ui/ui_error.wav' remapped 'res://assets/audio/ui/ui_error.wav' at thread -1
+Loading resource: res://assets/audio/sfx/puzzle_solve.wav remapped: res://assets/audio/sfx/puzzle_solve.wav
+Loading resource: res://.godot/imported/puzzle_solve.wav-d6e6217d0dd2532208ab830e087a13d6.sample remapped: res://.godot/imported/puzzle_solve.wav-d6e6217d0dd2532208ab830e087a13d6.sample
+Completed load for: 'res://assets/audio/sfx/puzzle_solve.wav' remapped 'res://assets/audio/sfx/puzzle_solve.wav' at thread -1
+Loading resource: res://assets/audio/sfx/laser_fire.wav remapped: res://assets/audio/sfx/laser_fire.wav
+Loading resource: res://.godot/imported/laser_fire.wav-6cfdb103145a8d7b111f1cc850220305.sample remapped: res://.godot/imported/laser_fire.wav-6cfdb103145a8d7b111f1cc850220305.sample
+Completed load for: 'res://assets/audio/sfx/laser_fire.wav' remapped 'res://assets/audio/sfx/laser_fire.wav' at thread -1
+Loading resource: res://assets/audio/sfx/switch_toggle.wav remapped: res://assets/audio/sfx/switch_toggle.wav
+Loading resource: res://.godot/imported/switch_toggle.wav-8cc7811cb30d94bb2828a7bfedf651c4.sample remapped: res://.godot/imported/switch_toggle.wav-8cc7811cb30d94bb2828a7bfedf651c4.sample
+Completed load for: 'res://assets/audio/sfx/switch_toggle.wav' remapped 'res://assets/audio/sfx/switch_toggle.wav' at thread -1
+Loading resource: res://assets/audio/sfx/button_press.wav remapped: res://assets/audio/sfx/button_press.wav
+Loading resource: res://.godot/imported/button_press.wav-597439835c1b988fccaeff89387cec9c.sample remapped: res://.godot/imported/button_press.wav-597439835c1b988fccaeff89387cec9c.sample
+Completed load for: 'res://assets/audio/sfx/button_press.wav' remapped 'res://assets/audio/sfx/button_press.wav' at thread -1
+Loading resource: res://assets/audio/sfx/particle_spark.wav remapped: res://assets/audio/sfx/particle_spark.wav
+Loading resource: res://.godot/imported/particle_spark.wav-9a90c01c1cd0055bbdd0db403022cdb7.sample remapped: res://.godot/imported/particle_spark.wav-9a90c01c1cd0055bbdd0db403022cdb7.sample
+Completed load for: 'res://assets/audio/sfx/particle_spark.wav' remapped 'res://assets/audio/sfx/particle_spark.wav' at thread -1
+Loading resource: res://assets/audio/music/stinger_victory.wav remapped: res://assets/audio/music/stinger_victory.wav
+Loading resource: res://.godot/imported/stinger_victory.wav-794a6b79e6743e20010d4581a45663cb.sample remapped: res://.godot/imported/stinger_victory.wav-794a6b79e6743e20010d4581a45663cb.sample
+Completed load for: 'res://assets/audio/music/stinger_victory.wav' remapped 'res://assets/audio/music/stinger_victory.wav' at thread -1
+Loading resource: res://assets/audio/music/stinger_failure.wav remapped: res://assets/audio/music/stinger_failure.wav
+Loading resource: res://.godot/imported/stinger_failure.wav-573bc1a6576b067fb0c9d86d78d27742.sample remapped: res://.godot/imported/stinger_failure.wav-573bc1a6576b067fb0c9d86d78d27742.sample
+Completed load for: 'res://assets/audio/music/stinger_failure.wav' remapped 'res://assets/audio/music/stinger_failure.wav' at thread -1
+Loading resource: res://assets/audio/music/stem_ambient.wav remapped: res://assets/audio/music/stem_ambient.wav
+Loading resource: res://.godot/imported/stem_ambient.wav-53b0d26aa884a22d43de280fc0a4bfc3.sample remapped: res://.godot/imported/stem_ambient.wav-53b0d26aa884a22d43de280fc0a4bfc3.sample
+Completed load for: 'res://assets/audio/music/stem_ambient.wav' remapped 'res://assets/audio/music/stem_ambient.wav' at thread -1
+Loading resource: res://assets/audio/music/stem_bed.wav remapped: res://assets/audio/music/stem_bed.wav
+Loading resource: res://.godot/imported/stem_bed.wav-c1b529a9e0094288b1c2922e5acfb699.sample remapped: res://.godot/imported/stem_bed.wav-c1b529a9e0094288b1c2922e5acfb699.sample
+Completed load for: 'res://assets/audio/music/stem_bed.wav' remapped 'res://assets/audio/music/stem_bed.wav' at thread -1
+Loading resource: res://assets/audio/music/stem_tension.wav remapped: res://assets/audio/music/stem_tension.wav
+Loading resource: res://.godot/imported/stem_tension.wav-ac997daa6ab7718f753a45638454cf75.sample remapped: res://.godot/imported/stem_tension.wav-ac997daa6ab7718f753a45638454cf75.sample
+Completed load for: 'res://assets/audio/music/stem_tension.wav' remapped 'res://assets/audio/music/stem_tension.wav' at thread -1
+[breadcrumb:boot] CrashService ready
+[breadcrumb:boot] GameServices ready
+Loading resource: res://resources/configs/visual/default_design_tokens.tres remapped: res://resources/configs/visual/default_design_tokens.tres
+Completed load for: 'res://resources/configs/visual/default_design_tokens.tres' remapped 'res://resources/configs/visual/default_design_tokens.tres' at thread -1
+Loading resource: res://resources/configs/visual/quality_high.tres remapped: res://resources/configs/visual/quality_high.tres
+Completed load for: 'res://resources/configs/visual/quality_high.tres' remapped 'res://resources/configs/visual/quality_high.tres' at thread -1
+Loading resource: res://resources/configs/feel/default_shift_feel.tres remapped: res://resources/configs/feel/default_shift_feel.tres
+Completed load for: 'res://resources/configs/feel/default_shift_feel.tres' remapped 'res://resources/configs/feel/default_shift_feel.tres' at thread -1
+Loading resource: res://resources/configs/visual/quality_high.tres remapped: res://resources/configs/visual/quality_high.tres
+Completed load for: 'res://resources/configs/visual/quality_high.tres' remapped 'res://resources/configs/visual/quality_high.tres' at thread -1
+XR: Clearing primary interface
+XR: Removed interface "Native mobile"
+XR: Removed interface "OpenXR"
+Freeing Default Tex_Blit Shader
+MultiUmaBuffer 'SceneState::uniform_buffers' used a total of 0 buffers. A large number may indicate a waste of VRAM and can be brought down by tweaking MAX_EXTRA_BUFFERS for this buffer.
+MultiUmaBuffer 'RENDER_LIST_OPAQUE' used a total of 0 buffers. A large number may indicate a waste of VRAM and can be brought down by tweaking MAX_EXTRA_BUFFERS for this buffer.
+MultiUmaBuffer 'RENDER_LIST_ALPHA' used a total of 0 buffers. A large number may indicate a waste of VRAM and can be brought down by tweaking MAX_EXTRA_BUFFERS for this buffer.
+MultiUmaBuffer 'RENDER_LIST_SECONDARY' used a total of 0 buffers. A large number may indicate a waste of VRAM and can be brought down by tweaking MAX_EXTRA_BUFFERS for this buffer.
+MultiUmaBuffer 'CANVAS_INSTANCE_DATA' used a total of 0 buffers. A large number may indicate a waste of VRAM and can be brought down by tweaking MAX_EXTRA_BUFFERS for this buffer.
+Accessibility: window 0 adapter destroyed.
+Leaked instance: GDScriptNativeClass:9223372047340536144 - Reference count: 1
+Leaked instance: GDScriptNativeClass:9223372052356924027 - Reference count: 1
+Leaked instance: GDScriptNativeClass:9223372052390478461 - Reference count: 1
+Leaked instance: GDScriptNativeClass:9223372054319858416 - Reference count: 1
+Leaked instance: GDScriptNativeClass:9223372057322980259 - Reference count: 1
+Leaked instance: GDScriptNativeClass:9223372057641747382 - Reference count: 4
+Leaked instance: GDScript:9223372068614047197 - Reference count: 1
+Leaked instance: GDScript:9223372069335467490 - Reference count: 9
+Leaked instance: GDScript:9223372072506361331 - Reference count: 1
+Leaked instance: GDScript:9223372073731098109 - Reference count: 1
+Leaked instance: GDScript:9223372076901991948 - Reference count: 3
+Leaked instance: GDScript:9223372077052986893 - Reference count: 6
+Hint: Leaked instances typically happen when nodes are removed from the scene tree (with `remove_child()`) but not freed (with `free()` or `queue_free()`).
+Resource still in use: res://resources/configs/audio/audio_event_def.gd (GDScript)
+Resource still in use: res://resources/configs/audio/audio_catalog.gd (GDScript)
+Resource still in use: res://scripts/services/platform/feature_flags.gd (GDScript)
+Resource still in use: res://resources/configs/visual/visual_quality.gd (GDScript)
+Resource still in use: res://scripts/utils/power_policy.gd (GDScript)
+Resource still in use: res://scripts/services/input_remap_profile.gd (GDScript)
+Orphan StringName: stinger_failure (static: 0, total: 1)
+Orphan StringName: effective_ambient_amount (static: 0, total: 3)
+Orphan StringName: @static_initializer (static: 1, total: 2)
+Orphan StringName: parallax_enabled (static: 0, total: 8)
+Orphan StringName: duck_music_db (static: 0, total: 6)
+Orphan StringName: puzzle_solve (static: 0, total: 1)
+Orphan StringName: shift_sub (static: 0, total: 1)
+Orphan StringName: ui_click (static: 0, total: 1)
+Orphan StringName: ceil (static: 0, total: 3)
+Orphan StringName: category (static: 0, total: 7)
+Orphan StringName: AudioCatalog (static: 0, total: 4)
+Orphan StringName: @group_24_Accessibility / Power (static: 0, total: 2)
+Orphan StringName: reduce_motion (static: 0, total: 5)
+Orphan StringName: switch_toggle (static: 0, total: 1)
+Orphan StringName: effective_particle_preprocess (static: 0, total: 3)
+Orphan StringName: shift_combo (static: 0, total: 1)
+Orphan StringName: res://resources/configs/audio/audio_event_def.gd (static: 0, total: 1)
+Orphan StringName: effective_bloom_samples (static: 0, total: 3)
+Orphan StringName: load_or_builtin (static: 0, total: 3)
+Orphan StringName: make_default (static: 0, total: 3)
+Orphan StringName: leaderboards (static: 0, total: 4)
+Orphan StringName: typeof (static: 0, total: 2)
+Orphan StringName: res://resources/configs/visual/visual_quality.gd (static: 0, total: 16)
+Orphan StringName: InputEvent (static: 0, total: 2)
+Orphan StringName: rebuild_index (static: 0, total: 5)
+Orphan StringName: crash_reporting (static: 0, total: 5)
+Orphan StringName: bindings (static: 0, total: 5)
+Orphan StringName: auth (static: 0, total: 5)
+Orphan StringName: set_battery_saver (static: 0, total: 3)
+Orphan StringName: PowerPolicy (static: 0, total: 3)
+Orphan StringName: achievements (static: 0, total: 4)
+Orphan StringName: @group_20_Glass / UI (static: 0, total: 2)
+Orphan StringName: append (static: 0, total: 1)
+Orphan StringName: apply_reduce_motion_from_feel (static: 0, total: 3)
+Orphan StringName: bloom_enabled (static: 0, total: 8)
+Orphan StringName: cooldown_ms (static: 0, total: 5)
+Orphan StringName: make_medium (static: 0, total: 3)
+Orphan StringName: _ev (static: 0, total: 4)
+Orphan StringName: profile_name (static: 0, total: 6)
+Orphan StringName: InputRemapProfile (static: 0, total: 4)
+Orphan StringName: InputEventJoypadButton (static: 0, total: 1)
+Orphan StringName: spatial (static: 0, total: 6)
+Orphan StringName: bloom_samples (static: 0, total: 8)
+Orphan StringName: SFX_Juice (static: 0, total: 1)
+Orphan StringName: effective_shimmer (static: 0, total: 3)
+Orphan StringName: bus (static: 0, total: 6)
+Orphan StringName: VisualQualityConfig (static: 0, total: 6)
+Orphan StringName: effective_board_burst_cap (static: 0, total: 3)
+Orphan StringName: ambient_particles (static: 0, total: 8)
+Orphan StringName: set_gameplay_active (static: 0, total: 3)
+Orphan StringName: shift_tick (static: 0, total: 1)
+Orphan StringName: ui_confirm_amount (static: 0, total: 8)
+Orphan StringName: Resource (static: 1, total: 14)
+Orphan StringName: SFX_Puzzle (static: 0, total: 1)
+Orphan StringName: effective_bloom_strength (static: 0, total: 3)
+Orphan StringName: icon_shimmer_enabled (static: 0, total: 8)
+Orphan StringName: laser_fire (static: 0, total: 1)
+Orphan StringName: cloud_save (static: 0, total: 5)
+Orphan StringName: @group_1_Bloom / Glow (static: 0, total: 2)
+Orphan StringName: AudioStream (static: 0, total: 4)
+Orphan StringName: light_beams_enabled (static: 0, total: 8)
+Orphan StringName: _by_id (static: 0, total: 3)
+Orphan StringName: get (static: 0, total: 2)
+Orphan StringName: ambient_amount (static: 0, total: 8)
+Orphan StringName: tier (static: 0, total: 8)
+Orphan StringName: _event_from_dict (static: 0, total: 4)
+Orphan StringName: effective_parallax (static: 0, total: 3)
+Orphan StringName: id (static: 0, total: 7)
+Orphan StringName: AudioEventDef (static: 0, total: 5)
+Orphan StringName: soft_glow_enabled (static: 0, total: 8)
+Orphan StringName: ui_confirm_particles (static: 0, total: 8)
+Orphan StringName: procedural_kind (static: 0, total: 6)
+Orphan StringName: to_dict (static: 0, total: 3)
+Orphan StringName: res://scripts/services/platform/feature_flags.gd (static: 0, total: 3)
+Orphan StringName: animated_background (static: 0, total: 8)
+Orphan StringName: shift_whoosh (static: 0, total: 1)
+Orphan StringName: make_low (static: 0, total: 3)
+Orphan StringName: privacy_gate (static: 0, total: 4)
+Orphan StringName: music (static: 0, total: 1)
+Orphan StringName: apply_to_input_map (static: 0, total: 3)
+Orphan StringName: VisualQualityConfig.Tier (static: 0, total: 2)
+Orphan StringName: volume_db (static: 0, total: 5)
+Orphan StringName: new (static: 4, total: 5)
+Orphan StringName: for_current_platform (static: 0, total: 3)
+Orphan StringName: @group_13_Particles (static: 0, total: 2)
+Orphan StringName: has_event (static: 0, total: 3)
+Orphan StringName: set_menu_idle (static: 0, total: 3)
+Orphan StringName: bloom_multiplier (static: 0, total: 3)
+Orphan StringName: stream (static: 0, total: 5)
+Orphan StringName: events (static: 0, total: 5)
+Orphan StringName: battery_saver (static: 0, total: 8)
+Orphan StringName: glass_blur_enabled (static: 0, total: 8)
+Orphan StringName: background_intensity (static: 0, total: 8)
+Orphan StringName: make_high (static: 0, total: 3)
+Orphan StringName: sfx (static: 0, total: 4)
+Orphan StringName: str (static: 0, total: 1)
+Orphan StringName: particle_spark (static: 0, total: 1)
+Orphan StringName: res://resources/configs/audio/audio_catalog.gd (static: 0, total: 7)
+Orphan StringName: duck_ms (static: 0, total: 6)
+Orphan StringName: SFX_Movement (static: 0, total: 4)
+Orphan StringName: menu_idle (static: 0, total: 3)
+Orphan StringName: ui_error (static: 0, total: 1)
+Orphan StringName: get_event (static: 0, total: 4)
+Orphan StringName: _apply (static: 0, total: 6)
+Orphan StringName: glass_blur_samples (static: 0, total: 8)
+Orphan StringName: SFX_Particles (static: 0, total: 1)
+Orphan StringName: effective_glass_blur (static: 0, total: 3)
+Orphan StringName: pitch_variance (static: 0, total: 5)
+Orphan StringName: Music_Stinger (static: 0, total: 1)
+Orphan StringName: controller_glyphs (static: 0, total: 5)
+Orphan StringName: SFX_UI (static: 0, total: 1)
+Orphan StringName: button_press (static: 0, total: 1)
+Orphan StringName: RefCounted (static: 0, total: 2)
+Orphan StringName: board_burst_cap (static: 0, total: 8)
+Orphan StringName: Object (static: 1, total: 2)
+Orphan StringName: res://scripts/utils/power_policy.gd (static: 0, total: 8)
+Orphan StringName: stinger_victory (static: 0, total: 1)
+Orphan StringName: keycode (static: 0, total: 1)
+Orphan StringName: max_polyphony (static: 0, total: 5)
+Orphan StringName: _builtin_events (static: 0, total: 4)
+Orphan StringName: effective_ambient_particles (static: 0, total: 4)
+Orphan StringName: effective_ui_confirm_amount (static: 0, total: 3)
+Orphan StringName: InputEventKey (static: 0, total: 1)
+Orphan StringName: pitch_scale (static: 0, total: 5)
+Orphan StringName: res://scripts/services/input_remap_profile.gd (static: 0, total: 4)
+Orphan StringName: bloom_strength (static: 0, total: 8)
+Orphan StringName: gameplay_active (static: 0, total: 3)
+Orphan StringName: bloom_threshold (static: 0, total: 8)
+Orphan StringName: particle_preprocess (static: 0, total: 8)
+Orphan StringName: button_index (static: 0, total: 1)
+Orphan StringName: shift_land (static: 0, total: 1)
+Orphan StringName: @group_8_Background (static: 0, total: 2)
+Orphan StringName: @implicit_new (static: 0, total: 6)
+Orphan StringName: Tier (static: 0, total: 2)
+Orphan StringName: particle_multiplier (static: 0, total: 3)
+Orphan StringName: effective_bloom (static: 0, total: 3)
+Orphan StringName: FeatureFlags (static: 0, total: 4)
+Orphan StringName: use_combo_pitch (static: 0, total: 6)
+Orphan StringName: analytics (static: 0, total: 5)
+Orphan StringName: bloom_resolution_scale (static: 0, total: 8)
+StringName: 140 unclaimed string names at exit.

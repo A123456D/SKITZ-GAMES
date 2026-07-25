@@ -1,0 +1,40 @@
+keys,en,es,fr
+UI_BRAND,SHIFTR,SHIFTR,SHIFTR
+UI_TAGLINE,One shift. Clarity snaps.,Un desplazamiento. La claridad encaja.,Un décalage. La clarté s’aligne.
+UI_CONTINUE,Continue,Continuar,Continuer
+UI_DAILY,Daily Challenge,Desafío diario,Défi du jour
+UI_CREATE,Create,Crear,Créer
+UI_WORLD_MAP,World Map,Mapa mundial,Carte du monde
+UI_INVENTORY,Inventory,Inventario,Inventaire
+UI_ACHIEVEMENTS,Achievements,Logros,Succès
+UI_LEADERBOARDS,Leaderboards,Clasificaciones,Classements
+UI_SETTINGS,Settings,Ajustes,Réglages
+UI_ACCESSIBILITY,Accessibility,Accesibilidad,Accessibilité
+UI_SETTINGS_SUB,Audio · graphics · controls,Audio · gráficos · controles,Audio · graphismes · commandes
+UI_SECTION_AUDIO,Audio,Audio,Audio
+UI_SECTION_GRAPHICS,Graphics,Gráficos,Graphismes
+UI_SECTION_CONTROLS,Controls,Controles,Commandes
+UI_SECTION_LANGUAGE,Language,Idioma,Langue
+UI_SECTION_PRIVACY,Privacy & sync,Privacidad y sincronización,Confidentialité et sync
+UI_MASTER,Master,Principal,Principal
+UI_MUSIC,Music,Música,Musique
+UI_SFX,SFX,Efectos,SFX
+UI_UI_VOL,UI,IU,IU
+UI_QUALITY,Quality,Calidad,Qualité
+UI_CLOUD_SYNC,Cloud save sync,Sincronizar nube,Sync cloud
+UI_ANALYTICS,Analytics,Analíticas,Analytique
+UI_CRASH_REPORTS,Crash reports,Informes de fallos,Rapports de plantage
+UI_PRIVACY_POLICY,Privacy policy,Política de privacidad,Politique de confidentialité
+UI_CONTROLLER_HINT,D-pad / Stick  ·  A / Enter  ·  B / Esc,Cruceta / Stick  ·  A / Enter  ·  B / Esc,Croix / Stick  ·  A / Entrée  ·  B / Échap
+UI_CONTROLS_NOTE,Swipe a row or column to shift. Keyboard: Q/E rows, R/F columns, Z undo. Gamepad: D-pad aim, face buttons shift, X undo.,Desliza una fila o columna. Teclado: Q/E filas, R/F columnas, Z deshacer. Mando: cruceta apuntar, botones desplazar, X deshacer.,Balayez une rangée ou colonne. Clavier : Q/E rangées, R/F colonnes, Z annuler. Manette : croix viser, boutons décaler, X annuler.
+PRIVACY_TITLE,Your privacy,Tu privacidad,Votre confidentialité
+PRIVACY_BODY,"We use optional analytics to improve SHIFTR. Crash reports help us fix bugs. You can change this later in Settings.","Usamos analíticas opcionales para mejorar SHIFTR. Los informes de fallos nos ayudan a corregir errores. Puedes cambiarlo luego en Ajustes.","Nous utilisons des analyses optionnelles pour améliorer SHIFTR. Les rapports de plantage aident à corriger les bugs. Modifiable plus tard dans Réglages."
+PRIVACY_ANALYTICS,Allow analytics,Permitir analíticas,Autoriser l’analytique
+PRIVACY_CRASH,Allow crash reports,Permitir informes de fallos,Autoriser les rapports de plantage
+PRIVACY_POLICY_LINK,Privacy policy,Política de privacidad,Politique de confidentialité
+PRIVACY_ACCEPT,Continue,Continuar,Continuer
+PRIVACY_ESSENTIAL,Essential only,Solo lo esencial,Essentiel uniquement
+A11Y_REDUCE_MOTION,Reduce motion,Reducir movimiento,Réduire les animations
+A11Y_TEXT_SIZE,Text size,Tamaño del texto,Taille du texte
+LB_GLOBAL,Global,Global,Mondial
+LB_FRIENDS,Friends,Amigos,Amis

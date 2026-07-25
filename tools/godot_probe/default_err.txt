@@ -1,0 +1,121 @@
+ERROR: Failed loading resource: res://localization/shiftr.csv.
+   at: _load (core/io/resource_loader.cpp:317)
+SHADER ERROR: Tokenizer: Unknown character #35: '#'
+   at: (null) (res://assets/shaders/source/dynamic_gradient_bg.gdshader:2)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://scripts/presentation/ui/animated_shift_background.gd:21)
+       [1] _apply_background (res://scripts/presentation/ui/visual_director.gd:189)
+       [2] _apply_all (res://scripts/presentation/ui/visual_director.gd:179)
+       [3] _ready (res://scripts/presentation/ui/visual_director.gd:37)
+ERROR: Shader compilation failed.
+   at: set_code (servers/rendering/renderer_rd/renderer_canvas_render_rd.cpp:1589)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://scripts/presentation/ui/animated_shift_background.gd:21)
+       [1] _apply_background (res://scripts/presentation/ui/visual_director.gd:189)
+       [2] _apply_all (res://scripts/presentation/ui/visual_director.gd:179)
+       [3] _ready (res://scripts/presentation/ui/visual_director.gd:37)
+SHADER ERROR: Tokenizer: Unknown character #35: '#'
+   at: (null) (res://assets/shaders/source/canvas_bloom.gdshader:3)
+   GDScript backtrace (most recent call first):
+       [0] _apply_bloom (res://scripts/presentation/ui/visual_director.gd:218)
+       [1] _apply_all (res://scripts/presentation/ui/visual_director.gd:180)
+       [2] _ready (res://scripts/presentation/ui/visual_director.gd:37)
+ERROR: Shader compilation failed.
+   at: set_code (servers/rendering/renderer_rd/renderer_canvas_render_rd.cpp:1589)
+   GDScript backtrace (most recent call first):
+       [0] _apply_bloom (res://scripts/presentation/ui/visual_director.gd:218)
+       [1] _apply_all (res://scripts/presentation/ui/visual_director.gd:180)
+       [2] _ready (res://scripts/presentation/ui/visual_director.gd:37)
+SHADER ERROR: Tokenizer: Unknown character #35: '#'
+   at: (null) (res://assets/shaders/source/soft_glow.gdshader:2)
+   GDScript backtrace (most recent call first):
+       [0] _ensure_glow (res://scripts/presentation/ui/glass_button.gd:53)
+       [1] _ready (res://scripts/presentation/ui/glass_button.gd:20)
+       [2] _add_cta (res://scripts/presentation/ui/screens/main_menu_screen.gd:125)
+       [3] _build (res://scripts/presentation/ui/screens/main_menu_screen.gd:65)
+       [4] setup (res://scripts/presentation/ui/ui_screen.gd:32)
+       [5] push (res://scripts/presentation/ui/ui_router.gd:134)
+       [6] start (res://scripts/presentation/ui/ui_router.gd:113)
+       [7] _ready (res://scripts/presentation/ui/main_shell.gd:48)
+ERROR: Shader compilation failed.
+   at: set_code (servers/rendering/renderer_rd/renderer_canvas_render_rd.cpp:1589)
+   GDScript backtrace (most recent call first):
+       [0] _ensure_glow (res://scripts/presentation/ui/glass_button.gd:53)
+       [1] _ready (res://scripts/presentation/ui/glass_button.gd:20)
+       [2] _add_cta (res://scripts/presentation/ui/screens/main_menu_screen.gd:125)
+       [3] _build (res://scripts/presentation/ui/screens/main_menu_screen.gd:65)
+       [4] setup (res://scripts/presentation/ui/ui_screen.gd:32)
+       [5] push (res://scripts/presentation/ui/ui_router.gd:134)
+       [6] start (res://scripts/presentation/ui/ui_router.gd:113)
+       [7] _ready (res://scripts/presentation/ui/main_shell.gd:48)
+ERROR: The object does not have any 'meta' values with the key 'icon_base_scale'.
+   at: get_meta (core/object/object.cpp:1053)
+   GDScript backtrace (most recent call first):
+       [0] play_focus (res://scripts/presentation/ui/icon_motion.gd:43)
+       [1] _on_focus (res://scripts/presentation/ui/glass_button.gd:83)
+       [2] focus_first (res://scripts/services/controller_nav.gd:47)
+       [3] _focus_menu (res://scripts/presentation/ui/screens/main_menu_screen.gd:102)
+ERROR: Parameter "version" is null.
+   at: version_get_shader (./servers/rendering/renderer_rd/shader_rd.h:203)
+ERROR: Parameter "version" is null.
+   at: version_get_shader (./servers/rendering/renderer_rd/shader_rd.h:203)
+ERROR: Parameter "version" is null.
+   at: version_get_shader (./servers/rendering/renderer_rd/shader_rd.h:203)
+ERROR: Parameter "version" is null.
+   at: version_get_shader (./servers/rendering/renderer_rd/shader_rd.h:203)
+ERROR: Parameter "version" is null.
+   at: version_get_shader (./servers/rendering/renderer_rd/shader_rd.h:203)
+ERROR: Parameter "version" is null.
+   at: version_get_shader (./servers/rendering/renderer_rd/shader_rd.h:203)
+ERROR: Parameter "version" is null.
+   at: version_get_shader (./servers/rendering/renderer_rd/shader_rd.h:203)
+ERROR: Parameter "version" is null.
+   at: version_get_shader (./servers/rendering/renderer_rd/shader_rd.h:203)
+ERROR: Parameter "version" is null.
+   at: version_get_shader (./servers/rendering/renderer_rd/shader_rd.h:203)
+ERROR: Parameter "version" is null.
+   at: version_get_shader (./servers/rendering/renderer_rd/shader_rd.h:203)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/level_select_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/level_select_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+SCRIPT ERROR: Parse Error: Cannot infer the type of "live" variable because the value doesn't have a set type.
+   at: GDScript::reload (res://scripts/presentation/ui/screens/achievements_screen.gd:26)
+ERROR: Failed to load script "res://scripts/presentation/ui/screens/achievements_screen.gd" with error "Parse error".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/achievements_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/achievements_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+SCRIPT ERROR: Parse Error: Cannot infer the type of "is_floor" variable because the value doesn't have a set type.
+   at: GDScript::reload (res://scripts/systems/puzzle/puzzle_world.gd:139)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/systems/puzzle/puzzle_context.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/systems/puzzle/puzzle_object.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/systems/puzzle/puzzle_engine.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://tools/puzzle_editor/editor_test_session.gd:0)
+SCRIPT ERROR: Parse Error: Cannot assign a value of type Error to variable "result" with specified type Dictionary.
+   at: GDScript::reload (res://tools/puzzle_editor/editor_difficulty_analyzer.gd:188)
+SCRIPT ERROR: Parse Error: Cannot assign a value of type Error to variable "result2" with specified type Dictionary.
+   at: GDScript::reload (res://tools/puzzle_editor/editor_difficulty_analyzer.gd:194)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://tools/puzzle_editor/level_editor_controller.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/tools/level_editor/editor_board_view.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/tools/level_editor/level_editor_screen.gd:0)
+ERROR: Failed to load script "res://scripts/tools/level_editor/level_editor_screen.gd" with error "Compilation failed".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+ERROR: Parse Error: Failed. [Resource file res://scenes/ui/screens/level_editor/level_editor_screen.tscn:12]
+   at: _parse_node_tag (scene/resources/resource_format_text.cpp:293)
+ERROR: Failed loading resource: res://scenes/ui/screens/level_editor/level_editor_screen.tscn.
+   at: _load (core/io/resource_loader.cpp:317)
+WARNING: 2 RIDs of type "Texture" were leaked.
+   at: finalize (servers/rendering/rendering_device.cpp:8900)
+WARNING: 122 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 75 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

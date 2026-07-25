@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="PatternTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/puzzle_gen/pattern_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"stripes_h_4"
+display_name = "H Stripes"
+family = 1
+tier = 1
+width = 4
+height = 4
+cells = PackedInt32Array(0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1)
+tags = PackedStringArray("stripes")

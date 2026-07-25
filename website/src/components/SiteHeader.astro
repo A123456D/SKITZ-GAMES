@@ -1,0 +1,86 @@
+---
+const path = Astro.url.pathname;
+const links = [
+	{ href: '/games/', label: 'Games' },
+	{ href: '/about/', label: 'About' },
+];
+---
+
+<header class="site-header">
+	<div class="wrap site-header__inner">
+		<a class="logo" href="/" aria-label="SKITZ home">
+			<img src="/images/skitz-logo.png" alt="SKITZ games & apps" width="220" height="120" />
+		</a>
+		<nav class="nav" aria-label="Primary">
+			{
+				links.map((link) => (
+					<a
+						href={link.href}
+						class:list={['nav__link', { 'is-active': path.startsWith(link.href) }]}
+					>
+						{link.label}
+					</a>
+				))
+			}
+		</nav>
+	</div>
+</header>
+
+<style>
+	.site-header {
+		position: sticky;
+		top: 0;
+		z-index: 40;
+		height: var(--header-h);
+		background: rgba(14, 14, 14, 0.78);
+		backdrop-filter: blur(10px);
+		border-bottom: 1px solid var(--line);
+	}
+
+	.site-header__inner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		height: 100%;
+		gap: 1rem;
+	}
+
+	.logo {
+		display: inline-flex;
+		text-decoration: none;
+		transform: rotate(-1.5deg);
+		transition: transform 160ms var(--ease);
+	}
+
+	.logo:hover {
+		transform: rotate(-0.2deg) scale(1.03);
+	}
+
+	.logo img {
+		height: 3.35rem;
+		width: auto;
+		filter: drop-shadow(3px 3px 0 rgba(0, 0, 0, 0.85));
+	}
+
+	.nav {
+		display: flex;
+		gap: 0.65rem;
+	}
+
+	.nav__link {
+		font-family: var(--font-type);
+		font-size: 0.95rem;
+		color: var(--paper);
+		text-decoration: none;
+		padding: 0.35rem 0.7rem;
+		border: 2px solid transparent;
+	}
+
+	.nav__link:hover,
+	.nav__link.is-active {
+		border-color: var(--paper);
+		background: var(--paper);
+		color: var(--mark);
+		box-shadow: 3px 3px 0 #000;
+	}
+</style>

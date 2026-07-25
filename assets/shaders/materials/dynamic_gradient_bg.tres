@@ -1,0 +1,17 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://assets/shaders/source/dynamic_gradient_bg.gdshader" id="1"]
+
+[resource]
+shader = ExtResource("1")
+shader_parameter/color_a = Color(0.0392157, 0.054902, 0.0784314, 1)
+shader_parameter/color_b = Color(0.0705882, 0.101961, 0.141176, 1)
+shader_parameter/color_c = Color(0.054902, 0.0941176, 0.12549, 1)
+shader_parameter/beam_color = Color(0.184314, 0.878431, 0.772549, 0.12)
+shader_parameter/grid_color = Color(0.45, 0.55, 0.62, 0.09)
+shader_parameter/grid_scale = 48.0
+shader_parameter/drift_speed = 0.08
+shader_parameter/beam_speed = 0.05
+shader_parameter/intensity = 1.0
+shader_parameter/beams_enabled = 1.0
+shader_parameter/parallax_offset = Vector2(0, 0)

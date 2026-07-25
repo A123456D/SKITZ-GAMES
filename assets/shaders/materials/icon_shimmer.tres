@@ -1,0 +1,11 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://assets/shaders/source/icon_shimmer.gdshader" id="1"]
+
+[resource]
+shader = ExtResource("1")
+shader_parameter/shimmer_color = Color(0.75, 0.95, 0.92, 0.55)
+shader_parameter/speed = 0.45
+shader_parameter/band_width = 0.12
+shader_parameter/strength = 0.55
+shader_parameter/angle = 0.7

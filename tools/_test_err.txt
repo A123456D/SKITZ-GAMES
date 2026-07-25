@@ -1,0 +1,6 @@
+ERROR: Failed loading resource: res://localization/shiftr.csv.
+   at: _load (core/io/resource_loader.cpp:317)
+WARNING: 26 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 16 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

@@ -1,0 +1,169 @@
+---
+interface Downloads {
+	windows?: string;
+	android?: string;
+	macos?: string;
+	linux?: string;
+}
+
+interface Props {
+	slug: string;
+	downloads: Downloads;
+	appStoreUrl?: string;
+	playStoreUrl?: string;
+	platforms: {
+		web: boolean;
+		windows: boolean;
+		android: boolean;
+		macos: boolean;
+		linux: boolean;
+		ios: boolean;
+	};
+}
+
+const { slug, downloads, appStoreUrl, playStoreUrl, platforms } = Astro.props;
+
+const desktop = [
+	{ key: 'windows', label: 'Windows', href: downloads.windows },
+	{ key: 'macos', label: 'macOS', href: downloads.macos },
+	{ key: 'linux', label: 'Linux', href: downloads.linux },
+].filter((item) => item.href);
+
+const androidHref = downloads.android;
+const showIosStore = Boolean(appStoreUrl);
+const showPlayStore = Boolean(playStoreUrl);
+---
+
+<section class="downloads" aria-labelledby="downloads-heading">
+	<h2 id="downloads-heading" class="section-title">Download free</h2>
+	<p class="muted intro">
+		Desktop and Android builds install on your device. On iPhone, play in Safari — App Store links
+		show up here when a native build is live.
+	</p>
+
+	{
+		desktop.length > 0 && (
+			<div class="block">
+				<h3>Desktop</h3>
+				<div class="btn-row">
+					{desktop.map((item) => (
+						<a class="btn btn-ghost" href={item.href} download>
+							Download {item.label}
+						</a>
+					))}
+				</div>
+			</div>
+		)
+	}
+
+	{
+		(androidHref || showPlayStore) && (
+			<div class="block">
+				<h3>Android</h3>
+				<div class="btn-row">
+					{androidHref && (
+						<a class="btn" href={androidHref} download>
+							Download APK
+						</a>
+					)}
+					{showPlayStore && (
+						<a class="btn btn-ghost" href={playStoreUrl} rel="noopener noreferrer" target="_blank">
+							Google Play
+						</a>
+					)}
+				</div>
+				<details class="help">
+					<summary>How to install the APK</summary>
+					<ol>
+						<li>Open the download on your phone (Chrome works well).</li>
+						<li>If prompted, allow installs from the browser.</li>
+						<li>Open the APK and tap Install.</li>
+					</ol>
+				</details>
+			</div>
+		)
+	}
+
+	<div class="block">
+		<h3>iPhone</h3>
+		{
+			showIosStore ? (
+				<div class="btn-row">
+					<a class="btn" href={appStoreUrl} rel="noopener noreferrer" target="_blank">
+						App Store
+					</a>
+					{platforms.web && (
+						<a class="btn btn-ghost" href={`/games/${slug}/play/`}>
+							Or play in Safari
+						</a>
+					)}
+				</div>
+			) : (
+				<>
+					<p class="muted">
+						iOS does not allow free sideloaded installs from websites. Play online in Safari
+						instead — no app install needed.
+					</p>
+					{
+						platforms.web && (
+							<a class="btn" href={`/games/${slug}/play/`}>
+								Play in browser
+							</a>
+						)
+					}
+				</>
+			)
+		}
+	</div>
+
+	{
+		desktop.length === 0 && !androidHref && !showPlayStore && !showIosStore && (
+			<p class="muted">
+				Download builds are not published yet. You can still{' '}
+				{platforms.web ? <a href={`/games/${slug}/play/`}>play online</a> : 'check back soon'}.
+			</p>
+		)
+	}
+</section>
+
+<style>
+	.downloads {
+		padding: 2rem 0 0.5rem;
+	}
+
+	.intro {
+		max-width: 38rem;
+		margin-bottom: 1.5rem;
+		font-family: var(--font-type);
+	}
+
+	.block {
+		padding: 1.25rem 0;
+		border-top: 1px dashed var(--line);
+	}
+
+	.block h3 {
+		font-family: var(--font-type);
+		font-size: 1.15rem;
+		text-transform: none;
+		letter-spacing: 0;
+		margin-bottom: 0.85rem;
+	}
+
+	.help {
+		margin-top: 1rem;
+		color: var(--muted);
+		font-size: 0.95rem;
+	}
+
+	.help summary {
+		cursor: pointer;
+		font-family: var(--font-type);
+		color: var(--paper);
+	}
+
+	.help ol {
+		margin: 0.75rem 0 0;
+		padding-left: 1.2rem;
+	}
+</style>

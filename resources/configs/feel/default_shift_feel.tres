@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="ShiftFeelConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/configs/feel/shift_feel_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+shift_duration = 0.088
+min_shift_duration = 0.042
+queue_pressure_factor = 0.86
+handoff_window = 0.016
+max_command_queue = 3
+travel_trans = 6
+travel_ease = 1
+settle_duration = 0.032
+overshoot_pixels = 8.0
+shake_intensity = 1.0
+land_trauma = 0.2
+wrap_trauma = 0.11
+trauma_decay = 3.4
+shake_max_offset = 6.5
+nudge_pixels = 4.5
+nudge_return = 0.14
+land_zoom_pulse = 0.012
+hit_stop_enabled = true
+land_hit_stop_ms = 22.0
+trails_enabled = true
+trail_lifetime = 0.1
+trail_width = 7.5
+motion_blur_enabled = true
+motion_blur_strength = 0.8
+particles_enabled = true
+land_burst_amount = 14
+wrap_burst_amount = 8
+audio_enabled = true
+sfx_volume = 0.85
+pitch_variance = 0.06
+haptics_enabled = true
+haptic_intensity = 0.7
+reduce_motion = false
+disable_motion_blur = false
+disable_shake = false
+disable_hit_stop = false
+disable_zoom_pulse = false
+swipe_threshold_px = 26.0
+swipe_axis_bias = 0.35
+allow_interrupt_blend = false

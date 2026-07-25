@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cuichromescaffold"]
+
+[ext_resource type="Script" path="res://scripts/presentation/ui/hint_sheet.gd" id="1"]
+
+[node name="HintSheet" type="CanvasLayer"]
+script = ExtResource("1")

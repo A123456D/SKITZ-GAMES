@@ -1,0 +1,52 @@
+﻿Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+Godot_v4.7.1-stable_win64_console.exe : ERROR: Failed loading resource: res://localization/shiftr.csv.
+At C:\Users\PC\AppData\Local\Temp\ps-script-d3af2030-1fe6-4f74-85f7-f6d09b27d6a6.ps1:107 char:111
++ ... nsole.exe"; & $g --path "C:\Users\PC\Projects\SHIFTR" --headless --im ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ERROR: Failed l...ion/shiftr.csv.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Resource file not found:  (expected type: Translation)
+   at: _load (core/io/resource_loader.cpp:325)
+ERROR: Resource file not found:  (expected type: Translation)
+   at: _load (core/io/resource_loader.cpp:325)
+ERROR: Failed loading resource: res://localization/shiftr.csv.
+   at: _load (core/io/resource_loader.cpp:317)
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Started Project initialization (5 steps)[39m[0m
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Scanning file structure...[39m[0m
+[  16% ] [90m[1mfirst_scan_filesystem[22m | Loading global class names...[39m[0m
+[  33% ] [90m[1mfirst_scan_filesystem[22m | Verifying GDExtensions...[39m[0m
+[  50% ] [90m[1mfirst_scan_filesystem[22m | Creating autoload scripts...[39m[0m
+[  66% ] [90m[1mfirst_scan_filesystem[22m | Initializing plugins...[39m[0m
+[  83% ] [90m[1mfirst_scan_filesystem[22m | Starting file scan...[39m[0m
+[92m[ DONE ][39m [1mfirst_scan_filesystem[22m
+[0m
+[   0% ] [90m[1mupdate_scripts_classes[22m | Started Registering global classes... (15 steps)[39m[0m
+[   0% ] [90m[1mupdate_scripts_classes[22m | DesignTokens[39m[0m
+[   6% ] [90m[1mupdate_scripts_classes[22m | ConceptPlaySlice[39m[0m
+[  12% ] [90m[1mupdate_scripts_classes[22m | BoardTileView[39m[0m
+[  18% ] [90m[1mupdate_scripts_classes[22m | BoardView[39m[0m
+[  25% ] [90m[1mupdate_scripts_classes[22m | LaserBeamLayer[39m[0m
+[  31% ] [90m[1mupdate_scripts_classes[22m | PuzzleVisuals[39m[0m
+[  37% ] [90m[1mupdate_scripts_classes[22m | [39m[0m
+[  43% ] [90m[1mupdate_scripts_classes[22m | AnimatedShiftBackground[39m[0m
+[  50% ] [90m[1mupdate_scripts_classes[22m | GlassPanel[39m[0m
+[  56% ] [90m[1mupdate_scripts_classes[22m | MinimalHud[39m[0m
+[  62% ] [90m[1mupdate_scripts_classes[22m | MovesDial[39m[0m
+[  68% ] [90m[1mupdate_scripts_classes[22m | VictorySheet[39m[0m
+[  75% ] [90m[1mupdate_scripts_classes[22m | VisualDirector[39m[0m
+[  81% ] [90m[1mupdate_scripts_classes[22m | ShaderFx[39m[0m
+[  87% ] [90m[1mupdate_scripts_classes[22m | SharedAtlas[39m[0m
+[92m[ DONE ][39m [1mupdate_scripts_classes[22m
+[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Started Loading editor (5 steps)[39m[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Loading editor layout...[39m[0m
+[  16% ] [90m[1mloading_editor_layout[22m | Loading docks...[39m[0m
+[92m[ DONE ][39m [1mloading_editor_layout[22m
+[0m
+WARNING: 18 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 8 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

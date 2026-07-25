@@ -1,0 +1,21 @@
+[gd_scene load_steps=2 format=3 uid="uid://cwrapsparkshiftr"]
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_wrap"]
+particle_flag_disable_z = true
+direction = Vector3(0, -1, 0)
+spread = 160.0
+initial_velocity_min = 60.0
+initial_velocity_max = 160.0
+gravity = Vector3(0, 160, 0)
+scale_min = 1.2
+scale_max = 2.6
+color = Color(0.356863, 0.54902, 1, 1)
+
+[node name="WrapSpark" type="GPUParticles2D"]
+z_index = 8
+emitting = false
+amount = 8
+one_shot = true
+explosiveness = 1.0
+lifetime = 0.28
+process_material = SubResource("ParticleProcessMaterial_wrap")

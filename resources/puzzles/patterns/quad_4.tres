@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="PatternTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/puzzle_gen/pattern_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"quad_4"
+display_name = "Quad Blocks"
+family = 0
+tier = 0
+width = 4
+height = 4
+cells = PackedInt32Array(0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3)
+tags = PackedStringArray("teach", "blocks", "gdd_example")

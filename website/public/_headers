@@ -1,0 +1,10 @@
+# Cloudflare Pages headers for Godot Web (SharedArrayBuffer / threads)
+
+/games/*/play/
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless
+
+/games/*/web/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="PuzzleObjectDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://resources/configs/puzzle/puzzle_object_def.gd" id="1"]
+[ext_resource type="Script" path="res://resources/configs/puzzle/puzzle_component_spec.gd" id="2"]
+
+[sub_resource type="Resource" id="spec_0"]
+script = ExtResource("2")
+component_id = &"switch"
+params = {
+"channel": "door",
+"toggle": true
+}
+
+[resource]
+script = ExtResource("1")
+id = &"switch"
+display_name = "Switch"
+tags = PackedStringArray()
+components = Array[ExtResource("2")]([SubResource("spec_0")])

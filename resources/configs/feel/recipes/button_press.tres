@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="EffectRecipe" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/configs/feel/effect_recipe.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"button_press"
+intensity = 0
+notes = "UI click layer — GlassButton/IconMotion owns squash+glow; recipe adds audio/particles/haptics."
+audio_ui = true
+particles = true
+particle_amount = 8
+haptic = 1

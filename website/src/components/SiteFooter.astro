@@ -1,0 +1,66 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+	<div class="wrap site-footer__inner">
+		<img class="brand" src="/images/skitz-logo.png" alt="SKITZ games & apps" width="200" height="110" />
+		<p class="note">Play free online. Download free. No accounts. No paywalls.</p>
+		<nav class="footer-nav" aria-label="Footer">
+			<a href="/games/">Games</a>
+			<a href="/about/">About</a>
+			<a href="/privacy/">Privacy</a>
+		</nav>
+		<p class="copy">© {year} SKITZ games &amp; apps</p>
+	</div>
+</footer>
+
+<style>
+	.site-footer {
+		padding: 3rem 0 2.25rem;
+		border-top: 1px dashed var(--line);
+		margin-top: 2.5rem;
+	}
+
+	.site-footer__inner {
+		display: grid;
+		gap: 0.85rem;
+		justify-items: start;
+	}
+
+	.brand {
+		height: 4.25rem;
+		width: auto;
+		transform: rotate(-1deg);
+		filter: drop-shadow(3px 3px 0 #000);
+	}
+
+	.note {
+		margin: 0;
+		font-family: var(--font-type);
+		color: var(--muted);
+		max-width: 28rem;
+	}
+
+	.footer-nav {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1rem;
+	}
+
+	.footer-nav a {
+		font-family: var(--font-type);
+		color: var(--paper);
+		text-decoration: none;
+	}
+
+	.footer-nav a:hover {
+		text-decoration: underline;
+	}
+
+	.copy {
+		margin: 0.35rem 0 0;
+		font-size: 0.8rem;
+		color: var(--muted);
+	}
+</style>

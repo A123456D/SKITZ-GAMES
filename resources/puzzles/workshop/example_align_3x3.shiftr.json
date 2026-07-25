@@ -1,0 +1,53 @@
+{
+	"format": "shiftr_workshop_puzzle",
+	"schema_version": 1,
+	"exported_at": "2026-07-24T12:00:00Z",
+	"workshop": {
+		"title": "Half Shift",
+		"author": "SHIFTR",
+		"tags": ["intro", "align", "workshop"],
+		"seed": 1,
+		"difficulty": 1,
+		"preview_hash": "3:3#A#A#A#B#A#A#B#B#A|3:3#A#A#A#A#A#A#B#B#B",
+		"id": "workshop_half_3"
+	},
+	"puzzle": {
+		"id": "workshop_half_3",
+		"mode": "align",
+		"seed_value": 1,
+		"difficulty": 1,
+		"width": 3,
+		"height": 3,
+		"pattern_id": "solid_half_3",
+		"pattern_tier": 0,
+		"goal_occupants": ["A", "A", "A", "A", "A", "A", "B", "B", "B"],
+		"start_occupants": ["A", "A", "A", "B", "A", "A", "B", "B", "A"],
+		"scramble_depth": 1,
+		"optimal_moves": 1,
+		"optimal_is_exact": true,
+		"difficulty_score": 12.5,
+		"move_budget": 4,
+		"par_soft": 3,
+		"par_hard": 1,
+		"state_fingerprint": "3:3#A#A#A#B#A#A#B#B#A",
+		"branching_factor": 12.0,
+		"hint_first_move": {
+			"type": 1,
+			"command_id": 0,
+			"rng_seed": -1,
+			"row": 1,
+			"column": 0,
+			"dir": -1,
+			"steps": 1,
+			"turns": 1
+		},
+		"gen_params": {},
+		"meta": {
+			"title": "Half Shift",
+			"author": "SHIFTR",
+			"tags": ["intro", "align", "workshop"],
+			"workshop": true,
+			"construction_guaranteed": true
+		}
+	}
+}

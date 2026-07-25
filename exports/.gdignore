@@ -1,0 +1,2 @@
+# Prevents Godot from scanning/importing build artifacts under exports/.
+* 

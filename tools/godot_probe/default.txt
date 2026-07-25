@@ -1,0 +1,22 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+Vulkan 1.4.341 - Forward Mobile - Using Device #0: NVIDIA - NVIDIA GeForce RTX 3060 Laptop GPU
+
+[breadcrumb:boot] CrashService ready
+[breadcrumb:boot] GameServices ready
+--res://assets/shaders/source/dynamic_gradient_bg.gdshader--
+    1 | shader_type canvas_item;
+E   2-> ## Slow dynamic gradient + faint shift-grid + optional light beam planes.
+    3 | ## beams_enabled=0 and drift_speed=0: static wash (Low / Battery) — still one pass, fewer ops.
+    4 | 
+--res://assets/shaders/source/canvas_bloom.gdshader--
+    1 | shader_type canvas_item;
+    2 | render_mode blend_add;
+E   3-> ## Lightweight full-screen soft bloom via screen blur.
+    4 | ## Place on a ColorRect covering the viewport after BackBufferCopy.
+    5 | ## High/Med: enabled. Low / strength≈0: early-out (no texture reads).
+--res://assets/shaders/source/soft_glow.gdshader--
+    1 | shader_type canvas_item;
+E   2-> ## Soft additive glow halo for tiles / UI chrome. Drive `glow_strength` from tokens.
+    3 | ## Early-out when glow_strength≈0. pulse=0 skips TIME sin (Battery / reduce-motion).
+    4 | 
+ERROR: 1 RID allocations of type 'N10RendererRD14TextureStorage7TextureE' were leaked at exit.

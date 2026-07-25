@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="EffectRecipe" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/configs/feel/effect_recipe.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"puzzle_solve"
+intensity = 2
+notes = "Solve fanfare — heavy hit-stop, zoom, sub + solve motif."
+hit_stop_ms = 55.0
+hit_stop_time_scale = 0.05
+trauma = 0.32
+zoom_pulse = 0.022
+zoom_pulse_ms = 180.0
+particles = true
+particle_amount = 28
+glow_pulse = true
+glow_strength = 1.2
+glow_ms = 360.0
+audio_land = true
+audio_sub = true
+audio_solve = true
+audio_combo = true
+squash = true
+follow_through = true
+follow_through_ms = 140.0
+haptic = 3

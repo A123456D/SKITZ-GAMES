@@ -1,0 +1,97 @@
+﻿# SHIFTR â€” Godot 4.x project
+config_version=5
+
+[application]
+
+config/name="SHIFTR"
+config/description="Circular row/column shift puzzle â€” mobile-first."
+run/main_scene="res://scenes/ui/main_shell.tscn"
+config/features=PackedStringArray("4.7", "Mobile")
+## Placeholder wordmark; replace with final art under assets/icons/app/ before store builds.
+config/icon="res://assets/icons/app/icon_1024.png"
+
+[audio]
+
+buses/default_bus_layout="res://assets/audio/default_bus_layout.tres"
+
+[autoload]
+
+Audio="*res://scripts/managers/audio/audio_director.gd"
+GameServices="*res://scripts/singletons/game_services.gd"
+
+[internationalization]
+
+## Do NOT list shiftr.csv here — Godot cannot load CSV as a Translation at runtime
+## (spam: Failed loading resource). LocaleService registers en/es/fr from the CSV.
+## After editor import, optional remaps shiftr.*.translation are also picked up.
+locale/translations=PackedStringArray()
+
+[display]
+
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/size/window_width_override=405
+window/size/window_height_override=720
+window/handheld/orientation=1
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/stretch/scale_mode="fractional"
+window/dpi/allow_hidpi=true
+window/vsync/vsync_mode=1
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[input]
+
+shift_row_left={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":81,"key_label":0,"unicode":113,"location":0,"echo":false,"script":null)
+]
+}
+shift_row_right={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":69,"key_label":0,"unicode":101,"location":0,"echo":false,"script":null)
+]
+}
+shift_col_up={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":82,"key_label":0,"unicode":114,"location":0,"echo":false,"script":null)
+]
+}
+shift_col_down={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":70,"key_label":0,"unicode":102,"location":0,"echo":false,"script":null)
+]
+}
+board_undo={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":90,"key_label":0,"unicode":122,"location":0,"echo":false,"script":null)
+]
+}
+
+[physics]
+
+## SHIFTR is a pure 2D puzzle â€” no RigidBody / CharacterBody simulation.
+## Keep a low tick rate so unused physics does not burn CPU on mobile.
+common/physics_ticks_per_second=20
+common/enable_pause_aware_picking=false
+2d/default_gravity=0.0
+
+[rendering]
+
+## Mobile (Vulkan Forward Mobile) is the shipping default — verified on Windows + NVIDIA.
+## Desktop Steam / high-end can override to forward_plus via export preset or CLI:
+##   --rendering-method forward_plus
+## Fallback for broken GPU drivers: --rendering-method gl_compatibility
+renderer/rendering_method="mobile"
+textures/canvas_textures/default_texture_filter=1
+## Uncapped so 120 Hz displays can present; tweens are delta-based.
+environment/defaults/default_clear_color=Color(0.055, 0.067, 0.086, 1)
+
+[debug]
+
+gdscript/warnings/inferred_declaration=1
+gdscript/warnings/untyped_declaration=1
+gdscript/warnings/native_method_override=1

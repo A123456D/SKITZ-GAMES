@@ -1,0 +1,146 @@
+﻿Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+Godot_v4.7.1-stable_win64_console.exe : ERROR: Failed loading resource: res://localization/shiftr.csv.
+At C:\Users\PC\AppData\Local\Temp\ps-script-99d26a70-79a8-4e8c-a88e-483419d851b3.ps1:107 char:111
++ ... nsole.exe"; & $g --path "C:\Users\PC\Projects\SHIFTR" --headless --sc ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ERROR: Failed l...ion/shiftr.csv.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   at: _load (core/io/resource_loader.cpp:317)
+SCRIPT ERROR: Parse Error: Cannot infer the type of "is_floor" variable because the value doesn't have a set type.
+   at: GDScript::reload (res://scripts/systems/puzzle/puzzle_world.gd:139)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/systems/puzzle/puzzle_context.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/systems/puzzle/puzzle_object.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/systems/puzzle/puzzle_engine.gd:0)
+SCRIPT ERROR: Parse Error: No constructor of "Vector2" matches the signature "Vector2(float, float, float)".
+   at: GDScript::reload (res://scripts/presentation/feel/shift_animator.gd:181)
+SCRIPT ERROR: Parse Error: Cannot infer the type of "c" variable because the value doesn't have a set type.
+   at: GDScript::reload (res://scripts/presentation/feel/trail_renderer.gd:84)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scripts/presentation/feel/board_feel_controller.gd:0)
+SCRIPT ERROR: Compile Error: Failed to compile depended scripts.
+   at: GDScript::reload (res://scenes/puzzles/concept_play_slice.gd:0)
+ERROR: Failed to load script "res://scenes/puzzles/concept_play_slice.gd" with error "Compilation failed".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+[breadcrumb:boot] CrashService ready
+[breadcrumb:boot] GameServices ready
+SCRIPT ERROR: Invalid call. Nonexistent function 'new' in base 'GDScript'.
+   at: PuzzleEngine.@implicit_new (res://scripts/systems/puzzle/puzzle_engine.gd:10)
+   GDScript backtrace (most recent call first):
+       [0] @implicit_new (res://scripts/systems/puzzle/puzzle_engine.gd:10)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:70)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'setup_catalog' in base 'Nil'.
+   at: PuzzleEngine.setup_catalog (res://scripts/systems/puzzle/puzzle_engine.gd:23)
+   GDScript backtrace (most recent call first):
+       [0] setup_catalog (res://scripts/systems/puzzle/puzzle_engine.gd:23)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:72)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'place_new' in base 'Nil'.
+   at: PuzzleEngine.place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+   GDScript backtrace (most recent call first):
+       [0] place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:76)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'place_new' in base 'Nil'.
+   at: PuzzleEngine.place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+   GDScript backtrace (most recent call first):
+       [0] place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:77)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'place_new' in base 'Nil'.
+   at: PuzzleEngine.place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+   GDScript backtrace (most recent call first):
+       [0] place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:78)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'place_new' in base 'Nil'.
+   at: PuzzleEngine.place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+   GDScript backtrace (most recent call first):
+       [0] place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:79)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'place_new' in base 'Nil'.
+   at: PuzzleEngine.place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+   GDScript backtrace (most recent call first):
+       [0] place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:80)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'place_new' in base 'Nil'.
+   at: PuzzleEngine.place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+   GDScript backtrace (most recent call first):
+       [0] place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:81)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'place_new' in base 'Nil'.
+   at: PuzzleEngine.place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+   GDScript backtrace (most recent call first):
+       [0] place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:82)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'place_new' in base 'Nil'.
+   at: PuzzleEngine.place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+   GDScript backtrace (most recent call first):
+       [0] place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:83)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'place_new' in base 'Nil'.
+   at: PuzzleEngine.place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+   GDScript backtrace (most recent call first):
+       [0] place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:84)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'place_new' in base 'Nil'.
+   at: PuzzleEngine.place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+   GDScript backtrace (most recent call first):
+       [0] place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:85)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'place_new' in base 'Nil'.
+   at: PuzzleEngine.place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+   GDScript backtrace (most recent call first):
+       [0] place (res://scripts/systems/puzzle/puzzle_engine.gd:90)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:86)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'rebuild_from_board' in base 'Nil'.
+   at: PuzzleEngine.bootstrap_from_board (res://scripts/systems/puzzle/puzzle_engine.gd:32)
+   GDScript backtrace (most recent call first):
+       [0] bootstrap_from_board (res://scripts/systems/puzzle/puzzle_engine.gd:32)
+       [1] _build_session_and_puzzle (res://scenes/puzzles/concept_play_slice.gd:93)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:30)
+SCRIPT ERROR: Invalid call. Nonexistent function 'new' in base 'GDScript'.
+   at: BoardFeelController._ensure_children (res://scripts/presentation/feel/board_feel_controller.gd:108)
+   GDScript backtrace (most recent call first):
+       [0] _ensure_children (res://scripts/presentation/feel/board_feel_controller.gd:108)
+       [1] setup (res://scripts/presentation/feel/board_feel_controller.gd:58)
+       [2] _build_feel (res://scenes/puzzles/concept_play_slice.gd:168)
+       [3] _ready (res://scenes/puzzles/concept_play_slice.gd:32)
+SCRIPT ERROR: Invalid call. Nonexistent function 'configure' in base 'Nil'.
+   at: BoardFeelController.setup (res://scripts/presentation/feel/board_feel_controller.gd:61)
+   GDScript backtrace (most recent call first):
+       [0] setup (res://scripts/presentation/feel/board_feel_controller.gd:61)
+       [1] _build_feel (res://scenes/puzzles/concept_play_slice.gd:168)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:32)
+SCRIPT ERROR: Invalid call. Nonexistent function 'rebuild_from_board' in base 'Nil'.
+   at: PuzzleEngine.recompute (res://scripts/systems/puzzle/puzzle_engine.gd:100)
+   GDScript backtrace (most recent call first):
+       [0] recompute (res://scripts/systems/puzzle/puzzle_engine.gd:100)
+       [1] _refresh_lasers (res://scenes/puzzles/concept_play_slice.gd:240)
+       [2] _ready (res://scenes/puzzles/concept_play_slice.gd:35)
+SCRIPT ERROR: Invalid call. Nonexistent function 'rebuild_from_board' in base 'Nil'.
+   at: PuzzleEngine.recompute (res://scripts/systems/puzzle/puzzle_engine.gd:100)
+   GDScript backtrace (most recent call first):
+       [0] recompute (res://scripts/systems/puzzle/puzzle_engine.gd:100)
+       [1] _refresh_lasers (res://scenes/puzzles/concept_play_slice.gd:240)
+       [2] _fit_board (res://scenes/puzzles/concept_play_slice.gd:152)
+ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.
+ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.
+ERROR: 1 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.
+WARNING: 22 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 9 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

@@ -1,0 +1,59 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/presentation/ui/screens/privacy_consent_screen.gd" id="1"]
+
+[node name="PrivacyConsentScreen" type="ColorRect"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.055, 0.067, 0.086, 0.96)
+script = ExtResource("1")
+
+[node name="Center" type="CenterContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="VBoxContainer" parent="Center"]
+custom_minimum_size = Vector2(320, 0)
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="Center/Panel"]
+unique_name_in_owner = true
+text = "Privacy"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 22
+
+[node name="Body" type="Label" parent="Center/Panel"]
+unique_name_in_owner = true
+text = "We use optional analytics to improve SHIFTR. Crash reports help us fix bugs. You can change this later in Settings."
+autowrap_mode = 3
+horizontal_alignment = 1
+
+[node name="AnalyticsToggle" type="CheckButton" parent="Center/Panel"]
+unique_name_in_owner = true
+text = "Allow analytics"
+
+[node name="CrashToggle" type="CheckButton" parent="Center/Panel"]
+unique_name_in_owner = true
+button_pressed = true
+text = "Allow crash reports"
+
+[node name="PolicyButton" type="Button" parent="Center/Panel"]
+unique_name_in_owner = true
+flat = true
+text = "Privacy policy"
+
+[node name="AcceptButton" type="Button" parent="Center/Panel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+text = "Continue"
+
+[node name="EssentialButton" type="Button" parent="Center/Panel"]
+unique_name_in_owner = true
+flat = true
+text = "Essential only"

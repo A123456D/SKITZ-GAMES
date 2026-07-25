@@ -1,0 +1,48 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import GameCard from '../../components/GameCard.astro';
+import { getCollection } from 'astro:content';
+
+const games = (await getCollection('games')).sort((a, b) => a.data.title.localeCompare(b.data.title));
+---
+
+<BaseLayout title="Games" description="Browse SKITZ games — play in the browser or download free.">
+	<SiteHeader />
+	<main class="site-main">
+		<section class="section">
+			<div class="wrap">
+				<p class="eyebrow">catalog</p>
+				<h1 class="section-title">Games</h1>
+				<p class="lead muted">One title for now. More stickers later.</p>
+				<div class="list">
+					{
+						games.map((game) => (
+							<GameCard
+								href={`/games/${game.id}/`}
+								title={game.data.title}
+								summary={game.data.summary}
+								cover={game.data.cover}
+								genre={game.data.genre}
+							/>
+						))
+					}
+				</div>
+			</div>
+		</section>
+	</main>
+	<SiteFooter />
+</BaseLayout>
+
+<style>
+	.lead {
+		max-width: 34rem;
+		margin-bottom: 1.5rem;
+		font-family: var(--font-type);
+	}
+
+	.list {
+		animation: rise 500ms var(--ease);
+	}
+</style>

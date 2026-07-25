@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://bscreentrans"]
+
+[ext_resource type="Script" path="res://scripts/presentation/ui/screen_transition.gd" id="1"]
+
+[node name="ScreenTransition" type="CanvasLayer"]
+layer = 100
+script = ExtResource("1")

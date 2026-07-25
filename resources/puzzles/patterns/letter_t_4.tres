@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="PatternTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/puzzle_gen/pattern_template.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"letter_t_4"
+display_name = "T Motif"
+family = 4
+tier = 4
+width = 4
+height = 4
+cells = PackedInt32Array(0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1)
+tags = PackedStringArray("letter")

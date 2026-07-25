@@ -1,0 +1,21 @@
+[gd_scene load_steps=2 format=3 uid="uid://clandburstshiftr"]
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_land"]
+particle_flag_disable_z = true
+direction = Vector3(0, -1, 0)
+spread = 180.0
+initial_velocity_min = 50.0
+initial_velocity_max = 140.0
+gravity = Vector3(0, 220, 0)
+scale_min = 1.5
+scale_max = 3.2
+color = Color(0.184314, 0.878431, 0.772549, 1)
+
+[node name="LandBurst" type="GPUParticles2D"]
+z_index = 8
+emitting = false
+amount = 14
+one_shot = true
+explosiveness = 1.0
+lifetime = 0.35
+process_material = SubResource("ParticleProcessMaterial_land")
