@@ -1,10 +1,2 @@
-# Cloudflare Pages headers for Godot Web (SharedArrayBuffer / threads)
-
-/games/*/play/
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: credentialless
-
-/games/*/web/*
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: require-corp
-  Cross-Origin-Resource-Policy: same-origin
+# PulseFold is a Vite/canvas game and does not need SharedArrayBuffer.
+# Restrictive COOP/COEP headers break the play-page iframe embed.
