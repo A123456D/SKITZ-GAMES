@@ -323,8 +323,9 @@ function doTwist(twist: Twist): void {
 }
 
 function inCubeOrbitZone(_layout: CubeLayout, x: number, y: number): boolean {
-  // Whole play band around the cube — stickers are claimed first on pointerdown.
-  return y > 300 && y < 1000 && x > 24 && x < W - 24;
+  // Include the band above/below the cube so vertical flips work. HUD goals
+  // end ~184; hint bar starts ~1148. Stickers still claim the face first.
+  return y > 195 && y < 1120 && x > 24 && x < W - 24;
 }
 
 function snapAngles(rx: number, ry: number): { x: number; y: number } {
@@ -454,11 +455,11 @@ canvas.addEventListener("pointermove", (e) => {
   if (orbitDrag) {
     const dx = p.x - orbitDrag.x0;
     const dy = p.y - orbitDrag.y0;
-    // Screen Y is down; invert so dragging up tips the cube up
+    // Screen Y is down. Dragging up (dy < 0) decreases rotX → TOP face.
     rotY = orbitDrag.rotY0 + dx * ORBIT_DRAG_SENS;
-    rotX = orbitDrag.rotX0 - dy * ORBIT_DRAG_SENS;
-    // Keep pitch in a playable range (no upside-down diamond views)
-    rotX = Math.max(-SNAP_Q * 0.95, Math.min(SNAP_Q * 0.95, rotX));
+    rotX = orbitDrag.rotX0 + dy * ORBIT_DRAG_SENS;
+    // Keep pitch in a playable range (allow full top/bottom snaps)
+    rotX = Math.max(-SNAP_Q, Math.min(SNAP_Q, rotX));
     targetRotX = rotX;
     targetRotY = rotY;
     syncActiveFace();

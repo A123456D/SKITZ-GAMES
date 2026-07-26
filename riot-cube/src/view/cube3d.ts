@@ -549,7 +549,6 @@ export function drawCubeOrbitButtons(
   up: { x: number; y: number; w: number; h: number };
   down: { x: number; y: number; w: number; h: number };
 } {
-  // Front face projects larger than `cubeScale` under perspective.
   const half = cubeScale * 1.42;
   const gap = 12;
   const sideW = 34;
@@ -557,6 +556,9 @@ export function drawCubeOrbitButtons(
   const endW = 54;
   const endH = 34;
   const edge = 14;
+  // Larger tap pads than the drawn chrome — top/bottom were easy to miss.
+  const hitPadX = 10;
+  const hitPadY = 12;
 
   const left = {
     x: Math.max(edge, cx - half - gap - sideW),
@@ -606,7 +608,32 @@ export function drawCubeOrbitButtons(
   draw(right, "›");
   draw(up, "˄");
   draw(down, "˅");
-  return { left, right, up, down };
+  return {
+    left: {
+      x: left.x - hitPadX,
+      y: left.y - hitPadY,
+      w: left.w + hitPadX * 2,
+      h: left.h + hitPadY * 2,
+    },
+    right: {
+      x: right.x - hitPadX,
+      y: right.y - hitPadY,
+      w: right.w + hitPadX * 2,
+      h: right.h + hitPadY * 2,
+    },
+    up: {
+      x: up.x - hitPadX,
+      y: up.y - hitPadY,
+      w: up.w + hitPadX * 2,
+      h: up.h + hitPadY * 2,
+    },
+    down: {
+      x: down.x - hitPadX,
+      y: down.y - hitPadY,
+      w: down.w + hitPadX * 2,
+      h: down.h + hitPadY * 2,
+    },
+  };
 }
 
 export function hitOrbitButton(
