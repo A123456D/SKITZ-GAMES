@@ -145,6 +145,8 @@ let tutorialStep = 0;
 let pointIndex = 0;
 /** First-time theme picker: preview before confirm. */
 let themePreview: ThemeId = save.theme;
+/** Screen to return to after opening the global theme picker. */
+let themePickFrom: Screen = "menu";
 
 const PAGE_SIZE = 10;
 
@@ -511,6 +513,7 @@ function finishTutorialFlow(): void {
   clearWinState();
   themePreview = getThemeId();
   applyTheme(themePreview);
+  themePickFrom = "menu";
   screen = "theme_pick";
 }
 
@@ -831,6 +834,14 @@ function onButton(id: string): void {
     setMusicMuted(save, !save.musicMuted);
     return;
   }
+  if (id === "change_theme") {
+    persistRun();
+    themePickFrom = screen;
+    themePreview = getThemeId();
+    applyTheme(themePreview);
+    screen = "theme_pick";
+    return;
+  }
   if (id === "play") {
     if (session && !inTutorial) {
       screen = "play";
@@ -947,7 +958,18 @@ function onButton(id: string): void {
   }
   if (id === "theme_confirm") {
     setTheme(save, themePreview);
-    screen = "menu";
+    if ((themePickFrom === "play" || themePickFrom === "pause") && session) {
+      screen = "play";
+    } else if (
+      themePickFrom === "menu" ||
+      themePickFrom === "levels" ||
+      themePickFrom === "settings" ||
+      themePickFrom === "how"
+    ) {
+      screen = themePickFrom;
+    } else {
+      screen = "menu";
+    }
     return;
   }
   if (id.startsWith("theme_")) {
@@ -1305,6 +1327,30 @@ function pushMusicChrome(): void {
   const next: ButtonRect = { x: inset, y: 68, w: buttonW, h: 40, id: "music_next" };
   drawMusicSkipButton(next, nextEnabled);
   buttons.push(next);
+
+  // Global top-right controls. They use each theme's native button chrome and
+  // stay large enough to tap after the 720-wide canvas scales down on phones.
+  const rightX = W - inset - buttonW;
+  if (screen !== "theme_pick") {
+    const themeButton: ButtonRect = {
+      x: rightX,
+      y: 22,
+      w: buttonW,
+      h: 40,
+      id: "change_theme",
+    };
+    drawGlassButton(ctx, themeButton, "THEME", false, time);
+    buttons.push(themeButton);
+  }
+  const muteButton: ButtonRect = {
+    x: rightX,
+    y: 68,
+    w: buttonW,
+    h: 40,
+    id: "mute_music",
+  };
+  drawGlassButton(ctx, muteButton, save.musicMuted ? "UNMUTE" : "MUTE", false, time);
+  buttons.push(muteButton);
 }
 
 /** Next-track media icon (triangle + bar) and a clear text label. */
