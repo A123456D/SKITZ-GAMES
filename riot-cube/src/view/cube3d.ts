@@ -4,6 +4,7 @@ import type { CubeFaces, FaceId } from "../core/session";
 import type { TileKind } from "../core/types";
 import { drawCrumpledSticker } from "./crumple";
 import { drawStickerSprite } from "./draw";
+import { paperTextureImage } from "./paperTexture";
 
 export type Vec3 = { x: number; y: number; z: number };
 export type Vec2 = { x: number; y: number };
@@ -463,13 +464,14 @@ function lerp2(a: Vec2, b: Vec2, t: number): Vec2 {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
-/** Soft lined paper + fold creases + light grain, clipped to the face quad. */
+/** Map the generated crumple texture onto the face quad. */
 function paintPaperTexture(
   ctx: CanvasRenderingContext2D,
   q: Vec2[],
   faceIndex: number,
   isActive: boolean,
 ): void {
+  const tex = paperTextureImage();
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(q[0]!.x, q[0]!.y);
@@ -479,8 +481,30 @@ function paintPaperTexture(
   ctx.closePath();
   ctx.clip();
 
-  // Ruled lines
-  ctx.strokeStyle = isActive ? "rgba(80,140,200,0.18)" : "rgba(80,140,200,0.12)";
+  if (tex) {
+    // Rotate UV corners per face so sides don't look identical.
+    const uv: Vec2[] = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ];
+    const rot = faceIndex % 4;
+    const mapped = uv.map((_, i) => uv[(i + rot) % 4]!);
+    if (faceIndex % 2 === 1) {
+      // Mirror every other face
+      for (const p of mapped) p.x = 1 - p.x;
+    }
+    ctx.globalAlpha = isActive ? 0.92 : 0.72;
+    drawImageOnQuad(ctx, tex, q, mapped);
+    ctx.globalAlpha = 1;
+    // Warm paper tint over the photo so stickers stay readable
+    ctx.fillStyle = isActive ? "rgba(244,238,224,0.28)" : "rgba(229,220,200,0.38)";
+    ctx.fill();
+  }
+
+  // Soft ruled lines on top of the crumple photo
+  ctx.strokeStyle = isActive ? "rgba(80,140,200,0.14)" : "rgba(80,140,200,0.08)";
   ctx.lineWidth = 1;
   for (let i = 1; i < 8; i++) {
     const t = i / 8;
@@ -492,83 +516,99 @@ function paintPaperTexture(
     ctx.stroke();
   }
 
-  // Fold banding — soft shade bands that read as paper bent at creases
-  const bands = [
-    { t: 0.22, w: 0.07, a: 0.07 },
-    { t: 0.55, w: 0.05, a: 0.055 },
-    { t: 0.78, w: 0.06, a: 0.06 },
-  ];
-  for (const band of bands) {
-    const a0 = lerp2(q[0]!, q[3]!, band.t - band.w);
-    const b0 = lerp2(q[1]!, q[2]!, band.t - band.w);
-    const a1 = lerp2(q[0]!, q[3]!, band.t + band.w);
-    const b1 = lerp2(q[1]!, q[2]!, band.t + band.w);
-    const g = ctx.createLinearGradient(a0.x, a0.y, a1.x, a1.y);
-    g.addColorStop(0, "rgba(90,70,40,0)");
-    g.addColorStop(0.45, `rgba(70,52,28,${band.a})`);
-    g.addColorStop(0.55, `rgba(255,250,235,${band.a * 0.55})`);
-    g.addColorStop(1, "rgba(90,70,40,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.moveTo(a0.x, a0.y);
-    ctx.lineTo(b0.x, b0.y);
-    ctx.lineTo(b1.x, b1.y);
-    ctx.lineTo(a1.x, a1.y);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // Crease strokes — slightly bent fold lines
-  const creases: Array<[number, number, number, number, number]> = [
-    [0.08, 0.12, 0.92, 0.38, 0.14],
-    [0.15, 0.72, 0.88, 0.55, 0.11],
-    [0.35, 0.05, 0.62, 0.95, 0.1],
-    [0.05, 0.48, 0.95, 0.62, 0.09],
-  ];
-  for (const [u0, v0, u1, v1, alpha] of creases) {
-    const p0 = bilerp(q, u0, v0);
-    const p1 = bilerp(q, u1, v1);
-    const mid = bilerp(q, (u0 + u1) * 0.5 + 0.04 * ((faceIndex % 3) - 1), (v0 + v1) * 0.5);
-    ctx.strokeStyle = `rgba(60,45,25,${isActive ? alpha : alpha * 0.7})`;
-    ctx.lineWidth = isActive ? 1.35 : 1;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(p0.x, p0.y);
-    ctx.quadraticCurveTo(mid.x, mid.y, p1.x, p1.y);
-    ctx.stroke();
-    // Highlight twin for paper-fold sheen
-    ctx.strokeStyle = `rgba(255,252,240,${isActive ? alpha * 0.55 : alpha * 0.35})`;
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.moveTo(p0.x + 1.2, p0.y + 1.2);
-    ctx.quadraticCurveTo(mid.x + 1, mid.y + 1, p1.x + 1.2, p1.y + 1.2);
-    ctx.stroke();
-  }
-
-  // Deterministic paper grain (no Math.random flicker)
-  let seed = (faceIndex + 1) * 9973;
-  const next = () => {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    return seed / 0x7fffffff;
-  };
-  ctx.fillStyle = isActive ? "rgba(40,30,18,0.045)" : "rgba(40,30,18,0.03)";
-  for (let i = 0; i < 90; i++) {
-    const u = next();
-    const v = next();
-    const p = bilerp(q, u, v);
-    const r = 0.6 + next() * 1.4;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
   ctx.restore();
 }
 
-function bilerp(q: Vec2[], u: number, v: number): Vec2 {
-  const a = lerp2(q[0]!, q[1]!, u);
-  const b = lerp2(q[3]!, q[2]!, u);
-  return lerp2(a, b, v);
+/** Affine-map an image onto a screen-space quad via two triangles. */
+function drawImageOnQuad(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  q: Vec2[],
+  uv: Vec2[],
+): void {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  drawImageTriangle(
+    ctx,
+    img,
+    q[0]!,
+    q[1]!,
+    q[2]!,
+    uv[0]!.x * w,
+    uv[0]!.y * h,
+    uv[1]!.x * w,
+    uv[1]!.y * h,
+    uv[2]!.x * w,
+    uv[2]!.y * h,
+  );
+  drawImageTriangle(
+    ctx,
+    img,
+    q[0]!,
+    q[2]!,
+    q[3]!,
+    uv[0]!.x * w,
+    uv[0]!.y * h,
+    uv[2]!.x * w,
+    uv[2]!.y * h,
+    uv[3]!.x * w,
+    uv[3]!.y * h,
+  );
+}
+
+function drawImageTriangle(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p0: Vec2,
+  p1: Vec2,
+  p2: Vec2,
+  u0: number,
+  v0: number,
+  u1: number,
+  v1: number,
+  u2: number,
+  v2: number,
+): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(p0.x, p0.y);
+  ctx.lineTo(p1.x, p1.y);
+  ctx.lineTo(p2.x, p2.y);
+  ctx.closePath();
+  ctx.clip();
+
+  const denom = u0 * (v1 - v2) + u1 * (v2 - v0) + u2 * (v0 - v1);
+  if (Math.abs(denom) < 1e-6) {
+    ctx.restore();
+    return;
+  }
+  const a = (p0.x * (v1 - v2) + p1.x * (v2 - v0) + p2.x * (v0 - v1)) / denom;
+  const b = (p0.x * (u2 - u1) + p1.x * (u0 - u2) + p2.x * (u1 - u0)) / denom;
+  const c =
+    (p0.x * (u1 * v2 - u2 * v1) +
+      p1.x * (u2 * v0 - u0 * v2) +
+      p2.x * (u0 * v1 - u1 * v0)) /
+    denom;
+  const d = (p0.y * (v1 - v2) + p1.y * (v2 - v0) + p2.y * (v0 - v1)) / denom;
+  const e = (p0.y * (u2 - u1) + p1.y * (u0 - u2) + p2.y * (u1 - u0)) / denom;
+  const f =
+    (p0.y * (u1 * v2 - u2 * v1) +
+      p1.y * (u2 * v0 - u0 * v2) +
+      p2.y * (u0 * v1 - u1 * v0)) /
+    denom;
+
+  // Compose with current transform (keeps devicePixelRatio scale).
+  const cur = ctx.getTransform();
+  ctx.setTransform(
+    a * cur.a + d * cur.c,
+    a * cur.b + d * cur.d,
+    b * cur.a + e * cur.c,
+    b * cur.b + e * cur.d,
+    c * cur.a + f * cur.c + cur.e,
+    c * cur.b + f * cur.d + cur.f,
+  );
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
 }
 
 function drawStickerOnQuad(

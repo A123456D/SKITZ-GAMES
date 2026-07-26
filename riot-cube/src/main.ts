@@ -35,6 +35,7 @@ import {
   screenDeltaToFaceUV,
   type CubeLayout,
 } from "./view/cube3d";
+import { loadPaperTexture } from "./view/paperTexture";
 import { loadStickers } from "./view/stickers";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
@@ -511,7 +512,7 @@ window.addEventListener("resize", () => {
   paint();
 });
 
-loadStickers().then(() => {
+loadStickers().then(() => loadPaperTexture()).then(() => {
   syncActiveFace();
   resize();
   paint();
