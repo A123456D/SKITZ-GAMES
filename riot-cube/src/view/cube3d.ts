@@ -511,16 +511,47 @@ export function drawCubeOrbitButtons(
   cx: number,
   cy: number,
   cubeScale: number,
+  canvasW = 720,
+  canvasH = 1280,
 ): {
   left: { x: number; y: number; w: number; h: number };
   right: { x: number; y: number; w: number; h: number };
   up: { x: number; y: number; w: number; h: number };
   down: { x: number; y: number; w: number; h: number };
 } {
-  const left = { x: cx - cubeScale - 70, y: cy - 44, w: 48, h: 88 };
-  const right = { x: cx + cubeScale + 22, y: cy - 44, w: 48, h: 88 };
-  const up = { x: cx - 44, y: cy - cubeScale - 70, w: 88, h: 44 };
-  const down = { x: cx - 44, y: cy + cubeScale + 22, w: 88, h: 44 };
+  // Front face projects larger than `cubeScale` under perspective.
+  const half = cubeScale * 1.42;
+  const gap = 22;
+  const sideW = 50;
+  const sideH = 86;
+  const endW = 86;
+  const endH = 50;
+  const edge = 14;
+
+  const left = {
+    x: Math.max(edge, cx - half - gap - sideW),
+    y: cy - sideH / 2,
+    w: sideW,
+    h: sideH,
+  };
+  const right = {
+    x: Math.min(canvasW - edge - sideW, cx + half + gap),
+    y: cy - sideH / 2,
+    w: sideW,
+    h: sideH,
+  };
+  const up = {
+    x: cx - endW / 2,
+    y: Math.max(edge, cy - half - gap - endH),
+    w: endW,
+    h: endH,
+  };
+  const down = {
+    x: cx - endW / 2,
+    y: Math.min(canvasH - edge - endH, cy + half + gap),
+    w: endW,
+    h: endH,
+  };
   const draw = (r: typeof left, label: string) => {
     ctx.fillStyle = "#111";
     ctx.beginPath();

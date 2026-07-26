@@ -59,8 +59,8 @@ let springUv = 0;
 let springAxis: "row" | "col" | null = null;
 let springIndex = -1;
 
-const DEFAULT_ROT_X = 0.08;
-const DEFAULT_ROT_Y = -0.1;
+const DEFAULT_ROT_X = 0.035;
+const DEFAULT_ROT_Y = -0.045;
 let rotX = DEFAULT_ROT_X;
 let rotY = DEFAULT_ROT_Y;
 let targetRotX = DEFAULT_ROT_X;
@@ -80,7 +80,7 @@ function cubeLayout(): CubeLayout {
   return {
     cx: W / 2,
     cy: 620,
-    scale: 210,
+    scale: 175,
     rotX,
     rotY,
   };
@@ -160,7 +160,7 @@ function paint(): void {
   });
 
   if (!rotating) {
-    orbitBtns = drawCubeOrbitButtons(ctx, layout.cx, layout.cy, layout.scale + 20);
+    orbitBtns = drawCubeOrbitButtons(ctx, layout.cx, layout.cy, layout.scale, W, H);
   } else {
     orbitBtns = null;
   }
