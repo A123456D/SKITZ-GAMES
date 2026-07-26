@@ -1,5 +1,6 @@
 import type { Board } from "../core/board";
-import type { FaceId } from "../core/session";
+import { lanePreview } from "../core/cubeTwist";
+import type { CubeFaces, FaceId } from "../core/session";
 import type { TileKind } from "../core/types";
 import { drawCrumpledSticker } from "./crumple";
 import { drawStickerSprite } from "./draw";
@@ -278,7 +279,7 @@ export function drawCube3D(
   order.sort((a, b) => a.depth - b.depth); // far (small z) first
 
   for (const f of order) {
-    drawFace(ctx, layout, f.i, faces[f.i]!, opts, f.i === opts.activeFace);
+    drawFace(ctx, layout, f.i, faces, opts, f.i === opts.activeFace);
   }
 }
 
@@ -286,7 +287,7 @@ function drawFace(
   ctx: CanvasRenderingContext2D,
   layout: CubeLayout,
   faceIndex: FaceId,
-  board: Board,
+  faces: Board[],
   opts: {
     activeFace: FaceId;
     motion: CubeMotion;
@@ -296,6 +297,7 @@ function drawFace(
   isActive: boolean,
 ): void {
   const geom = FACES[faceIndex]!;
+  const board = faces[faceIndex]!;
   const n = board.length;
   const crumpleMap = new Map(
     opts.crumples.filter(() => isActive).map((c) => [`${c.r},${c.c}`, c] as const),
@@ -402,36 +404,42 @@ function drawFace(
     }
   }
 
-  // Sliding strip: place each source cell on an infinite lane at
-  // (index + offset) so ±n copies bring the real far-side stickers in.
-  // This matches twistBoard: +offset → content shifts +U/+V, far edge enters.
+  // Sliding strip from the real adjacent-face belt (not within-face wrap)
   if (movingRow >= 0) {
     const r = movingRow;
-    const off = opts.motion.offset;
-    for (let d = -n; d < 2 * n; d++) {
-      const sourceC = ((d % n) + n) % n;
-      const crumple = d >= 0 && d < n ? crumpleMap.get(`${r},${sourceC}`) : undefined;
-      const kind = crumple?.kind ?? board[r]![sourceC];
-      if (!kind) continue;
-      const u0 = d * stride + pad + off;
+    const items = lanePreview(
+      faces as CubeFaces,
+      faceIndex,
+      "row",
+      r,
+      opts.motion.offset,
+    );
+    for (const { pos, kind } of items) {
+      const crumple =
+        pos >= 0 && pos < n ? crumpleMap.get(`${r},${Math.floor(pos)}`) : undefined;
+      const u0 = (pos - 0.5) * stride + pad;
       const u1 = u0 + cell;
       const v0 = r * stride + pad;
       const v1 = v0 + cell;
-      paintSticker(kind, u0, v0, u1, v1, true, crumple && d === sourceC ? crumple : undefined);
+      paintSticker(crumple?.kind ?? kind, u0, v0, u1, v1, true, crumple);
     }
   } else if (movingCol >= 0) {
     const c = movingCol;
-    const off = opts.motion.offset;
-    for (let d = -n; d < 2 * n; d++) {
-      const sourceR = ((d % n) + n) % n;
-      const crumple = d >= 0 && d < n ? crumpleMap.get(`${sourceR},${c}`) : undefined;
-      const kind = crumple?.kind ?? board[sourceR]![c];
-      if (!kind) continue;
+    const items = lanePreview(
+      faces as CubeFaces,
+      faceIndex,
+      "col",
+      c,
+      opts.motion.offset,
+    );
+    for (const { pos, kind } of items) {
+      const crumple =
+        pos >= 0 && pos < n ? crumpleMap.get(`${Math.floor(pos)},${c}`) : undefined;
       const u0 = c * stride + pad;
       const u1 = u0 + cell;
-      const v0 = d * stride + pad + off;
+      const v0 = (pos - 0.5) * stride + pad;
       const v1 = v0 + cell;
-      paintSticker(kind, u0, v0, u1, v1, true, crumple && d === sourceR ? crumple : undefined);
+      paintSticker(crumple?.kind ?? kind, u0, v0, u1, v1, true, crumple);
     }
   }
   ctx.restore();

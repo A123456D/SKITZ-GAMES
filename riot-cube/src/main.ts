@@ -12,9 +12,9 @@ import {
   cloneBoard,
   findMatches,
   matchedCells,
-  twistBoard,
   type Board,
 } from "./core/board";
+import { twistCubeFaces } from "./core/cubeTwist";
 import type { TileKind, Twist } from "./core/types";
 import {
   W,
@@ -180,7 +180,7 @@ function paint(): void {
   drawHint(
     ctx,
     session.status === "playing"
-      ? "Drag stickers to twist. Drag around the cube to spin it."
+      ? "Drag a row/col — stickers slide in from the side faces. Drag around the cube to spin."
       : session.status === "won"
         ? "Rip. Match. Repeat."
         : "Try another twist path.",
@@ -261,7 +261,8 @@ function finishCrumple(): void {
 
 function doTwist(twist: Twist): void {
   if (busy || session.status !== "playing") return;
-  const twisted = twistBoard(session.board, twist);
+  const facesTwisted = twistCubeFaces(session.faces, session.face, twist);
+  const twisted = facesTwisted[session.face]!;
   const groups = findMatches(twisted);
   if (groups.length === 0) {
     const result = applyTwist(session, twist);

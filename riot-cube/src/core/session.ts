@@ -2,9 +2,9 @@ import {
   generateBoard,
   mulberry32,
   resolveBoard,
-  twistBoard,
   type Board,
 } from "./board";
+import { twistCubeFaces } from "./cubeTwist";
 import type { Goal, LevelDef, TileKind, Twist } from "./types";
 
 export type GameStatus = "playing" | "won" | "lost";
@@ -93,15 +93,16 @@ export function applyTwist(session: Session, twist: Twist): TwistResult {
     return { session, didTwist: false, scoreGain: 0, combo: 0 };
   }
 
-  const twisted = twistBoard(session.board, twist);
-  const resolved = resolveBoard(twisted, session.rng);
+  const facesTwisted = twistCubeFaces(session.faces, session.face, twist);
+  const resolved = resolveBoard(facesTwisted[session.face]!, session.rng);
   const goals = applyClearsToGoals(session.goals, resolved.totalCleared);
   const movesLeft = session.movesLeft - 1;
   const score = session.score + resolved.scoreGain;
   const comboPeak = Math.max(session.comboPeak, resolved.combo);
 
-  const faces = session.faces.map((f) => f) as CubeFaces;
-  faces[session.face] = resolved.board;
+  const faces = facesTwisted.map((f, i) =>
+    i === session.face ? resolved.board : f,
+  ) as CubeFaces;
 
   let status: GameStatus = "playing";
   if (goalsMet(goals)) status = "won";
