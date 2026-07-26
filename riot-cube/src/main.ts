@@ -452,7 +452,7 @@ canvas.addEventListener("pointermove", (e) => {
       drag.index = drag.c;
     }
   }
-  drag.offsetUv = drag.axis === "row" ? du : dv;
+  drag.offsetUv = drag.axis === "row" ? du : -dv;
   paint();
 });
 
