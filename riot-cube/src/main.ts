@@ -66,14 +66,15 @@ let rotY = DEFAULT_ROT_Y;
 let targetRotX = DEFAULT_ROT_X;
 let targetRotY = DEFAULT_ROT_Y;
 let rotating = false;
-/** While set, cube spins continuously in that direction. */
-let orbitHold: "left" | "right" | "up" | "down" | null = null;
-let orbitHoldAt = 0;
-let orbitHoldStartX = 0;
-let orbitHoldStartY = 0;
-const ORBIT_HOLD_SPEED = 0.028; // rad/frame — slow look-around
-const ORBIT_TAP_MS = 200;
-const ORBIT_TAP_RAD = 0.15;
+
+/** Free finger orbit — rot follows the pointer. */
+let orbitDrag: {
+  x0: number;
+  y0: number;
+  rotX0: number;
+  rotY0: number;
+} | null = null;
+const ORBIT_DRAG_SENS = 0.0065; // radians per canvas pixel
 
 let visualBoard: Board | null = null;
 type Crumple = { r: number; c: number; kind: TileKind; seed: number };
@@ -167,15 +168,7 @@ function paint(): void {
     paper: true,
   });
 
-  orbitBtns = drawCubeOrbitButtons(
-    ctx,
-    layout.cx,
-    layout.cy,
-    layout.scale,
-    W,
-    H,
-    orbitHold,
-  );
+  orbitBtns = drawCubeOrbitButtons(ctx, layout.cx, layout.cy, layout.scale, W, H);
 
   const faceName = ["FRONT", "BACK", "RIGHT", "LEFT", "TOP", "BOTTOM"][session.face];
   ctx.fillStyle = "#f3efe6";
@@ -186,7 +179,7 @@ function paint(): void {
   drawHint(
     ctx,
     session.status === "playing"
-      ? "Drag stickers to twist. Hold ‹ › ˄ ˅ to spin the cube."
+      ? "Drag stickers to twist. Drag around the cube to spin it."
       : session.status === "won"
         ? "Rip. Match. Repeat."
         : "Try another twist path.",
@@ -226,16 +219,7 @@ function tick(): void {
     }
     dirty = true;
   }
-  if (orbitHold) {
-    if (orbitHold === "left") rotY += ORBIT_HOLD_SPEED;
-    if (orbitHold === "right") rotY -= ORBIT_HOLD_SPEED;
-    if (orbitHold === "up") rotX -= ORBIT_HOLD_SPEED;
-    if (orbitHold === "down") rotX += ORBIT_HOLD_SPEED;
-    targetRotX = rotX;
-    targetRotY = rotY;
-    syncActiveFace();
-    dirty = true;
-  } else if (rotating) {
+  if (rotating && !orbitDrag) {
     const speed = 0.14;
     rotX += (targetRotX - rotX) * speed;
     rotY += (targetRotY - rotY) * speed;
@@ -252,7 +236,7 @@ function tick(): void {
     dirty = true;
     if (crumpleT >= 1 && pendingTwist) finishCrumple();
   }
-  if (dirty || drag || crumples.length || rotating || orbitHold) paint();
+  if (dirty || drag || orbitDrag || crumples.length || rotating) paint();
   requestAnimationFrame(tick);
 }
 
@@ -301,38 +285,37 @@ function doTwist(twist: Twist): void {
   paint();
 }
 
-function beginOrbitHold(dir: "left" | "right" | "up" | "down"): void {
-  if (busy || drag || session.status !== "playing") return;
-  rotating = false;
-  orbitHold = dir;
-  orbitHoldAt = performance.now();
-  orbitHoldStartX = rotX;
-  orbitHoldStartY = rotY;
+function inCubeOrbitZone(_layout: CubeLayout, x: number, y: number): boolean {
+  // Whole play band around the cube — stickers are claimed first on pointerdown.
+  return y > 300 && y < 1000 && x > 24 && x < W - 24;
 }
 
-/** Snap to the nearest face, or treat a quick press as a 90° step. */
-function releaseOrbitHold(): void {
-  if (!orbitHold) return;
-  const dir = orbitHold;
-  const heldMs = performance.now() - orbitHoldAt;
-  const moved = Math.hypot(rotX - orbitHoldStartX, rotY - orbitHoldStartY);
-  orbitHold = null;
+function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
+  if (busy || drag || orbitDrag || session.status !== "playing") return;
   const q = Math.PI / 2;
+  let tx = Math.round((rotX - DEFAULT_ROT_X) / q) * q + DEFAULT_ROT_X;
+  let ty = Math.round((rotY - DEFAULT_ROT_Y) / q) * q + DEFAULT_ROT_Y;
+  if (dir === "left") ty += q;
+  if (dir === "right") ty -= q;
+  if (dir === "up") tx -= q;
+  if (dir === "down") tx += q;
+  targetRotX = tx;
+  targetRotY = ty;
+  rotating = true;
+}
 
-  if (heldMs < ORBIT_TAP_MS && moved < ORBIT_TAP_RAD) {
-    // Quick tap: jump one face in that direction from the starting pose
-    let tx = Math.round((orbitHoldStartX - DEFAULT_ROT_X) / q) * q + DEFAULT_ROT_X;
-    let ty = Math.round((orbitHoldStartY - DEFAULT_ROT_Y) / q) * q + DEFAULT_ROT_Y;
-    if (dir === "left") ty += q;
-    if (dir === "right") ty -= q;
-    if (dir === "up") tx -= q;
-    if (dir === "down") tx += q;
-    targetRotX = tx;
-    targetRotY = ty;
-  } else {
-    targetRotX = Math.round((rotX - DEFAULT_ROT_X) / q) * q + DEFAULT_ROT_X;
-    targetRotY = Math.round((rotY - DEFAULT_ROT_Y) / q) * q + DEFAULT_ROT_Y;
-  }
+function beginOrbitDrag(x: number, y: number): void {
+  rotating = false;
+  orbitDrag = { x0: x, y0: y, rotX0: rotX, rotY0: rotY };
+}
+
+function endOrbitDrag(): void {
+  if (!orbitDrag) return;
+  orbitDrag = null;
+  // Soft-settle onto the nearest playable face
+  const q = Math.PI / 2;
+  targetRotX = Math.round((rotX - DEFAULT_ROT_X) / q) * q + DEFAULT_ROT_X;
+  targetRotY = Math.round((rotY - DEFAULT_ROT_Y) / q) * q + DEFAULT_ROT_Y;
   rotating = true;
 }
 
@@ -348,7 +331,7 @@ canvas.addEventListener("pointerdown", (e) => {
       crumpleT = 0;
       pendingTwist = null;
       busy = false;
-      orbitHold = null;
+      orbitDrag = null;
       rotating = false;
       rotX = DEFAULT_ROT_X;
       rotY = DEFAULT_ROT_Y;
@@ -360,40 +343,61 @@ canvas.addEventListener("pointerdown", (e) => {
   }
   if (busy) return;
 
-  // Orbit buttons stay clickable even while a snap-rotate is finishing
   if (orbitBtns) {
     const orb = hitOrbitButton(orbitBtns, p.x, p.y);
     if (orb) {
-      beginOrbitHold(orb);
-      paint();
+      startOrbitStep(orb);
       return;
     }
   }
 
-  if (rotating || orbitHold) return;
+  if (rotating) return;
 
   const layout = cubeLayout();
   const hit = hitFrontUV(layout, p.x, p.y);
-  if (!hit || hit.face !== session.face) return;
-  const n = session.level.size;
-  const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
-  const r = Math.min(n - 1, Math.max(0, Math.floor(hit.v * n)));
-  drag = {
-    u0: hit.u,
-    v0: hit.v,
-    x0: p.x,
-    y0: p.y,
-    axis: null,
-    index: -1,
-    offsetUv: 0,
-    r,
-    c,
-  };
+  if (hit && hit.face === session.face) {
+    const n = session.level.size;
+    const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
+    const r = Math.min(n - 1, Math.max(0, Math.floor(hit.v * n)));
+    drag = {
+      u0: hit.u,
+      v0: hit.v,
+      x0: p.x,
+      y0: p.y,
+      axis: null,
+      index: -1,
+      offsetUv: 0,
+      r,
+      c,
+    };
+    return;
+  }
+
+  // Drag around / on the cube (not on the sticker face) = free aim
+  if (inCubeOrbitZone(layout, p.x, p.y)) {
+    beginOrbitDrag(p.x, p.y);
+  }
 });
 
 canvas.addEventListener("pointermove", (e) => {
-  if (!drag || session.status !== "playing" || rotating || orbitHold || busy) return;
+  if (session.status !== "playing" || busy) return;
   const p = canvasPoint(e);
+
+  if (orbitDrag) {
+    const dx = p.x - orbitDrag.x0;
+    const dy = p.y - orbitDrag.y0;
+    rotY = orbitDrag.rotY0 + dx * ORBIT_DRAG_SENS;
+    rotX = orbitDrag.rotX0 + dy * ORBIT_DRAG_SENS;
+    // Keep pitch from flipping over the poles too wildly
+    rotX = Math.max(-Math.PI * 0.85, Math.min(Math.PI * 0.85, rotX));
+    targetRotX = rotX;
+    targetRotY = rotY;
+    syncActiveFace();
+    paint();
+    return;
+  }
+
+  if (!drag || rotating) return;
   const layout = cubeLayout();
   // Map drag in the facing face's screen axes so wrap peeks track the finger
   // even when the pointer leaves the face quad.
@@ -416,8 +420,8 @@ canvas.addEventListener("pointermove", (e) => {
 });
 
 function endDrag(): void {
-  if (orbitHold) {
-    releaseOrbitHold();
+  if (orbitDrag) {
+    endOrbitDrag();
     paint();
     return;
   }
@@ -440,8 +444,6 @@ function endDrag(): void {
   }
   const dir: 1 | -1 = steps > 0 ? 1 : -1;
   const amount = Math.min(session.level.size - 1, Math.abs(steps));
-  // Board already jumps to the committed twist — don't keep a residual offset
-  // on top of that (it made the wrap peek disagree with the landed stickers).
   springAxis = null;
   springIndex = -1;
   springUv = 0;
@@ -450,8 +452,8 @@ function endDrag(): void {
 
 canvas.addEventListener("pointerup", endDrag);
 canvas.addEventListener("pointercancel", () => {
-  if (orbitHold) {
-    releaseOrbitHold();
+  if (orbitDrag) {
+    endOrbitDrag();
   }
   if (drag?.axis) {
     springAxis = drag.axis;

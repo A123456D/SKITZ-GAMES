@@ -513,7 +513,6 @@ export function drawCubeOrbitButtons(
   cubeScale: number,
   canvasW = 720,
   canvasH = 1280,
-  held: "left" | "right" | "up" | "down" | null = null,
 ): {
   left: { x: number; y: number; w: number; h: number };
   right: { x: number; y: number; w: number; h: number };
@@ -553,13 +552,8 @@ export function drawCubeOrbitButtons(
     w: endW,
     h: endH,
   };
-  const draw = (
-    r: typeof left,
-    label: string,
-    id: "left" | "right" | "up" | "down",
-  ) => {
-    const on = held === id;
-    ctx.fillStyle = on ? "#c8ff3d" : "#111";
+  const draw = (r: typeof left, label: string) => {
+    ctx.fillStyle = "#111";
     ctx.beginPath();
     const rr = 10;
     ctx.moveTo(r.x + rr, r.y);
@@ -572,16 +566,16 @@ export function drawCubeOrbitButtons(
     ctx.strokeStyle = "#c8ff3d";
     ctx.lineWidth = 3;
     ctx.stroke();
-    ctx.fillStyle = on ? "#111" : "#c8ff3d";
+    ctx.fillStyle = "#c8ff3d";
     ctx.font = "800 26px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2);
   };
-  draw(left, "‹", "left");
-  draw(right, "›", "right");
-  draw(up, "˄", "up");
-  draw(down, "˅", "down");
+  draw(left, "‹");
+  draw(right, "›");
+  draw(up, "˄");
+  draw(down, "˅");
   return { left, right, up, down };
 }
 
