@@ -102,7 +102,7 @@ function cubeLayout(): CubeLayout {
   return {
     cx: W / 2,
     cy: 620,
-    scale: 175,
+    scale: 215,
     rotX,
     rotY,
   };

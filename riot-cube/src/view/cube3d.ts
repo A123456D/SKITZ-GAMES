@@ -551,11 +551,11 @@ export function drawCubeOrbitButtons(
 } {
   // Front face projects larger than `cubeScale` under perspective.
   const half = cubeScale * 1.42;
-  const gap = 22;
-  const sideW = 50;
-  const sideH = 86;
-  const endW = 86;
-  const endH = 50;
+  const gap = 12;
+  const sideW = 34;
+  const sideH = 54;
+  const endW = 54;
+  const endH = 34;
   const edge = 14;
 
   const left = {
@@ -585,7 +585,7 @@ export function drawCubeOrbitButtons(
   const draw = (r: typeof left, label: string) => {
     ctx.fillStyle = "#111";
     ctx.beginPath();
-    const rr = 10;
+    const rr = 7;
     ctx.moveTo(r.x + rr, r.y);
     ctx.arcTo(r.x + r.w, r.y, r.x + r.w, r.y + r.h, rr);
     ctx.arcTo(r.x + r.w, r.y + r.h, r.x, r.y + r.h, rr);
@@ -594,10 +594,10 @@ export function drawCubeOrbitButtons(
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = "#c8ff3d";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2;
     ctx.stroke();
     ctx.fillStyle = "#c8ff3d";
-    ctx.font = "800 26px 'Chakra Petch', sans-serif";
+    ctx.font = "800 18px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2);
