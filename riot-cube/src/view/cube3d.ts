@@ -3,6 +3,7 @@ import type { FaceId } from "../core/session";
 import type { TileKind } from "../core/types";
 import { drawCrumpledSticker } from "./crumple";
 import { drawStickerSprite } from "./draw";
+import { stickerImage } from "./stickers";
 
 export type Vec3 = { x: number; y: number; z: number };
 export type Vec2 = { x: number; y: number };
@@ -331,7 +332,9 @@ function drawFace(
   ctx.restore();
 
   const gap = 0.04;
+  const stride = 1 / n;
   const cell = (1 - gap * (n - 1)) / n;
+  const pad = (stride - cell) / 2;
   const activeLift =
     isActive && opts.motion.hovering && opts.motion.axis ? 0.045 : 0;
 
@@ -349,26 +352,38 @@ function drawFace(
     const kind = crumple?.kind ?? board[r]![c];
     if (!kind) return;
 
+    // Match the flat board: modulo-wrap into the face, plus ±1 copies so the
+    // far-side stickers slide in continuously instead of leaving an empty gap.
     const copies = moving ? [-1, 0, 1] : [0];
     for (const copy of copies) {
-      let uCenter = (c + 0.5) / n;
-      let vCenter = (r + 0.5) / n;
+      let u0: number;
+      let v0: number;
+      let u1: number;
+      let v1: number;
+
       if (moving && opts.motion.axis === "row") {
-        uCenter += opts.motion.offset + copy;
+        const uLeft =
+          ((((c * stride + opts.motion.offset) % 1) + 1) % 1) + copy;
+        u0 = uLeft + pad;
+        u1 = u0 + cell;
+        v0 = r * stride + pad;
+        v1 = v0 + cell;
       } else if (moving && opts.motion.axis === "col") {
-        vCenter += opts.motion.offset + copy;
-      } else if (copy !== 0) {
-        continue;
+        const vTop =
+          ((((r * stride + opts.motion.offset) % 1) + 1) % 1) + copy;
+        u0 = c * stride + pad;
+        u1 = u0 + cell;
+        v0 = vTop + pad;
+        v1 = v0 + cell;
+      } else {
+        u0 = c * stride + pad;
+        u1 = u0 + cell;
+        v0 = r * stride + pad;
+        v1 = v0 + cell;
       }
 
-      const u0 = uCenter - cell / 2;
-      const u1 = uCenter + cell / 2;
-      const v0 = vCenter - cell / 2;
-      const v1 = vCenter + cell / 2;
-      if (u1 < -0.02 || u0 > 1.02 || v1 < -0.02 || v0 > 1.02) continue;
-      if (uCenter < -0.25 || uCenter > 1.25 || vCenter < -0.25 || vCenter > 1.25) {
-        continue;
-      }
+      // Must overlap the paper face in UV
+      if (u1 <= 0 || u0 >= 1 || v1 <= 0 || v0 >= 1) continue;
 
       const liftAmt = moving ? activeLift : 0;
       const s0 = facePointLifted(geom, u0, v0, liftAmt, layout);
@@ -441,16 +456,18 @@ function drawStickerOnQuad(
   faceQuad: Vec2[],
   hovering: boolean,
 ): void {
+  const img = stickerImage(kind);
   const cx = (tl.x + tr.x + br.x + bl.x) / 4;
   const cy = (tl.y + tr.y + br.y + bl.y) / 4;
-  const bw = (Math.hypot(tr.x - tl.x, tr.y - tl.y) + Math.hypot(br.x - bl.x, br.y - bl.y)) / 2;
-  const bh = (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) / 2;
+  const bw =
+    (Math.hypot(tr.x - tl.x, tr.y - tl.y) + Math.hypot(br.x - bl.x, br.y - bl.y)) /
+    2;
+  const bh =
+    (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) /
+    2;
   const s = Math.min(bw, bh) * (hovering ? 1.02 : 1);
-  const x = cx - s / 2;
-  const y = cy - s / 2;
 
   ctx.save();
-  // Clip to the paper face so wrap peeks stay on the cube
   ctx.beginPath();
   ctx.moveTo(faceQuad[0]!.x, faceQuad[0]!.y);
   ctx.lineTo(faceQuad[1]!.x, faceQuad[1]!.y);
@@ -458,8 +475,34 @@ function drawStickerOnQuad(
   ctx.lineTo(faceQuad[3]!.x, faceQuad[3]!.y);
   ctx.closePath();
   ctx.clip();
-  // Soft shadow only — lift itself is done in 3D along the face normal
-  drawStickerSprite(ctx, kind, x, y, s, 1, hovering ? 3 : 0);
+
+  // Affine-map the sticker onto the cell quad so edge peeks stay glued to the face
+  // instead of floating as a screen-aligned square that misses the clip.
+  const x0 = tl.x;
+  const y0 = tl.y;
+  const x1 = tr.x - tl.x;
+  const y1 = tr.y - tl.y;
+  const x2 = bl.x - tl.x;
+  const y2 = bl.y - tl.y;
+
+  if (hovering) {
+    ctx.shadowColor = "rgba(0,0,0,0.4)";
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 5;
+  } else {
+    ctx.shadowColor = "rgba(0,0,0,0.2)";
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetY = 2;
+  }
+
+  if (img && Math.abs(x1 * y2 - y1 * x2) > 1e-3) {
+    ctx.save();
+    ctx.transform(x1, y1, x2, y2, x0, y0);
+    ctx.drawImage(img, 0, 0, 1, 1);
+    ctx.restore();
+  } else {
+    drawStickerSprite(ctx, kind, cx - s / 2, cy - s / 2, s, 1, hovering ? 3 : 0);
+  }
   ctx.restore();
 }
 
