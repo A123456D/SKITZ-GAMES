@@ -249,7 +249,7 @@ const TUTORIAL_PAGES: { title: string; body: string[] }[] = [
     title: "TURN DISCS",
     body: [
       "Tap a disc to select it.",
-      "Drag around it, or use ↺ ↻, to rotate.",
+      "Hold ↺ or ↻, then twist to turn.",
       "Open sides must face a matching neighbor.",
     ],
   },
@@ -312,8 +312,71 @@ type DragState = {
   baseRot: number;
   lastTickQ: number;
   liveAngle: number;
+  /** When set, twist is measured around a rotate dial, not the disc hub. */
+  dial?: {
+    side: "ccw" | "cw";
+    cx: number;
+    cy: number;
+    pressedAt: number;
+    lastAngle: number;
+    accum: number;
+  };
 };
 let drag: DragState | null = null;
+
+const TURN_BTN_R = 56;
+const TURN_BTN_Y = 1208;
+const TURN_BTN_LX = 175;
+const TURN_BTN_RX = 545;
+
+function turnDialScale(): number {
+  if (!drag?.dial) return 1;
+  const u = Math.min(1, (time - drag.dial.pressedAt) / 0.12);
+  return 1 + 0.42 * (1 - Math.pow(1 - u, 3));
+}
+
+function turnDialSpin(): number {
+  if (!drag?.dial) return 0;
+  return drag.dial.accum;
+}
+
+function angleAround(x: number, y: number, cx: number, cy: number): number {
+  return Math.atan2(y - cy, x - cx);
+}
+
+function unwrapDelta(delta: number): number {
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  return delta;
+}
+
+function canUseTurnDials(): boolean {
+  if (!session || victory || pendingWin || screen !== "play") return false;
+  if (tutorialPhase === "point") return false;
+  if (session.selectedTable < 0) return false;
+  const sel = session.state.tables.find((t) => t.id === session!.selectedTable);
+  return !!sel && !sel.locked;
+}
+
+function beginTurnDial(side: "ccw" | "cw", x: number, y: number, pointerId: number): boolean {
+  if (!session || !canUseTurnDials()) return false;
+  const tableId = session.selectedTable;
+  const t = session.state.tables.find((tb) => tb.id === tableId);
+  if (!t || t.locked) return false;
+  const cx = side === "ccw" ? TURN_BTN_LX : TURN_BTN_RX;
+  const cy = TURN_BTN_Y;
+  const a = angleAround(x, y, cx, cy);
+  drag = {
+    tableId,
+    startAngle: a,
+    baseRot: t.rotationQ * (Math.PI / 2),
+    lastTickQ: t.rotationQ,
+    liveAngle: t.rotationQ * (Math.PI / 2),
+    dial: { side, cx, cy, pressedAt: time, lastAngle: a, accum: 0 },
+  };
+  canvas.setPointerCapture(pointerId);
+  return true;
+}
 
 // Tables that have been turned settle onto the board (stop hovering).
 let settledTables = new Set<number>();
@@ -580,9 +643,9 @@ function drawPointTourOverlay(): void {
     drawGlassButton(ctx, pulseBtn, "PULSE", beat.at.id === "pulse", time, false);
     drawGlassButton(ctx, resetBtn, "RESET", false, time, false);
     drawGlassButton(ctx, menuBtn, "MENU", false, time, false);
-    const rotR = 56;
-    drawRoundButton(ctx, 175, 1208, rotR, "↺", beat.at.id === "turn", time);
-    drawRoundButton(ctx, 545, 1208, rotR, "↻", beat.at.id === "turn", time);
+    const rotR = TURN_BTN_R;
+    drawRoundButton(ctx, TURN_BTN_LX, TURN_BTN_Y, rotR, "↺", beat.at.id === "turn", time);
+    drawRoundButton(ctx, TURN_BTN_RX, TURN_BTN_Y, rotR, "↻", beat.at.id === "turn", time);
   }
 
   const targetLow =
@@ -773,6 +836,20 @@ canvas.addEventListener(
         return;
       }
     }
+
+    // Hold-to-grow twist dials — intercept before generic button taps.
+    if (canUseTurnDials()) {
+      const hitR = TURN_BTN_R + 10;
+      if (hitCircle(p.x, p.y, TURN_BTN_LX, TURN_BTN_Y, hitR)) {
+        beginTurnDial("ccw", p.x, p.y, e.pointerId);
+        return;
+      }
+      if (hitCircle(p.x, p.y, TURN_BTN_RX, TURN_BTN_Y, hitR)) {
+        beginTurnDial("cw", p.x, p.y, e.pointerId);
+        return;
+      }
+    }
+
     for (const b of buttons) {
       if (hitRect(p.x, p.y, b)) {
         onButton(b.id);
@@ -814,10 +891,20 @@ canvas.addEventListener("pointermove", (e) => {
     return;
   }
   if (!drag || !session) return;
-  let delta = angleAt(p.x, p.y, drag.tableId) - drag.startAngle;
-  while (delta > Math.PI) delta -= Math.PI * 2;
-  while (delta < -Math.PI) delta += Math.PI * 2;
-  drag.liveAngle = drag.baseRot + delta;
+  if (drag.dial) {
+    const dist = Math.hypot(p.x - drag.dial.cx, p.y - drag.dial.cy);
+    // Ignore near-center jitter while the thumb plants on the dial.
+    if (dist >= 18) {
+      const a = angleAround(p.x, p.y, drag.dial.cx, drag.dial.cy);
+      const step = unwrapDelta(a - drag.dial.lastAngle);
+      drag.dial.lastAngle = a;
+      drag.dial.accum += step;
+      drag.liveAngle = drag.baseRot + drag.dial.accum;
+    }
+  } else {
+    const delta = unwrapDelta(angleAt(p.x, p.y, drag.tableId) - drag.startAngle);
+    drag.liveAngle = drag.baseRot + delta;
+  }
   const previewQ = Math.round(drag.liveAngle / (Math.PI / 2));
   if (previewQ !== drag.lastTickQ) {
     drag.lastTickQ = previewQ;
@@ -832,13 +919,24 @@ canvas.addEventListener("pointerup", () => {
   }
   if (!drag || !session) return;
   const tableId = drag.tableId;
+  const dial = drag.dial;
+  const spun = dial ? Math.abs(dial.accum) : Math.abs(unwrapDelta(drag.liveAngle - drag.baseRot));
   const snapQ = Math.round(drag.liveAngle / (Math.PI / 2));
   drag = null;
+
+  // Tap (no real twist): still nudge one quarter in the dial's direction.
+  if (dial && spun < 0.22) {
+    doRotate(dial.side === "cw" ? 1 : -1);
+    return;
+  }
+
   const changed = commitRotationQ(session, tableId, snapQ);
   displayResult = session.result;
   beamProgress = 1;
   if (changed) {
     settledTables.add(tableId);
+    squashId = tableId;
+    squashUntil = time + 0.14;
     sfxSnap();
     persistRun();
   }
@@ -1031,8 +1129,6 @@ function onButton(id: string): void {
     return;
   }
   if (!session) return;
-  if (id === "ccw") doRotate(-1);
-  if (id === "cw") doRotate(1);
   if (id === "pulse") doPulse();
   if (id === "undo") {
     undo(session);
@@ -1776,20 +1872,19 @@ function drawPlay(): void {
   drawGlassButton(ctx, menuBtn, "MENU", false, time);
   buttons.push(undoBtn, pulseBtn, resetBtn, menuBtn);
 
-  const enabled = session.selectedTable >= 0 && !victory && !pendingWin && !drag;
+  const dialing = !!drag?.dial;
+  const enabled = session.selectedTable >= 0 && !victory && !pendingWin && (!drag || dialing);
   const sel = session.state.tables.find((t) => t.id === session!.selectedTable);
   const canTurn = enabled && sel && !sel.locked;
-  const rotR = 56;
-  // Keep a clear margin above the canvas floor so circles aren't clipped.
-  const turnY = 1208;
-  const turnL = 175;
-  const turnR = 545;
-  drawRoundButton(ctx, turnL, turnY, rotR, "↺", !!canTurn, time);
-  drawRoundButton(ctx, turnR, turnY, rotR, "↻", !!canTurn, time);
-  buttons.push(
-    { x: turnL - rotR, y: turnY - rotR, w: rotR * 2, h: rotR * 2, id: "ccw" },
-    { x: turnR - rotR, y: turnY - rotR, w: rotR * 2, h: rotR * 2, id: "cw" },
-  );
+  const dialScale = turnDialScale();
+  const dialSpin = turnDialSpin();
+  const leftLook =
+    dialing && drag!.dial!.side === "ccw" ? { scale: dialScale, spin: dialSpin } : undefined;
+  const rightLook =
+    dialing && drag!.dial!.side === "cw" ? { scale: dialScale, spin: dialSpin } : undefined;
+  drawRoundButton(ctx, TURN_BTN_LX, TURN_BTN_Y, TURN_BTN_R, "↺", !!canTurn, time, leftLook);
+  drawRoundButton(ctx, TURN_BTN_RX, TURN_BTN_Y, TURN_BTN_R, "↻", !!canTurn, time, rightLook);
+  // Hit targets stay registered for visuals/layout; input uses beginTurnDial.
 
   if (victory || victoryAlpha > 0) {
     const a = victory ? Math.min(1, victoryAlpha) : victoryAlpha;

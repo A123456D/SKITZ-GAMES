@@ -3273,7 +3273,20 @@ export function drawRoundButton(
   label: string,
   enabled: boolean,
   _time = 0,
+  look?: { scale?: number; spin?: number },
 ): void {
+  const scale = look?.scale ?? 1;
+  const spin = look?.spin ?? 0;
+  // Grow / twist transform for hold-to-dial rotate controls.
+  if (scale !== 1 || spin !== 0) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(spin);
+    ctx.scale(scale, scale);
+    drawRoundButton(ctx, 0, 0, r, label, enabled, _time);
+    ctx.restore();
+    return;
+  }
   const theme = getThemeId();
   if (theme === "paper") {
     ctx.save();
