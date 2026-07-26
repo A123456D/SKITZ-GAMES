@@ -38,7 +38,7 @@ export type Layout = {
 export function boardLayout(state: GridState): Layout {
   // Dense boards: tight gaps so the grid reads as one tiled circuit.
   const padX = 18;
-  const boardTop = 140;
+  const boardTop = 236;
   const boardBottom = 1070;
   const availW = W - padX * 2;
   const availH = boardBottom - boardTop;
@@ -2550,12 +2550,12 @@ export function drawHudStats(
     ctx.font = font(700, 16);
   }
   ctx.textAlign = "center";
-  ctx.fillText(`MOVES  ${moves}`, W / 2 - 220, 148);
+  ctx.fillText(`MOVES  ${moves}`, W / 2 - 220, 132);
   if (pulsesLeft >= 0 && pulseLimit >= 0) {
-    ctx.fillText(`CHECKS  ${pulsesLeft}/${pulseLimit}`, W / 2 + 10, 148);
+    ctx.fillText(`CHECKS  ${pulsesLeft}/${pulseLimit}`, W / 2 + 10, 132);
   }
   if (need > 0) {
-    ctx.fillText(spill > 0 ? `OPEN  ${spill}` : `NET  ${lit}/${need}`, W / 2 + 220, 148);
+    ctx.fillText(spill > 0 ? `OPEN  ${spill}` : `NET  ${lit}/${need}`, W / 2 + 220, 132);
   }
   ctx.restore();
 }
@@ -3463,17 +3463,17 @@ export function drawVolumeSlider(
   const ink = theme === "paper";
   const retro = theme === "retro";
   const isCompact = compact || !!rect.compact;
-  const knobR = isCompact ? 9 : 14;
-  const trackThick = isCompact ? 3.5 : 5.5;
+  const knobR = isCompact ? 10 : 16;
+  const trackThick = isCompact ? 4 : 6.5;
   const labelW = rect.labelW ?? (isCompact ? 42 : 110);
   void time;
   ctx.save();
   ctx.fillStyle = retro ? "#FF9DE0" : theme === "mono" ? "#FF6A6A" : P.INK_FAINT;
   ctx.font = ink
-    ? fontHand(isCompact ? 14 : 18)
+    ? fontHand(isCompact ? 15 : 19)
     : theme === "mono"
-      ? fontCyber(isCompact ? 12 : 15, 600)
-      : font(700, isCompact ? 12 : 16);
+      ? fontCyber(isCompact ? 13 : 16, 600)
+      : font(700, isCompact ? 13 : 17);
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText(label, rect.x, rect.y + rect.h / 2);

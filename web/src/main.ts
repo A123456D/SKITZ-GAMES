@@ -1172,32 +1172,43 @@ function drawThemeGrid(y0: number): void {
 }
 
 function pushVolumeSliders(y: number): void {
+  // Separate MUSIC and SFX blocks with clear breathing room.
   const music: SliderRect = {
-    x: 76,
+    x: 64,
     y,
-    w: 456,
-    h: 52,
+    w: 480,
+    h: 64,
     id: "vol_music",
     value: save.musicVol,
-    labelW: 86,
+    labelW: 96,
   };
   const mute: ButtonRect = {
-    x: 548,
-    y: y + 7,
-    w: 38,
-    h: 38,
+    x: 560,
+    y: y + 10,
+    w: 44,
+    h: 44,
     id: "mute_music",
   };
+  const sfxY = y + 118;
   const sfx: SliderRect = {
-    x: 76,
-    y: y + 66,
-    w: 568,
-    h: 52,
+    x: 64,
+    y: sfxY,
+    w: 592,
+    h: 64,
     id: "vol_sfx",
     value: save.sfxVol,
-    labelW: 56,
+    labelW: 64,
   };
-  drawVolumeSlider(ctx, music, "MUSIC", time);
+
+  ctx.save();
+  ctx.fillStyle = P.INK_SOFT;
+  ctx.font = font(600, 13);
+  ctx.textAlign = "left";
+  ctx.fillText("MUSIC", 64, y - 14);
+  ctx.fillText("SOUND EFFECTS", 64, sfxY - 14);
+  ctx.restore();
+
+  drawVolumeSlider(ctx, music, "MUS", time);
   drawMuteBox(ctx, mute, save.musicMuted);
   drawVolumeSlider(ctx, sfx, "SFX", time);
   sliders.push(music, sfx);
@@ -1408,9 +1419,9 @@ function drawSettings(): void {
   drawThemeGrid(405);
   ctx.fillStyle = P.INK;
   ctx.font = font(700, 18);
-  ctx.fillText("VOLUME", W / 2, 625);
-  pushVolumeSliders(665);
-  const back: ButtonRect = { x: 120, y: 1100, w: 480, h: 64, id: "settings_back" };
+  ctx.fillText("VOLUME", W / 2, 610);
+  pushVolumeSliders(650);
+  const back: ButtonRect = { x: 120, y: 1120, w: 480, h: 64, id: "settings_back" };
   drawGlassButton(
     ctx,
     back,
@@ -1634,23 +1645,24 @@ function drawPlay(): void {
       pLim,
     );
     const music: SliderRect = {
-      x: W / 2 - 180,
-      y: 158,
-      w: 180,
-      h: 30,
+      x: 90,
+      y: 152,
+      w: 540,
+      h: 34,
       id: "vol_music",
       value: save.musicVol,
       compact: true,
+      labelW: 48,
     };
     const sfx: SliderRect = {
-      x: W / 2,
-      y: 158,
-      w: 180,
-      h: 30,
+      x: 90,
+      y: 192,
+      w: 540,
+      h: 34,
       id: "vol_sfx",
       value: save.sfxVol,
       compact: true,
-      labelW: 28,
+      labelW: 48,
     };
     drawVolumeSlider(ctx, music, "MUS", time, true);
     drawVolumeSlider(ctx, sfx, "SFX", time, true);
@@ -1858,8 +1870,13 @@ void loadUiFonts().finally(() => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("./sw.js").catch(() => {
-      /* offline install is best-effort */
-    });
+    void navigator.serviceWorker
+      .register("./sw.js", { updateViaCache: "none" })
+      .then((reg) => {
+        void reg.update();
+      })
+      .catch(() => {
+        /* offline install is best-effort */
+      });
   });
 }

@@ -59,7 +59,8 @@ let crossfadePoll = 0;
 let resumeChain: Promise<void> = Promise.resolve();
 
 function trackUrl(file: string): string {
-  return `./music/${file}`;
+  // Bust stale PWA caches that keyed on the bare filename.
+  return `./music/${file}?v=3`;
 }
 
 function shuffleInPlace(list: string[]): void {
@@ -356,7 +357,7 @@ function loadManifest(): Promise<void> {
   if (manifestPromise) return manifestPromise;
   manifestPromise = (async () => {
     try {
-      const res = await fetch("./music/playlist.json", { cache: "no-cache" });
+      const res = await fetch("./music/playlist.json?v=3", { cache: "no-cache" });
       if (!res.ok) return;
       const data = (await res.json()) as PlaylistManifest;
       const clean = (list: unknown): string[] =>
@@ -518,4 +519,24 @@ export function onMusicScreen(screen: string): void {
   if (screen === screenToken) return;
   screenToken = screen;
   void ensureMusicPlaying();
+}
+
+/** Android standalone PWAs suspend the audio graph in the background. */
+function resumeMusicAfterForeground(): void {
+  if (!unlocked || !graphReady || !ctx) return;
+  if (ctx.state === "suspended") {
+    resumeChain = ctx.resume().then(() => undefined).catch(() => undefined);
+  }
+  void resumeChain.then(() => {
+    if (!transitioning) applyActiveGain();
+    void ensureMusicPlaying();
+  });
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") resumeMusicAfterForeground();
+  });
+  window.addEventListener("pageshow", () => resumeMusicAfterForeground());
+  window.addEventListener("focus", () => resumeMusicAfterForeground());
 }

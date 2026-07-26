@@ -1,5 +1,5 @@
 /* Pulse Link — Android install / offline cache. */
-const CACHE = "pulse-link-v2";
+const CACHE = "pulse-link-v3";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -14,8 +14,10 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
+      // Drop every previous Pulse Link cache so installed apps cannot keep
+      // stale music beds (cache-first used to pin old uneven cyber tracks).
       const keys = await caches.keys();
-      await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
+      await Promise.all(keys.map((k) => caches.delete(k)));
       await self.clients.claim();
     })(),
   );
@@ -28,25 +30,41 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // App shell: network-first so deploys land quickly, cache as fallback.
-  if (req.mode === "navigate" || url.pathname.endsWith(".html") || url.pathname.endsWith("/")) {
+  const isShell =
+    req.mode === "navigate" || url.pathname.endsWith(".html") || url.pathname.endsWith("/");
+  // Music must never stick on an old decode — Android installs were still
+  // hearing pre-normalize cyber beds while the browser (no SW) was fine.
+  const isMusic = url.pathname.includes("/music/");
+  const isScript =
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".css") ||
+    url.pathname.endsWith(".webmanifest") ||
+    url.pathname.endsWith("sw.js");
+
+  if (isShell || isMusic || isScript) {
     event.respondWith(
       (async () => {
         try {
-          const fresh = await fetch(req);
-          const cache = await caches.open(CACHE);
-          cache.put(req, fresh.clone());
+          const fresh = await fetch(req, { cache: "no-store" });
+          if (fresh.ok && !isMusic) {
+            // Cache shell/scripts for offline; skip caching music so updates
+            // always land and we don't pin multi-MB beds forever.
+            const cache = await caches.open(CACHE);
+            cache.put(req, fresh.clone());
+          }
           return fresh;
         } catch {
           const cached = await caches.match(req);
-          return cached || caches.match("./index.html");
+          if (cached) return cached;
+          if (isShell) return caches.match("./index.html");
+          return Response.error();
         }
       })(),
     );
     return;
   }
 
-  // Assets / music: cache-first after first hit.
+  // Images / other assets: cache-first.
   event.respondWith(
     (async () => {
       const cached = await caches.match(req);
