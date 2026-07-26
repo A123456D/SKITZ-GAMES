@@ -421,9 +421,6 @@ function restoreSavedRun(): boolean {
   return true;
 }
 
-// A normal puzzle resumes exactly where the player closed the tab.
-if (save.tutorialDone) restoreSavedRun();
-
 function beginTutorial(): void {
   inTutorial = true;
   tutorialStep = 0;
@@ -643,6 +640,9 @@ function syncSocketLinks(): void {
   sfxPortLink();
 }
 
+// Resume after linkKeys is initialized — restoreSavedRun calls resetSocketLinks.
+if (save.tutorialDone) restoreSavedRun();
+
 function doRotate(dq: number): void {
   if (!session || victory || pendingWin) return;
   if (session.selectedTable < 0) return;
@@ -764,60 +764,65 @@ function applySlider(id: string, value: number): void {
   if (id === "vol_sfx") setVolumes(save, save.musicVol, value);
 }
 
-canvas.addEventListener("pointerdown", (e) => {
-  unlockAllAudio();
-  const p = canvasPos(e);
+canvas.addEventListener(
+  "pointerdown",
+  (e) => {
+    e.preventDefault();
+    unlockAllAudio();
+    const p = canvasPos(e);
 
-  // Close X on the explain card
-  if (inspect && inspectClose && hitRect(p.x, p.y, inspectClose)) {
-    dismissInspect();
-    return;
-  }
-
-  // Any other tap while a card is open just dismisses it
-  if (inspect) {
-    dismissInspect();
-    return;
-  }
-
-  for (const s of sliders) {
-    if (hitRect(p.x, p.y, s)) {
-      activeSlider = s.id;
-      applySlider(s.id, sliderValueAt(s, p.x));
-      canvas.setPointerCapture(e.pointerId);
+    // Close X on the explain card
+    if (inspect && inspectClose && hitRect(p.x, p.y, inspectClose)) {
+      dismissInspect();
       return;
     }
-  }
-  for (const b of buttons) {
-    if (hitRect(p.x, p.y, b)) {
-      onButton(b.id);
+
+    // Any other tap while a card is open just dismisses it
+    if (inspect) {
+      dismissInspect();
       return;
     }
-  }
-  if (screen === "play" && session && !victory && !pendingWin && tutorialPhase !== "point") {
-    const tid = hitTable(p.x, p.y);
-    if (tid >= 0) {
-      const t = session.state.tables.find((x) => x.id === tid)!;
-      // Tables have no explain card — only select / drag
-      if (t.locked) {
-        selectTable(session, tid);
+
+    for (const s of sliders) {
+      if (hitRect(p.x, p.y, s)) {
+        activeSlider = s.id;
+        applySlider(s.id, sliderValueAt(s, p.x));
+        canvas.setPointerCapture(e.pointerId);
         return;
       }
-      selectTable(session, tid);
-      const a = angleAt(p.x, p.y, tid);
-      drag = {
-        tableId: tid,
-        startAngle: a,
-        baseRot: t.rotationQ * (Math.PI / 2),
-        lastTickQ: t.rotationQ,
-        liveAngle: t.rotationQ * (Math.PI / 2),
-      };
-      canvas.setPointerCapture(e.pointerId);
-      return;
     }
-    inspectCellAt(p.x, p.y);
-  }
-});
+    for (const b of buttons) {
+      if (hitRect(p.x, p.y, b)) {
+        onButton(b.id);
+        return;
+      }
+    }
+    if (screen === "play" && session && !victory && !pendingWin && tutorialPhase !== "point") {
+      const tid = hitTable(p.x, p.y);
+      if (tid >= 0) {
+        const t = session.state.tables.find((x) => x.id === tid)!;
+        // Tables have no explain card — only select / drag
+        if (t.locked) {
+          selectTable(session, tid);
+          return;
+        }
+        selectTable(session, tid);
+        const a = angleAt(p.x, p.y, tid);
+        drag = {
+          tableId: tid,
+          startAngle: a,
+          baseRot: t.rotationQ * (Math.PI / 2),
+          lastTickQ: t.rotationQ,
+          liveAngle: t.rotationQ * (Math.PI / 2),
+        };
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
+      inspectCellAt(p.x, p.y);
+    }
+  },
+  { passive: false },
+);
 
 canvas.addEventListener("pointermove", (e) => {
   const p = canvasPos(e);

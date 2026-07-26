@@ -3,7 +3,8 @@ import { applyTheme, isThemeId, type ThemeId } from "../view/palette";
 import { setMusicVolume } from "../audio/music";
 import { setSfxVolume } from "../audio/sfx";
 
-const KEY = "shiftr_web_save_v11";
+const KEY = "shiftr_web_save_v12";
+const LEGACY_KEYS = ["shiftr_web_save_v11", "shiftr_web_save_v10", "shiftr_web_save_v9"];
 
 export type SaveData = {
   unlocked: number;
@@ -37,17 +38,38 @@ function clamp01(v: unknown, fallback: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
+function clampUnlocked(n: number): number {
+  return Math.max(1, Math.min(DIFFICULTY_COUNT, Math.floor(n)));
+}
+
+/**
+ * How far the player may go. Cleared diffs unlock the next one.
+ * Older builds forced every level open — if we see that, re-derive from clears.
+ */
+function unlockedFromProgress(d: Partial<SaveData>): number {
+  let maxClearedIndex = -1;
+  for (const id of Object.keys(d.bestStars ?? {})) {
+    const m = /^diff_(\d+)$/.exec(id);
+    if (m) maxClearedIndex = Math.max(maxClearedIndex, Number(m[1]) - 1);
+  }
+  const fromClears = maxClearedIndex >= 0 ? maxClearedIndex + 2 : 1;
+  const raw = typeof d.unlocked === "number" && Number.isFinite(d.unlocked) ? d.unlocked : fromClears;
+  // Previous builds wrote DIFFICULTY_COUNT into every save — treat that as "recompute".
+  if (raw >= DIFFICULTY_COUNT) return clampUnlocked(fromClears);
+  return clampUnlocked(Math.max(fromClears, raw));
+}
+
 function migrateTheme(raw: unknown): ThemeId {
   if (raw === "synthwave" || raw === "wave") return "retro";
-  // Retired light boards fold into Ink; retired night boards into Mono.
-  if (raw === "pastel" || raw === "dusk") return "mono";
+  // Retired boards: vintage → cyber (mono); pastel/dusk → cyber; red/blue → ink.
+  if (raw === "vintage" || raw === "pastel" || raw === "dusk") return "mono";
   if (raw === "red" || raw === "blue") return "paper";
   return isThemeId(raw) ? raw : "paper";
 }
 
 function freshSave(firstRun: boolean): SaveData {
   return {
-    unlocked: DIFFICULTY_COUNT,
+    unlocked: 1,
     bestStars: {},
     bestMoves: {},
     lastLevelIndex: 0,
@@ -66,21 +88,29 @@ export function applyAudioFromSave(save: SaveData): void {
   setSfxVolume(save.sfxVol);
 }
 
+function readLegacyRaw(): string | null {
+  for (const k of LEGACY_KEYS) {
+    const v = localStorage.getItem(k);
+    if (v) return v;
+  }
+  return null;
+}
+
 export function loadSave(): SaveData {
   try {
-    const v11 = localStorage.getItem(KEY);
-    if (!v11) {
-      const legacy = localStorage.getItem("shiftr_web_save_v10") ?? localStorage.getItem("shiftr_web_save_v9");
+    const v12 = localStorage.getItem(KEY);
+    if (!v12) {
+      const legacy = readLegacyRaw();
       if (!legacy) {
         const fresh = freshSave(true);
         writeSave(fresh);
         applyAudioFromSave(fresh);
         return fresh;
       }
-      // Migrate older saves — skip first-run tutorial/theme gate.
+      // Migrate older saves — skip first-run tutorial/theme gate, restore real unlocks.
       const d = JSON.parse(legacy) as Partial<SaveData>;
       const save: SaveData = {
-        unlocked: Math.max(d.unlocked ?? 1, DIFFICULTY_COUNT),
+        unlocked: unlockedFromProgress(d),
         bestStars: d.bestStars ?? {},
         bestMoves: d.bestMoves ?? {},
         lastLevelIndex: Math.max(0, Number(d.lastLevelIndex) || 0),
@@ -96,9 +126,9 @@ export function loadSave(): SaveData {
       applyAudioFromSave(save);
       return save;
     }
-    const d = JSON.parse(v11) as Partial<SaveData>;
+    const d = JSON.parse(v12) as Partial<SaveData>;
     const save: SaveData = {
-      unlocked: Math.max(d.unlocked ?? 1, DIFFICULTY_COUNT),
+      unlocked: unlockedFromProgress(d),
       bestStars: d.bestStars ?? {},
       bestMoves: d.bestMoves ?? {},
       lastLevelIndex: Math.max(0, Number(d.lastLevelIndex) || 0),
@@ -175,6 +205,7 @@ export function recordClear(
   if (moves < prevM) save.bestMoves[levelId] = moves;
   save.lastLevelIndex = levelIndex;
   save.activeRun = null;
-  save.unlocked = Math.max(save.unlocked, levelIndex + 2, DIFFICULTY_COUNT);
+  // Unlock the next level only — never open the whole catalog at once.
+  save.unlocked = clampUnlocked(Math.max(save.unlocked, levelIndex + 2));
   writeSave(save);
 }
