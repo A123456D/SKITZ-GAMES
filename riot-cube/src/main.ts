@@ -1,10 +1,11 @@
 import { LEVEL_1 } from "./core/levels";
 import {
   applyTwist,
-  flipFace,
+  setActiveFace,
   restartSession,
   startSession,
   starsForScore,
+  type FaceId,
   type Session,
 } from "./core/session";
 import {
@@ -18,58 +19,69 @@ import type { TileKind, Twist } from "./core/types";
 import {
   W,
   H,
-  boardLayout,
-  cellBase,
   drawDesk,
   drawEndOverlay,
-  drawFlipButtons,
   drawHint,
   drawHud,
-  drawPage,
-  drawStickerSprite,
-  hitCell,
-  hitFlip,
   hitRetry,
-  type Layout,
 } from "./view/draw";
-import { drawCrumpledSticker } from "./view/crumple";
+import {
+  drawCube3D,
+  drawCubeOrbitButtons,
+  facingFace,
+  hitFrontUV,
+  hitOrbitButton,
+  type CubeLayout,
+} from "./view/cube3d";
 import { loadStickers } from "./view/stickers";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
 
 let session: Session = startSession(LEVEL_1);
-let layout: Layout = boardLayout(session.level.size);
 let floatText: { text: string; life: number } | null = null;
 
 type DragState = {
-  r: number;
-  c: number;
+  u0: number;
+  v0: number;
   x0: number;
   y0: number;
   axis: "row" | "col" | null;
   index: number;
-  offset: number;
+  offsetUv: number;
+  r: number;
+  c: number;
 };
 
 let drag: DragState | null = null;
-let springOffset = 0;
+let springUv = 0;
 let springAxis: "row" | "col" | null = null;
 let springIndex = -1;
 
-/** 0 = showing face, 0.5 = edge-on, 1 = landed on other face */
-let flipAnim = 0;
-let flipDir: 1 | -1 = 1;
-let flipping = false;
-let flipSwapped = false;
+let rotX = 0.18;
+let rotY = -0.22;
+let targetRotX = 0.18;
+let targetRotY = -0.22;
+let rotating = false;
 
-/** Visual board during crumple (twisted, pre-resolve). */
 let visualBoard: Board | null = null;
 type Crumple = { r: number; c: number; kind: TileKind; seed: number };
 let crumples: Crumple[] = [];
 let crumpleT = 0;
 let pendingTwist: Twist | null = null;
 let busy = false;
+
+let orbitBtns: ReturnType<typeof drawCubeOrbitButtons> | null = null;
+
+function cubeLayout(): CubeLayout {
+  return {
+    cx: W / 2,
+    cy: 620,
+    scale: 210,
+    rotX,
+    rotY,
+  };
+}
 
 function resize(): void {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -91,7 +103,14 @@ function canvasPoint(e: PointerEvent): { x: number; y: number } {
   };
 }
 
-function activeOffset(): {
+function syncActiveFace(): void {
+  const face = facingFace(rotX, rotY) as FaceId;
+  if (face !== session.face) {
+    session = setActiveFace(session, face);
+  }
+}
+
+function activeMotion(): {
   axis: "row" | "col" | null;
   index: number;
   offset: number;
@@ -101,7 +120,7 @@ function activeOffset(): {
     return {
       axis: drag.axis,
       index: drag.index,
-      offset: drag.offset,
+      offset: drag.offsetUv,
       hovering: true,
     };
   }
@@ -109,29 +128,11 @@ function activeOffset(): {
     return {
       axis: springAxis,
       index: springIndex,
-      offset: springOffset,
-      hovering: Math.abs(springOffset) > 1,
+      offset: springUv,
+      hovering: Math.abs(springUv) > 0.01,
     };
   }
   return { axis: null, index: -1, offset: 0, hovering: false };
-}
-
-function stickerPos(
-  r: number,
-  c: number,
-  n: number,
-  motion: { axis: "row" | "col" | null; index: number; offset: number },
-): { x: number; y: number } {
-  const base = cellBase(layout, r, c);
-  let x = base.x;
-  let y = base.y;
-  const span = n * layout.stride;
-  if (motion.axis === "row" && motion.index === r) {
-    x = layout.boardX + ((((c * layout.stride + motion.offset) % span) + span) % span);
-  } else if (motion.axis === "col" && motion.index === c) {
-    y = layout.boardY + ((((r * layout.stride + motion.offset) % span) + span) % span);
-  }
-  return { x, y };
 }
 
 function paint(): void {
@@ -143,85 +144,34 @@ function paint(): void {
     goals: session.goals,
   });
 
-  const flipT = flipping ? flipAnim : 0;
-  drawPage(ctx, layout, flipT);
+  const layout = cubeLayout();
+  const faces = session.faces.map((f, i) =>
+    i === session.face && visualBoard ? visualBoard : f,
+  ) as Session["faces"];
 
-  // Hide stickers when page is edge-on
-  const visible = Math.abs(Math.cos(flipT * Math.PI)) > 0.12;
-  const motion = activeOffset();
-  const n = session.level.size;
+  drawCube3D(ctx, layout, faces, {
+    activeFace: session.face,
+    motion: activeMotion(),
+    crumples: crumples.map((c) => ({ ...c, t: crumpleT })),
+    paper: true,
+  });
 
-  if (visible) {
-    ctx.save();
-    const cx = layout.pageX + layout.pageW / 2;
-    const scaleX = Math.max(0.04, Math.abs(Math.cos(flipT * Math.PI)));
-    ctx.translate(cx, layout.pageY + layout.pageH / 2);
-    ctx.scale(scaleX, 1);
-    ctx.translate(-cx, -(layout.pageY + layout.pageH / 2));
-
-    // Clip to page interior so wrapping stickers slide under the edge feel
-    ctx.beginPath();
-    ctx.rect(layout.pageX + 8, layout.pageY + 8, layout.pageW - 16, layout.pageH - 16);
-    ctx.clip();
-
-    const board = visualBoard ?? session.board;
-    const crumpleKeys = new Set(crumples.map((c) => `${c.r},${c.c}`));
-
-    // Draw wrapped copies for continuous reveal
-    const copies = motion.axis ? [-1, 0, 1] : [0];
-    for (const copy of copies) {
-      for (let r = 0; r < n; r++) {
-        for (let c = 0; c < n; c++) {
-          if (crumpleKeys.has(`${r},${c}`)) continue;
-          const kind = board[r]![c];
-          if (!kind) continue;
-          const pos = stickerPos(r, c, n, motion);
-          let x = pos.x;
-          let y = pos.y;
-          if (motion.axis === "row" && motion.index === r) {
-            x += copy * n * layout.stride;
-          } else if (motion.axis === "col" && motion.index === c) {
-            y += copy * n * layout.stride;
-          } else if (copy !== 0) {
-            continue;
-          }
-
-          const inLane =
-            (motion.axis === "row" && motion.index === r) ||
-            (motion.axis === "col" && motion.index === c);
-          const lift = inLane && motion.hovering ? 14 : 0;
-          const scale = inLane && motion.hovering ? 1.08 : 1;
-          drawStickerSprite(ctx, kind, x, y, layout.cell, scale, lift);
-        }
-      }
-    }
-
-    // Crumpling matched stickers on top
-    if (crumples.length && crumpleT < 1) {
-      for (const c of crumples) {
-        const pos = cellBase(layout, c.r, c.c);
-        drawCrumpledSticker(
-          ctx,
-          c.kind,
-          pos.x,
-          pos.y,
-          layout.cell,
-          crumpleT,
-          c.seed,
-        );
-      }
-    }
-    ctx.restore();
+  if (!rotating) {
+    orbitBtns = drawCubeOrbitButtons(ctx, layout.cx, layout.cy, layout.scale + 20);
+  } else {
+    orbitBtns = null;
   }
 
-  if (!flipping) {
-    drawFlipButtons(ctx, layout, session.face);
-  }
+  const faceName = ["FRONT", "BACK", "RIGHT", "LEFT", "TOP", "BOTTOM"][session.face];
+  ctx.fillStyle = "#f3efe6";
+  ctx.font = "700 16px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(`FACE · ${faceName}`, W / 2, 980);
 
   drawHint(
     ctx,
     session.status === "playing"
-      ? "Drag stickers — they wrap forever. Tap ‹ › to flip the cube."
+      ? "Drag stickers on the front face. Orbit buttons turn the 3D cube."
       : session.status === "won"
         ? "Rip. Match. Repeat."
         : "Try another twist path.",
@@ -232,7 +182,7 @@ function paint(): void {
     ctx.globalAlpha = Math.min(1, floatText.life * 2);
     ctx.fillStyle = "#c8ff3d";
     ctx.font = "800 42px 'Permanent Marker', sans-serif";
-    ctx.fillText(floatText.text, W / 2 - 80, layout.pageY - 16);
+    ctx.fillText(floatText.text, W / 2 - 80, 300);
     ctx.restore();
   }
 
@@ -253,35 +203,32 @@ function tick(): void {
     dirty = true;
   }
   if (springAxis) {
-    springOffset *= 0.78;
-    if (Math.abs(springOffset) < 0.5) {
-      springOffset = 0;
+    springUv *= 0.78;
+    if (Math.abs(springUv) < 0.008) {
+      springUv = 0;
       springAxis = null;
       springIndex = -1;
     }
     dirty = true;
   }
-  if (flipping) {
-    flipAnim += 0.07;
-    if (!flipSwapped && flipAnim >= 0.5) {
-      session = flipFace(session, flipDir);
-      flipSwapped = true;
-    }
-    if (flipAnim >= 1) {
-      flipAnim = 0;
-      flipping = false;
-      flipSwapped = false;
+  if (rotating) {
+    const speed = 0.12;
+    rotX += (targetRotX - rotX) * speed;
+    rotY += (targetRotY - rotY) * speed;
+    if (Math.abs(targetRotX - rotX) < 0.01 && Math.abs(targetRotY - rotY) < 0.01) {
+      rotX = targetRotX;
+      rotY = targetRotY;
+      rotating = false;
+      syncActiveFace();
     }
     dirty = true;
   }
   if (crumples.length) {
     crumpleT = Math.min(1, crumpleT + 0.045);
     dirty = true;
-    if (crumpleT >= 1 && pendingTwist) {
-      finishCrumple();
-    }
+    if (crumpleT >= 1 && pendingTwist) finishCrumple();
   }
-  if (dirty || drag || crumples.length) paint();
+  if (dirty || drag || crumples.length || rotating) paint();
   requestAnimationFrame(tick);
 }
 
@@ -314,35 +261,30 @@ function doTwist(twist: Twist): void {
     paint();
     return;
   }
-
   busy = true;
   pendingTwist = twist;
   visualBoard = cloneBoard(twisted);
   crumpleT = 0;
-  const cells = matchedCells(groups);
   crumples = [];
-  for (const k of cells) {
+  for (const k of matchedCells(groups)) {
     const [rs, cs] = k.split(",");
     const r = Number(rs);
     const c = Number(cs);
     const kind = twisted[r]![c];
     if (!kind) continue;
-    crumples.push({
-      r,
-      c,
-      kind,
-      seed: (r * 97 + c * 13 + session.score + 1) | 0,
-    });
+    crumples.push({ r, c, kind, seed: (r * 97 + c * 13 + session.score + 1) | 0 });
   }
   paint();
 }
 
-function startFlip(dir: 1 | -1): void {
-  if (flipping || session.status !== "playing" || drag || busy) return;
-  flipDir = dir;
-  flipping = true;
-  flipAnim = 0;
-  flipSwapped = false;
+function startOrbit(dir: "left" | "right" | "up" | "down"): void {
+  if (rotating || busy || drag || session.status !== "playing") return;
+  const step = Math.PI / 2;
+  if (dir === "left") targetRotY += step;
+  if (dir === "right") targetRotY -= step;
+  if (dir === "up") targetRotX -= step;
+  if (dir === "down") targetRotX += step;
+  rotating = true;
 }
 
 canvas.addEventListener("pointerdown", (e) => {
@@ -351,46 +293,65 @@ canvas.addEventListener("pointerdown", (e) => {
   if (session.status !== "playing") {
     if (hitRetry(p.x, p.y)) {
       session = restartSession(session);
-      layout = boardLayout(session.level.size);
       floatText = null;
       visualBoard = null;
       crumples = [];
       crumpleT = 0;
       pendingTwist = null;
       busy = false;
+      rotX = 0.18;
+      rotY = -0.22;
+      targetRotX = rotX;
+      targetRotY = rotY;
       paint();
     }
     return;
   }
-  if (flipping || busy) return;
+  if (rotating || busy) return;
 
-  const flip = hitFlip(layout, p.x, p.y);
-  if (flip) {
-    startFlip(flip);
-    return;
+  if (orbitBtns) {
+    const orb = hitOrbitButton(orbitBtns, p.x, p.y);
+    if (orb) {
+      startOrbit(orb);
+      return;
+    }
   }
 
-  const cell = hitCell(layout, session.level.size, p.x, p.y);
-  if (!cell) return;
+  const layout = cubeLayout();
+  const hit = hitFrontUV(layout, p.x, p.y);
+  if (!hit || hit.face !== session.face) return;
+  const n = session.level.size;
+  const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
+  const r = Math.min(n - 1, Math.max(0, Math.floor(hit.v * n)));
   drag = {
-    ...cell,
+    u0: hit.u,
+    v0: hit.v,
     x0: p.x,
     y0: p.y,
     axis: null,
     index: -1,
-    offset: 0,
+    offsetUv: 0,
+    r,
+    c,
   };
 });
 
 canvas.addEventListener("pointermove", (e) => {
-  if (!drag || session.status !== "playing" || flipping || busy) return;
+  if (!drag || session.status !== "playing" || rotating || busy) return;
   const p = canvasPoint(e);
-  const dx = p.x - drag.x0;
-  const dy = p.y - drag.y0;
+  const layout = cubeLayout();
+  const hit = hitFrontUV(layout, p.x, p.y);
+  // Fall back to pixel delta mapped roughly to UV
+  let du = (p.x - drag.x0) / (layout.scale * 1.6);
+  let dv = (p.y - drag.y0) / (layout.scale * 1.6);
+  if (hit) {
+    du = hit.u - drag.u0;
+    dv = hit.v - drag.v0;
+  }
 
   if (!drag.axis) {
-    if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
-    if (Math.abs(dx) >= Math.abs(dy)) {
+    if (Math.abs(du) < 0.03 && Math.abs(dv) < 0.03) return;
+    if (Math.abs(du) >= Math.abs(dv)) {
       drag.axis = "row";
       drag.index = drag.r;
     } else {
@@ -398,40 +359,33 @@ canvas.addEventListener("pointermove", (e) => {
       drag.index = drag.c;
     }
   }
-  drag.offset = drag.axis === "row" ? dx : dy;
-  // Re-anchor so long drags stay continuous without fighting
+  drag.offsetUv = drag.axis === "row" ? du : dv;
   paint();
 });
 
-function endDrag(e: PointerEvent): void {
+function endDrag(): void {
   if (!drag) return;
   const axis = drag.axis;
   const index = drag.index;
-  const offset = drag.offset;
+  const offsetUv = drag.offsetUv;
   drag = null;
-
   if (!axis || index < 0) {
     paint();
     return;
   }
-
-  const steps = Math.round(offset / layout.stride);
+  const steps = Math.round(offsetUv * session.level.size);
   if (steps === 0) {
     springAxis = axis;
     springIndex = index;
-    springOffset = offset;
+    springUv = offsetUv;
     paint();
     return;
   }
-
   const dir: 1 | -1 = steps > 0 ? 1 : -1;
   const amount = Math.min(session.level.size - 1, Math.abs(steps));
-  // Visual snap remainder
-  const snapped = steps * layout.stride;
   springAxis = axis;
   springIndex = index;
-  springOffset = offset - snapped;
-
+  springUv = offsetUv - steps / session.level.size;
   doTwist({ axis, index, dir, amount });
 }
 
@@ -440,7 +394,7 @@ canvas.addEventListener("pointercancel", () => {
   if (drag?.axis) {
     springAxis = drag.axis;
     springIndex = drag.index;
-    springOffset = drag.offset;
+    springUv = drag.offsetUv;
   }
   drag = null;
   paint();
@@ -452,6 +406,7 @@ window.addEventListener("resize", () => {
 });
 
 loadStickers().then(() => {
+  syncActiveFace();
   resize();
   paint();
   requestAnimationFrame(tick);

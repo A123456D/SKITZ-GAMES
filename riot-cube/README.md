@@ -29,5 +29,5 @@ Open `riot-cube/godot/` in **Godot 4.7**. See `godot/README.md` for export steps
 
 ## Roadmap
 
-1. **Now:** Flat board + row/column slice twists, goals + score stars (web + Godot)
-2. **Later:** Same rules on a real 3D cube (Godot first)
+1. **Now:** 3D cube (6 faces) + row/column twists on the facing face, goals + score stars (web)
+2. **Later:** Port the 3D cube to Godot for Android; true Rubik-style slice turns across faces
