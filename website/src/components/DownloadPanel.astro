@@ -73,6 +73,11 @@ const canInstallAndroid = platforms.web || platforms.android;
 						</li>
 						<li>Confirm — {title} lands on your home screen and opens fullscreen.</li>
 					</ol>
+					<p class="muted tip">
+						<strong>Icon not updating?</strong> Android keeps the first home-screen icon forever.
+						Long-press the old Pulse Link icon → Remove / Uninstall, then open the game in Chrome
+						and Install again. The new logo only appears on a fresh install.
+					</p>
 				</details>
 			</div>
 		)
@@ -173,5 +178,11 @@ const canInstallAndroid = platforms.web || platforms.android;
 	.help ol {
 		margin: 0.75rem 0 0;
 		padding-left: 1.2rem;
+	}
+
+	.help .tip {
+		margin: 1rem 0 0;
+		font-size: 0.9rem;
+		line-height: 1.45;
 	}
 </style>
