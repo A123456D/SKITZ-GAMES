@@ -36,7 +36,6 @@ import { onMusicScreen, unlockMusic, skipMusicTrack, canSkipMusicNext } from "./
 import {
   unlockAudio,
   sfxBeamHit,
-  sfxPortLink,
   sfxReceiverOn,
   sfxSnap,
   sfxTick,
@@ -81,7 +80,7 @@ import {
   type Layout,
   type SliderRect,
 } from "./view/draw";
-import { clearFeel, drawFeel, triggerRouteAck, triggerSocketConnect, triggerVictoryFeel } from "./view/feel";
+import { clearFeel, drawFeel, triggerRouteAck, triggerVictoryFeel } from "./view/feel";
 import type { TurnResult } from "./core/beamSolver";
 import {
   THEME_LABELS,
@@ -345,7 +344,6 @@ function startLevel(i: number, newSeed = true): void {
   dismissInspect();
   clearWinState();
   clearFeel();
-  resetSocketLinks();
   screen = "play";
   persistRun();
 }
@@ -415,7 +413,6 @@ function restoreSavedRun(): boolean {
   beamProgress = 1;
   settledTables = new Set(session.state.tables.map((t) => t.id));
   clearWinState();
-  resetSocketLinks();
   if (session.result.won) pendingWin = true;
   screen = "play";
   return true;
@@ -467,7 +464,6 @@ function startPointTour(step: TutPoint): void {
   dismissInspect();
   clearWinState();
   clearFeel();
-  resetSocketLinks();
   screen = "play";
 }
 
@@ -489,7 +485,6 @@ function startTutorialBoard(step?: TutPlay): void {
   dismissInspect();
   clearWinState();
   clearFeel();
-  resetSocketLinks();
   const firstOpen = session.state.tables.find((t) => !t.locked);
   if (firstOpen) selectTable(session, firstOpen.id);
   screen = "play";
@@ -591,56 +586,9 @@ function fireVictoryFeel(): void {
 function playEvents(before: TurnResult, after: TurnResult): void {
   if (after.beams.length > before.beams.length) sfxBeamHit();
   if (after.energizedReceivers.length > before.energizedReceivers.length) sfxReceiverOn();
-  const portHits = after.events.filter((e) => e.type === "portEnter" || e.type === "portExit").length;
-  const prevPorts = before.events.filter((e) => e.type === "portEnter" || e.type === "portExit").length;
-  if (portHits > prevPorts) sfxPortLink();
 }
 
-function linkEdgeKey(a: { x: number; y: number }, b: { x: number; y: number }): string {
-  const ak = `${a.x},${a.y}`;
-  const bk = `${b.x},${b.y}`;
-  return ak < bk ? `${ak}|${bk}` : `${bk}|${ak}`;
-}
-
-/** Matched socket pairs currently on the board, keyed per undirected edge. */
-let linkKeys = new Set<string>();
-/** Set after a load/reset so the next sync adopts links without celebrating. */
-let seedLinks = true;
-
-/** Adopt the current links silently — used on level load, restore and reset. */
-function resetSocketLinks(): void {
-  linkKeys = new Set();
-  seedLinks = true;
-}
-
-/**
- * Fires the connect effect for every socket pair that became matched since the
- * last check. Driven from the frame loop so no rotation path can miss it —
- * buttons, drag-snap, geared partners and undo all flow through here.
- */
-function syncSocketLinks(): void {
-  if (!session) return;
-  const next = new Set<string>();
-  const fresh: { from: { x: number; y: number }; to: { x: number; y: number } }[] = [];
-  for (const beam of session.latent.beams) {
-    for (const seg of beam.segments) {
-      const k = linkEdgeKey(seg.from, seg.to);
-      if (next.has(k)) continue;
-      next.add(k);
-      if (!seedLinks && !linkKeys.has(k)) fresh.push({ from: seg.from, to: seg.to });
-    }
-  }
-  linkKeys = next;
-  if (seedLinks) {
-    seedLinks = false;
-    return;
-  }
-  if (!fresh.length || !layout) return;
-  for (const edge of fresh) triggerSocketConnect(layout, edge.from, edge.to, time);
-  sfxPortLink();
-}
-
-// Resume after linkKeys is initialized — restoreSavedRun calls resetSocketLinks.
+// Resume a saved puzzle after the module has finished declaring helpers.
 if (save.tutorialDone) restoreSavedRun();
 
 function doRotate(dq: number): void {
@@ -665,7 +613,6 @@ function doRotate(dq: number): void {
   displayResult = session.result;
   beamProgress = 1;
   sfxSnap();
-  syncSocketLinks();
   persistRun();
 }
 
@@ -858,7 +805,6 @@ canvas.addEventListener("pointerup", () => {
   if (changed) {
     settledTables.add(tableId);
     sfxSnap();
-    syncSocketLinks();
     persistRun();
   }
 });
@@ -1046,7 +992,6 @@ function onButton(id: string): void {
     restart(session);
     layout = boardLayout(session.state);
     clearWinState();
-    resetSocketLinks();
     settledTables = new Set();
   rotTween = null;
   squashUntil = 0;
@@ -1830,8 +1775,6 @@ function drawPlay(): void {
 function frame(now: number): void {
   time = now / 1000;
   if (beamProgress < 1 && !drag) beamProgress = Math.min(1, beamProgress + 0.042);
-  // Catch links formed by any path (board turns, geared partners, undo).
-  if (session && !drag) syncSocketLinks();
 
   if (pendingWin && !drag && beamProgress >= 1) {
     fireVictoryFeel();

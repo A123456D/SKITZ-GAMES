@@ -623,12 +623,14 @@ function paintCyberMotion(ctx: CanvasRenderingContext2D, time: number): void {
   ctx.fillStyle = scan;
   ctx.fillRect(0, scanY - 40, W, 80);
 
-  // Fine CRT scanlines.
-  ctx.globalAlpha = 0.045;
-  ctx.fillStyle = "#FF2A2A";
-  const lineOff = Math.floor(time * 28) % 3;
-  for (let y = lineOff; y < H; y += 3) {
-    ctx.fillRect(0, y, W, 1);
+  // Fine CRT scanlines — desktop only (hundreds of fillRects hurt mobile GPUs).
+  if (!prefersLiteMotion()) {
+    ctx.globalAlpha = 0.045;
+    ctx.fillStyle = "#FF2A2A";
+    const lineOff = Math.floor(time * 28) % 3;
+    for (let y = lineOff; y < H; y += 3) {
+      ctx.fillRect(0, y, W, 1);
+    }
   }
 
   // Corner bracket pulse — red ticks breathe.
@@ -638,8 +640,10 @@ function paintCyberMotion(ctx: CanvasRenderingContext2D, time: number): void {
   ctx.strokeStyle = "#FF2A2A";
   ctx.lineWidth = 1.8;
   ctx.globalAlpha = 0.45 + pulse * 0.45;
-  ctx.shadowColor = "#FF2A2A";
-  ctx.shadowBlur = 6;
+  if (!prefersLiteMotion()) {
+    ctx.shadowColor = "#FF2A2A";
+    ctx.shadowBlur = 6;
+  }
   const corners: [number, number, number, number][] = [
     [m, m, 1, 1],
     [W - m, m, -1, 1],
@@ -672,19 +676,38 @@ function paintCyberMotion(ctx: CanvasRenderingContext2D, time: number): void {
 }
 
 /**
+ * Coarse pointers / small viewports: skip the GPU-heavy motion extras
+ * (shadowBlur, dense scanlines) while keeping the same animated look.
+ */
+function prefersLiteMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (window.matchMedia("(pointer: coarse)").matches) return true;
+    if (Math.min(window.innerWidth, window.innerHeight) < 700) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+/**
  * Per-frame RETRO motion — synth sun breathe, grid crawl, star twinkle, CRT wash.
  * Soft and edge-weighted so the board stays readable.
+ * On coarse/mobile pointers we drop shadowBlur + dense scanlines (GPU killers)
+ * while keeping the same glow, stars, and crawling grid look.
  */
 function paintRetroMotion(ctx: CanvasRenderingContext2D, time: number): void {
   const horizon = H * 0.52;
   const vx = W * 0.5;
   const pulse = 0.5 + 0.5 * Math.sin(time * 1.55);
   const pulse2 = 0.5 + 0.5 * Math.sin(time * 2.1 + 0.8);
+  const lite = prefersLiteMotion();
 
   ctx.save();
 
   // Twinkling stars in the upper sky (deterministic positions).
-  for (let i = 0; i < 28; i++) {
+  const starCount = lite ? 14 : 28;
+  for (let i = 0; i < starCount; i++) {
     const sx = ((i * 97 + 41) % 1000) / 1000;
     const sy = ((i * 53 + 17) % 1000) / 1000;
     const x = 24 + sx * (W - 48);
@@ -694,9 +717,14 @@ function paintRetroMotion(ctx: CanvasRenderingContext2D, time: number): void {
     const r = 0.8 + (i % 3) * 0.55 + twinkle * 0.4;
     ctx.globalAlpha = a;
     ctx.fillStyle = i % 4 === 0 ? "#5CFFF8" : i % 4 === 1 ? "#FF9DE0" : "#FFFFFF";
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
+    if (lite) {
+      // Tiny squares are much cheaper than arcs on mobile GPUs.
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // Breathing magenta/violet sun glow on the horizon.
@@ -713,8 +741,10 @@ function paintRetroMotion(ctx: CanvasRenderingContext2D, time: number): void {
   ctx.globalAlpha = 0.25 + pulse2 * 0.35;
   ctx.strokeStyle = "#FF6EC7";
   ctx.lineWidth = 2.2;
-  ctx.shadowColor = "#FF6EC7";
-  ctx.shadowBlur = 12 + pulse * 10;
+  if (!lite) {
+    ctx.shadowColor = "#FF6EC7";
+    ctx.shadowBlur = 12 + pulse * 10;
+  }
   ctx.beginPath();
   ctx.moveTo(W * 0.12, horizon);
   ctx.lineTo(W * 0.88, horizon);
@@ -734,10 +764,11 @@ function paintRetroMotion(ctx: CanvasRenderingContext2D, time: number): void {
   ctx.rect(0, horizon, W, H - horizon);
   ctx.clip();
   const scroll = ((time * 0.42) % 1 + 1) % 1;
+  const floorLines = lite ? 6 : 10;
   ctx.strokeStyle = "#FF6EC7";
   ctx.lineWidth = 1.15;
-  for (let i = 0; i < 10; i++) {
-    const u = (i + scroll) / 10;
+  for (let i = 0; i < floorLines; i++) {
+    const u = (i + scroll) / floorLines;
     const y = horizon + (H - horizon) * Math.pow(u, 1.55);
     ctx.globalAlpha = 0.08 + (1 - u) * 0.28;
     ctx.beginPath();
@@ -747,9 +778,10 @@ function paintRetroMotion(ctx: CanvasRenderingContext2D, time: number): void {
   }
   // Subtle ray sway so the grid feels alive.
   const rayShift = Math.sin(time * 0.35) * 0.035;
+  const rayCount = lite ? 8 : 12;
   ctx.strokeStyle = "#C77DFF";
-  for (let i = 0; i <= 12; i++) {
-    const t = i / 12 + rayShift;
+  for (let i = 0; i <= rayCount; i++) {
+    const t = i / rayCount + rayShift;
     const x0 = t * W;
     ctx.globalAlpha = 0.06 + (1 - Math.abs(t - 0.5) * 2) * 0.1;
     ctx.beginPath();
@@ -777,12 +809,14 @@ function paintRetroMotion(ctx: CanvasRenderingContext2D, time: number): void {
   ctx.fillStyle = scan;
   ctx.fillRect(0, scanY - 50, W, 100);
 
-  // Fine scanlines.
-  ctx.globalAlpha = 0.035;
-  ctx.fillStyle = "#5CFFF8";
-  const lineOff = Math.floor(time * 22) % 3;
-  for (let y = lineOff; y < H; y += 3) {
-    ctx.fillRect(0, y, W, 1);
+  // Fine scanlines — desktop only (hundreds of fillRects kill mobile GPUs).
+  if (!lite) {
+    ctx.globalAlpha = 0.035;
+    ctx.fillStyle = "#5CFFF8";
+    const lineOff = Math.floor(time * 22) % 3;
+    for (let y = lineOff; y < H; y += 3) {
+      ctx.fillRect(0, y, W, 1);
+    }
   }
 
   // Neon corner ticks that breathe.
@@ -799,8 +833,10 @@ function paintRetroMotion(ctx: CanvasRenderingContext2D, time: number): void {
   ];
   for (const [bx, by, sx, sy, col] of corners) {
     ctx.strokeStyle = col;
-    ctx.shadowColor = col;
-    ctx.shadowBlur = 6;
+    if (!lite) {
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 6;
+    }
     ctx.beginPath();
     ctx.moveTo(bx + sx * arm, by + sy * 5);
     ctx.lineTo(bx + sx * 5, by + sy * 5);
