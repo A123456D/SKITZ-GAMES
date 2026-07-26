@@ -49,6 +49,7 @@ import {
   screenDeltaToFaceUV,
   type CubeLayout,
 } from "./view/cube3d";
+import { applyOrbitDrag, orbitStepDelta, SNAP_Q } from "./view/orbit";
 import {
   cycleSfxVolume,
   getSfxVolume,
@@ -103,8 +104,6 @@ let orbitDrag: {
   rotX0: number;
   rotY0: number;
 } | null = null;
-const ORBIT_DRAG_SENS = 0.0042; // radians per canvas pixel
-const SNAP_Q = Math.PI / 2;
 
 let visualBoard: Board | null = null;
 type Crumple = { r: number; c: number; kind: TileKind; seed: number };
@@ -427,10 +426,9 @@ function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
     tx = 0;
     ty = 0;
   }
-  if (dir === "left") ty += SNAP_Q;
-  if (dir === "right") ty -= SNAP_Q;
-  if (dir === "up") tx -= SNAP_Q;
-  if (dir === "down") tx += SNAP_Q;
+  const { dRotX, dRotY } = orbitStepDelta(dir);
+  tx += dRotX;
+  ty += dRotY;
   // Re-apply home tip if we landed on front
   const landed = snapAngles(tx, ty);
   targetRotX = landed.x;
@@ -589,11 +587,9 @@ canvas.addEventListener("pointermove", (e) => {
   if (orbitDrag) {
     const dx = p.x - orbitDrag.x0;
     const dy = p.y - orbitDrag.y0;
-    // Horizontal restored; vertical inverted from prior build.
-    rotY = orbitDrag.rotY0 + dx * ORBIT_DRAG_SENS;
-    rotX = orbitDrag.rotX0 - dy * ORBIT_DRAG_SENS;
-    // Keep pitch in a playable range (allow full top/bottom snaps)
-    rotX = Math.max(-SNAP_Q, Math.min(SNAP_Q, rotX));
+    const next = applyOrbitDrag(orbitDrag.rotX0, orbitDrag.rotY0, dx, dy);
+    rotX = next.rotX;
+    rotY = next.rotY;
     targetRotX = rotX;
     targetRotY = rotY;
     syncActiveFace();
