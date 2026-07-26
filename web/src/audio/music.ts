@@ -76,6 +76,44 @@ function trackUrl(file: string): string {
   return `./music/${file}?v=9`;
 }
 
+function artworkUrl(file: string): string {
+  try {
+    return new URL(file, document.baseURI).href;
+  } catch {
+    return file;
+  }
+}
+
+function prettyTrackTitle(file: string): string {
+  return file
+    .replace(/\.mp3$/i, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Brand the Android/iOS now-playing chip so it isn't Chrome's icon. */
+function updateMediaSession(file: string | null): void {
+  if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+  try {
+    if (!file) {
+      navigator.mediaSession.playbackState = "none";
+      return;
+    }
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: "Pulse Link",
+      artist: prettyTrackTitle(file),
+      album: "Pulse Link",
+      artwork: [
+        { src: artworkUrl("./icons/icon-192-v7.png"), sizes: "192x192", type: "image/png" },
+        { src: artworkUrl("./icons/icon-512-v7.png"), sizes: "512x512", type: "image/png" },
+      ],
+    });
+    navigator.mediaSession.playbackState = "playing";
+  } catch {
+    /* Media Session is best-effort on older WebViews */
+  }
+}
+
 function shuffleInPlace(list: string[]): void {
   for (let i = list.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -361,6 +399,7 @@ async function beginCrossfade(hard: boolean): Promise<void> {
   preloadNext();
   transitioning = false;
   watchCrossfade();
+  updateMediaSession(next);
 }
 
 function abortMusicTransition(): void {
@@ -559,6 +598,7 @@ export async function ensureMusicPlaying(): Promise<void> {
   void fadeGain(el, targetLevel(), 1200, 0);
   preloadNext();
   watchCrossfade();
+  updateMediaSession(first);
 }
 
 /**

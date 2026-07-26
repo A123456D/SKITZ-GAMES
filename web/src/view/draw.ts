@@ -1513,7 +1513,7 @@ function paintWheelFace(
 
   // Crisp outer rim — dark on light faces, soft ink on paper triangles.
   // Punk paints its own hard lime rim + studs above.
-  // INK knobs mirror the rotate button: bold outer ring + inner hairline.
+  // INK knobs: single bold outer ring (no inner concentric hairline).
   // Cyber (mono) paints its own red/white enamel badge above.
   if (theme === "paper") {
     ctx.strokeStyle = P.INK;
@@ -1521,12 +1521,6 @@ function paintWheelFace(
     ctx.beginPath();
     ctx.arc(0, 0, r - 0.5, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.globalAlpha = 0.65;
-    ctx.lineWidth = Math.max(1.05, r * 0.028);
-    ctx.beginPath();
-    ctx.arc(0, 0, r - Math.max(3.8, r * 0.11), 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
   } else if (theme === "retro") {
     // Hot pink neon rim — matches the synthwave reference triangles.
     ctx.save();
@@ -1717,20 +1711,7 @@ function paintWheelFace(
       ctx.arc(p.x, p.y, pr, 0, Math.PI * 2);
     }
     ctx.stroke();
-    // Inner hairline — echoes the button’s double ring.
-    ctx.globalAlpha = 0.55;
-    ctx.lineWidth = Math.max(0.9, r * 0.022);
-    ctx.beginPath();
-    for (const port of ports) {
-      const p = portPos(port);
-      const ir = pr - Math.max(1.4, r * 0.028);
-      ctx.moveTo(p.x + ir, p.y);
-      ctx.arc(p.x, p.y, ir, 0, Math.PI * 2);
-    }
-    ctx.stroke();
-    ctx.globalAlpha = 1;
   } else {
-    // Punched connection points — cream hole on paper discs.
     const pr = Math.max(3.2, r * 0.105);
     ctx.fillStyle = isLightTheme(theme) ? P.PAPER : face;
     ctx.beginPath();
@@ -3305,12 +3286,6 @@ export function drawRoundButton(
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    ctx.lineWidth = 1.1;
-    ctx.globalAlpha = enabled ? 0.65 : 0.28;
-    ctx.beginPath();
-    ctx.arc(0, 0, r - 4, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = enabled ? 1 : 0.4;
     ctx.fillStyle = P.INK;
     ctx.font = fontHand(Math.round(r * 1.05));
     ctx.textAlign = "center";
