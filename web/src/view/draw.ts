@@ -679,15 +679,59 @@ function paintCyberMotion(ctx: CanvasRenderingContext2D, time: number): void {
  * Coarse pointers / small viewports: skip the GPU-heavy motion extras
  * (shadowBlur, dense scanlines) while keeping the same animated look.
  */
+let liteMotionCache: boolean | null = null;
+
 function prefersLiteMotion(): boolean {
+  if (liteMotionCache !== null) return liteMotionCache;
   if (typeof window === "undefined") return false;
+  let lite = false;
   try {
-    if (window.matchMedia("(pointer: coarse)").matches) return true;
-    if (Math.min(window.innerWidth, window.innerHeight) < 700) return true;
+    lite =
+      window.matchMedia("(pointer: coarse)").matches ||
+      Math.min(window.innerWidth, window.innerHeight) < 700;
   } catch {
     /* ignore */
   }
-  return false;
+  liteMotionCache = lite;
+  return lite;
+}
+
+let retroGlowCache: HTMLCanvasElement | null = null;
+let retroScanCache: HTMLCanvasElement | null = null;
+
+/** Cached radial sun-glow sprite (drawn scaled + alpha'd per frame). */
+function retroGlowStrip(): HTMLCanvasElement {
+  if (retroGlowCache) return retroGlowCache;
+  const size = 256;
+  const c = document.createElement("canvas");
+  c.width = size;
+  c.height = size;
+  const g = c.getContext("2d")!;
+  const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, "rgba(255, 110, 199, 0.18)");
+  grad.addColorStop(0.4, "rgba(199, 125, 255, 0.08)");
+  grad.addColorStop(1, "rgba(255, 110, 199, 0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  retroGlowCache = c;
+  return c;
+}
+
+/** Cached CRT scan band strip (stretched to full width per frame). */
+function retroScanStrip(): HTMLCanvasElement {
+  if (retroScanCache) return retroScanCache;
+  const c = document.createElement("canvas");
+  c.width = 4;
+  c.height = 100;
+  const g = c.getContext("2d")!;
+  const grad = g.createLinearGradient(0, 0, 0, 100);
+  grad.addColorStop(0, "rgba(92, 255, 248, 0)");
+  grad.addColorStop(0.5, "rgba(255, 110, 199, 0.05)");
+  grad.addColorStop(1, "rgba(92, 255, 248, 0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 4, 100);
+  retroScanCache = c;
+  return c;
 }
 
 /**
@@ -727,15 +771,13 @@ function paintRetroMotion(ctx: CanvasRenderingContext2D, time: number): void {
     }
   }
 
-  // Breathing magenta/violet sun glow on the horizon.
+  // Breathing magenta/violet sun glow on the horizon. The gradient is baked
+  // once into a strip; per-frame createRadialGradient allocations stuttered
+  // mobile browsers, so we scale + alpha the cached strip instead.
   const glowR = W * (0.3 + pulse * 0.1);
-  const glow = ctx.createRadialGradient(vx, horizon, 0, vx, horizon, glowR);
-  glow.addColorStop(0, `rgba(255, 110, 199, ${0.1 + pulse * 0.12})`);
-  glow.addColorStop(0.4, `rgba(199, 125, 255, ${0.05 + pulse * 0.05})`);
-  glow.addColorStop(1, "rgba(255, 110, 199, 0)");
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, horizon - glowR, W, glowR * 1.6);
+  const glowStrip = retroGlowStrip();
+  ctx.globalAlpha = 0.55 + pulse * 0.45;
+  ctx.drawImage(glowStrip, vx - glowR, horizon - glowR, glowR * 2, glowR * 2);
 
   // Neon horizon shimmer — magenta core, cyan lips.
   ctx.globalAlpha = 0.25 + pulse2 * 0.35;
@@ -799,15 +841,10 @@ function paintRetroMotion(ctx: CanvasRenderingContext2D, time: number): void {
   ctx.stroke();
   ctx.restore();
 
-  // Soft CRT scan band drifting down.
+  // Soft CRT scan band drifting down (cached strip — no per-frame gradient).
   const scanY = ((time * 70) % (H + 180)) - 90;
-  const scan = ctx.createLinearGradient(0, scanY - 50, 0, scanY + 50);
-  scan.addColorStop(0, "rgba(92, 255, 248, 0)");
-  scan.addColorStop(0.5, "rgba(255, 110, 199, 0.05)");
-  scan.addColorStop(1, "rgba(92, 255, 248, 0)");
   ctx.globalAlpha = 1;
-  ctx.fillStyle = scan;
-  ctx.fillRect(0, scanY - 50, W, 100);
+  ctx.drawImage(retroScanStrip(), 0, scanY - 50, W, 100);
 
   // Fine scanlines — desktop only (hundreds of fillRects kill mobile GPUs).
   if (!lite) {
@@ -1493,8 +1530,10 @@ function paintWheelFace(
   } else if (theme === "retro") {
     // Hot pink neon rim — matches the synthwave reference triangles.
     ctx.save();
-    ctx.shadowColor = "#FF6EC7";
-    ctx.shadowBlur = Math.max(8, r * 0.22);
+    if (!prefersLiteMotion()) {
+      ctx.shadowColor = "#FF6EC7";
+      ctx.shadowBlur = Math.max(8, r * 0.22);
+    }
     ctx.strokeStyle = "#FF6EC7";
     ctx.lineWidth = Math.max(2.2, r * 0.055);
     pathKnobTriangle(ctx, r - 0.4);
@@ -1608,8 +1647,10 @@ function paintWheelFace(
     // Cyan sockets — tubes terminate inside these nodes.
     const pr = Math.max(3.6, r * 0.11);
     ctx.save();
-    ctx.shadowColor = "#5CFFF8";
-    ctx.shadowBlur = Math.max(8, r * 0.22);
+    if (!prefersLiteMotion()) {
+      ctx.shadowColor = "#5CFFF8";
+      ctx.shadowBlur = Math.max(8, r * 0.22);
+    }
     ctx.fillStyle = "#5CFFF8";
     ctx.beginPath();
     for (const port of ports) {
@@ -1850,14 +1891,19 @@ function strokeNeonPinkBeam(
   scale: number,
   pathReady = false,
 ): void {
+  // shadowBlur per stroke murders mobile GPUs — the wide low-alpha aura
+  // pass already fakes the glow there, so lite skips the blur entirely.
+  const lite = prefersLiteMotion();
   const paint = (style: string, width: number, alpha: number, blur: number): void => {
     if (!pathReady) buildPath();
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = style;
     ctx.lineWidth = width;
-    ctx.shadowColor = "#FF4FB8";
-    ctx.shadowBlur = blur;
+    if (!lite) {
+      ctx.shadowColor = "#FF4FB8";
+      ctx.shadowBlur = blur;
+    }
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.stroke();
@@ -2321,7 +2367,7 @@ export function drawOptics(
       if (cell.kind === Kind.EMPTY) continue;
       const c = cellCenter(layout, { x, y });
       ctx.save();
-      if (getThemeId() === "retro") {
+      if (getThemeId() === "retro" && !prefersLiteMotion()) {
         const channel = cell.channel ?? 0;
         ctx.shadowColor = channelColor(channel);
         ctx.shadowBlur = 11;
@@ -2452,7 +2498,7 @@ export function drawBeams(
     }
 
     ctx.fillStyle = theme === "retro" ? "#5CFFF8" : ink;
-    if (theme === "retro") {
+    if (theme === "retro" && !prefersLiteMotion()) {
       ctx.shadowColor = "#5CFFF8";
       ctx.shadowBlur = 8;
     }

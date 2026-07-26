@@ -168,7 +168,7 @@ function clamp01(v: number): number {
 }
 
 /** Music sits under the effects, so the bed is trimmed well below the slider. */
-const MUSIC_TRIM = 0.09;
+const MUSIC_TRIM = 0.009;
 
 function targetLevel(): number {
   return clamp01(musicVol * duckGain * MUSIC_TRIM);
