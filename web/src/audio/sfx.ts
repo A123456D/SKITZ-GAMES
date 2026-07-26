@@ -10,7 +10,7 @@ let master: GainNode | null = null;
  * unity so a mid slider is audible; individual voices peak near 0.09, so even
  * overlapping stings stay well clear of clipping.
  */
-const SFX_TRIM = 1.6;
+const SFX_TRIM = 1.28;
 
 function busLevel(): number {
   return sfxVol * SFX_TRIM;

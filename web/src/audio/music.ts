@@ -55,8 +55,6 @@ let graphReady = false;
 let transitioning = false;
 let fadeRaf = 0;
 let crossfadePoll = 0;
-let duckGain = 1;
-let duckClear: number | null = null;
 let resumeChain: Promise<void> = Promise.resolve();
 
 function trackUrl(file: string): string {
@@ -168,10 +166,10 @@ function clamp01(v: number): number {
 }
 
 /** Music sits under the effects, so the bed is trimmed well below the slider. */
-const MUSIC_TRIM = 0.009;
+const MUSIC_TRIM = 0.0108;
 
 function targetLevel(): number {
-  return clamp01(musicVol * duckGain * MUSIC_TRIM);
+  return clamp01(musicVol * MUSIC_TRIM);
 }
 
 function setGain(el: HTMLAudioElement, value: number): void {
@@ -489,23 +487,13 @@ export async function ensureMusicPlaying(): Promise<void> {
 }
 
 /**
- * Keep the bed going across screens. Soft duck via GainNode (no element.volume
- * RAF), and never re-enter if the screen hasn't changed — the game loop calls
- * this every frame.
+ * Keep the bed going across screens — no ducking, so the level stays constant
+ * through menus and gameplay. Never re-enters if the screen hasn't changed
+ * (the game loop calls this every frame).
  */
 export function onMusicScreen(screen: string): void {
   if (!unlocked) return;
   if (screen === screenToken) return;
   screenToken = screen;
-  void ensureMusicPlaying().then(() => {
-    if (!started || musicVol <= 0.001 || transitioning) return;
-    duckGain = 0.45;
-    applyActiveGain();
-    if (duckClear !== null) window.clearTimeout(duckClear);
-    duckClear = window.setTimeout(() => {
-      duckGain = 1;
-      applyActiveGain();
-      duckClear = null;
-    }, 420);
-  });
+  void ensureMusicPlaying();
 }
