@@ -51,6 +51,7 @@ let usingA = true;
 let ctx: AudioContext | null = null;
 let gainA: GainNode | null = null;
 let gainB: GainNode | null = null;
+let busComp: DynamicsCompressorNode | null = null;
 let graphReady = false;
 let transitioning = false;
 let fadeRaf = 0;
@@ -134,10 +135,19 @@ function ensureGraph(): void {
   ctx = new Ctor();
   gainA = ctx.createGain();
   gainB = ctx.createGain();
+  busComp = ctx.createDynamicsCompressor();
+  // Gentle glue so theme beds with big mid-track dynamics (esp. cyber) stay
+  // at a steady perceived level instead of diving into quiet sections.
+  busComp.threshold.value = -28;
+  busComp.knee.value = 18;
+  busComp.ratio.value = 3.5;
+  busComp.attack.value = 0.02;
+  busComp.release.value = 0.35;
   gainA.gain.value = 0;
   gainB.gain.value = 0;
-  gainA.connect(ctx.destination);
-  gainB.connect(ctx.destination);
+  gainA.connect(busComp);
+  gainB.connect(busComp);
+  busComp.connect(ctx.destination);
   // createMediaElementSource may only be called once per element.
   ctx.createMediaElementSource(a!).connect(gainA);
   ctx.createMediaElementSource(b!).connect(gainB);
@@ -173,8 +183,12 @@ function targetLevel(): number {
 }
 
 function setGain(el: HTMLAudioElement, value: number): void {
-  if (!graphReady) return;
-  gainOf(el).gain.value = clamp01(value);
+  if (!graphReady || !ctx) return;
+  const param = gainOf(el).gain;
+  const v = clamp01(value);
+  // setValueAtTime avoids cancelling any in-flight audio-thread curves.
+  param.cancelScheduledValues(ctx.currentTime);
+  param.setValueAtTime(v, ctx.currentTime);
 }
 
 function getGain(el: HTMLAudioElement): number {
@@ -289,23 +303,31 @@ async function beginCrossfade(hard: boolean): Promise<void> {
   const ms = hard ? 700 : crossfadeMs;
   const fromStart = getGain(from);
   const target = targetLevel();
-  const t0 = performance.now();
+  const fromParam = gainOf(from).gain;
+  const toParam = gainOf(to).gain;
+  const startAt = ctx!.currentTime;
+  const duration = Math.max(0.05, ms / 1000);
+  const curveSize = 64;
+  const fadeOut = new Float32Array(curveSize);
+  const fadeIn = new Float32Array(curveSize);
 
-  await new Promise<void>((resolve) => {
-    const step = (now: number) => {
-      const p = Math.min(1, (now - t0) / Math.max(1, ms));
-      const eased = p * p * (3 - 2 * p);
-      setGain(from, fromStart * (1 - eased));
-      setGain(to, target * eased);
-      if (p < 1) fadeRaf = requestAnimationFrame(step);
-      else {
-        fadeRaf = 0;
-        resolve();
-      }
-    };
-    fadeRaf = requestAnimationFrame(step);
-  });
+  // Equal-power curves keep perceived loudness steady through the midpoint.
+  // AudioParam curves run on the audio thread, so a busy mobile render frame
+  // cannot interrupt the fade and create an audible gain step.
+  for (let i = 0; i < curveSize; i++) {
+    const p = i / (curveSize - 1);
+    fadeOut[i] = fromStart * Math.cos(p * Math.PI * 0.5);
+    fadeIn[i] = target * Math.sin(p * Math.PI * 0.5);
+  }
+  fromParam.cancelScheduledValues(startAt);
+  toParam.cancelScheduledValues(startAt);
+  fromParam.setValueCurveAtTime(fadeOut, startAt, duration);
+  toParam.setValueCurveAtTime(fadeIn, startAt, duration);
 
+  await new Promise<void>((resolve) => window.setTimeout(resolve, ms + 30));
+
+  fromParam.cancelScheduledValues(ctx!.currentTime);
+  toParam.cancelScheduledValues(ctx!.currentTime);
   from.pause();
   try {
     from.currentTime = 0;
