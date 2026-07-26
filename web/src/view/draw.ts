@@ -202,10 +202,10 @@ function paintBackground(ctx: CanvasRenderingContext2D, theme: ThemeId): void {
       clear.addColorStop(0.7, "rgba(247,244,236,0.06)");
       clear.addColorStop(1, "rgba(0,0,0,0)");
     } else if (theme === "mono") {
-      // Soft white veil so the board sits cleanly on the red grid art.
-      clear.addColorStop(0, "rgba(247,247,249,0.55)");
-      clear.addColorStop(0.55, "rgba(247,247,249,0.18)");
-      clear.addColorStop(1, "rgba(247,247,249,0)");
+      // Soft black veil so the board sits cleanly on the red grid art.
+      clear.addColorStop(0, "rgba(8, 8, 10, 0.55)");
+      clear.addColorStop(0.55, "rgba(8, 8, 10, 0.18)");
+      clear.addColorStop(1, "rgba(8, 8, 10, 0)");
     } else {
       clear.addColorStop(0, dark ? "rgba(6,4,14,0.5)" : "rgba(244,240,232,0.42)");
       clear.addColorStop(0.6, dark ? "rgba(6,4,14,0.16)" : "rgba(244,240,232,0.14)");
@@ -224,7 +224,7 @@ function paintBackground(ctx: CanvasRenderingContext2D, theme: ThemeId): void {
     vig.addColorStop(
       1,
       theme === "mono"
-        ? "rgba(40, 36, 48, 0.12)"
+        ? "rgba(0, 0, 0, 0.55)"
         : dark
           ? "rgba(0,0,0,0.55)"
           : theme === "paper"
@@ -377,59 +377,55 @@ function paintBackground(ctx: CanvasRenderingContext2D, theme: ThemeId): void {
   ctx.globalAlpha = 1;
 }
 
-/** Full procedural CYBER stage — white field + red laser grid. */
+/** Full procedural CYBER stage — black carbon terminal + red neon HUD. */
 function paintCyberBackdrop(ctx: CanvasRenderingContext2D): void {
+  // Deep carbon field with a slight vertical falloff.
   const field = ctx.createLinearGradient(0, 0, 0, H);
-  field.addColorStop(0, "#FFFFFF");
-  field.addColorStop(0.45, "#F4F4F8");
-  field.addColorStop(1, "#E8E8EE");
+  field.addColorStop(0, "#0A0A0C");
+  field.addColorStop(0.45, "#070708");
+  field.addColorStop(1, "#030304");
   ctx.fillStyle = field;
   ctx.fillRect(0, 0, W, H);
 
-  const horizon = H * 0.46;
+  // Fine noise grain so the panel reads as matte carbon, not flat void.
+  ctx.save();
+  ctx.globalAlpha = 0.045;
+  ctx.fillStyle = "#FF2A2A";
+  for (let i = 0; i < 180; i++) {
+    const x = ((i * 97) % (W - 8)) + 4;
+    const y = ((i * 53) % (H - 8)) + 4;
+    ctx.fillRect(x, y, 1.2, 1.2);
+  }
+  ctx.restore();
+
+  const horizon = H * 0.42;
   const vx = W * 0.5;
 
-  // Soft red sun / core glow behind the grid.
-  const core = ctx.createRadialGradient(vx, horizon, 0, vx, horizon, W * 0.55);
-  core.addColorStop(0, "rgba(255, 42, 42, 0.22)");
-  core.addColorStop(0.35, "rgba(255, 42, 42, 0.08)");
+  // Soft red core glow behind the board.
+  const core = ctx.createRadialGradient(vx, H * 0.48, 0, vx, H * 0.48, W * 0.55);
+  core.addColorStop(0, "rgba(255, 42, 42, 0.14)");
+  core.addColorStop(0.4, "rgba(255, 42, 42, 0.05)");
   core.addColorStop(1, "rgba(255, 42, 42, 0)");
   ctx.fillStyle = core;
   ctx.fillRect(0, 0, W, H);
 
-  // Thin horizon line.
-  ctx.save();
-  ctx.strokeStyle = "rgba(18, 18, 20, 0.35)";
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(0, horizon);
-  ctx.lineTo(W, horizon);
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(255, 42, 42, 0.75)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(W * 0.22, horizon);
-  ctx.lineTo(W * 0.78, horizon);
-  ctx.stroke();
-  ctx.restore();
-
-  // Perspective laser floor.
+  // Perspective laser floor under the puzzle.
   ctx.save();
   ctx.strokeStyle = "#FF2A2A";
   ctx.lineWidth = 1;
-  for (let i = 0; i <= 14; i++) {
-    const t = i / 14;
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16;
     const x0 = t * W;
-    ctx.globalAlpha = 0.1 + (1 - Math.abs(t - 0.5) * 2) * 0.08;
+    ctx.globalAlpha = 0.08 + (1 - Math.abs(t - 0.5) * 2) * 0.1;
     ctx.beginPath();
     ctx.moveTo(x0, H);
-    ctx.lineTo(vx + (x0 - vx) * 0.08, horizon);
+    ctx.lineTo(vx + (x0 - vx) * 0.06, horizon);
     ctx.stroke();
   }
-  for (let i = 1; i <= 10; i++) {
-    const u = i / 10;
-    const y = horizon + (H - horizon) * (u * u);
-    ctx.globalAlpha = 0.14 * (1 - u);
+  for (let i = 1; i <= 12; i++) {
+    const u = i / 12;
+    const y = horizon + (H - horizon) * Math.pow(u, 1.55);
+    ctx.globalAlpha = 0.16 * (1 - u);
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(W, y);
@@ -437,55 +433,82 @@ function paintCyberBackdrop(ctx: CanvasRenderingContext2D): void {
   }
   ctx.restore();
 
-  // Upper scan lattice (ceiling tech).
+  // Upper tech lattice + crosshair ticks behind the title / HUD.
   ctx.save();
-  ctx.strokeStyle = "rgba(18, 18, 20, 0.06)";
+  ctx.strokeStyle = "rgba(255, 42, 42, 0.08)";
   ctx.lineWidth = 1;
-  for (let y = 40; y < horizon - 40; y += 28) {
+  for (let y = 36; y < horizon - 20; y += 26) {
     ctx.beginPath();
-    ctx.moveTo(40, y);
-    ctx.lineTo(W - 40, y);
+    ctx.moveTo(36, y);
+    ctx.lineTo(W - 36, y);
     ctx.stroke();
   }
-  for (let x = 40; x < W - 40; x += 36) {
+  for (let x = 36; x < W - 36; x += 32) {
     ctx.beginPath();
-    ctx.moveTo(x, 40);
-    ctx.lineTo(x, horizon - 40);
+    ctx.moveTo(x, 36);
+    ctx.lineTo(x, horizon - 20);
     ctx.stroke();
   }
   ctx.fillStyle = "#FF2A2A";
-  for (let i = 0; i < 8; i++) {
-    const x = 60 + ((i * 97) % (W - 120));
-    const y = 50 + ((i * 53) % (horizon - 100));
-    ctx.globalAlpha = 0.55;
-    ctx.fillRect(x, y, 10, 1.5);
-    ctx.fillRect(x, y, 1.5, 10);
+  for (let i = 0; i < 14; i++) {
+    const x = 48 + ((i * 89) % (W - 96));
+    const y = 48 + ((i * 61) % Math.max(40, horizon - 90));
+    ctx.globalAlpha = 0.45;
+    ctx.fillRect(x - 5, y, 10, 1.2);
+    ctx.fillRect(x, y - 5, 1.2, 10);
   }
   ctx.restore();
 
   paintCyberHud(ctx);
 
-  const vig = ctx.createRadialGradient(W * 0.5, H * 0.45, W * 0.18, W * 0.5, H * 0.5, W * 0.95);
+  // Deep vignette — seats the neon chrome.
+  const vig = ctx.createRadialGradient(W * 0.5, H * 0.45, W * 0.15, W * 0.5, H * 0.5, W * 0.95);
   vig.addColorStop(0, "rgba(0,0,0,0)");
-  vig.addColorStop(1, "rgba(40, 36, 48, 0.1)");
+  vig.addColorStop(1, "rgba(0, 0, 0, 0.55)");
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, W, H);
 }
 
-/** Black L-brackets + red inner frame — HUD chrome for CYBER. */
+/** Multi-layer red neon frame + corner brackets — HUD chrome for CYBER. */
 function paintCyberHud(ctx: CanvasRenderingContext2D): void {
   ctx.save();
   ctx.lineCap = "square";
-  const m = 28;
-  const arm = 52;
+  const m = 18;
+  const outer = 10;
+  const mid = 22;
+
+  // Outer red glow frame.
+  ctx.shadowColor = "#FF2A2A";
+  ctx.shadowBlur = 18;
+  ctx.strokeStyle = "#FF2A2A";
+  ctx.lineWidth = 2.4;
+  ctx.strokeRect(m, m, W - m * 2, H - m * 2);
+  ctx.shadowBlur = 0;
+
+  // Inner hairline frame.
+  ctx.strokeStyle = "rgba(255, 42, 42, 0.55)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(m + outer, m + outer, W - (m + outer) * 2, H - (m + outer) * 2);
+
+  // Mid dashed tech rails on each edge.
+  ctx.setLineDash([10, 8]);
+  ctx.strokeStyle = "rgba(255, 42, 42, 0.35)";
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(m + mid, m + mid, W - (m + mid) * 2, H - (m + mid) * 2);
+  ctx.setLineDash([]);
+
+  // Heavy L-brackets at the four corners.
+  const arm = 64;
   const bkt: [number, number, number, number][] = [
     [m, m, 1, 1],
     [W - m, m, -1, 1],
     [m, H - m, 1, -1],
     [W - m, H - m, -1, -1],
   ];
-  ctx.strokeStyle = "rgba(18, 18, 20, 0.85)";
-  ctx.lineWidth = 2.4;
+  ctx.strokeStyle = "#FF2A2A";
+  ctx.lineWidth = 3.2;
+  ctx.shadowColor = "#FF2A2A";
+  ctx.shadowBlur = 10;
   for (const [bx, by, sx, sy] of bkt) {
     ctx.beginPath();
     ctx.moveTo(bx + sx * arm, by);
@@ -493,57 +516,74 @@ function paintCyberHud(ctx: CanvasRenderingContext2D): void {
     ctx.lineTo(bx, by + sy * arm);
     ctx.stroke();
   }
-  ctx.strokeStyle = "#FF2A2A";
-  ctx.lineWidth = 1.4;
+  ctx.shadowBlur = 0;
+
+  // Inner corner ticks.
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = "#FF6A6A";
   for (const [bx, by, sx, sy] of bkt) {
     ctx.beginPath();
-    ctx.moveTo(bx + sx * 18, by + sy * 8);
-    ctx.lineTo(bx + sx * 8, by + sy * 8);
-    ctx.lineTo(bx + sx * 8, by + sy * 18);
+    ctx.moveTo(bx + sx * 22, by + sy * 10);
+    ctx.lineTo(bx + sx * 10, by + sy * 10);
+    ctx.lineTo(bx + sx * 10, by + sy * 22);
     ctx.stroke();
   }
-  ctx.strokeStyle = "rgba(255, 42, 42, 0.5)";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(m + 8, m + 8, W - (m + 8) * 2, H - (m + 8) * 2);
+
+  // Edge progress bars / tech decals along top and bottom.
+  ctx.fillStyle = "#FF2A2A";
+  const barY = [m + 6, H - m - 8];
+  for (const y of barY) {
+    ctx.globalAlpha = 0.7;
+    ctx.fillRect(W * 0.22, y, W * 0.18, 2);
+    ctx.fillRect(W * 0.6, y, W * 0.18, 2);
+    ctx.globalAlpha = 0.35;
+    ctx.fillRect(W * 0.22, y + 4, W * 0.1, 1);
+    ctx.fillRect(W * 0.68, y + 4, W * 0.1, 1);
+  }
+
+  // Side hatch marks.
+  ctx.globalAlpha = 0.5;
+  for (let i = 0; i < 5; i++) {
+    const y = H * 0.28 + i * 28;
+    ctx.fillRect(m + 4, y, 8, 1.5);
+    ctx.fillRect(W - m - 12, y, 8, 1.5);
+  }
+  ctx.globalAlpha = 1;
   ctx.restore();
 }
 
 /**
- * Per-frame CYBER motion layered on the cached base — pulse, scan, floor crawl.
+ * Per-frame CYBER motion — red pulse, scan, floor crawl on the black terminal.
  * Kept soft and edge-weighted so the puzzle board stays readable.
  */
 function paintCyberMotion(ctx: CanvasRenderingContext2D, time: number): void {
-  const horizon = H * 0.46;
+  const horizon = H * 0.42;
   const vx = W * 0.5;
   const pulse = 0.5 + 0.5 * Math.sin(time * 1.7);
   const pulse2 = 0.5 + 0.5 * Math.sin(time * 2.3 + 1.1);
 
   ctx.save();
 
-  // Breathing red core on the horizon.
+  // Breathing red core behind the board.
   const glowR = W * (0.28 + pulse * 0.08);
-  const glow = ctx.createRadialGradient(vx, horizon, 0, vx, horizon, glowR);
-  glow.addColorStop(0, `rgba(255, 42, 42, ${0.08 + pulse * 0.08})`);
-  glow.addColorStop(0.45, `rgba(255, 42, 42, ${0.03 + pulse * 0.03})`);
+  const glow = ctx.createRadialGradient(vx, H * 0.48, 0, vx, H * 0.48, glowR);
+  glow.addColorStop(0, `rgba(255, 42, 42, ${0.1 + pulse * 0.1})`);
+  glow.addColorStop(0.45, `rgba(255, 42, 42, ${0.04 + pulse * 0.04})`);
   glow.addColorStop(1, "rgba(255, 42, 42, 0)");
   ctx.fillStyle = glow;
-  ctx.fillRect(0, horizon - glowR, W, glowR * 2);
+  ctx.fillRect(0, H * 0.48 - glowR, W, glowR * 2);
 
   // Soft horizon shimmer.
-  ctx.globalAlpha = 0.15 + pulse2 * 0.2;
-  ctx.strokeStyle = "#121214";
+  ctx.globalAlpha = 0.2 + pulse2 * 0.25;
+  ctx.strokeStyle = "#FF2A2A";
   ctx.lineWidth = 1.2;
+  ctx.shadowColor = "#FF2A2A";
+  ctx.shadowBlur = 8;
   ctx.beginPath();
   ctx.moveTo(W * 0.18, horizon);
   ctx.lineTo(W * 0.82, horizon);
   ctx.stroke();
-  ctx.globalAlpha = 0.3 + pulse * 0.35;
-  ctx.strokeStyle = "#FF2A2A";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(W * 0.3, horizon);
-  ctx.lineTo(W * 0.7, horizon);
-  ctx.stroke();
+  ctx.shadowBlur = 0;
 
   // Perspective floor lines crawling toward the camera.
   ctx.save();
@@ -556,7 +596,7 @@ function paintCyberMotion(ctx: CanvasRenderingContext2D, time: number): void {
   for (let i = 0; i < 9; i++) {
     const u = (i + scroll) / 9;
     const y = horizon + (H - horizon) * (u * u);
-    ctx.globalAlpha = 0.06 + (1 - u) * 0.14;
+    ctx.globalAlpha = 0.08 + (1 - u) * 0.18;
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(W, y);
@@ -566,7 +606,7 @@ function paintCyberMotion(ctx: CanvasRenderingContext2D, time: number): void {
   for (let i = 0; i <= 10; i++) {
     const t = i / 10 + rayShift;
     const x0 = t * W;
-    ctx.globalAlpha = 0.05 + (1 - Math.abs(t - 0.5) * 2) * 0.06;
+    ctx.globalAlpha = 0.06 + (1 - Math.abs(t - 0.5) * 2) * 0.08;
     ctx.beginPath();
     ctx.moveTo(x0, H);
     ctx.lineTo(vx + (x0 - vx) * 0.08, horizon);
@@ -578,26 +618,28 @@ function paintCyberMotion(ctx: CanvasRenderingContext2D, time: number): void {
   const scanY = ((time * 90) % (H + 160)) - 80;
   const scan = ctx.createLinearGradient(0, scanY - 40, 0, scanY + 40);
   scan.addColorStop(0, "rgba(255, 42, 42, 0)");
-  scan.addColorStop(0.5, "rgba(255, 42, 42, 0.06)");
+  scan.addColorStop(0.5, "rgba(255, 42, 42, 0.07)");
   scan.addColorStop(1, "rgba(255, 42, 42, 0)");
   ctx.fillStyle = scan;
   ctx.fillRect(0, scanY - 40, W, 80);
 
-  // Fine scanlines (very light).
-  ctx.globalAlpha = 0.03;
-  ctx.fillStyle = "#121214";
+  // Fine CRT scanlines.
+  ctx.globalAlpha = 0.045;
+  ctx.fillStyle = "#FF2A2A";
   const lineOff = Math.floor(time * 28) % 3;
   for (let y = lineOff; y < H; y += 3) {
     ctx.fillRect(0, y, W, 1);
   }
 
   // Corner bracket pulse — red ticks breathe.
-  const m = 28;
-  const armPulse = 14 + pulse * 8;
+  const m = 18;
+  const armPulse = 16 + pulse * 10;
   ctx.lineCap = "square";
   ctx.strokeStyle = "#FF2A2A";
-  ctx.lineWidth = 1.6;
-  ctx.globalAlpha = 0.4 + pulse * 0.45;
+  ctx.lineWidth = 1.8;
+  ctx.globalAlpha = 0.45 + pulse * 0.45;
+  ctx.shadowColor = "#FF2A2A";
+  ctx.shadowBlur = 6;
   const corners: [number, number, number, number][] = [
     [m, m, 1, 1],
     [W - m, m, -1, 1],
@@ -611,16 +653,17 @@ function paintCyberMotion(ctx: CanvasRenderingContext2D, time: number): void {
     ctx.lineTo(bx + sx * 6, by + sy * armPulse);
     ctx.stroke();
   }
+  ctx.shadowBlur = 0;
 
   // Occasional edge "data ticks" that blink.
   ctx.fillStyle = "#FF2A2A";
   for (let i = 0; i < 6; i++) {
     const phase = (time * 1.4 + i * 0.9) % (Math.PI * 2);
-    const on = Math.sin(phase) > 0.35 ? 0.55 : 0.1;
+    const on = Math.sin(phase) > 0.35 ? 0.65 : 0.12;
     ctx.globalAlpha = on;
     const top = i < 3;
     const x = 70 + i * 105 + Math.sin(time * 0.7 + i) * 6;
-    const y = top ? 22 : H - 24;
+    const y = top ? 28 : H - 30;
     ctx.fillRect(x, y, 14, 2);
     ctx.fillRect(x, y, 2, 8 * (top ? 1 : -1));
   }
@@ -1237,26 +1280,39 @@ function paintWheelFace(
   }
   ctx.fill();
 
-  // CYBER enamel badge — black disc, red laser rim + white inner lip, white studs.
+  // CYBER enamel badge — recessed black well, glowing red laser rim, white studs.
   if (theme === "mono") {
-    // Subtle red core well for depth.
+    // Deep recessed well.
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.78, 0, Math.PI * 2);
+    const well = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.78);
+    well.addColorStop(0, "#050506");
+    well.addColorStop(0.7, "#0C0C0E");
+    well.addColorStop(1, "#121214");
+    ctx.fillStyle = well;
+    ctx.fill();
+    // Soft red core glow.
     ctx.beginPath();
     ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2);
     const core = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.7);
-    core.addColorStop(0, "rgba(255, 42, 42, 0.18)");
+    core.addColorStop(0, "rgba(255, 42, 42, 0.22)");
     core.addColorStop(1, "rgba(255, 42, 42, 0)");
     ctx.fillStyle = core;
     ctx.fill();
-    // Hard red outer rim.
+    // Hard red outer rim with bloom.
+    ctx.save();
+    ctx.shadowColor = "#FF2A2A";
+    ctx.shadowBlur = Math.max(8, r * 0.22);
     ctx.beginPath();
     ctx.arc(0, 0, r - 1.2, 0, Math.PI * 2);
     ctx.strokeStyle = "#FF2A2A";
-    ctx.lineWidth = Math.max(2.4, r * 0.07);
+    ctx.lineWidth = Math.max(2.6, r * 0.08);
     ctx.stroke();
+    ctx.restore();
     // White inner lip.
     ctx.beginPath();
     ctx.arc(0, 0, r - Math.max(4.5, r * 0.14), 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(244, 244, 246, 0.9)";
+    ctx.strokeStyle = "rgba(244, 244, 246, 0.85)";
     ctx.lineWidth = Math.max(1.4, r * 0.035);
     ctx.stroke();
     // White rivet studs around the rim.
@@ -2346,9 +2402,9 @@ export function drawHudStats(
     ctx.fillStyle = "#C8FF00";
     ctx.font = fontPunk(15);
   } else if (theme === "mono") {
-    ctx.fillStyle = "#121214";
+    ctx.fillStyle = "#FF2A2A";
     ctx.shadowColor = "#FF2A2A";
-    ctx.shadowBlur = 4;
+    ctx.shadowBlur = 8;
     ctx.font = fontCyber(14, 600);
   } else {
     ctx.fillStyle = P.INK;
@@ -2409,7 +2465,7 @@ export function drawCoachHint(ctx: CanvasRenderingContext2D, text: string, y = 1
   } else if (theme === "punk") {
     ctx.fillStyle = "#C8FF00";
   } else if (theme === "mono") {
-    ctx.fillStyle = "#121214";
+    ctx.fillStyle = "#FF6A6A";
   } else {
     ctx.fillStyle = P.INK_SOFT;
   }
@@ -2859,15 +2915,18 @@ export function drawTitle(ctx: CanvasRenderingContext2D, subtitle?: string): voi
   if (theme === "mono") {
     ctx.save();
     ctx.textAlign = "center";
-    // Black wordmark with a red chromatic-offset ghost.
-    ctx.globalAlpha = 0.45;
+    // Neon-red wordmark with a soft bloom — matches the terminal HUD.
+    ctx.shadowColor = "#FF2A2A";
+    ctx.shadowBlur = 14;
     ctx.fillStyle = "#FF2A2A";
     ctx.font = fontCyber(27, 700);
-    ctx.fillText("PULSE LINK", W / 2 + 2, 59);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "#121214";
     ctx.fillText("PULSE LINK", W / 2, 58);
-    ctx.fillStyle = "#FF2A2A";
+    // Flanking chevrons like the reference HUD.
+    ctx.shadowBlur = 0;
+    ctx.font = fontCyber(16, 600);
+    ctx.fillText("◂", W / 2 - 118, 58);
+    ctx.fillText("▸", W / 2 + 118, 58);
+    ctx.fillStyle = "#FF6A6A";
     ctx.font = fontCyber(12, 600);
     ctx.fillText(subtitle ?? "TURN. LINK. PULSE.", W / 2, 84);
     ctx.restore();
@@ -3002,7 +3061,7 @@ export function drawGlassButton(
     return;
   }
 
-  // CYBER — white panel, red neon rim (primary) / black rim (secondary).
+  // CYBER — black carbon panel, red neon rim (primary glows harder).
   if (theme === "mono") {
     ctx.save();
     ctx.globalAlpha = enabled ? 1 : 0.4;
@@ -3023,29 +3082,29 @@ export function drawGlassButton(
       ctx.closePath();
     };
     const fill = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
-    fill.addColorStop(0, "#FFFFFF");
-    fill.addColorStop(1, primary ? "#FFF0F0" : "#F0F0F4");
+    fill.addColorStop(0, primary ? "#1A0A0C" : "#101012");
+    fill.addColorStop(1, primary ? "#0C0608" : "#08080A");
     panel();
     ctx.fillStyle = fill;
     ctx.fill();
-    ctx.shadowColor = primary ? "#FF2A2A" : "rgba(18,18,20,0.35)";
-    ctx.shadowBlur = primary ? 12 + pulse * 6 : 6;
-    ctx.strokeStyle = primary ? "#FF2A2A" : "#121214";
-    ctx.lineWidth = primary ? 2.2 : 1.6;
+    ctx.shadowColor = "#FF2A2A";
+    ctx.shadowBlur = primary ? 14 + pulse * 8 : 8;
+    ctx.strokeStyle = primary ? "#FF2A2A" : "#C02020";
+    ctx.lineWidth = primary ? 2.4 : 1.6;
     ctx.lineJoin = "miter";
     panel();
     ctx.stroke();
     ctx.shadowBlur = 0;
     // Inner accent line.
     ctx.globalAlpha = enabled ? 0.45 : 0.16;
-    ctx.strokeStyle = primary ? "#121214" : "#FF2A2A";
+    ctx.strokeStyle = "#FF6A6A";
     ctx.lineWidth = 1;
     roundRect(ctx, rect.x + 4, rect.y + 4, rect.w - 8, rect.h - 8, 2);
     ctx.stroke();
     ctx.globalAlpha = enabled ? 1 : 0.4;
-    ctx.shadowColor = primary ? "#FF2A2A" : "rgba(18,18,20,0.2)";
-    ctx.shadowBlur = primary ? 4 : 2;
-    ctx.fillStyle = primary ? "#FF2A2A" : "#121214";
+    ctx.shadowColor = "#FF2A2A";
+    ctx.shadowBlur = primary ? 6 : 2;
+    ctx.fillStyle = primary ? "#FF2A2A" : "#FF6A6A";
     ctx.font = fontCyber(16, 600);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -3196,26 +3255,26 @@ export function drawRoundButton(
     ctx.globalAlpha = enabled ? 1 : 0.4;
     ctx.translate(x, y);
     const disc = ctx.createRadialGradient(-r * 0.3, -r * 0.35, 0, 0, 0, r);
-    disc.addColorStop(0, "#FFFFFF");
-    disc.addColorStop(1, "#F0F0F4");
+    disc.addColorStop(0, "#1A1A1E");
+    disc.addColorStop(1, "#0A0A0C");
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.fillStyle = disc;
     ctx.fill();
     ctx.shadowColor = "#FF2A2A";
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = 10;
     ctx.strokeStyle = "#FF2A2A";
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
     ctx.arc(0, 0, r - 1, 0, Math.PI * 2);
     ctx.stroke();
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = "rgba(18, 18, 20, 0.55)";
+    ctx.strokeStyle = "rgba(255, 106, 106, 0.45)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(0, 0, r - 4.5, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.fillStyle = "#121214";
+    ctx.fillStyle = "#FF2A2A";
     ctx.font = fontCyber(Math.round(r * 0.85), 600);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -3270,27 +3329,32 @@ export function drawVolumeSlider(
   const labelW = rect.labelW ?? (isCompact ? 42 : 110);
   void time;
   ctx.save();
-  ctx.fillStyle = retro ? "#FF9DE0" : P.INK_FAINT;
+  ctx.fillStyle = retro ? "#FF9DE0" : theme === "mono" ? "#FF6A6A" : P.INK_FAINT;
   ctx.font = ink
     ? fontHand(isCompact ? 13 : 16)
-    : font(700, isCompact ? 11 : 14);
+    : theme === "mono"
+      ? fontCyber(isCompact ? 11 : 13, 600)
+      : font(700, isCompact ? 11 : 14);
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText(label, rect.x, rect.y + rect.h / 2);
   const trackX = rect.x + labelW;
   const trackW = rect.w - labelW;
   const trackY = rect.y + rect.h / 2;
-  ctx.strokeStyle = ink ? P.INK : retro ? "#C24A9A" : P.INK_HAIR;
+  ctx.strokeStyle = ink ? P.INK : retro ? "#C24A9A" : theme === "mono" ? "#3A1214" : P.INK_HAIR;
   ctx.lineWidth = ink ? 1.4 : trackThick;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(trackX, trackY);
   ctx.lineTo(trackX + trackW, trackY);
   ctx.stroke();
-  ctx.strokeStyle = ink ? P.INK : retro ? "#FF6EC7" : P.TABLE_OUTLINE;
+  ctx.strokeStyle = ink ? P.INK : retro ? "#FF6EC7" : theme === "mono" ? "#FF2A2A" : P.TABLE_OUTLINE;
   ctx.lineWidth = ink ? 1.8 : trackThick;
   if (retro) {
     ctx.shadowColor = "#FF4FB8";
+    ctx.shadowBlur = 6;
+  } else if (theme === "mono") {
+    ctx.shadowColor = "#FF2A2A";
     ctx.shadowBlur = 6;
   }
   ctx.beginPath();
@@ -3299,9 +3363,12 @@ export function drawVolumeSlider(
   ctx.stroke();
   ctx.shadowBlur = 0;
   const kx = trackX + trackW * rect.value;
-  ctx.fillStyle = ink ? "#FBF9F4" : retro ? "#5CFFF8" : P.TABLE_FILL;
+  ctx.fillStyle = ink ? "#FBF9F4" : retro ? "#5CFFF8" : theme === "mono" ? "#FF2A2A" : P.TABLE_FILL;
   if (retro) {
     ctx.shadowColor = "#5CFFF8";
+    ctx.shadowBlur = 8;
+  } else if (theme === "mono") {
+    ctx.shadowColor = "#FF2A2A";
     ctx.shadowBlur = 8;
   }
   ctx.beginPath();
@@ -3357,8 +3424,8 @@ export function drawMuteBox(
     ctx.fill();
     ctx.stroke();
   } else if (cyber) {
-    ctx.fillStyle = "#FFFFFF";
-    ctx.strokeStyle = muted ? "#FF2A2A" : "#121214";
+    ctx.fillStyle = "#0A0A0C";
+    ctx.strokeStyle = muted ? "#FF2A2A" : "#FF6A6A";
     ctx.lineWidth = 1.6;
     roundRect(ctx, x, y, size, size, 2);
     ctx.fill();

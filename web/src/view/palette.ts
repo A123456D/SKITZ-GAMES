@@ -149,45 +149,45 @@ export const THEMES: Record<ThemeId, ThemeColors> = {
     ),
   ),
   /**
-   * CYBER — white / red futuristic console: bright panels, red laser accents,
-   * black signal marks. Internal id stays `mono` for save compatibility.
+   * CYBER — black / red hacking terminal: carbon panels, neon-red HUD, laser
+   * traces. Internal id stays `mono` for save compatibility.
    */
   mono: {
-    VOID: "#E8E8EC",
-    PAPER: "#F7F7F9",
-    PAPER_DARK: "#E2E2E8",
-    INK: "#121214",
-    INK_SOFT: "#FF2A2A",
-    INK_FAINT: "#8A8A92",
-    INK_HAIR: "#D0D0D6",
+    VOID: "#050506",
+    PAPER: "#0A0A0C",
+    PAPER_DARK: "#121214",
+    INK: "#FF2A2A",
+    INK_SOFT: "#FF6A6A",
+    INK_FAINT: "#8A3030",
+    INK_HAIR: "#2A1214",
     SELECT: "#FF2A2A",
-    FILL: "#FFFFFF",
-    SHADE: "#D8D8DE",
+    FILL: "#101012",
+    SHADE: "#050506",
     OBJ: "#FF2A2A",
-    BLOCK: "#121214",
+    BLOCK: "#FF2A2A",
     BARRIER: "#FF2A2A",
-    TABLE_FILL: "#111114",
+    TABLE_FILL: "#0C0C0E",
     TABLE: "#FF2A2A",
-    TABLE_OUTLINE: "#121214",
+    TABLE_OUTLINE: "#FF2A2A",
     WORM: "#FF2A2A",
-    MIRROR: "#121214",
+    MIRROR: "#FF6A6A",
     SINK: "#FF2A2A",
-    FILTER: "#121214",
+    FILTER: "#FF2A2A",
     CH0: "#FF2A2A",
     CH1: "#FF6A6A",
-    CH2: "#121214",
-    PRIMARY: "#121214",
+    CH2: "#FF9A9A",
+    PRIMARY: "#FF2A2A",
     ACCENT: "#FF2A2A",
-    TEXT: "#121214",
-    MUTED: "#8A8A92",
+    TEXT: "#FF2A2A",
+    MUTED: "#8A3030",
     SUCCESS: "#FF2A2A",
-    WARN: "#FF2A2A",
+    WARN: "#FF6A6A",
     RIM_IDLE: "#FF2A2A",
-    RIM_SEL: "#121214",
-    FLOOR: "#F7F7F9",
-    METAL_DARK: "#D8D8DE",
-    METAL_MID: "#FFFFFF",
-    METAL_LIGHT: "#FFFFFF",
+    RIM_SEL: "#FF6A6A",
+    FLOOR: "#0A0A0C",
+    METAL_DARK: "#050506",
+    METAL_MID: "#121214",
+    METAL_LIGHT: "#1A1A1E",
   },
   /**
    * RETRO — still night, still cyan, but one accent only (no rainbow objects).
@@ -268,12 +268,12 @@ export function getThemeId(): ThemeId {
 
 /** Light paper-board themes (cream / white boards). */
 export function isLightTheme(id: ThemeId = currentId): boolean {
-  return id === "paper" || id === "mono";
+  return id === "paper";
 }
 
 /** Dark night-board themes. */
 export function isDarkTheme(id: ThemeId = currentId): boolean {
-  return id === "retro" || id === "punk";
+  return id === "retro" || id === "punk" || id === "mono";
 }
 
 export function isThemeId(v: unknown): v is ThemeId {
