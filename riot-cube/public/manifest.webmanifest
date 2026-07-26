@@ -1,0 +1,11 @@
+{
+  "name": "RIOT CUBE",
+  "short_name": "RIOT CUBE",
+  "description": "Twist slices. Rip matches. Clear the riot.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0c0c",
+  "theme_color": "#0c0c0c",
+  "icons": []
+}

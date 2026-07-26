@@ -1,42 +1,34 @@
 # Godot 4
 .godot/
 *.translation
+.import/
 
-# Local Godot editor binaries (too large for GitHub)
-tools/Godot_v*/
-tools/*.exe
-
-# Imports / local cache
-*.import
-
-# Exports / builds
-exports/**/*.apk
-exports/**/*.aab
-exports/**/*.ipa
-exports/**/*.exe
-exports/**/*.app
-exports/**/*.zip
-exports/**/*.x86_64
-exports/**/*.dmg
-exports/**/*.wasm
-exports/**/*.pck
+# Exports
+exports/*
+!exports/README.md
 
 # OS / editor
 .DS_Store
 Thumbs.db
 *.tmp
 *~
-.vscode/
-.idea/
 
-# Secrets / local overrides
-*.env
-.env.*
+# Secrets
 export_credentials.cfg
-**/google-services.json
-**/GoogleService-Info.plist
-**/steam_appid.txt
-*.keystore
-*.jks
-*.p12
-*.mobileprovision
+.env
+.env.*
+
+# Logs
+tools/_*.txt
+*.log
+
+# Node / web game
+node_modules/
+web/dist/
+riot-cube/dist/
+website/node_modules/
+website/dist/
+website/.astro/
+
+# Backup archives outside project are fine; ignore local zips in-repo
+*.zip
