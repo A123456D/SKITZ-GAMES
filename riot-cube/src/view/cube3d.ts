@@ -4,7 +4,6 @@ import type { CubeFaces, FaceId } from "../core/session";
 import type { TileKind } from "../core/types";
 import { drawCrumpledSticker } from "./crumple";
 import { drawStickerSprite } from "./draw";
-import { paperTextureImage } from "./paperTexture";
 
 export type Vec3 = { x: number; y: number; z: number };
 export type Vec2 = { x: number; y: number };
@@ -321,15 +320,27 @@ function drawFace(
   ctx.lineTo(q[2]!.x, q[2]!.y);
   ctx.lineTo(q[3]!.x, q[3]!.y);
   ctx.closePath();
-  // Fallback fill only until the crumple photo loads
-  if (!paperTextureImage()) {
-    ctx.fillStyle = isActive ? "#f4eee0" : "#e5dcc8";
-    ctx.fill();
-  }
-  paintPaperTexture(ctx, q, faceIndex, isActive);
+  ctx.fillStyle = isActive ? "#f4eee0" : "#e5dcc8";
+  ctx.fill();
   ctx.strokeStyle = "#1a120c";
   ctx.lineWidth = isActive ? 4 : 2.5;
   ctx.stroke();
+
+  // Lined paper hint
+  ctx.save();
+  ctx.clip();
+  ctx.strokeStyle = isActive ? "rgba(80,140,200,0.2)" : "rgba(80,140,200,0.14)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 8; i++) {
+    const t = i / 8;
+    const a = lerp2(q[0]!, q[3]!, t);
+    const b = lerp2(q[1]!, q[2]!, t);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+  ctx.restore();
 
   const gap = 0.04;
   const stride = 1 / n;
@@ -464,190 +475,6 @@ function facePointLifted(
 
 function lerp2(a: Vec2, b: Vec2, t: number): Vec2 {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-}
-
-/** Generated crumple photo as the paper face, plus blue ruled lines. */
-function paintPaperTexture(
-  ctx: CanvasRenderingContext2D,
-  q: Vec2[],
-  faceIndex: number,
-  isActive: boolean,
-): void {
-  const tex = paperTextureImage();
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(q[0]!.x, q[0]!.y);
-  ctx.lineTo(q[1]!.x, q[1]!.y);
-  ctx.lineTo(q[2]!.x, q[2]!.y);
-  ctx.lineTo(q[3]!.x, q[3]!.y);
-  ctx.closePath();
-  ctx.clip();
-
-  if (tex) {
-    // Slight per-face crop so sides aren't identical (no rotate — that made seams crawl).
-    const inset = 0.08;
-    const ox = (faceIndex % 3) * 0.04;
-    const oy = Math.floor(faceIndex / 2) * 0.05;
-    const u0 = ox;
-    const v0 = oy;
-    const u1 = 1 - inset + ox * 0.2;
-    const v1 = 1 - inset + oy * 0.2;
-    drawImageOnQuad(ctx, tex, q, [
-      { x: u0, y: v0 },
-      { x: u1, y: v0 },
-      { x: u1, y: v1 },
-      { x: u0, y: v1 },
-    ]);
-    if (!isActive) {
-      ctx.fillStyle = "rgba(40, 30, 18, 0.12)";
-      ctx.fill();
-    }
-  }
-
-  // Soft notebook rules (lower alpha to avoid shimmer while rotating)
-  ctx.strokeStyle = isActive ? "rgba(80,140,200,0.16)" : "rgba(80,140,200,0.09)";
-  ctx.lineWidth = 1;
-  for (let i = 1; i < 8; i++) {
-    const t = i / 8;
-    const a = lerp2(q[0]!, q[3]!, t);
-    const b = lerp2(q[1]!, q[2]!, t);
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
-
-/**
- * Map texture onto a screen quad with an NxN grid.
- * A single two-triangle affine map creates a diagonal seam / crawling shadows
- * under perspective while the cube rotates.
- */
-function drawImageOnQuad(
-  ctx: CanvasRenderingContext2D,
-  img: CanvasImageSource,
-  q: Vec2[],
-  uv: Vec2[],
-  divisions = 8,
-): void {
-  const w =
-    "naturalWidth" in img && (img as HTMLImageElement).naturalWidth
-      ? (img as HTMLImageElement).naturalWidth
-      : (img as HTMLCanvasElement).width;
-  const h =
-    "naturalHeight" in img && (img as HTMLImageElement).naturalHeight
-      ? (img as HTMLImageElement).naturalHeight
-      : (img as HTMLCanvasElement).height;
-
-  for (let j = 0; j < divisions; j++) {
-    for (let i = 0; i < divisions; i++) {
-      // Slight overlap hides hairline gaps between cells
-      const pad = 0.002;
-      const su0 = Math.max(0, i / divisions - pad);
-      const su1 = Math.min(1, (i + 1) / divisions + pad);
-      const sv0 = Math.max(0, j / divisions - pad);
-      const sv1 = Math.min(1, (j + 1) / divisions + pad);
-
-      const p00 = bilerp(q, su0, sv0);
-      const p10 = bilerp(q, su1, sv0);
-      const p11 = bilerp(q, su1, sv1);
-      const p01 = bilerp(q, su0, sv1);
-
-      const t00 = bilerp(uv, su0, sv0);
-      const t10 = bilerp(uv, su1, sv0);
-      const t11 = bilerp(uv, su1, sv1);
-      const t01 = bilerp(uv, su0, sv1);
-
-      drawImageTriangle(
-        ctx,
-        img,
-        p00,
-        p10,
-        p11,
-        t00.x * w,
-        t00.y * h,
-        t10.x * w,
-        t10.y * h,
-        t11.x * w,
-        t11.y * h,
-      );
-      drawImageTriangle(
-        ctx,
-        img,
-        p00,
-        p11,
-        p01,
-        t00.x * w,
-        t00.y * h,
-        t11.x * w,
-        t11.y * h,
-        t01.x * w,
-        t01.y * h,
-      );
-    }
-  }
-}
-
-function bilerp(q: Vec2[], u: number, v: number): Vec2 {
-  const a = lerp2(q[0]!, q[1]!, u);
-  const b = lerp2(q[3]!, q[2]!, u);
-  return lerp2(a, b, v);
-}
-
-function drawImageTriangle(
-  ctx: CanvasRenderingContext2D,
-  img: CanvasImageSource,
-  p0: Vec2,
-  p1: Vec2,
-  p2: Vec2,
-  u0: number,
-  v0: number,
-  u1: number,
-  v1: number,
-  u2: number,
-  v2: number,
-): void {
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(p0.x, p0.y);
-  ctx.lineTo(p1.x, p1.y);
-  ctx.lineTo(p2.x, p2.y);
-  ctx.closePath();
-  ctx.clip();
-
-  const denom = u0 * (v1 - v2) + u1 * (v2 - v0) + u2 * (v0 - v1);
-  if (Math.abs(denom) < 1e-6) {
-    ctx.restore();
-    return;
-  }
-  const a = (p0.x * (v1 - v2) + p1.x * (v2 - v0) + p2.x * (v0 - v1)) / denom;
-  const b = (p0.x * (u2 - u1) + p1.x * (u0 - u2) + p2.x * (u1 - u0)) / denom;
-  const c =
-    (p0.x * (u1 * v2 - u2 * v1) +
-      p1.x * (u2 * v0 - u0 * v2) +
-      p2.x * (u0 * v1 - u1 * v0)) /
-    denom;
-  const d = (p0.y * (v1 - v2) + p1.y * (v2 - v0) + p2.y * (v0 - v1)) / denom;
-  const e = (p0.y * (u2 - u1) + p1.y * (u0 - u2) + p2.y * (u1 - u0)) / denom;
-  const f =
-    (p0.y * (u1 * v2 - u2 * v1) +
-      p1.y * (u2 * v0 - u0 * v2) +
-      p2.y * (u0 * v1 - u1 * v0)) /
-    denom;
-
-  const cur = ctx.getTransform();
-  ctx.setTransform(
-    a * cur.a + d * cur.c,
-    a * cur.b + d * cur.d,
-    b * cur.a + e * cur.c,
-    b * cur.b + e * cur.d,
-    c * cur.a + f * cur.c + cur.e,
-    c * cur.b + f * cur.d + cur.f,
-  );
-  ctx.drawImage(img, 0, 0);
-  ctx.restore();
 }
 
 function drawStickerOnQuad(
