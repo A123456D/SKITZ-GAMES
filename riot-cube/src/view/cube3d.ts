@@ -282,7 +282,7 @@ export function drawCube3D(
   order.sort((a, b) => a.depth - b.depth); // far (small z) first
 
   for (const f of order) {
-    drawFace(ctx, layout, f.i, faces, opts, f.i === opts.activeFace, f.nZ);
+    drawFace(ctx, layout, f.i, faces, opts, f.i === opts.activeFace);
   }
 }
 
@@ -299,14 +299,12 @@ function drawFace(
     sourceFaces?: Board[];
   },
   isActive: boolean,
-  faceNz: number,
 ): void {
   const geom = FACES[faceIndex]!;
   const board = faces[faceIndex]!;
   const source = (opts.sourceFaces ?? faces) as CubeFaces;
   const n = board.length;
   const quality = getQuality();
-  const drawStickers = faceNz >= quality.minFaceNzForStickers;
   const crumpleMap = new Map(
     opts.crumples.filter(() => isActive).map((c) => [`${c.r},${c.c}`, c] as const),
   );
@@ -366,11 +364,6 @@ function drawFace(
         ? 0.04
         : 0;
   const liftAmt = liftPulse;
-
-  if (!drawStickers) {
-    ctx.restore();
-    return;
-  }
 
   const paintSticker = (
     kind: TileKind,

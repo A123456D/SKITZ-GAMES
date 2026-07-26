@@ -49,7 +49,6 @@ const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
 
 let session: Session = startSession(LEVEL_1);
-let paintThrottle = 0;
 let floatText: { text: string; life: number } | null = null;
 
 type DragState = {
@@ -266,15 +265,7 @@ function tick(): void {
   }
   const needsPaint =
     dirty || drag || orbitDrag || crumples.length || rotating || springAxis;
-  // On low-end / mobile, throttle continuous drag/orbit paints ~30fps.
-  if (needsPaint) {
-    if (!getQuality().hoverAnim && (drag || orbitDrag) && !dirty && !crumples.length) {
-      paintThrottle = (paintThrottle + 1) % 2;
-      if (paintThrottle === 0) paint();
-    } else {
-      paint();
-    }
-  }
+  if (needsPaint) paint();
   requestAnimationFrame(tick);
 }
 
