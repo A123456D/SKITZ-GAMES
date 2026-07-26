@@ -35,6 +35,13 @@ import {
   screenDeltaToFaceUV,
   type CubeLayout,
 } from "./view/cube3d";
+import {
+  sfxPaperCrumple,
+  sfxPaperFlutter,
+  sfxPaperRustle,
+  sfxPaperSlide,
+  unlockAudio,
+} from "./audio/paper";
 import { loadStickers } from "./view/stickers";
 import { detectQuality, getQuality } from "./view/quality";
 
@@ -294,6 +301,7 @@ function doTwist(twist: Twist): void {
   const facesTwisted = twistCubeFaces(session.faces, session.face, twist);
   const twisted = facesTwisted[session.face]!;
   const groups = findMatches(twisted);
+  sfxPaperSlide();
   if (groups.length === 0) {
     const result = applyTwist(session, twist);
     if (!result.didTwist) return;
@@ -314,6 +322,7 @@ function doTwist(twist: Twist): void {
     if (!kind) continue;
     crumples.push({ r, c, kind, seed: (r * 97 + c * 13 + session.score + 1) | 0 });
   }
+  sfxPaperCrumple();
   paint();
 }
 
@@ -354,6 +363,7 @@ function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
   targetRotX = landed.x;
   targetRotY = landed.y;
   rotating = true;
+  sfxPaperFlutter();
 }
 
 function beginOrbitDrag(x: number, y: number): void {
@@ -371,6 +381,7 @@ function endOrbitDrag(): void {
 }
 
 canvas.addEventListener("pointerdown", (e) => {
+  unlockAudio();
   canvas.setPointerCapture(e.pointerId);
   const p = canvasPoint(e);
   if (session.status !== "playing") {
@@ -465,6 +476,7 @@ canvas.addEventListener("pointermove", (e) => {
       drag.axis = "col";
       drag.index = drag.c;
     }
+    sfxPaperRustle();
   }
   // Column: finger down (+V) pulls content down so TOP slides in from the top edge.
   drag.offsetUv = drag.axis === "row" ? du : dv;
@@ -491,6 +503,7 @@ function endDrag(): void {
     springAxis = axis;
     springIndex = index;
     springUv = offsetUv;
+    sfxPaperRustle();
     paint();
     return;
   }
