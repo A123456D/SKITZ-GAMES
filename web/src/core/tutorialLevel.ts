@@ -163,7 +163,7 @@ export const SHOWCASE_POINTS: PointBeat[] = [
   },
   {
     title: "Turn",
-    body: "Tap a disc, then use ↺ ↻ or drag to rotate.",
+    body: "Tap a disc, then hold ↺ or ↻ and twist to turn.",
     at: { kind: "ui", id: "turn" },
   },
   {
