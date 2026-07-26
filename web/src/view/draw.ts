@@ -2880,8 +2880,8 @@ export function loadLogo(): void {
     logoReady = false;
     logoImg = null;
   };
-  // File lives in public/; alpha punched so it tints cleanly per theme.
-  logoImg.src = "./logo-pulseconnector.png";
+  // Alpha-punched mark in public/; tints cleanly per theme.
+  logoImg.src = "./logo-pulseconnector.png?v=5";
 }
 
 function logoTintColor(): string {
