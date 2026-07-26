@@ -9,9 +9,7 @@ const links = [
 <header class="site-header">
 	<div class="wrap site-header__inner">
 		<a class="logo" href="/" aria-label="SKITZ home">
-			<span class="logo-plate">
-				<img src="/images/skitz-logo-v2.png" alt="SKITZ games & apps" width="220" height="120" />
-			</span>
+			<img src="/images/skitz-mark.png" alt="SKITZ games & apps" width="220" height="120" />
 		</a>
 		<nav class="nav" aria-label="Primary">
 			{
@@ -34,7 +32,7 @@ const links = [
 		top: 0;
 		z-index: 40;
 		height: var(--header-h);
-		background: rgba(14, 14, 14, 0.78);
+		background: color-mix(in srgb, var(--paper) 82%, transparent);
 		backdrop-filter: blur(10px);
 		border-bottom: 1px solid var(--line);
 	}
@@ -59,19 +57,9 @@ const links = [
 	}
 
 	.logo img {
-		height: 3.1rem;
+		height: 3.25rem;
 		width: auto;
-		filter: none;
-	}
-
-	.logo-plate {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		background: #fff;
-		padding: 0.2rem 0.35rem;
-		clip-path: polygon(2% 6%, 96% 0%, 100% 92%, 4% 100%);
-		box-shadow: 3px 3px 0 var(--skitz-purple);
+		filter: drop-shadow(3px 3px 0 rgba(22, 19, 16, 0.18));
 	}
 
 	.nav {
@@ -82,7 +70,7 @@ const links = [
 	.nav__link {
 		font-family: var(--font-type);
 		font-size: 0.95rem;
-		color: var(--paper);
+		color: var(--mark);
 		text-decoration: none;
 		padding: 0.35rem 0.7rem;
 		border: 2px solid transparent;
@@ -90,8 +78,8 @@ const links = [
 
 	.nav__link:hover,
 	.nav__link.is-active {
-		border-color: var(--paper);
-		background: var(--paper);
+		border-color: var(--mark);
+		background: #fffef9;
 		color: var(--mark);
 		box-shadow: 3px 3px 0 var(--skitz-red);
 	}

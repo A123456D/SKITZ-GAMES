@@ -9,7 +9,7 @@ interface Props {
 
 const {
 	title = 'SKITZ',
-	description = 'SKITZ games & apps — free browser play, Android install, freemium extras optional.',
+	description = 'SKITZ — freemium games and apps. Play free in the browser, install on Android.',
 	bodyClass = '',
 } = Astro.props;
 
@@ -23,9 +23,9 @@ const pageTitle = title === 'SKITZ' ? 'SKITZ — games & apps' : `${title} · SK
 		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 		<meta name="generator" content={Astro.generator} />
 		<meta name="description" content={description} />
-		<meta name="theme-color" content="#050505" />
+		<meta name="theme-color" content="#f3eee4" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="apple-touch-icon" href="/images/skitz-logo-v2.png" />
+		<link rel="apple-touch-icon" href="/images/skitz-mark.png" />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link

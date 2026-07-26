@@ -1,7 +1,7 @@
 ---
 title: Pulse Link
 tagline: Turn. Link. Pulse.
-summary: Turn precision wheels to aim lasers into receivers. Free in the browser, install on Android from Chrome. Freemium extras optional.
+summary: Turn precision wheels to aim lasers into receivers. Freemium — free in the browser, install on Android.
 cover: /images/pulse-link-logo.png
 screenshots: []
 featured: true

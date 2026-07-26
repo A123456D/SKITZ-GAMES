@@ -1,7 +1,7 @@
 ---
 title: Pulsefold
 tagline: Fold lines. Pulse matches. Clear the desk.
-summary: Fold lines to flip tiles, pulse matches of 3+, and clear the whole desk before folds run out. Free in the browser — install on Android from Chrome. Freemium extras optional.
+summary: Fold lines to flip tiles, pulse matches of 3+, and clear the whole desk before folds run out. Freemium — free in the browser, install on Android.
 cover: /images/pulsefold-logo.png
 screenshots: []
 featured: true

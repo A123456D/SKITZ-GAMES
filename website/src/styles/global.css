@@ -6,21 +6,22 @@
 	--skitz-blue: #1e5bb8;
 	--skitz-yellow: #e8a317;
 
-	--ink: #050505;
-	--ink-soft: #121212;
-	--paper: #f4f1ea;
-	--paper-2: #e7e1d4;
-	--mark: #0a0a0a;
-	--muted: #a39e94;
-	--line: rgba(244, 241, 234, 0.2);
+	--ink: #1a1714;
+	--ink-soft: #2c2722;
+	--paper: #f3eee4;
+	--paper-2: #e8e0d2;
+	--paper-3: #ddd4c4;
+	--mark: #161310;
+	--muted: #6e665c;
+	--line: rgba(22, 19, 16, 0.16);
 	--accent: var(--skitz-red);
 	--font-display: 'Archivo Black', Impact, system-ui, sans-serif;
 	--font-type: 'Special Elite', 'Courier New', monospace;
 	--font-body: 'IBM Plex Mono', ui-monospace, monospace;
 	--ease: cubic-bezier(0.2, 0.9, 0.2, 1);
 	--header-h: 4.75rem;
-	--sticker-shadow: 7px 8px 0 #000;
-	color-scheme: dark;
+	--sticker-shadow: 7px 8px 0 rgba(22, 19, 16, 0.85);
+	color-scheme: light;
 }
 
 *,
@@ -39,24 +40,24 @@ body {
 	font-family: var(--font-body);
 	font-size: 1rem;
 	line-height: 1.6;
-	color: var(--paper);
-	background: var(--ink);
+	color: var(--mark);
+	background: var(--paper);
 	-webkit-font-smoothing: antialiased;
 }
 
-/* xerox / plaster grain */
+/* Heavy paper fiber / plaster grain */
 body::before {
 	content: '';
 	position: fixed;
 	inset: 0;
 	pointer-events: none;
 	z-index: 50;
-	opacity: 0.13;
-	mix-blend-mode: soft-light;
-	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+	opacity: 0.28;
+	mix-blend-mode: multiply;
+	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* cracked-wall room: black void with faint logo-color washes */
+/* Torn-paper wall: warm sheet + soft logo-color washes + faint cracks */
 body::after {
 	content: '';
 	position: fixed;
@@ -64,19 +65,19 @@ body::after {
 	pointer-events: none;
 	z-index: -1;
 	background:
-		radial-gradient(ellipse 70% 45% at 18% 12%, rgba(107, 45, 139, 0.18), transparent 60%),
-		radial-gradient(ellipse 55% 40% at 88% 18%, rgba(224, 49, 46, 0.14), transparent 58%),
-		radial-gradient(ellipse 50% 35% at 72% 78%, rgba(30, 91, 184, 0.12), transparent 55%),
-		radial-gradient(ellipse 60% 40% at 22% 88%, rgba(232, 163, 23, 0.1), transparent 55%),
-		radial-gradient(ellipse 40% 30% at 50% 50%, rgba(46, 125, 50, 0.08), transparent 60%),
-		linear-gradient(180deg, #0c0c0c 0%, #050505 45%, #0a0a0a 100%),
+		radial-gradient(ellipse 55% 40% at 12% 8%, rgba(107, 45, 139, 0.1), transparent 62%),
+		radial-gradient(ellipse 50% 38% at 90% 14%, rgba(224, 49, 46, 0.09), transparent 60%),
+		radial-gradient(ellipse 48% 36% at 78% 82%, rgba(30, 91, 184, 0.08), transparent 58%),
+		radial-gradient(ellipse 52% 40% at 18% 90%, rgba(232, 163, 23, 0.1), transparent 60%),
+		radial-gradient(ellipse 42% 32% at 48% 48%, rgba(46, 125, 50, 0.06), transparent 65%),
 		repeating-linear-gradient(
-			0deg,
+			105deg,
 			transparent,
-			transparent 3px,
-			rgba(255, 255, 255, 0.02) 3px,
-			rgba(255, 255, 255, 0.02) 4px
-		);
+			transparent 11px,
+			rgba(22, 19, 16, 0.015) 11px,
+			rgba(22, 19, 16, 0.015) 12px
+		),
+		linear-gradient(165deg, #f7f2e8 0%, var(--paper) 42%, var(--paper-2) 100%);
 }
 
 img {
@@ -85,12 +86,12 @@ img {
 }
 
 a {
-	color: var(--paper);
+	color: var(--skitz-blue);
 	text-underline-offset: 0.2em;
 }
 
 a:hover {
-	color: #fff;
+	color: var(--skitz-red);
 }
 
 h1,
@@ -102,6 +103,7 @@ h3 {
 	line-height: 0.95;
 	margin: 0 0 0.55em;
 	text-transform: uppercase;
+	color: var(--mark);
 }
 
 p {
@@ -131,10 +133,11 @@ p {
 /* jagged plaster sticker panel */
 .sticker {
 	background:
-		linear-gradient(135deg, rgba(255, 255, 255, 0.35), transparent 40%),
-		var(--paper);
+		linear-gradient(145deg, rgba(255, 255, 255, 0.55), transparent 42%),
+		linear-gradient(180deg, #faf6ee, var(--paper-2));
 	color: var(--mark);
 	box-shadow: var(--sticker-shadow);
+	border: 1px solid rgba(22, 19, 16, 0.08);
 	clip-path: polygon(
 		1.5% 2%,
 		8% 0%,
@@ -192,7 +195,8 @@ p {
 	gap: 0.45rem;
 	padding: 0.85rem 1.35rem;
 	border: 3px solid var(--mark);
-	background: var(--paper);
+	background:
+		linear-gradient(160deg, #fffef9, var(--paper));
 	color: var(--mark);
 	font-family: var(--font-display);
 	font-size: 0.95rem;
@@ -218,13 +222,13 @@ p {
 
 .btn-ghost {
 	background: transparent;
-	color: var(--paper);
-	border-color: var(--paper);
-	box-shadow: 4px 4px 0 rgba(232, 163, 23, 0.45);
+	color: var(--mark);
+	border-color: var(--mark);
+	box-shadow: 4px 4px 0 rgba(232, 163, 23, 0.55);
 }
 
 .btn-ghost:hover {
-	background: var(--paper);
+	background: #fff;
 	color: var(--mark);
 	box-shadow: 6px 6px 0 var(--skitz-green);
 }
