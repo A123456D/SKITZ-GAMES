@@ -7,7 +7,14 @@ import {
   starsForScore,
   type Session,
 } from "./core/session";
-import type { Twist } from "./core/types";
+import {
+  cloneBoard,
+  findMatches,
+  matchedCells,
+  twistBoard,
+  type Board,
+} from "./core/board";
+import type { TileKind, Twist } from "./core/types";
 import {
   W,
   H,
@@ -25,6 +32,7 @@ import {
   hitRetry,
   type Layout,
 } from "./view/draw";
+import { drawCrumpledSticker } from "./view/crumple";
 import { loadStickers } from "./view/stickers";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
@@ -54,6 +62,14 @@ let flipAnim = 0;
 let flipDir: 1 | -1 = 1;
 let flipping = false;
 let flipSwapped = false;
+
+/** Visual board during crumple (twisted, pre-resolve). */
+let visualBoard: Board | null = null;
+type Crumple = { r: number; c: number; kind: TileKind; seed: number };
+let crumples: Crumple[] = [];
+let crumpleT = 0;
+let pendingTwist: Twist | null = null;
+let busy = false;
 
 function resize(): void {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -148,12 +164,16 @@ function paint(): void {
     ctx.rect(layout.pageX + 8, layout.pageY + 8, layout.pageW - 16, layout.pageH - 16);
     ctx.clip();
 
+    const board = visualBoard ?? session.board;
+    const crumpleKeys = new Set(crumples.map((c) => `${c.r},${c.c}`));
+
     // Draw wrapped copies for continuous reveal
     const copies = motion.axis ? [-1, 0, 1] : [0];
     for (const copy of copies) {
       for (let r = 0; r < n; r++) {
         for (let c = 0; c < n; c++) {
-          const kind = session.board[r]![c];
+          if (crumpleKeys.has(`${r},${c}`)) continue;
+          const kind = board[r]![c];
           if (!kind) continue;
           const pos = stickerPos(r, c, n, motion);
           let x = pos.x;
@@ -173,6 +193,22 @@ function paint(): void {
           const scale = inLane && motion.hovering ? 1.08 : 1;
           drawStickerSprite(ctx, kind, x, y, layout.cell, scale, lift);
         }
+      }
+    }
+
+    // Crumpling matched stickers on top
+    if (crumples.length && crumpleT < 1) {
+      for (const c of crumples) {
+        const pos = cellBase(layout, c.r, c.c);
+        drawCrumpledSticker(
+          ctx,
+          c.kind,
+          pos.x,
+          pos.y,
+          layout.cell,
+          crumpleT,
+          c.seed,
+        );
       }
     }
     ctx.restore();
@@ -238,21 +274,71 @@ function tick(): void {
     }
     dirty = true;
   }
-  if (dirty || drag) paint();
+  if (crumples.length) {
+    crumpleT = Math.min(1, crumpleT + 0.045);
+    dirty = true;
+    if (crumpleT >= 1 && pendingTwist) {
+      finishCrumple();
+    }
+  }
+  if (dirty || drag || crumples.length) paint();
   requestAnimationFrame(tick);
 }
 
-function doTwist(twist: Twist): void {
+function finishCrumple(): void {
+  const twist = pendingTwist!;
+  pendingTwist = null;
+  crumples = [];
+  crumpleT = 0;
+  visualBoard = null;
   const result = applyTwist(session, twist);
-  if (!result.didTwist) return;
+  busy = false;
+  if (!result.didTwist) {
+    paint();
+    return;
+  }
   session = result.session;
   if (result.combo > 1) floatText = { text: `COMBO x${result.combo}`, life: 1 };
   else if (result.scoreGain > 0) floatText = { text: `+${result.scoreGain}`, life: 0.9 };
   paint();
 }
 
+function doTwist(twist: Twist): void {
+  if (busy || session.status !== "playing") return;
+  const twisted = twistBoard(session.board, twist);
+  const groups = findMatches(twisted);
+  if (groups.length === 0) {
+    const result = applyTwist(session, twist);
+    if (!result.didTwist) return;
+    session = result.session;
+    paint();
+    return;
+  }
+
+  busy = true;
+  pendingTwist = twist;
+  visualBoard = cloneBoard(twisted);
+  crumpleT = 0;
+  const cells = matchedCells(groups);
+  crumples = [];
+  for (const k of cells) {
+    const [rs, cs] = k.split(",");
+    const r = Number(rs);
+    const c = Number(cs);
+    const kind = twisted[r]![c];
+    if (!kind) continue;
+    crumples.push({
+      r,
+      c,
+      kind,
+      seed: (r * 97 + c * 13 + session.score + 1) | 0,
+    });
+  }
+  paint();
+}
+
 function startFlip(dir: 1 | -1): void {
-  if (flipping || session.status !== "playing" || drag) return;
+  if (flipping || session.status !== "playing" || drag || busy) return;
   flipDir = dir;
   flipping = true;
   flipAnim = 0;
@@ -267,11 +353,16 @@ canvas.addEventListener("pointerdown", (e) => {
       session = restartSession(session);
       layout = boardLayout(session.level.size);
       floatText = null;
+      visualBoard = null;
+      crumples = [];
+      crumpleT = 0;
+      pendingTwist = null;
+      busy = false;
       paint();
     }
     return;
   }
-  if (flipping) return;
+  if (flipping || busy) return;
 
   const flip = hitFlip(layout, p.x, p.y);
   if (flip) {
@@ -292,7 +383,7 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 
 canvas.addEventListener("pointermove", (e) => {
-  if (!drag || session.status !== "playing" || flipping) return;
+  if (!drag || session.status !== "playing" || flipping || busy) return;
   const p = canvasPoint(e);
   const dx = p.x - drag.x0;
   const dy = p.y - drag.y0;
