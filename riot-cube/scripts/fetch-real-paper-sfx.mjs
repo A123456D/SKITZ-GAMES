@@ -3,97 +3,68 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+/**
+ * Soft page-paper SFX from Mixkit (no harsh crumple/scratch samples).
+ * Heavy lowpass + low gain so they stay ear-friendly.
+ */
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const html = await (await fetch("https://mixkit.co/free-sound-effects/paper/")).text();
-
 const cards = [];
-const re =
-  /data-audio-player-item-id-value="(\d+)"[\s\S]*?data-audio-player-preview-url-value="([^"]+)"[\s\S]*?<h2 class="item-grid-card__title">\s*([^<]+?)\s*<\/h2>/g;
-// preview url may appear before id - try both orders
 const re2 =
   /data-audio-player-preview-url-value="([^"]+)"[\s\S]{0,400}?data-audio-player-item-id-value="(\d+)"[\s\S]{0,1200}?<h2 class="item-grid-card__title">\s*([^<]+?)\s*<\/h2>/g;
-
 for (const m of html.matchAll(re2)) {
   cards.push({ id: m[2], preview: m[1], title: m[3].trim() });
 }
-console.log(
-  cards
-    .map((c) => `${c.id}\t${c.title}\t${c.preview}`)
-    .join("\n"),
-);
 
-const pick = {
-  rustle: ["Paper quick movement", "Pages of paper moving", "Paper slide"],
-  slide: ["Paper slide", "Paper scroll in an office", "Paper quick movement"],
-  crumple: ["Crumpled paper", "Paper crumpled up", "Paper crinkle", "Quick paper crumple sound"],
-  flutter: ["Big paper page turn", "Single book paging", "Page turn single"],
-};
-
-function find(titles) {
+function find(...titles) {
   for (const t of titles) {
     const hit = cards.find((c) => c.title.toLowerCase() === t.toLowerCase());
     if (hit) return hit;
   }
-  return null;
+  throw new Error(`missing ${titles.join(" / ")}`);
 }
 
 const chosen = {
-  rustle: find(pick.rustle),
-  slide: find(pick.slide),
-  crumple: find(pick.crumple),
-  flutter: find(pick.flutter),
+  // Soft page turns only — avoid crumple/scrape samples
+  rustle: find("Page turn single", "Single book paging"),
+  slide: find("Big paper page turn", "Page turn single"),
+  crumple: find("Single book paging", "Page turn single", "Paper magazine paging"),
+  flutter: find("Page turn single", "Single book paging"),
 };
-console.log("\nCHOSEN", chosen);
 
 const outDir = join(__dirname, "../public/sfx");
 mkdirSync(outDir, { recursive: true });
-
 const ffmpeg =
   "C:\\Users\\PC\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.2-full_build\\bin\\ffmpeg.exe";
 
-async function grab(key, card, opts) {
-  if (!card) throw new Error(`missing ${key}`);
+const softEq =
+  "highpass=f=180,lowpass=f=1600,acompressor=threshold=-22dB:ratio=2.5:attack=8:release=80:makeup=2,volume=0.32";
+
+async function grab(key, card, trim) {
   const tmp = join(outDir, `_${key}_src.mp3`);
   const out = join(outDir, `paper_${key}.wav`);
   const res = await fetch(card.preview);
   if (!res.ok) throw new Error(`fetch ${card.preview} ${res.status}`);
   writeFileSync(tmp, Buffer.from(await res.arrayBuffer()));
-  const args = [
-    "-y",
-    "-i",
-    tmp,
-    "-af",
-    opts.af,
-    "-ac",
-    "1",
-    "-ar",
-    "44100",
-    out,
-  ];
-  const r = spawnSync(ffmpeg, args, { encoding: "utf8" });
+  const af = `atrim=${trim},afade=t=in:st=0:d=0.025,afade=t=out:st=${Number(trim.split(":")[1]) - 0.08}:d=0.08,${softEq}`;
+  const r = spawnSync(ffmpeg, ["-y", "-i", tmp, "-af", af, "-ac", "1", "-ar", "44100", out], {
+    encoding: "utf8",
+  });
   if (r.status !== 0) {
     console.error(r.stderr);
-    throw new Error(`ffmpeg failed for ${key}`);
+    throw new Error(`ffmpeg ${key}`);
   }
-  console.log("wrote", out, "from", card.title);
+  console.log("wrote", out, "←", card.title);
 }
 
-await grab("rustle", chosen.rustle, {
-  af: "atrim=0:0.22,afade=t=in:st=0:d=0.01,afade=t=out:st=0.16:d=0.06,volume=1.15",
-});
-await grab("slide", chosen.slide, {
-  af: "atrim=0:0.28,afade=t=in:st=0:d=0.01,afade=t=out:st=0.2:d=0.08,volume=1.05",
-});
-await grab("crumple", chosen.crumple, {
-  af: "atrim=0:0.45,afade=t=in:st=0:d=0.005,afade=t=out:st=0.32:d=0.12,volume=1.2",
-});
-await grab("flutter", chosen.flutter, {
-  af: "atrim=0:0.16,afade=t=in:st=0:d=0.008,afade=t=out:st=0.11:d=0.05,volume=1.1",
-});
+await grab("rustle", chosen.rustle, "0:0.20");
+await grab("slide", chosen.slide, "0:0.26");
+await grab("crumple", chosen.crumple, "0:0.30");
+await grab("flutter", chosen.flutter, "0:0.14");
 
 writeFileSync(
   join(outDir, "SOURCES.txt"),
   Object.entries(chosen)
-    .map(([k, c]) => `${k}: Mixkit "${c.title}" (id ${c.id}) — ${c.preview}`)
-    .join("\n") + "\nLicense: Mixkit License (free for commercial use)\n",
+    .map(([k, c]) => `${k}: Mixkit "${c.title}" (id ${c.id})`)
+    .join("\n") + "\nSoftened with lowpass + compressor. Mixkit License.\n",
 );

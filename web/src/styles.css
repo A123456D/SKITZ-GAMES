@@ -52,3 +52,8 @@ body {
   border-radius: 0;
   touch-action: none;
 }
+
+html[data-orient="landscape"] #game {
+  transform: rotate(90deg);
+  transform-origin: center center;
+}

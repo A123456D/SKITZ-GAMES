@@ -24,6 +24,7 @@ import {
   drawHint,
   drawHud,
   hitRetry,
+  hitVolumeButton,
 } from "./view/draw";
 import {
   drawCube3D,
@@ -36,6 +37,8 @@ import {
   type CubeLayout,
 } from "./view/cube3d";
 import {
+  cycleSfxVolume,
+  getSfxVolume,
   sfxPaperCrumple,
   sfxPaperFlutter,
   sfxPaperRustle,
@@ -47,6 +50,7 @@ import { detectQuality, getQuality } from "./view/quality";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
+let landscape = false;
 
 let session: Session = startSession(LEVEL_1);
 let floatText: { text: string; life: number } | null = null;
@@ -107,10 +111,16 @@ function cubeLayout(): CubeLayout {
 
 function resize(): void {
   detectQuality();
-  const dpr = Math.min(window.devicePixelRatio || 1, getQuality().dprCap);
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const scale = Math.min(vw / W, vh / H);
+  landscape = vw > vh;
+  document.documentElement.dataset.orient = landscape ? "landscape" : "portrait";
+
+  // In landscape the canvas is CSS-rotated 90°, so fit against swapped axes.
+  const fitW = landscape ? vh : vw;
+  const fitH = landscape ? vw : vh;
+  const dpr = Math.min(window.devicePixelRatio || 1, getQuality().dprCap);
+  const scale = Math.min(fitW / W, fitH / H);
   canvas.style.width = `${W * scale}px`;
   canvas.style.height = `${H * scale}px`;
   canvas.width = Math.round(W * dpr);
@@ -120,9 +130,18 @@ function resize(): void {
 
 function canvasPoint(e: PointerEvent): { x: number; y: number } {
   const rect = canvas.getBoundingClientRect();
+  if (!landscape) {
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * W,
+      y: ((e.clientY - rect.top) / rect.height) * H,
+    };
+  }
+  // rotate(90deg): map AABB coords back into portrait canvas space
+  const nx = (e.clientX - rect.left) / rect.width;
+  const ny = (e.clientY - rect.top) / rect.height;
   return {
-    x: ((e.clientX - rect.left) / rect.width) * W,
-    y: ((e.clientY - rect.top) / rect.height) * H,
+    x: ny * W,
+    y: (1 - nx) * H,
   };
 }
 
@@ -165,6 +184,7 @@ function paint(): void {
     moves: session.movesLeft,
     score: session.score,
     goals: session.goals,
+    sfxVol: getSfxVolume(),
   });
 
   const layout = cubeLayout();
@@ -376,6 +396,11 @@ canvas.addEventListener("pointerdown", (e) => {
   canvas.setPointerCapture(e.pointerId);
   const p = canvasPoint(e);
   if (session.status !== "playing") {
+    if (hitVolumeButton(p.x, p.y)) {
+      cycleSfxVolume();
+      paint();
+      return;
+    }
     if (hitRetry(p.x, p.y)) {
       session = restartSession(session);
       floatText = null;
@@ -395,6 +420,12 @@ canvas.addEventListener("pointerdown", (e) => {
     return;
   }
   if (busy) return;
+
+  if (hitVolumeButton(p.x, p.y)) {
+    cycleSfxVolume();
+    paint();
+    return;
+  }
 
   if (orbitBtns) {
     const orb = hitOrbitButton(orbitBtns, p.x, p.y);

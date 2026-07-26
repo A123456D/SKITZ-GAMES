@@ -99,29 +99,42 @@ const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 
 /** Aspect-correct fit inside the safe visual viewport (no stretch, no nav-bar clip). */
+let landscape = false;
+
 function fitGameToViewport(): void {
   const root = getComputedStyle(document.documentElement);
   const sat = parseFloat(root.getPropertyValue("--sat")) || 0;
   const sar = parseFloat(root.getPropertyValue("--sar")) || 0;
   const sab = parseFloat(root.getPropertyValue("--sab")) || 0;
   const sal = parseFloat(root.getPropertyValue("--sal")) || 0;
-  // Some Android Chrome builds report 0 for the 3-button bar; keep a floor.
   const bottomPad = Math.max(sab, 12);
   const topPad = Math.max(sat, 4);
 
   const vv = window.visualViewport;
   const viewW = vv?.width ?? window.innerWidth;
   const viewH = vv?.height ?? window.innerHeight;
-  const availW = Math.max(1, viewW - sal - sar);
-  const availH = Math.max(1, viewH - topPad - bottomPad);
+  landscape = viewW > viewH;
+  document.documentElement.dataset.orient = landscape ? "landscape" : "portrait";
+
+  // Landscape: canvas is CSS-rotated 90°, so fit against swapped axes.
+  const availW = Math.max(1, (landscape ? viewH : viewW) - (landscape ? topPad + bottomPad : sal + sar));
+  const availH = Math.max(1, (landscape ? viewW : viewH) - (landscape ? sal + sar : topPad + bottomPad));
   const scale = Math.min(availW / W, availH / H);
   const w = Math.max(1, Math.round(W * scale));
   const h = Math.max(1, Math.round(H * scale));
-  const left = Math.round((vv?.offsetLeft ?? 0) + sal + (availW - w) / 2);
-  const top = Math.round((vv?.offsetTop ?? 0) + topPad + (availH - h) / 2);
 
-  canvas.style.left = `${left}px`;
-  canvas.style.top = `${top}px`;
+  if (landscape) {
+    // Center the pre-rotate box so after rotate(90deg) it fills the wide viewport.
+    const left = Math.round((vv?.offsetLeft ?? 0) + (viewW - w) / 2);
+    const top = Math.round((vv?.offsetTop ?? 0) + (viewH - h) / 2);
+    canvas.style.left = `${left}px`;
+    canvas.style.top = `${top}px`;
+  } else {
+    const left = Math.round((vv?.offsetLeft ?? 0) + sal + (viewW - sal - sar - w) / 2);
+    const top = Math.round((vv?.offsetTop ?? 0) + topPad + (viewH - topPad - bottomPad - h) / 2);
+    canvas.style.left = `${left}px`;
+    canvas.style.top = `${top}px`;
+  }
   canvas.style.width = `${w}px`;
   canvas.style.height = `${h}px`;
 }
@@ -771,9 +784,17 @@ function angleAt(x: number, y: number, tableId: number): number {
 
 function canvasPos(e: PointerEvent): { x: number; y: number } {
   const rect = canvas.getBoundingClientRect();
+  if (!landscape) {
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * W,
+      y: ((e.clientY - rect.top) / rect.height) * H,
+    };
+  }
+  const nx = (e.clientX - rect.left) / rect.width;
+  const ny = (e.clientY - rect.top) / rect.height;
   return {
-    x: ((e.clientX - rect.left) / rect.width) * W,
-    y: ((e.clientY - rect.top) / rect.height) * H,
+    x: ny * W,
+    y: (1 - nx) * H,
   };
 }
 

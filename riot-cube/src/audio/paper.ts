@@ -1,4 +1,4 @@
-/** Real Mixkit paper samples with light playback shaping. */
+/** Soft Mixkit page-paper samples + master volume. */
 
 type SfxId = "rustle" | "slide" | "crumple" | "flutter";
 
@@ -9,12 +9,30 @@ const FILES: Record<SfxId, string> = {
   flutter: "./sfx/paper_flutter.wav",
 };
 
+const VOL_KEY = "riotcube_sfx_vol";
+/** Cycle: muted → soft → normal */
+const VOL_STEPS = [0, 0.4, 0.75] as const;
+
 let ctx: AudioContext | null = null;
 let unlocked = false;
 let master: GainNode | null = null;
-let sfxVol = 0.92;
+let sfxVol = readStoredVol();
 const buffers = new Map<SfxId, AudioBuffer>();
 let loadPromise: Promise<void> | null = null;
+
+function readStoredVol(): number {
+  try {
+    const raw = localStorage.getItem(VOL_KEY);
+    if (raw == null) return 0.4;
+    const n = Number(raw);
+    if (VOL_STEPS.includes(n as (typeof VOL_STEPS)[number])) return n;
+    if (n <= 0) return 0;
+    if (n < 0.55) return 0.4;
+    return 0.75;
+  } catch {
+    return 0.4;
+  }
+}
 
 function ac(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -52,7 +70,7 @@ async function loadAll(): Promise<void> {
         const buf = await c.decodeAudioData(raw.slice(0));
         buffers.set(id, buf);
       } catch {
-        /* ignore missing sample */
+        /* ignore */
       }
     }),
   );
@@ -67,10 +85,30 @@ export function unlockAudio(): void {
   if (!loadPromise) loadPromise = loadAll();
 }
 
-function play(
-  id: SfxId,
-  opts?: { gain?: number; rate?: number; brightness?: number },
-): void {
+export function getSfxVolume(): number {
+  return sfxVol;
+}
+
+export function setSfxVolume(v: number): void {
+  sfxVol = Math.max(0, Math.min(1, v));
+  try {
+    localStorage.setItem(VOL_KEY, String(sfxVol));
+  } catch {
+    /* ignore */
+  }
+  const g = bus();
+  if (g) g.gain.value = sfxVol;
+}
+
+/** Mute → soft → normal → mute */
+export function cycleSfxVolume(): number {
+  const i = VOL_STEPS.findIndex((s) => Math.abs(s - sfxVol) < 0.05);
+  const next = VOL_STEPS[(i + 1) % VOL_STEPS.length]!;
+  setSfxVolume(next);
+  return next;
+}
+
+function play(id: SfxId, opts?: { gain?: number; rate?: number }): void {
   const c = ac();
   const out = bus();
   const buf = buffers.get(id);
@@ -78,21 +116,20 @@ function play(
 
   const src = c.createBufferSource();
   src.buffer = buf;
-  const baseRate = opts?.rate ?? 1;
-  src.playbackRate.value = baseRate * (0.97 + Math.random() * 0.06);
+  src.playbackRate.value = (opts?.rate ?? 1) * (0.98 + Math.random() * 0.04);
 
   const filter = c.createBiquadFilter();
   filter.type = "lowpass";
-  filter.frequency.value = opts?.brightness ?? 3800;
-  filter.Q.value = 0.65;
+  filter.frequency.value = 1700;
+  filter.Q.value = 0.5;
 
   const g = c.createGain();
-  const gain = (opts?.gain ?? 1) * 0.7;
+  const gain = (opts?.gain ?? 1) * 0.45;
   const t0 = c.currentTime;
   g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(Math.max(0.001, gain), t0 + 0.01);
-  g.gain.setValueAtTime(Math.max(0.001, gain), t0 + Math.max(0.02, buf.duration - 0.05));
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + buf.duration + 0.02);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.001, gain), t0 + 0.02);
+  g.gain.setValueAtTime(Math.max(0.001, gain), t0 + Math.max(0.03, buf.duration - 0.06));
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + buf.duration + 0.03);
 
   src.connect(filter);
   filter.connect(g);
@@ -101,17 +138,18 @@ function play(
 }
 
 export function sfxPaperRustle(): void {
-  play("rustle", { gain: 0.7, rate: 1.02, brightness: 3600 });
+  play("rustle", { gain: 0.55, rate: 1.02 });
 }
 
 export function sfxPaperSlide(): void {
-  play("slide", { gain: 0.85, rate: 1, brightness: 3400 });
+  play("slide", { gain: 0.6, rate: 0.98 });
 }
 
 export function sfxPaperCrumple(): void {
-  play("crumple", { gain: 0.95, rate: 0.96, brightness: 3200 });
+  // Soft page flutter — not a harsh crumple scratch
+  play("crumple", { gain: 0.65, rate: 0.94 });
 }
 
 export function sfxPaperFlutter(): void {
-  play("flutter", { gain: 0.65, rate: 1.04, brightness: 4000 });
+  play("flutter", { gain: 0.5, rate: 1.04 });
 }

@@ -238,6 +238,7 @@ export function drawHud(
     moves: number;
     score: number;
     goals: Goal[];
+    sfxVol?: number;
   },
 ): void {
   // Title scrap
@@ -256,25 +257,27 @@ export function drawHud(
   ctx.fillText("RIOT CUBE", 58, 78);
 
   ctx.fillStyle = "#111";
-  roundRect(ctx, 360, 40, 150, 58, 6);
+  roundRect(ctx, 340, 40, 130, 58, 6);
   ctx.fill();
   ctx.fillStyle = "#c8ff3d";
   ctx.font = "700 18px 'Chakra Petch', sans-serif";
-  ctx.fillText("MOVES", 378, 64);
+  ctx.fillText("MOVES", 356, 64);
   ctx.fillStyle = "#fff";
   ctx.font = "800 28px 'Chakra Petch', sans-serif";
-  ctx.fillText(String(opts.moves), 378, 90);
+  ctx.fillText(String(opts.moves), 356, 90);
 
   ctx.fillStyle = "#f3efe6";
-  roundRect(ctx, 530, 36, 150, 62, 6);
+  roundRect(ctx, 488, 36, 130, 62, 6);
   ctx.fill();
   ctx.strokeStyle = "#111";
   ctx.stroke();
   ctx.fillStyle = "#111";
   ctx.font = "700 16px 'Chakra Petch', sans-serif";
-  ctx.fillText("SCORE", 548, 60);
+  ctx.fillText("SCORE", 504, 60);
   ctx.font = "800 26px 'Chakra Petch', sans-serif";
-  ctx.fillText(String(opts.score), 548, 88);
+  ctx.fillText(String(opts.score), 504, 88);
+
+  drawVolumeButton(ctx, opts.sfxVol ?? 0.4);
 
   ctx.fillStyle = "#f7f3ea";
   roundRect(ctx, 40, 120, 640, 150, 6);
@@ -294,6 +297,63 @@ export function drawHud(
     ctx.font = "800 26px 'Chakra Petch', sans-serif";
     ctx.fillText(`${g.have}/${g.need}`, gx + 64, gy + 36);
   });
+}
+
+export const VOL_BTN = { x: 640, y: 36, w: 56, h: 62 };
+
+export function hitVolumeButton(x: number, y: number): boolean {
+  return (
+    x >= VOL_BTN.x &&
+    x <= VOL_BTN.x + VOL_BTN.w &&
+    y >= VOL_BTN.y &&
+    y <= VOL_BTN.y + VOL_BTN.h
+  );
+}
+
+function drawVolumeButton(ctx: CanvasRenderingContext2D, vol: number): void {
+  const { x, y, w, h } = VOL_BTN;
+  ctx.fillStyle = "#f3efe6";
+  roundRect(ctx, x, y, w, h, 6);
+  ctx.fill();
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  ctx.fillStyle = "#111";
+  // Speaker body
+  ctx.beginPath();
+  ctx.moveTo(cx - 12, cy - 7);
+  ctx.lineTo(cx - 4, cy - 7);
+  ctx.lineTo(cx + 4, cy - 14);
+  ctx.lineTo(cx + 4, cy + 14);
+  ctx.lineTo(cx - 4, cy + 7);
+  ctx.lineTo(cx - 12, cy + 7);
+  ctx.closePath();
+  ctx.fill();
+
+  if (vol <= 0.001) {
+    ctx.strokeStyle = "#ff2d6a";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx + 8, cy - 10);
+    ctx.lineTo(cx + 18, cy + 10);
+    ctx.moveTo(cx + 18, cy - 10);
+    ctx.lineTo(cx + 8, cy + 10);
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx + 4, cy, 8, -0.6, 0.6);
+    ctx.stroke();
+    if (vol > 0.5) {
+      ctx.beginPath();
+      ctx.arc(cx + 4, cy, 14, -0.7, 0.7);
+      ctx.stroke();
+    }
+  }
 }
 
 /** Draw sticker image without a square cell — floating on the page. */
