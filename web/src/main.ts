@@ -1037,10 +1037,16 @@ function drawThemeChip(rect: ButtonRect, id: ThemeId, active: boolean): void {
   ctx.shadowBlur = 0;
   const sw = (rect.w - 20) / 3;
   for (let i = 0; i < 3; i++) {
-    ctx.fillStyle = i === 0 ? t.BLOCK : i === 1 ? t.TABLE_FILL : t.WORM;
+    // Disc · ink · paper — one clean swatch trio, no accent rainbow.
+    ctx.fillStyle = i === 0 ? t.TABLE_FILL : i === 1 ? t.INK : t.PAPER_DARK;
     ctx.beginPath();
     ctx.arc(rect.x + 14 + i * (sw + 4) + sw / 2, rect.y + 28, 7, 0, Math.PI * 2);
     ctx.fill();
+    if (i === 0) {
+      ctx.strokeStyle = t.INK;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
   }
   ctx.fillStyle = t.OBJ;
   ctx.font = font(700, 11);

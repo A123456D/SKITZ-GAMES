@@ -13,6 +13,11 @@ import {
 } from "./palette";
 import { font } from "./typography";
 
+/** Palette fingerprint so sprite caches invalidate when colours change. */
+function paletteKey(): string {
+  return `${P.TABLE_FILL}|${P.TABLE}|${P.PAPER}|${P.INK}`;
+}
+
 function strokeChannel(ctx: CanvasRenderingContext2D, channel: number, scale = 1): void {
   ctx.setLineDash([]);
   if (channel === 1) ctx.setLineDash([7 * scale, 5 * scale]);
@@ -92,7 +97,8 @@ let bgCacheTheme = "";
 
 export function drawBackground(ctx: CanvasRenderingContext2D): void {
   const theme = getThemeId();
-  if (!bgCache || bgCacheTheme !== theme) {
+  const pal = paletteKey();
+  if (!bgCache || bgCacheTheme !== `${theme}|${pal}`) {
     if (!bgCache) {
       bgCache = document.createElement("canvas");
       bgCache.width = W;
@@ -105,7 +111,7 @@ export function drawBackground(ctx: CanvasRenderingContext2D): void {
     }
     bctx.clearRect(0, 0, W, H);
     paintBackground(bctx, theme);
-    bgCacheTheme = theme;
+    bgCacheTheme = `${theme}|${pal}`;
   }
   ctx.drawImage(bgCache, 0, 0);
 }
@@ -222,54 +228,30 @@ function paintBackground(ctx: CanvasRenderingContext2D, theme: ThemeId): void {
   } else if (theme === "dusk") {
     const wash = ctx.createLinearGradient(0, 0, 0, H);
     wash.addColorStop(0, "#0A1A3A");
-    wash.addColorStop(0.5, P.PAPER);
-    wash.addColorStop(1, "#0C2A52");
+    wash.addColorStop(0.55, P.PAPER);
+    wash.addColorStop(1, "#0A1C3A");
     ctx.fillStyle = wash;
     ctx.fillRect(0, 0, W, H);
-    const vig = ctx.createRadialGradient(W * 0.5, H * 0.38, W * 0.1, W * 0.5, H * 0.5, W * 0.92);
-    vig.addColorStop(0, "rgba(120, 170, 230, 0.07)");
-    vig.addColorStop(1, "rgba(0, 8, 24, 0.32)");
+    const vig = ctx.createRadialGradient(W * 0.5, H * 0.4, W * 0.12, W * 0.5, H * 0.5, W * 0.9);
+    vig.addColorStop(0, "rgba(120, 160, 210, 0.05)");
+    vig.addColorStop(1, "rgba(0, 8, 24, 0.28)");
     ctx.fillStyle = vig;
-    ctx.fillRect(0, 0, W, H);
-    // Soft mint whisper bottom-right.
-    const mint = ctx.createRadialGradient(W * 0.9, H * 0.85, 8, W * 0.85, H * 0.9, W * 0.45);
-    mint.addColorStop(0, "rgba(90, 214, 165, 0.08)");
-    mint.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = mint;
     ctx.fillRect(0, 0, W, H);
   } else if (theme === "mono") {
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, "#000000");
-    sky.addColorStop(0.5, P.PAPER);
-    sky.addColorStop(1, "#111111");
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
-  } else if (theme === "red") {
-    const wash = ctx.createLinearGradient(0, 0, 0, H);
-    wash.addColorStop(0, "#FBF4F2");
-    wash.addColorStop(1, "#F0E0DC");
-    ctx.fillStyle = wash;
-    ctx.fillRect(0, 0, W, H);
-    const vig = ctx.createRadialGradient(W * 0.5, H * 0.42, W * 0.15, W * 0.5, H * 0.5, W * 0.85);
-    vig.addColorStop(0, "rgba(0,0,0,0)");
-    vig.addColorStop(1, "rgba(120, 50, 45, 0.08)");
-    ctx.fillStyle = vig;
-    ctx.fillRect(0, 0, W, H);
-  } else if (theme === "blue") {
-    const wash = ctx.createLinearGradient(0, 0, 0, H);
-    wash.addColorStop(0, "#F4F8FC");
-    wash.addColorStop(1, "#DDE6F0");
-    ctx.fillStyle = wash;
-    ctx.fillRect(0, 0, W, H);
-    const vig = ctx.createRadialGradient(W * 0.5, H * 0.42, W * 0.15, W * 0.5, H * 0.5, W * 0.85);
-    vig.addColorStop(0, "rgba(0,0,0,0)");
-    vig.addColorStop(1, "rgba(45, 70, 110, 0.08)");
-    ctx.fillStyle = vig;
+    ctx.fillStyle = P.PAPER;
     ctx.fillRect(0, 0, W, H);
   } else {
-    const vig = ctx.createRadialGradient(W * 0.5, H * 0.42, W * 0.15, W * 0.5, H * 0.5, W * 0.85);
+    // Light paper boards: flat cream/tint + a whisper of vignette — no washes.
+    const vig = ctx.createRadialGradient(W * 0.5, H * 0.42, W * 0.2, W * 0.5, H * 0.5, W * 0.88);
     vig.addColorStop(0, "rgba(0,0,0,0)");
-    vig.addColorStop(1, "rgba(40, 32, 22, 0.07)");
+    vig.addColorStop(
+      1,
+      theme === "red"
+        ? "rgba(90, 50, 45, 0.05)"
+        : theme === "blue"
+          ? "rgba(40, 60, 90, 0.05)"
+          : "rgba(40, 32, 22, 0.05)",
+    );
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, W, H);
   }
@@ -283,38 +265,12 @@ function paintBackground(ctx: CanvasRenderingContext2D, theme: ThemeId): void {
 
 export function drawHairlineGrid(ctx: CanvasRenderingContext2D, state: GridState, layout: Layout): void {
   const theme = getThemeId();
-  // Light paper boards get architectural lines; night boards get soft dots.
-  if (isLightTheme(theme)) {
-    ctx.strokeStyle = P.INK_HAIR;
-    ctx.globalAlpha = 0.45;
-    ctx.lineWidth = 1;
-    const stepPx = layout.cell + layout.gap;
-    const ox = layout.origin.x - layout.gap / 2;
-    const oy = layout.origin.y - layout.gap / 2;
-    const bw = state.width * stepPx;
-    const bh = state.height * stepPx;
-    ctx.beginPath();
-    for (let x = 0; x <= state.width; x++) {
-      const px = ox + x * stepPx;
-      ctx.moveTo(px, oy);
-      ctx.lineTo(px, oy + bh);
-    }
-    for (let y = 0; y <= state.height; y++) {
-      const py = oy + y * stepPx;
-      ctx.moveTo(ox, py);
-      ctx.lineTo(ox + bw, py);
-    }
-    ctx.stroke();
-    ctx.globalAlpha = 1;
+  // Clean paper boards stay blank behind the discs — no grid lines.
+  if (isLightTheme(theme) || theme === "retro") {
     return;
   }
   ctx.fillStyle = P.INK_HAIR;
-  ctx.globalAlpha = theme === "dusk" ? 0.35 : 0.28;
-  // Retro already has the floor grid — skip board dots so it doesn't clutter.
-  if (theme === "retro") {
-    ctx.globalAlpha = 1;
-    return;
-  }
+  ctx.globalAlpha = theme === "dusk" ? 0.3 : 0.22;
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {
       const c = cellCenter(layout, { x, y });
@@ -334,6 +290,13 @@ export function drawHairlineGrid(ctx: CanvasRenderingContext2D, state: GridState
  */
 const SPRITE_SCALE = 2;
 const spriteCache = new Map<string, HTMLCanvasElement>();
+
+/** Drop baked art when the palette changes so discs pick up new colours. */
+export function clearThemeCaches(): void {
+  bgCache = null;
+  bgCacheTheme = "";
+  spriteCache.clear();
+}
 
 type Painter = (c: CanvasRenderingContext2D) => void;
 
@@ -393,17 +356,20 @@ export function drawWheel(
   const r = Math.min(layout.cell * 0.48, step(layout) * 0.46);
   const theme = getThemeId();
   const rKey = r.toFixed(1);
+  const pal = paletteKey();
   const lightFace = theme === "dusk" || isLightTheme(theme);
   const dark = isDarkTheme(theme) && theme !== "dusk";
-  // Soft hover bob; selection floats a touch higher.
-  const hover = Math.sin(time * 1.5 + table.id * 0.9) * (selected ? 1.35 : 0.75);
-  const floatY = (selected ? 6.5 : 5) + hover;
+  // Soft hover bob; paper boards stay flatter like cut cardstock.
+  const bob = isLightTheme(theme) ? 0.35 : selected ? 1.35 : 0.75;
+  const hover = Math.sin(time * 1.5 + table.id * 0.9) * bob;
+  const floatY = (isLightTheme(theme) ? (selected ? 3.5 : 2.5) : selected ? 6.5 : 5) + hover;
   const edge = Math.max(2.6, r * 0.07); // knob / cardstock thickness
   const face = table.locked ? P.SHADE : P.TABLE_FILL;
-  // Edge stock — darker than the face so the knob reads as thick.
-  const stock =
-    theme === "dusk"
-      ? "#B8C9E0"
+  // Edge stock — a shade darker than the face so the knob reads as thick card.
+  const stock = isLightTheme(theme)
+    ? P.SHADE
+    : theme === "dusk"
+      ? "#B0BAC8"
       : dark
         ? P.SHADE
         : P.PAPER_DARK;
@@ -413,7 +379,7 @@ export function drawWheel(
   const shadowH = r * 0.68 + 6;
   stamp(
     ctx,
-    `sh|${theme}|${rKey}`,
+    `sh|${theme}|${pal}|${rKey}`,
     shadowW,
     shadowH,
     (c) => {
@@ -447,32 +413,25 @@ export function drawWheel(
     hub.y + r * 0.1,
   );
 
-  // Retro: soft cyan outer glow around the floating knob.
+  // Retro: one soft cyan halo — no double blur storm.
   if (theme === "retro") {
-    const glowPulse = selected ? 0.55 + 0.2 * Math.sin(time * 3.2) : 0.42;
-    const pad = selected ? 40 : 32;
+    const glowPulse = selected ? 0.45 + 0.15 * Math.sin(time * 3.2) : 0.32;
+    const pad = selected ? 28 : 22;
     const glowSize = (r + pad) * 2;
     ctx.save();
     ctx.globalAlpha = glowPulse;
     stamp(
       ctx,
-      `glow|${theme}|${rKey}|${selected ? 1 : 0}`,
+      `glow|${theme}|${pal}|${rKey}|${selected ? 1 : 0}`,
       glowSize,
       glowSize,
       (c) => {
         c.shadowColor = P.TABLE;
-        c.shadowBlur = selected ? 22 : 16;
+        c.shadowBlur = selected ? 14 : 10;
         c.strokeStyle = P.TABLE;
-        c.lineWidth = 3;
+        c.lineWidth = 2.5;
         c.beginPath();
         c.arc(0, 0, r + 1.5, 0, Math.PI * 2);
-        c.stroke();
-        // Second softer halo.
-        c.shadowBlur = selected ? 34 : 26;
-        c.globalAlpha = 0.55;
-        c.lineWidth = 6;
-        c.beginPath();
-        c.arc(0, 0, r + 2, 0, Math.PI * 2);
         c.stroke();
       },
       hub.x,
@@ -495,7 +454,7 @@ export function drawWheel(
   const sx = squash > 1 ? 1 / Math.sqrt(squash) : squash;
   stamp(
     ctx,
-    `face|${theme}|${table.module}|${table.locked ? 1 : 0}|${table.link ? 1 : 0}|${rKey}`,
+    `face|${theme}|${pal}|${table.module}|${table.locked ? 1 : 0}|${table.link ? 1 : 0}|${rKey}`,
     faceSize,
     faceSize,
     (c) => paintWheelFace(c, table, r, theme, lightFace, dark, face),
@@ -570,7 +529,7 @@ function paintWheelFace(
   ctx: CanvasRenderingContext2D,
   table: TableDef,
   r: number,
-  theme: string,
+  theme: ThemeId,
   lightFace: boolean,
   dark: boolean,
   face: string,
@@ -655,9 +614,9 @@ function paintWheelFace(
   }
   ctx.stroke();
 
-  // Punched connection points — solid paper disc with ink ring.
+  // Punched connection points — cream hole on paper discs, ink ring.
   const pr = Math.max(3.2, r * 0.105);
-  ctx.fillStyle = face;
+  ctx.fillStyle = isLightTheme(theme) ? P.PAPER : face;
   ctx.beginPath();
   for (const port of ports) {
     const p = portPos(port);
@@ -665,7 +624,7 @@ function paintWheelFace(
     ctx.arc(p.x, p.y, pr, 0, Math.PI * 2);
   }
   ctx.fill();
-  ctx.strokeStyle = theme === "retro" ? P.INK_SOFT : theme === "dusk" ? P.BLOCK : P.TABLE;
+  ctx.strokeStyle = P.TABLE;
   ctx.lineWidth = Math.max(1.8, r * 0.06);
   ctx.beginPath();
   for (const port of ports) {
@@ -920,7 +879,7 @@ function drawCrate(ctx: CanvasRenderingContext2D, c: Vec2, size: number): void {
   ctx.save();
   ctx.translate(c.x, c.y);
   roundRect(ctx, -s / 2, -s / 2, s, s, 3);
-  ctx.fillStyle = getThemeId() === "dusk" ? P.BLOCK : P.SHADE;
+  ctx.fillStyle = P.SHADE;
   ctx.globalAlpha = 0.8;
   ctx.fill();
   ctx.globalAlpha = 1;
@@ -929,10 +888,8 @@ function drawCrate(ctx: CanvasRenderingContext2D, c: Vec2, size: number): void {
 
 function drawWall(ctx: CanvasRenderingContext2D, c: Vec2, size: number): void {
   const s = size * 0.7;
-  // Soft paper blocks — never pure ink black
-  const theme = getThemeId();
-  ctx.fillStyle = theme === "dusk" ? P.BLOCK : P.SHADE;
-  ctx.globalAlpha = theme === "dusk" ? 0.82 : 0.7;
+  ctx.fillStyle = P.SHADE;
+  ctx.globalAlpha = 0.75;
   roundRect(ctx, c.x - s / 2, c.y - s / 2, s, s, 3);
   ctx.fill();
   ctx.globalAlpha = 1;
@@ -1725,31 +1682,14 @@ export function drawGlassButton(
   const press = primary ? 1 - 0.04 * Math.max(0, Math.sin(time * 6) * 0.15) : 1;
   const cx = rect.x + rect.w / 2;
   const cy = rect.y + rect.h / 2;
-  const fill = primary ? P.PAPER_DARK : P.FILL;
-  const stroke =
-    theme === "retro"
-      ? primary
-        ? P.SELECT
-        : P.TABLE_OUTLINE
-      : theme === "dusk"
-        ? primary
-          ? P.BLOCK
-          : P.TABLE
-        : primary
-          ? P.SELECT
-          : P.INK;
-  const shadow =
-    theme === "retro"
-      ? "rgba(199, 125, 255, 0.32)"
-      : theme === "mono"
-        ? "rgba(0,0,0,0.55)"
-        : theme === "dusk"
-          ? "rgba(10, 30, 70, 0.4)"
-          : theme === "red"
-            ? "rgba(120, 50, 45, 0.16)"
-            : theme === "blue"
-              ? "rgba(45, 70, 110, 0.16)"
-              : "rgba(30, 24, 18, 0.14)";
+  // Paper themes: buttons match the disc taupe. Night themes keep a darker fill.
+  const fill = isLightTheme(theme) ? P.TABLE_FILL : primary ? P.PAPER_DARK : P.FILL;
+  const stroke = primary ? P.SELECT : P.INK;
+  const shadow = isDarkTheme(theme)
+    ? theme === "retro"
+      ? "rgba(0, 200, 220, 0.18)"
+      : "rgba(0,0,0,0.4)"
+    : "rgba(30, 24, 18, 0.12)";
 
   ctx.save();
   ctx.globalAlpha = enabled ? 1 : 0.4;
@@ -1757,16 +1697,16 @@ export function drawGlassButton(
   ctx.scale(press, press);
   ctx.translate(-cx, -cy);
   ctx.shadowColor = shadow;
-  ctx.shadowBlur = theme === "retro" ? 14 : theme === "dusk" ? 10 : 8;
-  ctx.shadowOffsetY = 2;
+  ctx.shadowBlur = isLightTheme(theme) ? 4 : theme === "retro" ? 10 : 6;
+  ctx.shadowOffsetY = 1;
   roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 12);
   ctx.fillStyle = fill;
   ctx.fill();
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
   ctx.strokeStyle = stroke;
-  ctx.lineWidth = primary ? 1.9 : 1.4;
-  ctx.globalAlpha = enabled ? (primary ? 0.95 : 0.65) : 0.35;
+  ctx.lineWidth = primary ? 1.7 : 1.35;
+  ctx.globalAlpha = enabled ? (primary ? 0.9 : 0.55) : 0.3;
   roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 12);
   ctx.stroke();
   ctx.globalAlpha = enabled ? 1 : 0.4;
@@ -1788,32 +1728,28 @@ export function drawRoundButton(
   _time = 0,
 ): void {
   const theme = getThemeId();
-  const stroke =
-    theme === "retro" ? P.SELECT : theme === "dusk" ? P.TABLE : P.INK;
-  const shadow =
-    theme === "retro"
-      ? "rgba(199, 125, 255, 0.32)"
-      : theme === "mono"
-        ? "rgba(0,0,0,0.55)"
-        : theme === "dusk"
-          ? "rgba(10, 30, 70, 0.4)"
-          : "rgba(30, 24, 18, 0.14)";
+  const stroke = P.INK;
+  const shadow = isDarkTheme(theme)
+    ? theme === "retro"
+      ? "rgba(0, 200, 220, 0.18)"
+      : "rgba(0,0,0,0.4)"
+    : "rgba(30, 24, 18, 0.12)";
 
   ctx.save();
   ctx.globalAlpha = enabled ? 1 : 0.4;
   ctx.translate(x, y);
   ctx.shadowColor = shadow;
-  ctx.shadowBlur = theme === "retro" ? 14 : theme === "dusk" ? 10 : 8;
-  ctx.shadowOffsetY = 2;
-  ctx.fillStyle = P.FILL;
+  ctx.shadowBlur = isLightTheme(theme) ? 4 : theme === "retro" ? 10 : 6;
+  ctx.shadowOffsetY = 1;
+  ctx.fillStyle = isLightTheme(theme) ? P.TABLE_FILL : P.FILL;
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
   ctx.strokeStyle = stroke;
-  ctx.lineWidth = 1.6;
-  ctx.globalAlpha = enabled ? 0.7 : 0.3;
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = enabled ? 0.55 : 0.28;
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
@@ -1854,7 +1790,7 @@ export function drawVolumeSlider(
   ctx.moveTo(trackX, trackY);
   ctx.lineTo(trackX + trackW, trackY);
   ctx.stroke();
-  ctx.strokeStyle = theme === "retro" ? P.CH0 : P.TABLE_OUTLINE;
+  ctx.strokeStyle = P.TABLE_OUTLINE;
   ctx.beginPath();
   ctx.moveTo(trackX, trackY);
   ctx.lineTo(trackX + trackW * rect.value, trackY);

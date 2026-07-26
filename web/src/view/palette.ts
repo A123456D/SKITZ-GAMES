@@ -85,164 +85,166 @@ function pack(base: ThemeBase): ThemeColors {
   };
 }
 
-/** One ink color across all object roles. */
-function monoObjects(ink: string, fill = "#FFFFFF", outline = ink): Pick<
-  ThemeBase,
-  | "OBJ"
-  | "BLOCK"
-  | "BARRIER"
-  | "TABLE_FILL"
-  | "TABLE"
-  | "TABLE_OUTLINE"
-  | "WORM"
-  | "MIRROR"
-  | "SINK"
-  | "FILTER"
-  | "CH0"
-  | "CH1"
-  | "CH2"
-> {
+/**
+ * Clean paper formula: one ink for every mark, one taupe for every disc.
+ * No red/blue/yellow object accents — the board stays monochrome within its tint.
+ */
+function cleanBoard(
+  paper: string,
+  paperDark: string,
+  voidBg: string,
+  ink: string,
+  inkSoft: string,
+  inkFaint: string,
+  inkHair: string,
+  disc: string,
+  button: string,
+  shade: string,
+  select = ink,
+): ThemeBase {
   return {
+    VOID: voidBg,
+    PAPER: paper,
+    PAPER_DARK: paperDark,
+    INK: ink,
+    INK_SOFT: inkSoft,
+    INK_FAINT: inkFaint,
+    INK_HAIR: inkHair,
+    SELECT: select,
+    FILL: button,
+    SHADE: shade,
     OBJ: ink,
     BLOCK: ink,
     BARRIER: ink,
-    TABLE_FILL: fill,
+    TABLE_FILL: disc,
     TABLE: ink,
-    TABLE_OUTLINE: outline,
+    TABLE_OUTLINE: inkSoft,
     WORM: ink,
     MIRROR: ink,
     SINK: ink,
     FILTER: ink,
     CH0: ink,
-    CH1: ink,
-    CH2: ink,
+    CH1: inkSoft,
+    CH2: inkFaint,
   };
 }
 
-/** Classic paper / ink — the original look. */
-const PAPER_BASE = {
-  VOID: "#F4F1EA",
-  PAPER: "#F7F4EC",
-  PAPER_DARK: "#E8E2D6",
-  INK: "#141414",
-  INK_SOFT: "#2A2A2A",
-  INK_FAINT: "#9A958C",
-  INK_HAIR: "#C4BFB4",
-  SELECT: "#141414",
-  FILL: "#FFFFFF",
-  SHADE: "#B8B2A6",
-} as const;
-
 export const THEMES: Record<ThemeId, ThemeColors> = {
-  paper: pack({
-    ...PAPER_BASE,
-    ...monoObjects("#141414"),
-  }),
-  red: pack({
-    VOID: "#F3E8E6",
-    PAPER: "#F8EEEB",
-    PAPER_DARK: "#E8D4D0",
-    INK: "#5C2E32",
-    INK_SOFT: "#A95F63",
-    INK_FAINT: "#B89694",
-    INK_HAIR: "#D4B8B4",
-    SELECT: "#A95F63",
-    FILL: "#FFF8F6",
-    SHADE: "#C9A8A4",
-    ...monoObjects("#A95F63", "#FFF8F6", "#8E4F58"),
-    CH0: "#B9676B",
-    CH1: "#CB7D72",
-    CH2: "#8E4F58",
-  }),
-  blue: pack({
-    VOID: "#E6ECF2",
-    PAPER: "#EEF3F8",
-    PAPER_DARK: "#D4DEE8",
-    INK: "#2E4058",
-    INK_SOFT: "#607F9F",
-    INK_FAINT: "#8A9BB0",
-    INK_HAIR: "#B8C6D4",
-    SELECT: "#607F9F",
-    FILL: "#F7FAFC",
-    SHADE: "#A8B8C8",
-    ...monoObjects("#607F9F", "#F7FAFC", "#526D91"),
-    CH0: "#698CAC",
-    CH1: "#7CA4BC",
-    CH2: "#526D91",
-  }),
   /**
-   * Soft night board: deep navy field, light-grey knobs,
-   * mint connectors, coral ports. Calm, not neon.
+   * INK — cream paper, taupe knobs, charcoal paths.
+   * Matches the reference look with no colored discs.
    */
-  dusk: pack({
-    VOID: "#071228",
-    PAPER: "#0E2448",
-    PAPER_DARK: "#16345F",
-    INK: "#F4F8FF",
-    INK_SOFT: "#C9D8F0",
-    INK_FAINT: "#7E96BC",
-    INK_HAIR: "#2A4A78",
-    SELECT: "#FF7A8A",
-    FILL: "#152E58",
-    SHADE: "#0A1B38",
-    OBJ: "#F4F8FF",
-    BLOCK: "#FF7A8A",
-    BARRIER: "#5AD6A5",
-    TABLE_FILL: "#D8DEE8",
-    TABLE: "#5AD6A5",
-    TABLE_OUTLINE: "#1A3358",
-    WORM: "#F0D56A",
-    MIRROR: "#B48AE8",
-    SINK: "#F0A06A",
-    FILTER: "#E08ABA",
-    CH0: "#5AD6A5",
-    CH1: "#7EE0BA",
-    CH2: "#3FBF90",
-  }),
-  mono: pack({
-    VOID: "#000000",
-    PAPER: "#0A0A0A",
-    PAPER_DARK: "#141414",
-    INK: "#F2F2F2",
-    INK_SOFT: "#D0D0D0",
-    INK_FAINT: "#888888",
-    INK_HAIR: "#3A3A3A",
-    SELECT: "#FFFFFF",
-    FILL: "#1A1A1A",
-    SHADE: "#2A2A2A",
-    ...monoObjects("#F2F2F2", "#1A1A1A", "#FFFFFF"),
-    CH0: "#FFFFFF",
-    CH1: "#C8C8C8",
-    CH2: "#A0A0A0",
-  }),
+  paper: pack(
+    cleanBoard(
+      "#F4F0E8", // paper
+      "#E6E0D4", // paper dark
+      "#EDE8DF", // void
+      "#2C2A26", // ink
+      "#4A4640", // ink soft
+      "#8A857C", // ink faint
+      "#C4BEB2", // ink hair
+      "#B8B2A6", // disc taupe — matches the reference cardstock
+      "#C4BEB2", // button
+      "#9A9488", // shade
+    ),
+  ),
   /**
-   * Neon night: violet void, dark knob faces,
-   * hot-pink select, glowing cyan connectors, purple accents.
+   * RED — same clean paper board, rose-tinted.
+   */
+  red: pack(
+    cleanBoard(
+      "#F8EDEA", // warmer rose paper
+      "#EAD6D0",
+      "#F2E6E2",
+      "#5C2E2C", // deep rose ink
+      "#8A504C",
+      "#B8908C",
+      "#D8C4C0",
+      "#C9A8A2", // rose-taupe discs
+      "#D4B8B2",
+      "#A87872",
+    ),
+  ),
+  /**
+   * BLUE — same clean paper board, slate-tinted.
+   */
+  blue: pack(
+    cleanBoard(
+      "#ECF1F6",
+      "#D4DEE8",
+      "#E4EAF0",
+      "#243848",
+      "#3E5870",
+      "#7A90A4",
+      "#B0C0D0",
+      "#A0B0C0",
+      "#B0C0D0",
+      "#7088A0",
+    ),
+  ),
+  /**
+   * DUSK — quiet night paper: navy field, light-grey knobs, single soft ink.
+   */
+  dusk: pack(
+    cleanBoard(
+      "#0E2448",
+      "#16345F",
+      "#071228",
+      "#E8EEF8",
+      "#C0CCE0",
+      "#7E96BC",
+      "#2A4A78",
+      "#D0D6E0",
+      "#1A3058",
+      "#0A1B38",
+      "#E8EEF8",
+    ),
+  ),
+  /**
+   * MONO — black field, grey knobs, white ink.
+   */
+  mono: pack(
+    cleanBoard(
+      "#0A0A0A",
+      "#141414",
+      "#000000",
+      "#F0F0F0",
+      "#C8C8C8",
+      "#888888",
+      "#3A3A3A",
+      "#2A2A2A",
+      "#1A1A1A",
+      "#404040",
+      "#FFFFFF",
+    ),
+  ),
+  /**
+   * RETRO — still night, still cyan, but one accent only (no rainbow objects).
    */
   retro: pack({
     VOID: "#060014",
     PAPER: "#100228",
     PAPER_DARK: "#1C0A3C",
-    INK: "#FFE8F6",
-    INK_SOFT: "#FF6EC7",
-    INK_FAINT: "#A88BC8",
-    INK_HAIR: "#4A2A72",
-    SELECT: "#C77DFF",
+    INK: "#F4ECF8",
+    INK_SOFT: "#C8B0D8",
+    INK_FAINT: "#8870A0",
+    INK_HAIR: "#3A2860",
+    SELECT: "#5CFFF8",
     FILL: "#1A0A3A",
     SHADE: "#2A1450",
-    OBJ: "#FFE8F6",
-    BLOCK: "#FF6EC7",
-    BARRIER: "#00E5F0",
+    OBJ: "#5CFFF8",
+    BLOCK: "#5CFFF8",
+    BARRIER: "#5CFFF8",
     TABLE_FILL: "#1A0A3A",
-    TABLE: "#00E5F0",
-    TABLE_OUTLINE: "#5CFFF8",
-    WORM: "#FFE8F6",
-    MIRROR: "#C77DFF",
-    SINK: "#FF6EC7",
+    TABLE: "#5CFFF8",
+    TABLE_OUTLINE: "#3AD0D8",
+    WORM: "#5CFFF8",
+    MIRROR: "#5CFFF8",
+    SINK: "#5CFFF8",
     FILTER: "#5CFFF8",
-    CH0: "#00E5F0",
-    CH1: "#5CFFF8",
-    CH2: "#C77DFF",
+    CH0: "#5CFFF8",
+    CH1: "#A8F0F4",
+    CH2: "#3AD0D8",
   }),
 };
 
@@ -298,7 +300,7 @@ export function syncDomTheme(): void {
     game.style.borderColor = colors.INK_HAIR;
     game.style.boxShadow = isDarkTheme()
       ? `0 16px 48px ${colors.VOID}aa`
-      : `0 12px 40px ${colors.INK}22`;
+      : `0 12px 40px ${colors.INK}18`;
   }
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", colors.PAPER);
