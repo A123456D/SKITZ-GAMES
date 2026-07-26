@@ -5,9 +5,9 @@ import { makeTable, type TableDef } from "./tableDef";
 
 /**
  * Solution / replay step.
- * - rotate: tableId >= 0
- * - flip phase switch: tableId === -1, (x,y) set
- * - place token on pad: tableId === -2, (x,y) set
+ * - rotate disc: tableId >= 0, delta = ±1 (or multi via repeated steps)
+ * - cycle triangle: tableId === -1, (x,y) set, delta = ±1 (ori flip)
+ * - board turn: tableId === -3, delta = ±1 (grid remap; discs keep rotationQ)
  */
 export type MoveStep = {
   tableId: number;
@@ -25,7 +25,7 @@ export type LevelData = {
   undoLimit: number;
   /** Max times the player may fire beams to inspect / clear. */
   pulseLimit: number;
-  /** How many tokens the player may place on PAD sockets. */
+  /** @deprecated Kept for save compat; always 0 after depth redesign. */
   tokenBudget: number;
   tables: TableDef[];
   cells: CellData[];
@@ -67,7 +67,11 @@ export const cell = {
     makeCell(1, dir, MirrorOri.BACKSLASH, tableId, channel, phase),
   recv: (channel = 0, tableId = -1, phase = 0) =>
     makeCell(3, Dir.E, MirrorOri.BACKSLASH, tableId, channel, phase),
-  mir: (ori: number, tableId = -1) => makeCell(2, Dir.E, ori, tableId, 0),
+  /**
+   * Triangle deflector. `player` → phase=1 (tap to cycle ori); fixed → phase=0.
+   */
+  mir: (ori: number, player = false, tableId = -1) =>
+    makeCell(2, Dir.E, ori, tableId, 0, player ? 1 : 0),
   crate: (tableId = -1) => makeCell(4, Dir.E, MirrorOri.BACKSLASH, tableId, 0),
   wall: (tableId = -1) => makeCell(5, Dir.E, MirrorOri.BACKSLASH, tableId, 0),
   sink: (tableId = -1) => makeCell(6, Dir.E, MirrorOri.BACKSLASH, tableId, 0),
@@ -75,14 +79,6 @@ export const cell = {
   filter: (channel: number, tableId = -1) => makeCell(8, Dir.E, MirrorOri.BACKSLASH, tableId, channel),
   barrier: (passDir: number, tableId = -1) =>
     makeCell(9, passDir, MirrorOri.BACKSLASH, tableId, 0),
-  phaseSwitch: (armed = 0, tableId = -1) =>
-    makeCell(10, Dir.E, MirrorOri.BACKSLASH, tableId, 0, armed),
-  phaseGate: (needPhase = 1, tableId = -1) =>
-    makeCell(11, Dir.E, MirrorOri.BACKSLASH, tableId, 0, needPhase),
-  pad: (hasToken = 0, linkId = 0, tableId = -1) =>
-    makeCell(12, Dir.E, MirrorOri.BACKSLASH, tableId, linkId, hasToken),
-  tokenDoor: (linkId = 0, tableId = -1) =>
-    makeCell(13, Dir.E, MirrorOri.BACKSLASH, tableId, linkId, 0),
 };
 
 export function table(
@@ -101,10 +97,12 @@ export function move(tableId: number, delta: number): MoveStep {
   return { tableId, delta };
 }
 
-export function flipAt(x: number, y: number): MoveStep {
-  return { tableId: -1, delta: 0, x, y };
+/** Cycle a player triangle's orientation at (x,y). */
+export function triangleAt(x: number, y: number, delta = 1): MoveStep {
+  return { tableId: -1, delta, x, y };
 }
 
-export function placeAt(x: number, y: number): MoveStep {
-  return { tableId: -2, delta: 0, x, y };
+/** Rotate the whole board by ±1 quarter. */
+export function boardTurn(delta: number): MoveStep {
+  return { tableId: -3, delta };
 }

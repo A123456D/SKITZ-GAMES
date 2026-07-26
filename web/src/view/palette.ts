@@ -1,6 +1,6 @@
 /** Live theme palette — draw code reads `colors` (mutable). */
 
-export type ThemeId = "paper" | "pastel" | "red" | "blue" | "mono" | "synthwave";
+export type ThemeId = "paper" | "dusk" | "red" | "blue" | "mono" | "retro";
 
 export type ThemeColors = {
   VOID: string;
@@ -139,34 +139,65 @@ export const THEMES: Record<ThemeId, ThemeColors> = {
     ...monoObjects("#141414"),
   }),
   red: pack({
-    ...PAPER_BASE,
-    ...monoObjects("#A95F63"),
+    VOID: "#F3E8E6",
+    PAPER: "#F8EEEB",
+    PAPER_DARK: "#E8D4D0",
+    INK: "#5C2E32",
+    INK_SOFT: "#A95F63",
+    INK_FAINT: "#B89694",
+    INK_HAIR: "#D4B8B4",
+    SELECT: "#A95F63",
+    FILL: "#FFF8F6",
+    SHADE: "#C9A8A4",
+    ...monoObjects("#A95F63", "#FFF8F6", "#8E4F58"),
     CH0: "#B9676B",
     CH1: "#CB7D72",
     CH2: "#8E4F58",
   }),
   blue: pack({
-    ...PAPER_BASE,
-    ...monoObjects("#607F9F"),
+    VOID: "#E6ECF2",
+    PAPER: "#EEF3F8",
+    PAPER_DARK: "#D4DEE8",
+    INK: "#2E4058",
+    INK_SOFT: "#607F9F",
+    INK_FAINT: "#8A9BB0",
+    INK_HAIR: "#B8C6D4",
+    SELECT: "#607F9F",
+    FILL: "#F7FAFC",
+    SHADE: "#A8B8C8",
+    ...monoObjects("#607F9F", "#F7FAFC", "#526D91"),
     CH0: "#698CAC",
     CH1: "#7CA4BC",
     CH2: "#526D91",
   }),
-  pastel: pack({
-    ...PAPER_BASE,
-    OBJ: "#141414",
-    BLOCK: "#E05C5C",
-    BARRIER: "#2FBF78",
-    TABLE_FILL: "#1B3A6E",
-    TABLE: "#D7E6FF",
-    TABLE_OUTLINE: "#0C1F40",
-    WORM: "#E6C84A",
-    MIRROR: "#9B6BC9",
-    SINK: "#E0894A",
-    FILTER: "#D46BA3",
-    CH0: "#2FBF78",
-    CH1: "#2FBF78",
-    CH2: "#2FBF78",
+  /**
+   * Soft night board: deep navy field, light-grey knobs,
+   * mint connectors, coral ports. Calm, not neon.
+   */
+  dusk: pack({
+    VOID: "#071228",
+    PAPER: "#0E2448",
+    PAPER_DARK: "#16345F",
+    INK: "#F4F8FF",
+    INK_SOFT: "#C9D8F0",
+    INK_FAINT: "#7E96BC",
+    INK_HAIR: "#2A4A78",
+    SELECT: "#FF7A8A",
+    FILL: "#152E58",
+    SHADE: "#0A1B38",
+    OBJ: "#F4F8FF",
+    BLOCK: "#FF7A8A",
+    BARRIER: "#5AD6A5",
+    TABLE_FILL: "#D8DEE8",
+    TABLE: "#5AD6A5",
+    TABLE_OUTLINE: "#1A3358",
+    WORM: "#F0D56A",
+    MIRROR: "#B48AE8",
+    SINK: "#F0A06A",
+    FILTER: "#E08ABA",
+    CH0: "#5AD6A5",
+    CH1: "#7EE0BA",
+    CH2: "#3FBF90",
   }),
   mono: pack({
     VOID: "#000000",
@@ -184,42 +215,46 @@ export const THEMES: Record<ThemeId, ThemeColors> = {
     CH1: "#C8C8C8",
     CH2: "#A0A0A0",
   }),
-  synthwave: pack({
-    VOID: "#05010F",
-    PAPER: "#0D0221",
-    PAPER_DARK: "#1A0A2E",
-    INK: "#FFE3F5",
-    INK_SOFT: "#FF71CE",
-    INK_FAINT: "#9B7BB8",
-    INK_HAIR: "#4A2A6A",
-    SELECT: "#05D9E8",
-    FILL: "#1B0B3A",
-    SHADE: "#2D1B4E",
-    OBJ: "#FFE3F5",
-    BLOCK: "#FFE3F5",
-    BARRIER: "#39FF8A",
-    TABLE_FILL: "#1B0B3A",
-    TABLE: "#FFE3F5",
-    TABLE_OUTLINE: "#05D9E8",
-    WORM: "#FFE3F5",
-    MIRROR: "#FFE3F5",
-    SINK: "#FFE3F5",
-    FILTER: "#FFE3F5",
-    CH0: "#05D9E8",
-    CH1: "#FF71CE",
-    CH2: "#B967FF",
+  /**
+   * Neon night: violet void, dark knob faces,
+   * hot-pink select, glowing cyan connectors, purple accents.
+   */
+  retro: pack({
+    VOID: "#060014",
+    PAPER: "#100228",
+    PAPER_DARK: "#1C0A3C",
+    INK: "#FFE8F6",
+    INK_SOFT: "#FF6EC7",
+    INK_FAINT: "#A88BC8",
+    INK_HAIR: "#4A2A72",
+    SELECT: "#C77DFF",
+    FILL: "#1A0A3A",
+    SHADE: "#2A1450",
+    OBJ: "#FFE8F6",
+    BLOCK: "#FF6EC7",
+    BARRIER: "#00E5F0",
+    TABLE_FILL: "#1A0A3A",
+    TABLE: "#00E5F0",
+    TABLE_OUTLINE: "#5CFFF8",
+    WORM: "#FFE8F6",
+    MIRROR: "#C77DFF",
+    SINK: "#FF6EC7",
+    FILTER: "#5CFFF8",
+    CH0: "#00E5F0",
+    CH1: "#5CFFF8",
+    CH2: "#C77DFF",
   }),
 };
 
-export const THEME_ORDER: ThemeId[] = ["paper", "pastel", "red", "blue", "mono", "synthwave"];
+export const THEME_ORDER: ThemeId[] = ["paper", "dusk", "red", "blue", "mono", "retro"];
 
 export const THEME_LABELS: Record<ThemeId, string> = {
   paper: "INK",
-  pastel: "PASTEL",
+  dusk: "DUSK",
   red: "RED",
   blue: "BLUE",
   mono: "MONO",
-  synthwave: "WAVE",
+  retro: "RETRO",
 };
 
 export const colors: ThemeColors = { ...THEMES.paper };
@@ -228,6 +263,16 @@ let currentId: ThemeId = "paper";
 
 export function getThemeId(): ThemeId {
   return currentId;
+}
+
+/** Light paper-board themes (cream / tinted paper). */
+export function isLightTheme(id: ThemeId = currentId): boolean {
+  return id === "paper" || id === "red" || id === "blue";
+}
+
+/** Dark night-board themes. */
+export function isDarkTheme(id: ThemeId = currentId): boolean {
+  return id === "dusk" || id === "mono" || id === "retro";
 }
 
 export function isThemeId(v: unknown): v is ThemeId {
@@ -251,7 +296,9 @@ export function syncDomTheme(): void {
   if (game) {
     game.style.background = colors.PAPER;
     game.style.borderColor = colors.INK_HAIR;
-    game.style.boxShadow = `0 12px 40px ${colors.INK}22`;
+    game.style.boxShadow = isDarkTheme()
+      ? `0 16px 48px ${colors.VOID}aa`
+      : `0 12px 40px ${colors.INK}22`;
   }
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", colors.PAPER);

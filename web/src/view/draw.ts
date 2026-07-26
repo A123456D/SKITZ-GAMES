@@ -2,8 +2,9 @@ import { dirDelta, Kind, MirrorOri, type Vec2 } from "../core/cellKind";
 import { getCell, type GridState } from "../core/gridState";
 import type { TurnResult } from "../core/beamSolver";
 import { Module, type TableDef } from "../core/tableDef";
-import { basePairs } from "../core/portWiring";
-import { channelColor, colors as P, getThemeId } from "./palette";
+import { basePairs, basePorts } from "../core/portWiring";
+import { channelColor, colors as P, getThemeId, isDarkTheme, isLightTheme } from "./palette";
+import { font } from "./typography";
 
 function strokeChannel(ctx: CanvasRenderingContext2D, channel: number, scale = 1): void {
   ctx.setLineDash([]);
@@ -22,15 +23,15 @@ export type Layout = {
 };
 
 export function boardLayout(state: GridState): Layout {
-  // Reclaim chrome so cells stay large on phones without shrinking puzzles.
-  const gap = 3;
-  const padX = 14;
-  const boardTop = 132;
-  const boardBottom = 1088;
+  // Dense boards: tight gaps so the grid reads as one tiled circuit.
+  const padX = 18;
+  const boardTop = 140;
+  const boardBottom = 1070;
   const availW = W - padX * 2;
   const availH = boardBottom - boardTop;
-  const stepSz = Math.min(availW / state.width, availH / state.height);
-  const cell = Math.max(44, Math.min(96, stepSz - gap));
+  const rough = Math.min(availW / state.width, availH / state.height);
+  const gap = Math.max(4, Math.round(rough * 0.06));
+  const cell = Math.max(28, Math.min(96, rough - gap));
   const boardW = state.width * (cell + gap) - gap;
   const boardH = state.height * (cell + gap) - gap;
   return {
@@ -75,29 +76,211 @@ function roundRect(
 }
 
 export function drawBackground(ctx: CanvasRenderingContext2D): void {
-  const synthwave = getThemeId() === "synthwave";
-  if (synthwave) {
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, "#080116");
-    sky.addColorStop(0.62, P.PAPER);
-    sky.addColorStop(1, "#140328");
-    ctx.fillStyle = sky;
-  } else {
-    ctx.fillStyle = P.PAPER;
-  }
+  const theme = getThemeId();
+  ctx.fillStyle = P.PAPER;
   ctx.fillRect(0, 0, W, H);
-  // Soft edge only — keep the board airy
+
+  if (theme === "retro") {
+    // Night sky
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "#050012");
+    sky.addColorStop(0.42, "#120228");
+    sky.addColorStop(0.52, "#2A0A4A");
+    sky.addColorStop(1, "#0A0218");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    const horizon = H * 0.52;
+    const vanishX = W * 0.5;
+
+    // Soft sun glow on the horizon.
+    const sunGlow = ctx.createRadialGradient(vanishX, horizon, 8, vanishX, horizon, W * 0.38);
+    sunGlow.addColorStop(0, "rgba(255, 110, 199, 0.35)");
+    sunGlow.addColorStop(0.35, "rgba(199, 125, 255, 0.12)");
+    sunGlow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = sunGlow;
+    ctx.fillRect(0, 0, W, H);
+
+    // Banded synth sun.
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(vanishX, horizon, 46, Math.PI, 0);
+    ctx.closePath();
+    ctx.clip();
+    const sunFill = ctx.createLinearGradient(vanishX, horizon - 46, vanishX, horizon);
+    sunFill.addColorStop(0, "#FFE08A");
+    sunFill.addColorStop(0.55, "#FF6EC7");
+    sunFill.addColorStop(1, "#C77DFF");
+    ctx.fillStyle = sunFill;
+    ctx.fillRect(vanishX - 50, horizon - 50, 100, 55);
+    // Cut bands with sky color so we don't punch through the canvas.
+    ctx.fillStyle = "#1A0840";
+    for (let i = 0; i < 5; i++) {
+      const y = horizon - 8 - i * 7;
+      ctx.fillRect(vanishX - 50, y, 100, 2.5 + i * 0.3);
+    }
+    ctx.restore();
+
+    // Floor under the grid.
+    const floor = ctx.createLinearGradient(0, horizon, 0, H);
+    floor.addColorStop(0, "rgba(16, 2, 40, 0.25)");
+    floor.addColorStop(1, "rgba(6, 0, 20, 0.95)");
+    ctx.fillStyle = floor;
+    ctx.fillRect(0, horizon, W, H - horizon);
+
+    // Perspective retrowave grid.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, horizon, W, H - horizon);
+    ctx.clip();
+
+    ctx.strokeStyle = P.TABLE;
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i <= 18; i++) {
+      const t = i / 18;
+      const y = horizon + Math.pow(t, 1.65) * (H - horizon + 40);
+      if (y > H + 20) continue;
+      ctx.globalAlpha = 0.12 + t * 0.38;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = P.INK_SOFT;
+    for (let i = -14; i <= 14; i++) {
+      if (i === 0) continue;
+      const xBottom = vanishX + i * (W * 0.095);
+      ctx.globalAlpha = 0.1 + Math.min(0.35, Math.abs(i) * 0.02);
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(vanishX, horizon);
+      ctx.lineTo(xBottom, H + 30);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = P.TABLE;
+    ctx.globalAlpha = 0.28;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(vanishX, horizon);
+    ctx.lineTo(vanishX, H);
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = P.INK_SOFT;
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = P.INK_SOFT;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.moveTo(0, horizon);
+    ctx.lineTo(W, horizon);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    // Vignette so the board stays readable.
+    const vig = ctx.createRadialGradient(W * 0.5, H * 0.42, W * 0.15, W * 0.5, H * 0.5, W * 0.85);
+    vig.addColorStop(0, "rgba(0,0,0,0)");
+    vig.addColorStop(1, "rgba(5, 0, 18, 0.45)");
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+  } else if (theme === "dusk") {
+    const wash = ctx.createLinearGradient(0, 0, 0, H);
+    wash.addColorStop(0, "#0A1A3A");
+    wash.addColorStop(0.5, P.PAPER);
+    wash.addColorStop(1, "#0C2A52");
+    ctx.fillStyle = wash;
+    ctx.fillRect(0, 0, W, H);
+    const vig = ctx.createRadialGradient(W * 0.5, H * 0.38, W * 0.1, W * 0.5, H * 0.5, W * 0.92);
+    vig.addColorStop(0, "rgba(120, 170, 230, 0.07)");
+    vig.addColorStop(1, "rgba(0, 8, 24, 0.32)");
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+    // Soft mint whisper bottom-right.
+    const mint = ctx.createRadialGradient(W * 0.9, H * 0.85, 8, W * 0.85, H * 0.9, W * 0.45);
+    mint.addColorStop(0, "rgba(90, 214, 165, 0.08)");
+    mint.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = mint;
+    ctx.fillRect(0, 0, W, H);
+  } else if (theme === "mono") {
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "#000000");
+    sky.addColorStop(0.5, P.PAPER);
+    sky.addColorStop(1, "#111111");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+  } else if (theme === "red") {
+    const wash = ctx.createLinearGradient(0, 0, 0, H);
+    wash.addColorStop(0, "#FBF4F2");
+    wash.addColorStop(1, "#F0E0DC");
+    ctx.fillStyle = wash;
+    ctx.fillRect(0, 0, W, H);
+    const vig = ctx.createRadialGradient(W * 0.5, H * 0.42, W * 0.15, W * 0.5, H * 0.5, W * 0.85);
+    vig.addColorStop(0, "rgba(0,0,0,0)");
+    vig.addColorStop(1, "rgba(120, 50, 45, 0.08)");
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+  } else if (theme === "blue") {
+    const wash = ctx.createLinearGradient(0, 0, 0, H);
+    wash.addColorStop(0, "#F4F8FC");
+    wash.addColorStop(1, "#DDE6F0");
+    ctx.fillStyle = wash;
+    ctx.fillRect(0, 0, W, H);
+    const vig = ctx.createRadialGradient(W * 0.5, H * 0.42, W * 0.15, W * 0.5, H * 0.5, W * 0.85);
+    vig.addColorStop(0, "rgba(0,0,0,0)");
+    vig.addColorStop(1, "rgba(45, 70, 110, 0.08)");
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    const vig = ctx.createRadialGradient(W * 0.5, H * 0.42, W * 0.15, W * 0.5, H * 0.5, W * 0.85);
+    vig.addColorStop(0, "rgba(0,0,0,0)");
+    vig.addColorStop(1, "rgba(40, 32, 22, 0.07)");
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+  }
+
   ctx.strokeStyle = P.INK_HAIR;
-  ctx.globalAlpha = 0.28;
+  ctx.globalAlpha = isDarkTheme(theme) ? 0.4 : 0.55;
   ctx.lineWidth = 1;
   ctx.strokeRect(28, 28, W - 56, H - 56);
   ctx.globalAlpha = 1;
 }
 
 export function drawHairlineGrid(ctx: CanvasRenderingContext2D, state: GridState, layout: Layout): void {
-  // Sparse dots — just enough to read spacing
+  const theme = getThemeId();
+  // Light paper boards get architectural lines; night boards get soft dots.
+  if (isLightTheme(theme)) {
+    ctx.strokeStyle = P.INK_HAIR;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 1;
+    const stepPx = layout.cell + layout.gap;
+    const ox = layout.origin.x - layout.gap / 2;
+    const oy = layout.origin.y - layout.gap / 2;
+    const bw = state.width * stepPx;
+    const bh = state.height * stepPx;
+    ctx.beginPath();
+    for (let x = 0; x <= state.width; x++) {
+      const px = ox + x * stepPx;
+      ctx.moveTo(px, oy);
+      ctx.lineTo(px, oy + bh);
+    }
+    for (let y = 0; y <= state.height; y++) {
+      const py = oy + y * stepPx;
+      ctx.moveTo(ox, py);
+      ctx.lineTo(ox + bw, py);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    return;
+  }
   ctx.fillStyle = P.INK_HAIR;
-  ctx.globalAlpha = 0.28;
+  ctx.globalAlpha = theme === "dusk" ? 0.35 : 0.28;
+  // Retro already has the floor grid — skip board dots so it doesn't clutter.
+  if (theme === "retro") {
+    ctx.globalAlpha = 1;
+    return;
+  }
   for (let y = 0; y < state.height; y++) {
     for (let x = 0; x < state.width; x++) {
       const c = cellCenter(layout, { x, y });
@@ -118,101 +301,217 @@ export function drawWheel(
   time: number,
   settled = false,
   showPreview = false,
+  _showWiring = false,
+  squash = 1,
 ): void {
   const hub = cellCenter(layout, table.hub);
-  const r = Math.max(layout.cell * 0.52, step(layout) * 0.34);
+  const r = Math.min(layout.cell * 0.48, step(layout) * 0.46);
   const theme = getThemeId();
-  // Hover until the player has turned it — then it seats onto the board.
-  const hover = settled ? 0 : Math.sin(time * 1.6 + table.id * 0.7);
-  const bob = hover * 3.2;
-  const lift = settled ? 0 : hover * 0.5 + 0.5;
+  const lightFace = theme === "dusk" || isLightTheme(theme);
+  const dark = isDarkTheme(theme) && theme !== "dusk";
+  // Soft hover bob; selection floats a touch higher.
+  const hover = Math.sin(time * 1.5 + table.id * 0.9) * (selected ? 1.35 : 0.75);
+  const floatY = (selected ? 6.5 : 5) + hover;
+  const edge = Math.max(2.6, r * 0.07); // knob / cardstock thickness
+  const face = table.locked ? P.SHADE : P.TABLE_FILL;
+  // Edge stock — darker than the face so the knob reads as thick.
+  const stock =
+    theme === "dusk"
+      ? "#B8C9E0"
+      : dark
+        ? P.SHADE
+        : P.PAPER_DARK;
 
+  // Soft ground shadow under the floating knob.
   ctx.save();
-  ctx.translate(hub.x, hub.y + r * 0.7 + lift * 2);
-  ctx.scale(1, 0.26);
-  ctx.fillStyle = theme === "synthwave" || theme === "mono" ? "rgba(0,0,0,0.3)" : "rgba(40, 30, 25, 0.16)";
-  ctx.globalAlpha = settled ? 0.85 : 0.7 - lift * 0.15;
-  ctx.beginPath();
-  ctx.arc(0, 0, r * (settled ? 0.9 : 0.86 - lift * 0.12), 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.restore();
-
-  ctx.save();
-  ctx.translate(hub.x, hub.y + bob);
-  ctx.rotate(visualRot);
-
-  ctx.shadowColor = theme === "synthwave" ? P.CH1 : "rgba(35, 28, 22, 0.16)";
-  ctx.shadowBlur = settled ? 4 : theme === "synthwave" ? 12 : 8 + lift * 4;
-  ctx.shadowOffsetY = settled ? 1 : 3 + lift * 3;
-  ctx.fillStyle = table.locked ? P.SHADE : P.TABLE_FILL;
+  ctx.translate(hub.x, hub.y + r * 0.1);
+  ctx.scale(1.1, 0.34);
+  const shadow = ctx.createRadialGradient(0, 0, r * 0.15, 0, 0, r);
+  if (theme === "retro") {
+    shadow.addColorStop(0, "rgba(0,0,0,0.55)");
+    shadow.addColorStop(0.55, "rgba(80, 20, 120, 0.25)");
+    shadow.addColorStop(1, "rgba(0,0,0,0)");
+  } else if (theme === "dusk") {
+    shadow.addColorStop(0, "rgba(0, 10, 30, 0.45)");
+    shadow.addColorStop(0.55, "rgba(0, 10, 30, 0.18)");
+    shadow.addColorStop(1, "rgba(0,0,0,0)");
+  } else if (dark) {
+    shadow.addColorStop(0, "rgba(0,0,0,0.5)");
+    shadow.addColorStop(0.55, "rgba(0,0,0,0.2)");
+    shadow.addColorStop(1, "rgba(0,0,0,0)");
+  } else {
+    shadow.addColorStop(0, "rgba(30, 24, 18, 0.26)");
+    shadow.addColorStop(0.55, "rgba(30, 24, 18, 0.1)");
+    shadow.addColorStop(1, "rgba(30, 24, 18, 0)");
+  }
+  ctx.fillStyle = shadow;
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
+  ctx.restore();
 
-  // Seated seam — reads as attached to the surface once turned/locked.
-  if (settled) {
-    ctx.strokeStyle = P.TABLE_OUTLINE;
-    ctx.globalAlpha = 0.18;
-    ctx.lineWidth = 1.5;
+  // Retro: soft cyan outer glow around the floating knob.
+  if (theme === "retro") {
+    const glowPulse = selected ? 0.55 + 0.2 * Math.sin(time * 3.2) : 0.42;
+    ctx.save();
+    ctx.translate(hub.x, hub.y - floatY);
+    ctx.shadowColor = P.TABLE;
+    ctx.shadowBlur = selected ? 22 : 16;
+    ctx.globalAlpha = glowPulse;
+    ctx.strokeStyle = P.TABLE;
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(0, 0, r * 0.9, 0, Math.PI * 2);
+    ctx.arc(0, 0, r + 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+    // Second softer halo.
+    ctx.shadowBlur = selected ? 34 : 26;
+    ctx.globalAlpha = glowPulse * 0.55;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Thickness ring under the face (does not spin).
+  ctx.save();
+  ctx.translate(hub.x, hub.y - floatY + edge);
+  ctx.fillStyle = stock;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Knob face.
+  ctx.save();
+  ctx.translate(hub.x, hub.y - floatY);
+  const sx = squash > 1 ? 1 / Math.sqrt(squash) : squash;
+  ctx.scale(sx, squash);
+  ctx.rotate(visualRot);
+
+  ctx.fillStyle = face;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Sharp edge bevel — light outer rim + dark inner lip, no soft face gradient.
+  const bevelW = Math.max(2.2, r * 0.055);
+  ctx.beginPath();
+  ctx.arc(0, 0, r - bevelW * 0.35, 0, Math.PI * 2);
+  ctx.strokeStyle = lightFace ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.22)";
+  ctx.lineWidth = bevelW;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, r - bevelW * 1.15, 0, Math.PI * 2);
+  ctx.strokeStyle = lightFace ? "rgba(30, 24, 18, 0.22)" : "rgba(0,0,0,0.45)";
+  ctx.lineWidth = Math.max(1.4, bevelW * 0.55);
+  ctx.stroke();
+
+  // Crisp outer rim — dark on light faces, accent on night knobs.
+  ctx.strokeStyle = P.TABLE_OUTLINE;
+  ctx.lineWidth = Math.max(1.6, r * 0.035);
+  ctx.beginPath();
+  ctx.arc(0, 0, r - 0.5, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Quiet inner guide ring.
+  ctx.strokeStyle = lightFace ? P.TABLE_OUTLINE : P.INK;
+  ctx.globalAlpha = lightFace ? 0.18 : dark ? 0.18 : 0.1;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.84, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Rim ticks.
+  ctx.strokeStyle = lightFace ? P.TABLE_OUTLINE : P.INK;
+  ctx.lineCap = "butt";
+  for (let i = 0; i < 12; i++) {
+    const a = (Math.PI * 2 * i) / 12;
+    const major = i % 3 === 0;
+    const inner = r * (major ? 0.76 : 0.82);
+    const outer = r * 0.91;
+    ctx.globalAlpha = major ? 0.28 : 0.12;
+    ctx.lineWidth = major ? 1.4 : 1;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+    ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.lineCap = "round";
+
+  if (selected) {
+    const pulse = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(time * 3.2));
+    ctx.strokeStyle = P.SELECT;
+    ctx.globalAlpha = pulse * 0.95;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 2.8, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
 
-  if (selected) {
-    ctx.strokeStyle = P.TABLE_OUTLINE;
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
   const portAngles = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
   const pairs = basePairs(table.module);
-  const portPos = (port: number): Vec2 => {
-    const a = portAngles[port];
+  const ports = basePorts(table.module);
+  const portPos = (port: number): { x: number; y: number } => {
+    const a = portAngles[port]!;
     return { x: Math.cos(a) * r * 0.62, y: Math.sin(a) * r * 0.62 };
   };
+
+  // Connector ink on paper — solid stroke, no glow.
   ctx.strokeStyle = P.TABLE;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = Math.max(2.8, r * 0.12);
   ctx.lineCap = "round";
-  for (const [a, b] of pairs) {
-    const pa = portPos(a);
-    const pb = portPos(b);
+  ctx.lineJoin = "round";
+  if (table.module === Module.ENDCAP || (pairs.length === 0 && ports.length === 1)) {
+    const p = portPos(ports[0] ?? 0);
     ctx.beginPath();
-    ctx.moveTo(pa.x, pa.y);
-    ctx.quadraticCurveTo(0, 0, pb.x, pb.y);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  } else {
+    for (const [a, b] of pairs) {
+      const pa = portPos(a);
+      const pb = portPos(b);
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.quadraticCurveTo(0, 0, pb.x, pb.y);
+      ctx.stroke();
+    }
+  }
+
+  // Punched connection points — solid paper disc with ink ring.
+  for (const port of ports) {
+    const a = portAngles[port]!;
+    const px = Math.cos(a) * r * 0.62;
+    const py = Math.sin(a) * r * 0.62;
+    const pr = Math.max(3.2, r * 0.105);
+    ctx.fillStyle = face;
+    ctx.beginPath();
+    ctx.arc(px, py, pr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle =
+      theme === "retro" ? P.INK_SOFT : theme === "dusk" ? P.BLOCK : P.TABLE;
+    ctx.lineWidth = Math.max(1.8, r * 0.06);
+    ctx.beginPath();
+    ctx.arc(px, py, pr, 0, Math.PI * 2);
     ctx.stroke();
   }
 
-  for (const a of portAngles) {
-    ctx.fillStyle = P.TABLE;
-    ctx.beginPath();
-    ctx.arc(Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62, r * 0.06, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Cog teeth mark a geared disc — turning it turns its partner too.
   if (table.link) {
     ctx.fillStyle = P.TABLE;
-    const teeth = 12;
-    for (let i = 0; i < teeth; i++) {
-      const a = (Math.PI * 2 * i) / teeth;
+    for (let i = 0; i < 12; i++) {
+      const a = (Math.PI * 2 * i) / 12;
       ctx.beginPath();
       ctx.arc(Math.cos(a) * r * 0.97, Math.sin(a) * r * 0.97, r * 0.055, 0, Math.PI * 2);
       ctx.fill();
     }
   }
 
-  // Route preview on the selected table: dashed stubs + arrowheads on connected
-  // ports, drawn in the rotated frame so they turn live while dragging.
-  // Tutorial-only — in real play this is a solution tell, so it's disabled.
   if (showPreview && selected && !table.locked) {
-    const connected = new Set<number>();
+    const connected = new Set(ports);
     for (const [a, b] of pairs) {
       connected.add(a);
       connected.add(b);
@@ -226,8 +525,8 @@ export function drawWheel(
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
     for (const port of connected) {
-      const ax = Math.cos(portAngles[port]);
-      const ay = Math.sin(portAngles[port]);
+      const ax = Math.cos(portAngles[port]!);
+      const ay = Math.sin(portAngles[port]!);
       ctx.beginPath();
       ctx.moveTo(ax * inner, ay * inner);
       ctx.lineTo(ax * outer, ay * outer);
@@ -235,8 +534,8 @@ export function drawWheel(
     }
     ctx.setLineDash([]);
     for (const port of connected) {
-      const ax = Math.cos(portAngles[port]);
-      const ay = Math.sin(portAngles[port]);
+      const ax = Math.cos(portAngles[port]!);
+      const ay = Math.sin(portAngles[port]!);
       const px = -ay;
       const py = ax;
       ctx.beginPath();
@@ -249,7 +548,6 @@ export function drawWheel(
     ctx.globalAlpha = 1;
   }
 
-  // Locked / gate: tiny glyph only
   if (table.module === Module.GATE) {
     ctx.strokeStyle = P.TABLE;
     ctx.lineWidth = 1.8;
@@ -262,16 +560,38 @@ export function drawWheel(
     ctx.lineWidth = 1.6;
     ctx.strokeRect(-r * 0.1, -r * 0.1, r * 0.2, r * 0.2);
   }
+  void settled;
   ctx.restore();
 }
 
-function drawMirror(ctx: CanvasRenderingContext2D, c: Vec2, size: number, ori: number): void {
-  const s = size * 0.44;
+function drawMirror(
+  ctx: CanvasRenderingContext2D,
+  c: Vec2,
+  size: number,
+  ori: number,
+  player = false,
+): void {
+  const s = size * 0.48;
   ctx.save();
   ctx.translate(c.x, c.y);
+  // Bold filled triangle — hypotenuse is the reflective face.
+  ctx.beginPath();
+  if (ori === MirrorOri.BACKSLASH) {
+    ctx.moveTo(-s, -s);
+    ctx.lineTo(s, s);
+    ctx.lineTo(-s, s);
+  } else {
+    ctx.moveTo(-s, s);
+    ctx.lineTo(s, -s);
+    ctx.lineTo(s, s);
+  }
+  ctx.closePath();
+  ctx.fillStyle = player ? P.TABLE_FILL : P.SHADE;
+  ctx.fill();
   ctx.strokeStyle = P.MIRROR;
-  ctx.lineWidth = lw(size, 0.08);
-  ctx.lineCap = "square";
+  ctx.lineWidth = lw(size, 0.09);
+  ctx.stroke();
+  // Thick hypotenuse so it reads as a triangle, not a disc.
   ctx.beginPath();
   if (ori === MirrorOri.BACKSLASH) {
     ctx.moveTo(-s, -s);
@@ -280,7 +600,20 @@ function drawMirror(ctx: CanvasRenderingContext2D, c: Vec2, size: number, ori: n
     ctx.moveTo(-s, s);
     ctx.lineTo(s, -s);
   }
+  ctx.lineWidth = lw(size, 0.14);
   ctx.stroke();
+  if (player) {
+    // Dot mark = tappable
+    ctx.fillStyle = P.MIRROR;
+    ctx.beginPath();
+    ctx.arc(0, size * 0.22, Math.max(3, size * 0.08), 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Small lock tick = fixed
+    ctx.strokeStyle = P.MIRROR;
+    ctx.lineWidth = lw(size, 0.06);
+    ctx.strokeRect(-size * 0.08, size * 0.14, size * 0.16, size * 0.16);
+  }
   ctx.restore();
 }
 
@@ -370,7 +703,7 @@ function drawEmitter(
   const by = -Math.sin(ang) * r * 0.55;
   ctx.fillStyle = col;
   ctx.globalAlpha = 0.85;
-  ctx.font = `700 ${Math.max(9, Math.round(size * 0.16))}px Georgia, serif`;
+  ctx.font = font(700, Math.max(9, Math.round(size * 0.16)));
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText("S", bx, by);
@@ -436,7 +769,7 @@ function drawReceiver(
   // Tiny FINISH mark under the socket
   ctx.globalAlpha = lit ? 0.9 : 0.65;
   ctx.fillStyle = col;
-  ctx.font = `700 ${Math.max(9, Math.round(size * 0.15))}px Georgia, serif`;
+  ctx.font = font(700, Math.max(9, Math.round(size * 0.15)));
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText("F", 0, r * 1.28);
@@ -449,7 +782,7 @@ function drawCrate(ctx: CanvasRenderingContext2D, c: Vec2, size: number): void {
   ctx.save();
   ctx.translate(c.x, c.y);
   roundRect(ctx, -s / 2, -s / 2, s, s, 3);
-  ctx.fillStyle = getThemeId() === "pastel" ? P.BLOCK : P.SHADE;
+  ctx.fillStyle = getThemeId() === "dusk" ? P.BLOCK : P.SHADE;
   ctx.globalAlpha = 0.8;
   ctx.fill();
   ctx.globalAlpha = 1;
@@ -460,8 +793,8 @@ function drawWall(ctx: CanvasRenderingContext2D, c: Vec2, size: number): void {
   const s = size * 0.7;
   // Soft paper blocks — never pure ink black
   const theme = getThemeId();
-  ctx.fillStyle = theme === "pastel" ? P.BLOCK : P.SHADE;
-  ctx.globalAlpha = theme === "pastel" ? 0.82 : 0.7;
+  ctx.fillStyle = theme === "dusk" ? P.BLOCK : P.SHADE;
+  ctx.globalAlpha = theme === "dusk" ? 0.82 : 0.7;
   roundRect(ctx, c.x - s / 2, c.y - s / 2, s, s, 3);
   ctx.fill();
   ctx.globalAlpha = 1;
@@ -686,7 +1019,7 @@ export function drawOptics(
       if (cell.kind === Kind.EMPTY) continue;
       const c = cellCenter(layout, { x, y });
       ctx.save();
-      if (getThemeId() === "synthwave") {
+      if (getThemeId() === "retro") {
         const channel = cell.channel ?? 0;
         ctx.shadowColor = channelColor(channel);
         ctx.shadowBlur = 11;
@@ -696,7 +1029,7 @@ export function drawOptics(
           drawEmitter(ctx, c, layout.cell, cell.dir, cell.channel ?? 0);
           break;
         case Kind.MIRROR:
-          drawMirror(ctx, c, layout.cell, cell.ori);
+          drawMirror(ctx, c, layout.cell, cell.ori, (cell.phase ?? 0) === 1);
           break;
         case Kind.RECEIVER:
           drawReceiver(
@@ -757,6 +1090,11 @@ export function drawBeams(
   result: TurnResult,
   progress = 1,
 ): void {
+  const theme = getThemeId();
+  const calm = isLightTheme(theme);
+  const beamW = Math.max(calm ? 2 : 1.8, layout.cell * 0.045);
+  const jointR = Math.max(2.2, beamW * 0.9);
+
   for (const beam of result.beams) {
     const n = beam.segments.length;
     if (!n) continue;
@@ -772,25 +1110,31 @@ export function drawBeams(
         x: from.x + (to.x - from.x) * lp,
         y: from.y + (to.y - from.y) * lp,
       };
-      ctx.save();
       const ink = channelColor(beam.channel ?? 0);
-      const beamW = Math.max(3.8, layout.cell * 0.085);
-      if (getThemeId() === "synthwave") {
+
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      if (theme === "retro") {
         ctx.shadowColor = ink;
-        ctx.shadowBlur = 18;
+        ctx.shadowBlur = 8;
       }
       ctx.strokeStyle = ink;
-      ctx.lineWidth = getThemeId() === "synthwave" ? beamW + 0.6 : beamW;
-      ctx.lineCap = "round";
+      ctx.lineWidth = beamW;
       strokeChannel(ctx, beam.channel ?? 0, layout.cell / 56);
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);
       ctx.lineTo(end.x, end.y);
       ctx.stroke();
       ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
+
       ctx.fillStyle = ink;
       ctx.beginPath();
-      ctx.arc(end.x, end.y, Math.max(3.5, layout.cell * 0.07), 0, Math.PI * 2);
+      ctx.arc(from.x, from.y, jointR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(end.x, end.y, jointR, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
@@ -806,27 +1150,27 @@ export function drawHudStats(
   spill = 0,
   pulsesLeft = -1,
   pulseLimit = -1,
-  tokensLeft = -1,
+  _tokensLeft = -1,
 ): void {
+  void par;
   ctx.fillStyle = P.INK;
-  ctx.font = "700 16px Georgia, serif";
+  ctx.font = font(700, 16);
   ctx.textAlign = "center";
-  ctx.fillText(`MOVES  ${moves}`, W / 2 - 240, 148);
+  ctx.fillText(`MOVES  ${moves}`, W / 2 - 220, 148);
+  // Pulses are the only rationed resource, so they carry the emphasis.
   if (pulsesLeft >= 0 && pulseLimit >= 0) {
-    ctx.fillText(`PULSES  ${pulsesLeft}/${pulseLimit}`, W / 2 - 70, 148);
+    ctx.fillText(`CHECKS  ${pulsesLeft}/${pulseLimit}`, W / 2 + 10, 148);
   }
-  ctx.fillText(`LINKED  ${lit}/${need}`, W / 2 + 80, 148);
-  if (tokensLeft >= 0) {
-    ctx.fillText(`TOKENS  ${tokensLeft}`, W / 2 + 200, 148);
-  } else {
-    ctx.fillText(spill > 0 ? `SPILL  ${spill}` : `PAR  ${par}`, W / 2 + 220, 148);
+  // Dense circuit: OPEN = loose ends, NET closed when it is one piece.
+  if (need > 0) {
+    ctx.fillText(spill > 0 ? `OPEN  ${spill}` : `NET  ${lit}/${need}`, W / 2 + 220, 148);
   }
 }
 
 export function drawCoachHint(ctx: CanvasRenderingContext2D, text: string, y = 1048): void {
   const maxW = 620;
   ctx.fillStyle = P.INK_SOFT;
-  ctx.font = "600 18px Georgia, serif";
+  ctx.font = font(600, 18);
   ctx.textAlign = "center";
   const words = text.split(" ");
   const lines: string[] = [];
@@ -924,7 +1268,7 @@ export function drawPointCoach(
 ): { next: ButtonRect; prev: ButtonRect | null; skip: ButtonRect } {
   const maxW = 520;
   const lineH = 24;
-  ctx.font = "500 17px Georgia, serif";
+  ctx.font = font(500, 17);
   const words = body.split(" ");
   const lines: string[] = [];
   let line = "";
@@ -958,7 +1302,7 @@ export function drawPointCoach(
 
   ctx.textAlign = "left";
   ctx.fillStyle = P.INK;
-  ctx.font = "700 22px Georgia, serif";
+  ctx.font = font(700, 22);
   ctx.fillText(title, x + 24, y + 36);
 
   const skip: ButtonRect = {
@@ -969,17 +1313,17 @@ export function drawPointCoach(
     id: "point_skip",
   };
   ctx.fillStyle = P.INK_FAINT;
-  ctx.font = "600 13px Georgia, serif";
+  ctx.font = font(600, 13);
   ctx.textAlign = "right";
   ctx.fillText("Skip tour", skip.x + skip.w - 2, skip.y + 18);
 
   ctx.fillStyle = P.INK_FAINT;
-  ctx.font = "600 12px Georgia, serif";
+  ctx.font = font(600, 12);
   ctx.textAlign = "left";
   ctx.fillText(`Step ${step + 1} of ${total}`, x + 24, y + 58);
 
   ctx.fillStyle = P.INK_SOFT;
-  ctx.font = "500 17px Georgia, serif";
+  ctx.font = font(500, 17);
   lines.forEach((ln, i) => ctx.fillText(ln, x + 24, y + 88 + i * lineH));
   ctx.restore();
 
@@ -1011,7 +1355,7 @@ export function drawInfoCard(
   const padBot = 20;
   const closeSize = 36;
 
-  ctx.font = "600 17px Georgia, serif";
+  ctx.font = font(600, 17);
   const words = body.split(" ");
   const lines: string[] = [];
   let line = "";
@@ -1054,11 +1398,11 @@ export function drawInfoCard(
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = P.INK;
-  ctx.font = "700 20px Georgia, serif";
+  ctx.font = font(700, 20);
   ctx.fillText(title, x + padX, y + 30);
 
   ctx.fillStyle = P.INK_SOFT;
-  ctx.font = "600 17px Georgia, serif";
+  ctx.font = font(600, 17);
   lines.forEach((ln, i) => ctx.fillText(ln, x + padX, y + padTop + 4 + i * lineH));
 
   // Close cross in the top-right corner
@@ -1106,8 +1450,8 @@ export function loadLogo(): void {
 
 function logoTintColor(): string {
   const id = getThemeId();
-  if (id === "pastel") return P.TABLE_OUTLINE;
-  if (id === "synthwave") return P.CH0;
+  if (id === "dusk") return P.TABLE;
+  if (id === "retro") return P.CH0;
   if (id === "red") return P.OBJ;
   if (id === "blue") return P.OBJ;
   if (id === "mono") return P.INK;
@@ -1169,9 +1513,9 @@ export function drawLogo(ctx: CanvasRenderingContext2D, cx: number, top: number,
   }
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
-  ctx.font = `700 ${Math.round(48 * scale)}px Georgia, serif`;
+  ctx.font = font(700, Math.round(48 * scale));
   ctx.fillText("PULSE", cx, top + 170 * scale);
-  ctx.font = `600 ${Math.round(18 * scale)}px Georgia, serif`;
+  ctx.font = font(600, Math.round(18 * scale));
   {
     const word = "SHIFTER";
     const gap = 8 * scale;
@@ -1195,37 +1539,81 @@ export function drawLogo(ctx: CanvasRenderingContext2D, cx: number, top: number,
   ctx.beginPath();
   ctx.arc(cx, divY, 3.5 * scale, 0, Math.PI * 2);
   ctx.fill();
-  ctx.font = `600 ${Math.round(13 * scale)}px Georgia, serif`;
+  ctx.font = font(600, Math.round(13 * scale));
   ctx.fillText("SHIFT. LINK. PULSE.", cx, top + 242 * scale);
   ctx.restore();
 }
 
 export function drawTitle(ctx: CanvasRenderingContext2D, subtitle?: string): void {
   ctx.fillStyle = P.INK;
-  ctx.font = "700 36px Georgia, serif";
+  ctx.font = font(700, 36);
   ctx.textAlign = "center";
   ctx.fillText("PULSE SHIFTER", W / 2, 58);
   ctx.fillStyle = P.INK_FAINT;
-  ctx.font = "600 14px Georgia, serif";
+  ctx.font = font(600, 14);
   ctx.fillText(subtitle ?? "SHIFT. LINK. PULSE.", W / 2, 84);
 }
 
-/** Flat paper button — fill only, no outline / shadow / bounce. */
+/** Themed button — fill/outline follow the active palette. */
 export function drawGlassButton(
   ctx: CanvasRenderingContext2D,
   rect: ButtonRect,
   label: string,
   primary = false,
-  _time = 0,
+  time = 0,
   enabled = true,
 ): void {
+  const theme = getThemeId();
+  const press = primary ? 1 - 0.04 * Math.max(0, Math.sin(time * 6) * 0.15) : 1;
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h / 2;
+  const fill = primary ? P.PAPER_DARK : P.FILL;
+  const stroke =
+    theme === "retro"
+      ? primary
+        ? P.SELECT
+        : P.TABLE_OUTLINE
+      : theme === "dusk"
+        ? primary
+          ? P.BLOCK
+          : P.TABLE
+        : primary
+          ? P.SELECT
+          : P.INK;
+  const shadow =
+    theme === "retro"
+      ? "rgba(199, 125, 255, 0.32)"
+      : theme === "mono"
+        ? "rgba(0,0,0,0.55)"
+        : theme === "dusk"
+          ? "rgba(10, 30, 70, 0.4)"
+          : theme === "red"
+            ? "rgba(120, 50, 45, 0.16)"
+            : theme === "blue"
+              ? "rgba(45, 70, 110, 0.16)"
+              : "rgba(30, 24, 18, 0.14)";
+
   ctx.save();
   ctx.globalAlpha = enabled ? 1 : 0.4;
+  ctx.translate(cx, cy);
+  ctx.scale(press, press);
+  ctx.translate(-cx, -cy);
+  ctx.shadowColor = shadow;
+  ctx.shadowBlur = theme === "retro" ? 14 : theme === "dusk" ? 10 : 8;
+  ctx.shadowOffsetY = 2;
   roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 12);
-  ctx.fillStyle = primary ? P.PAPER_DARK : P.FILL;
+  ctx.fillStyle = fill;
   ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = primary ? 1.9 : 1.4;
+  ctx.globalAlpha = enabled ? (primary ? 0.95 : 0.65) : 0.35;
+  roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 12);
+  ctx.stroke();
+  ctx.globalAlpha = enabled ? 1 : 0.4;
   ctx.fillStyle = P.INK;
-  ctx.font = "700 19px Georgia, serif";
+  ctx.font = font(700, 19);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
@@ -1241,16 +1629,39 @@ export function drawRoundButton(
   enabled: boolean,
   _time = 0,
 ): void {
+  const theme = getThemeId();
+  const stroke =
+    theme === "retro" ? P.SELECT : theme === "dusk" ? P.TABLE : P.INK;
+  const shadow =
+    theme === "retro"
+      ? "rgba(199, 125, 255, 0.32)"
+      : theme === "mono"
+        ? "rgba(0,0,0,0.55)"
+        : theme === "dusk"
+          ? "rgba(10, 30, 70, 0.4)"
+          : "rgba(30, 24, 18, 0.14)";
+
   ctx.save();
   ctx.globalAlpha = enabled ? 1 : 0.4;
   ctx.translate(x, y);
-  // Same language as rectangular buttons: solid disc, ink glyph
+  ctx.shadowColor = shadow;
+  ctx.shadowBlur = theme === "retro" ? 14 : theme === "dusk" ? 10 : 8;
+  ctx.shadowOffsetY = 2;
   ctx.fillStyle = P.FILL;
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 1.6;
+  ctx.globalAlpha = enabled ? 0.7 : 0.3;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = enabled ? 1 : 0.4;
   ctx.fillStyle = P.INK;
-  ctx.font = `700 ${Math.round(r * 0.95)}px Georgia, serif`;
+  ctx.font = font(700, Math.round(r * 0.95));
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(label, 0, 1);
@@ -1271,7 +1682,7 @@ export function drawVolumeSlider(
   void time;
   ctx.save();
   ctx.fillStyle = P.INK_FAINT;
-  ctx.font = isCompact ? "700 11px Georgia, serif" : "700 14px Georgia, serif";
+  ctx.font = font(700, isCompact ? 11 : 14);
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText(label, rect.x, rect.y + rect.h / 2);
@@ -1285,7 +1696,7 @@ export function drawVolumeSlider(
   ctx.moveTo(trackX, trackY);
   ctx.lineTo(trackX + trackW, trackY);
   ctx.stroke();
-  ctx.strokeStyle = theme === "synthwave" ? P.CH0 : P.TABLE_OUTLINE;
+  ctx.strokeStyle = theme === "retro" ? P.CH0 : P.TABLE_OUTLINE;
   ctx.beginPath();
   ctx.moveTo(trackX, trackY);
   ctx.lineTo(trackX + trackW * rect.value, trackY);

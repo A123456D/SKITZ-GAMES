@@ -37,6 +37,8 @@ function clamp01(v: unknown, fallback: number): number {
 }
 
 function migrateTheme(raw: unknown): ThemeId {
+  if (raw === "synthwave" || raw === "wave") return "retro";
+  if (raw === "pastel") return "dusk";
   return isThemeId(raw) ? raw : "paper";
 }
 

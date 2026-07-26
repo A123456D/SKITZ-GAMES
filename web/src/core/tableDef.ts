@@ -6,7 +6,9 @@ export const Module = {
   STRAIGHT: 1, // N↔S
   TEE: 2, // N↔E and N↔W
   CROSS: 3, // N↔S and E↔W
-  GATE: 4, // N↔S only while a side port is energized
+  GATE: 4, // N↔S only while a side port is energized (legacy beam)
+  /** Single open port — Net/Pipes dead-end stub. */
+  ENDCAP: 5,
 } as const;
 
 /** Geared coupling: turning this table also turns `partner` by `delta * sign`. */

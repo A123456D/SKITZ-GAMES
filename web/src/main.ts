@@ -1,24 +1,24 @@
 import { DIFFICULTY_COUNT, generateLevel, levelTitle } from "./core/levelCatalog";
 import { Kind } from "./core/cellKind";
-import { countKind, getCell } from "./core/gridState";
+import { getCell } from "./core/gridState";
 import {
   commitRotationQ,
   canPulse,
+  isFailed,
   loadLevel,
   pulse,
   pulsesRemaining,
   restart,
   selectTable,
   stars,
-  tryFlipPhase,
   tryRotate,
-  tryTogglePad,
   undo,
   type PuzzleSession,
 } from "./core/puzzleSession";
-import { buildTutorialBasics, buildTutorialChannels, buildTutorialDepth, buildTutorialPhaseTokens, buildTutorialShowcase, buildThemePreviewLevel, SHOWCASE_POINTS, type PointBeat } from "./core/tutorialLevel";
+import { buildTutorialBasics, buildTutorialChannels, buildTutorialShowcase, buildThemePreviewLevel, SHOWCASE_POINTS, type PointBeat } from "./core/tutorialLevel";
 import { buildState, type LevelData } from "./core/levelData";
-import { solve } from "./core/beamSolver";
+import { solve } from "./core/networkSolver";
+import { analyzeNetwork } from "./core/networkSolver";
 import { tableContains } from "./core/tableDef";
 import {
   clearActiveRun,
@@ -40,6 +40,7 @@ import {
   sfxSnap,
   sfxTick,
   sfxWin,
+  sfxFail,
 } from "./audio/sfx";
 
 function unlockAllAudio(): void {
@@ -86,6 +87,7 @@ import {
   getThemeId,
   type ThemeId,
 } from "./view/palette";
+import { font, loadUiFonts } from "./view/typography";
 
 type Screen = "menu" | "levels" | "play" | "pause" | "settings" | "how" | "tutorial" | "theme_pick";
 
@@ -104,6 +106,10 @@ let playSeed = Date.now() >>> 0;
 let session: PuzzleSession | null = null;
 let layout: Layout | null = null;
 let beamProgress = 1;
+/** Button-driven quarter-turn: ease with a soft overshoot, then settle. */
+let rotTween: { id: number; from: number; to: number; start: number; dur: number } | null = null;
+let squashUntil = 0;
+let squashId = -1;
 let time = 0;
 let buttons: ButtonRect[] = [];
 let sliders: SliderRect[] = [];
@@ -135,9 +141,9 @@ const TUTORIAL_FLOW: TutStep[] = [
     kind: "card",
     title: "WELCOME",
     body: [
-      "Pulse Shifter is a laser routing puzzle.",
-      "We’ll point at every symbol and explain it,",
-      "then you’ll solve four short practice boards.",
+      "Pulse Shifter is a dense circuit puzzle.",
+      "Every cell is a disc. Turn them until",
+      "every mark meets a neighbor — one network.",
     ],
     nextLabel: "MEET THE BOARD",
   },
@@ -150,50 +156,29 @@ const TUTORIAL_FLOW: TutStep[] = [
     kind: "card",
     title: "YOUR TURN",
     body: [
-      "Time to play. Turn discs, then PULSE.",
-      "Four lessons — basics, channels, depth, then phase & tokens.",
-      "Take your time. Undo and Reset are there to help.",
+      "Practice on two short boards.",
+      "Turn discs, then PULSE to check.",
+      "Undo and Reset are there to help.",
     ],
     nextLabel: "TRY LESSON 1",
   },
-  { kind: "play", build: buildTutorialBasics, lesson: "1 / 4 · Turn & Pulse" },
+  { kind: "play", build: buildTutorialBasics, lesson: "1 / 2 · Close the ring" },
   {
     kind: "card",
-    title: "CHANNELS NEXT",
+    title: "ONE NETWORK",
     body: [
-      "Remember: solid and dashed are different channels.",
-      "Each receiver only accepts its matching channel.",
-      "Wrong channel = Spill, and that blocks the win.",
+      "Larger boards stay one circuit.",
+      "No open stubs. No separate islands.",
+      "Ambiguity grows with size — that is the game.",
     ],
     nextLabel: "TRY LESSON 2",
   },
-  { kind: "play", build: buildTutorialChannels, lesson: "2 / 4 · Channels" },
+  { kind: "play", build: buildTutorialChannels, lesson: "2 / 2 · Full board" },
   {
     kind: "card",
-    title: "DEPTH NEXT",
+    title: "YOU'RE READY",
     body: [
-      "Wormholes jump beams. Barriers are one-way.",
-      "Use what you learned — then pulse when ready.",
-    ],
-    nextLabel: "TRY LESSON 3",
-  },
-  { kind: "play", build: buildTutorialDepth, lesson: "3 / 4 · Depth" },
-  {
-    kind: "card",
-    title: "PHASE & TOKENS",
-    body: [
-      "From Level 2 on, polarity and tokens matter as much as discs.",
-      "Arm phase switches. Place tokens on pads to open doors.",
-      "Discs alone won’t clear those boards.",
-    ],
-    nextLabel: "TRY LESSON 4",
-  },
-  { kind: "play", build: buildTutorialPhaseTokens, lesson: "4 / 4 · Phase & Tokens" },
-  {
-    kind: "card",
-    title: "YOU’RE READY",
-    body: [
-      "Light every receiver. No spill. Stay in the pulse budget.",
+      "Close every end. One network. Stay in the pulse budget.",
       "Next — pick a look for the game.",
     ],
     nextLabel: "PICK A THEME",
@@ -204,57 +189,41 @@ const TUTORIAL_PAGES: { title: string; body: string[] }[] = [
   {
     title: "WELCOME",
     body: [
-      "You route hidden beams through rotating tables.",
-      "Every turn on a shared hub can rewrite every path.",
-      "Read the board. Commit carefully. Then fire.",
+      "Every cell is a disc in one tiled circuit.",
+      "Marks show which sides are open.",
+      "Turn them until everything meets.",
     ],
   },
   {
-    title: "TURN TABLES",
+    title: "TURN DISCS",
     body: [
-      "Tap a white disc to select it.",
+      "Tap a disc to select it.",
       "Drag around it, or use ↺ ↻, to rotate.",
-      "Locked tables cannot turn — they are part of the puzzle.",
+      "Open sides must face a matching neighbor.",
     ],
   },
   {
-    title: "PULSE TO FIRE",
+    title: "PULSE TO CHECK",
     body: [
-      "Beams stay hidden until you PULSE.",
-      "Pulses are scarce — probing will strand you.",
-      "Plan the wiring first. Fire only when you mean it.",
+      "Connections stay hidden until you PULSE.",
+      "Pulses are scarce — think, then fire.",
+      "Win when there are no open ends and one network.",
     ],
   },
   {
-    title: "CHANNELS",
+    title: "THE RULE",
     body: [
-      "Solid, dashed, and dotted are different channels.",
-      "A receiver only counts if the matching channel arrives.",
-      "Wrong channel on a target is SPILL — that blocks the win.",
-    ],
-  },
-  {
-    title: "DEPTH",
-    body: [
-      "Wormholes teleport beams to their twin.",
-      "Barriers pass only one direction — follow the arrow.",
-      "Walls, sinks, filters, and mirrors all rewrite the route.",
-    ],
-  },
-  {
-    title: "GEARS",
-    body: [
-      "Cog-toothed discs are geared to a partner.",
-      "Turning one turns the other — you cannot set them apart.",
-      "Find the single offset that lines up both lanes at once.",
+      "Every open mark must meet another.",
+      "The whole board must be one connected circuit.",
+      "That is it — no other verbs.",
     ],
   },
   {
     title: "WIN",
     body: [
-      "Light every receiver with the correct channel.",
-      "No spill. Within your pulse budget.",
-      "After this, pick a look — then play.",
+      "No open ends. One network.",
+      "Within your pulse budget.",
+      "That is the whole game — close the circuit.",
     ],
   },
 ];
@@ -308,47 +277,7 @@ const SYMBOL_INFO: Record<number, { title: string; body: string }> = {
   },
   [Kind.RECEIVER]: {
     title: "RECEIVER · FINISH",
-    body: "The goal. Light it with the matching channel to link it. A wrong channel is spill and blocks the win.",
-  },
-  [Kind.MIRROR]: {
-    title: "MIRROR",
-    body: "Reflects a beam by 90 degrees. The slash direction decides which way it bends.",
-  },
-  [Kind.CRATE]: {
-    title: "CRATE",
-    body: "A solid block. Beams cannot pass through it — route around it.",
-  },
-  [Kind.SINK]: {
-    title: "SINK",
-    body: "Absorbs any beam that enters — a dead end. Keep beams away from it.",
-  },
-  [Kind.WORMHOLE]: {
-    title: "WORMHOLE",
-    body: "Teleports a beam to its matching twin, keeping the same direction. The ticks show which pair it belongs to.",
-  },
-  [Kind.FILTER]: {
-    title: "FILTER",
-    body: "Only the matching channel may pass through. Every other channel is blocked.",
-  },
-  [Kind.BARRIER]: {
-    title: "BARRIER",
-    body: "A one-way gate. A beam only passes while travelling through the open lane.",
-  },
-  [Kind.PHASE_SWITCH]: {
-    title: "PHASE SWITCH",
-    body: "Tap to arm or disarm. An armed switch flips a beam's polarity as it passes. Phase gates only accept the matching polarity.",
-  },
-  [Kind.PHASE_GATE]: {
-    title: "PHASE GATE",
-    body: "Only a beam with the matching polarity may pass. Use a phase switch upstream to flip the beam first.",
-  },
-  [Kind.PAD]: {
-    title: "TOKEN PAD",
-    body: "A socket for a token. Tap to place or pick up. A token door stays shut until its linked pad holds a token.",
-  },
-  [Kind.TOKEN_DOOR]: {
-    title: "TOKEN DOOR",
-    body: "Blocks every beam until a token sits on the matching pad. Discs alone cannot open it.",
+    body: "The goal. Light it with the matching channel to complete the circuit.",
   },
 };
 
@@ -392,6 +321,9 @@ function startLevel(i: number, newSeed = true): void {
   drag = null;
   displayResult = session.result;
   settledTables = new Set();
+  rotTween = null;
+  squashUntil = 0;
+  squashId = -1;
   dismissInspect();
   clearWinState();
   clearFeel();
@@ -449,7 +381,7 @@ function restoreSavedRun(): boolean {
     return snapshot;
   });
   session.moves = Math.max(0, Number(run.moves) || 0);
-  session.undosRemaining = Math.max(0, Number(run.undosRemaining) || 0);
+  session.undosRemaining = Number.POSITIVE_INFINITY;
   session.pulsesUsed = Math.max(0, Number(run.pulsesUsed) || 0);
   session.selectedTable = Number.isInteger(run.selectedTable) ? run.selectedTable : -1;
   session.beamsVisible = !!run.beamsVisible;
@@ -512,6 +444,9 @@ function startPointTour(step: TutPoint): void {
   drag = null;
   displayResult = session.result;
   settledTables = new Set();
+  rotTween = null;
+  squashUntil = 0;
+  squashId = -1;
   dismissInspect();
   clearWinState();
   clearFeel();
@@ -530,6 +465,9 @@ function startTutorialBoard(step?: TutPlay): void {
   drag = null;
   displayResult = session.result;
   settledTables = new Set();
+  rotTween = null;
+  squashUntil = 0;
+  squashId = -1;
   dismissInspect();
   clearWinState();
   clearFeel();
@@ -643,7 +581,20 @@ function doRotate(dq: number): void {
   if (!session || victory || pendingWin) return;
   if (session.selectedTable < 0) return;
   const rotatedId = session.selectedTable;
+  const before = session.state.tables.find((t) => t.id === rotatedId);
+  if (!before) return;
+  const from = before.rotationQ * (Math.PI / 2);
   if (!tryRotate(session, session.selectedTable, dq)) return;
+  const after = session.state.tables.find((t) => t.id === rotatedId)!;
+  // Shortest angular path for the tween (±π/2 typically).
+  let to = after.rotationQ * (Math.PI / 2);
+  let delta = to - from;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  to = from + delta;
+  rotTween = { id: rotatedId, from, to, start: time, dur: 0.11 };
+  squashId = rotatedId;
+  squashUntil = time + 0.14;
   settledTables.add(rotatedId);
   displayResult = session.result;
   beamProgress = 1;
@@ -663,6 +614,10 @@ function doPulse(): void {
   if (session.result.won) {
     pendingWin = true;
     winRevealAt = 0;
+  } else if (isFailed(session)) {
+    sfxFail();
+  } else if ((session.result.spillReceivers?.length ?? 0) > 0) {
+    sfxFail();
   }
   persistRun();
 }
@@ -676,7 +631,22 @@ function visualRot(tableId: number): number {
     const delta = drag.liveAngle - dragged.rotationQ * (Math.PI / 2);
     return t.rotationQ * (Math.PI / 2) + delta * t.link.sign;
   }
+  if (rotTween && rotTween.id === tableId) {
+    const u = Math.min(1, (time - rotTween.start) / rotTween.dur);
+    // Ease-out with a hair of overshoot — paper detent, not rubber.
+    const over = u < 1 ? 1 - Math.pow(1 - u, 3) : 1;
+    const bump = u < 1 ? Math.sin(u * Math.PI) * 0.06 * Math.sign(rotTween.to - rotTween.from) : 0;
+    if (u >= 1) rotTween = null;
+    else return rotTween.from + (rotTween.to - rotTween.from) * over + bump;
+  }
   return t.rotationQ * (Math.PI / 2);
+}
+
+function discSquash(tableId: number): number {
+  if (squashId !== tableId || time > squashUntil) return 1;
+  const u = 1 - (squashUntil - time) / 0.14;
+  // Brief vertical settle: 1.0 → 0.94 → 1.0
+  return 1 - 0.06 * Math.sin(Math.min(1, u) * Math.PI);
 }
 
 function angleAt(x: number, y: number, tableId: number): number {
@@ -771,33 +741,6 @@ canvas.addEventListener("pointerdown", (e) => {
       };
       canvas.setPointerCapture(e.pointerId);
       return;
-    }
-    // Phase switches + token pads are co-equal verbs with disc turns.
-    if (layout) {
-      const s = layout.cell + layout.gap;
-      const cx = Math.floor((p.x - layout.origin.x) / s);
-      const cy = Math.floor((p.y - layout.origin.y) / s);
-      if (cx >= 0 && cy >= 0 && cx < session.state.width && cy < session.state.height) {
-        const cell = getCell(session.state, cx, cy);
-        if (cell.kind === Kind.PHASE_SWITCH) {
-          if (tryFlipPhase(session, cx, cy)) {
-            displayResult = session.result;
-            beamProgress = 1;
-            sfxSnap();
-            persistRun();
-          }
-          return;
-        }
-        if (cell.kind === Kind.PAD) {
-          if (tryTogglePad(session, cx, cy)) {
-            displayResult = session.result;
-            beamProgress = 1;
-            sfxSnap();
-            persistRun();
-          }
-          return;
-        }
-      }
     }
     inspectCellAt(p.x, p.y);
   }
@@ -1006,6 +949,7 @@ function onButton(id: string): void {
   if (id === "pulse") doPulse();
   if (id === "undo") {
     undo(session);
+    layout = boardLayout(session.state);
     clearWinState();
     displayResult = session.result;
     beamProgress = 1;
@@ -1013,8 +957,12 @@ function onButton(id: string): void {
   }
   if (id === "reset") {
     restart(session);
+    layout = boardLayout(session.state);
     clearWinState();
     settledTables = new Set();
+  rotTween = null;
+  squashUntil = 0;
+  squashId = -1;
     dismissInspect();
     displayResult = session.result;
     beamProgress = 1;
@@ -1095,7 +1043,7 @@ function drawThemeChip(rect: ButtonRect, id: ThemeId, active: boolean): void {
     ctx.fill();
   }
   ctx.fillStyle = t.OBJ;
-  ctx.font = "700 11px Georgia, serif";
+  ctx.font = font(700, 11);
   ctx.textAlign = "center";
   ctx.fillText(THEME_LABELS[id], rect.x + rect.w / 2, rect.y + 58);
   ctx.restore();
@@ -1162,14 +1110,14 @@ function drawInfoPages(
   drawLogo(ctx, W / 2, 36, 260);
   const p = pages[page];
   ctx.fillStyle = P.INK;
-  ctx.font = "700 28px Georgia, serif";
+  ctx.font = font(700, 28);
   ctx.textAlign = "center";
   ctx.fillText(p.title, W / 2, 360);
   ctx.fillStyle = P.INK_SOFT;
-  ctx.font = "500 18px Georgia, serif";
+  ctx.font = font(500, 18);
   p.body.forEach((line, i) => ctx.fillText(line, W / 2, 420 + i * 36));
   ctx.fillStyle = P.INK_FAINT;
-  ctx.font = "600 14px Georgia, serif";
+  ctx.font = font(600, 14);
   ctx.fillText(`${page + 1} / ${pages.length}`, W / 2, 560);
 
   if (page > 0) {
@@ -1221,7 +1169,7 @@ function drawMenu(): void {
   drawGlassButton(ctx, settingsBtn, "SETTINGS", false, time);
   buttons.push(play, levelsBtn, tutBtn, howBtn, settingsBtn);
   ctx.fillStyle = P.INK_FAINT;
-  ctx.font = "16px Georgia, serif";
+  ctx.font = font(400, 16);
   ctx.textAlign = "center";
   ctx.fillText("Wormholes. Walls. Scarce pulses. Think before you fire.", W / 2, 920);
 }
@@ -1247,7 +1195,7 @@ function drawHeadphonesBadge(): void {
   ctx.stroke();
 
   ctx.globalAlpha = 0.78;
-  ctx.font = "600 13px Georgia, serif";
+  ctx.font = font(600, 13);
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
   ctx.fillText("BEST WITH", cx, 78);
@@ -1260,13 +1208,13 @@ function drawSettings(): void {
   drawBackground(ctx);
   drawTitle(ctx, "SETTINGS");
   ctx.fillStyle = P.INK;
-  ctx.font = "700 18px Georgia, serif";
+  ctx.font = font(700, 18);
   ctx.textAlign = "center";
   ctx.fillText("THEME · LIVE PREVIEW", W / 2, 125);
   drawThemeGamePreview(145);
   drawThemeGrid(405);
   ctx.fillStyle = P.INK;
-  ctx.font = "700 18px Georgia, serif";
+  ctx.font = font(700, 18);
   ctx.fillText("VOLUME", W / 2, 625);
   pushVolumeSliders(665);
   const back: ButtonRect = { x: 120, y: 1100, w: 480, h: 64, id: "settings_back" };
@@ -1286,11 +1234,11 @@ function drawThemePick(): void {
   drawBackground(ctx);
   drawLogo(ctx, W / 2, 24, 180);
   ctx.fillStyle = P.INK;
-  ctx.font = "700 24px Georgia, serif";
+  ctx.font = font(700, 24);
   ctx.textAlign = "center";
   ctx.fillText("CHOOSE A THEME", W / 2, 230);
   ctx.fillStyle = P.INK_SOFT;
-  ctx.font = "500 15px Georgia, serif";
+  ctx.font = font(500, 15);
   ctx.fillText("Tap a look — the board below shows how it plays.", W / 2, 262);
   drawThemeGamePreview(290);
   drawThemeGrid(560);
@@ -1298,7 +1246,7 @@ function drawThemePick(): void {
   drawGlassButton(ctx, confirm, `CONFIRM · ${THEME_LABELS[themePreview].toUpperCase()}`, true, time);
   buttons.push(confirm);
   ctx.fillStyle = P.INK_FAINT;
-  ctx.font = "500 14px Georgia, serif";
+  ctx.font = font(500, 14);
   ctx.fillText("You can change this anytime in Settings.", W / 2, 1010);
 }
 
@@ -1327,7 +1275,7 @@ function drawThemeGamePreview(top: number): void {
   ctx.stroke();
 
   ctx.fillStyle = P.INK_FAINT;
-  ctx.font = "600 12px Georgia, serif";
+  ctx.font = font(600, 12);
   ctx.textAlign = "center";
   ctx.fillText("IN-GAME LOOK", W / 2, panelY + 18);
 
@@ -1357,14 +1305,14 @@ function drawTutorialCard(): void {
   drawBackground(ctx);
   drawLogo(ctx, W / 2, 36, 240);
   ctx.fillStyle = P.INK;
-  ctx.font = "700 28px Georgia, serif";
+  ctx.font = font(700, 28);
   ctx.textAlign = "center";
   ctx.fillText(step.title, W / 2, 340);
   ctx.fillStyle = P.INK_SOFT;
-  ctx.font = "500 18px Georgia, serif";
+  ctx.font = font(500, 18);
   step.body.forEach((line, i) => ctx.fillText(line, W / 2, 400 + i * 36));
   ctx.fillStyle = P.INK_FAINT;
-  ctx.font = "600 14px Georgia, serif";
+  ctx.font = font(600, 14);
   ctx.fillText(`Guide ${tutCardIndex() + 1} / ${tutCardCount()}`, W / 2, 560);
 
   const canBack = tutorialStep > 0;
@@ -1430,7 +1378,7 @@ function drawLevels(): void {
   if (levelPage < pageCount() - 1) buttons.push(next);
 
   ctx.fillStyle = P.INK_FAINT;
-  ctx.font = "14px Georgia, serif";
+  ctx.font = font(400, 14);
   ctx.textAlign = "center";
   ctx.fillText(`Page ${levelPage + 1} / ${pageCount()}`, W / 2, 1165);
 }
@@ -1441,7 +1389,7 @@ function drawPause(): void {
   drawBackground(ctx);
   drawTitle(ctx, "PAUSED");
   ctx.fillStyle = P.INK_SOFT;
-  ctx.font = "600 16px Georgia, serif";
+  ctx.font = font(600, 16);
   ctx.textAlign = "center";
   ctx.fillText(session ? levelTitle(levelIndex + 1).toUpperCase() : "", W / 2, 120);
 
@@ -1461,9 +1409,10 @@ function drawPlay(): void {
   sliders = [];
   if (!session || !layout) return;
   const result = displayResult ?? session.result;
-  const lit = session.beamsVisible ? result.energizedReceivers.length : 0;
-  const need = countKind(session.state, Kind.RECEIVER);
-  const spill = session.beamsVisible ? (result.spillReceivers?.length ?? 0) : 0;
+  const net = analyzeNetwork(session.state);
+  const lit = session.beamsVisible && result.won ? net.discCount : 0;
+  const need = session.beamsVisible ? net.discCount : 0;
+  const spill = session.beamsVisible ? net.looseEnds : 0;
   const pLeft = pulsesRemaining(session);
   const pLim = session.level.pulseLimit > 0 ? session.level.pulseLimit : 3;
   drawBackground(ctx);
@@ -1485,7 +1434,6 @@ function drawPlay(): void {
       spill,
       pLeft,
       pLim,
-      session.level.tokenBudget > 0 ? session.tokensLeft : -1,
     );
     const music: SliderRect = {
       x: W / 2 - 140,
@@ -1510,7 +1458,7 @@ function drawPlay(): void {
     sliders.push(music, sfx);
   } else {
     ctx.fillStyle = P.INK_FAINT;
-    ctx.font = "600 14px Georgia, serif";
+    ctx.font = font(600, 14);
     ctx.textAlign = "center";
     ctx.fillText("Follow the finger — tap Next to learn each symbol", W / 2, 148);
   }
@@ -1525,9 +1473,18 @@ function drawPlay(): void {
   }
 
   for (const t of session.state.tables) {
-    const settled = settledTables.has(t.id) || t.locked || tutorialPhase === "point";
-    // Route-preview stubs are a solution tell — only show them while teaching.
-    drawWheel(ctx, t, layout, t.id === session.selectedTable && tutorialPhase !== "point", visualRot(t.id), time, settled, inTutorial);
+    drawWheel(
+      ctx,
+      t,
+      layout,
+      t.id === session.selectedTable && tutorialPhase !== "point",
+      visualRot(t.id),
+      time,
+      true,
+      false,
+      true,
+      discSquash(t.id),
+    );
   }
   if (session.beamsVisible) {
     drawBeams(ctx, layout, result, beamProgress);
@@ -1545,22 +1502,22 @@ function drawPlay(): void {
   } else {
     inspectClose = null;
     if (!victory && spill > 0) {
-      drawCoachHint(ctx, "Spill — wrong channel on a target. That blocks the win.", 1040);
+      drawCoachHint(ctx, "Open ends — marks that meet nothing. Turn until every stub closes.", 1040);
     } else if (!victory && session.moves === 0 && session.level.hint) {
       drawCoachHint(ctx, session.level.hint, 1040);
     } else if (!victory && !session.beamsVisible && pLeft > 0) {
-      drawCoachHint(ctx, "Commit your turns, then PULSE to fire the beams. Tap any symbol to learn it.", 1048);
+      drawCoachHint(ctx, "Think freely. A check costs one pulse — spend it when you're ready.", 1048);
     } else if (!victory && pLeft === 0 && !session.result.won) {
-      drawCoachHint(ctx, "No pulses left — RESET to try again.", 1048);
+      drawCoachHint(ctx, "Out of checks — try the same board again, or a new layout.", 1048);
     }
   }
 
-  // Order: UNDO · PULSE (center) · RESET · MENU
+  // Order: UNDO · PULSE · RESET · MENU
   const undoBtn: ButtonRect = { x: 28, y: 1090, w: 130, h: 56, id: "undo" };
   const pulseBtn: ButtonRect = { x: 172, y: 1090, w: 220, h: 56, id: "pulse" };
   const resetBtn: ButtonRect = { x: 406, y: 1090, w: 130, h: 56, id: "reset" };
   const menuBtn: ButtonRect = { x: 550, y: 1090, w: 142, h: 56, id: "menu" };
-  drawGlassButton(ctx, undoBtn, `UNDO ${session.undosRemaining}`, false, time);
+  drawGlassButton(ctx, undoBtn, "UNDO", false, time);
   drawGlassButton(ctx, pulseBtn, `PULSE ${pLeft}`, canPulse(session) && !victory && !pendingWin, time);
   drawGlassButton(ctx, resetBtn, "RESET", false, time);
   drawGlassButton(ctx, menuBtn, "MENU", false, time);
@@ -1593,13 +1550,13 @@ function drawPlay(): void {
     const delta = session.moves - session.level.par;
     const near = delta === 0 ? "ON PAR" : delta < 0 ? `PAR − ${-delta}` : `OVER BY ${delta}`;
     ctx.fillStyle = P.INK;
-    ctx.font = "700 28px Georgia, serif";
+    ctx.font = font(700, 28);
     ctx.textAlign = "center";
-    ctx.fillText(inTutorial ? "NICE LINK" : "LINKED", W / 2, 510);
-    ctx.font = "700 36px Georgia, serif";
+    ctx.fillText(inTutorial ? "NICE LINK" : "CLOSED", W / 2, 510);
+    ctx.font = font(700, 36);
     ctx.fillText("★".repeat(s) + "☆".repeat(3 - s), W / 2, 565);
     ctx.fillStyle = P.INK_SOFT;
-    ctx.font = "17px Georgia, serif";
+    ctx.font = font(400, 17);
     ctx.fillText(
       inTutorial
         ? "Lesson cleared — keep going to learn the rest."
@@ -1626,12 +1583,36 @@ function drawPlay(): void {
         buttons = [next, replay, diffs];
       }
     }
+  } else if (isFailed(session) && !pendingWin) {
+    // Spending the last check without closing the circuit ends the attempt.
+    ctx.fillStyle = "rgba(244,241,234,0.72)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = P.PAPER;
+    ctx.strokeStyle = P.INK;
+    ctx.lineWidth = 1.5;
+    const panel = { x: 100, y: 440, w: 520, h: 300 };
+    roundRectPath(ctx, panel.x, panel.y, panel.w, panel.h, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = P.INK;
+    ctx.font = font(700, 28);
+    ctx.textAlign = "center";
+    ctx.fillText("OUT OF CHECKS", W / 2, 510);
+    ctx.fillStyle = P.INK_SOFT;
+    ctx.font = font(400, 17);
+    ctx.fillText(`${net.looseEnds} open ends still on the board.`, W / 2, 558);
+    ctx.fillText("Read the board before you spend the next one.", W / 2, 584);
+    const again: ButtonRect = { x: 160, y: 620, w: 400, h: 52, id: "reset" };
+    const fresh: ButtonRect = { x: 160, y: 685, w: 400, h: 52, id: "replay" };
+    drawGlassButton(ctx, again, "SAME BOARD AGAIN", true, time);
+    drawGlassButton(ctx, fresh, inTutorial ? "TRY AGAIN" : "NEW LAYOUT", false, time);
+    buttons = [again, fresh];
   }
 }
 
 function frame(now: number): void {
   time = now / 1000;
-  if (beamProgress < 1 && !drag) beamProgress = Math.min(1, beamProgress + 0.055);
+  if (beamProgress < 1 && !drag) beamProgress = Math.min(1, beamProgress + 0.042);
 
   if (pendingWin && !drag && beamProgress >= 1) {
     fireVictoryFeel();
@@ -1661,4 +1642,6 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
 }
 
-requestAnimationFrame(frame);
+void loadUiFonts().finally(() => {
+  requestAnimationFrame(frame);
+});

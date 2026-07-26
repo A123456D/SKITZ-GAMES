@@ -1,143 +1,127 @@
-import { Dir, MirrorOri } from "./cellKind";
-import { Module } from "./tableDef";
+import { Dir } from "./cellKind";
 import { cell, table, type LevelData } from "./levelData";
+import { moduleForPorts } from "./portWiring";
 
 const e = () => cell.empty();
 
+function denseFromPorts(
+  ports: number[][],
+  w: number,
+  h: number,
+  id: string,
+  title: string,
+  hint: string,
+): LevelData {
+  const tables = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const shaped = moduleForPorts(ports[i]!);
+      if (!shaped) throw new Error(`tutorial ports invalid at ${x},${y}`);
+      tables.push(table(i, x, y, shaped.module, shaped.rotationQ, 0, false));
+    }
+  }
+  return {
+    id,
+    title,
+    width: w,
+    height: h,
+    par: 1,
+    undoLimit: 8,
+    pulseLimit: 6,
+    tokenBudget: 0,
+    tables,
+    cells: Array.from({ length: w * h }, () => e()),
+    solution: [],
+    hint,
+    tutorial: true,
+  };
+}
+
+function portsFromEdges(w: number, h: number, edges: [number, number, number, number][]): number[][] {
+  const ports: number[][] = Array.from({ length: w * h }, () => []);
+  const add = (x: number, y: number, dir: number) => {
+    ports[y * w + x]!.push(dir);
+  };
+  for (const [x1, y1, x2, y2] of edges) {
+    if (x2 === x1 + 1 && y2 === y1) {
+      add(x1, y1, Dir.E);
+      add(x2, y2, Dir.W);
+    } else if (x2 === x1 - 1 && y2 === y1) {
+      add(x1, y1, Dir.W);
+      add(x2, y2, Dir.E);
+    } else if (y2 === y1 + 1 && x2 === x1) {
+      add(x1, y1, Dir.S);
+      add(x2, y2, Dir.N);
+    } else if (y2 === y1 - 1 && x2 === x1) {
+      add(x1, y1, Dir.N);
+      add(x2, y2, Dir.S);
+    }
+  }
+  return ports;
+}
+
 /**
- * Lesson 1 — Turn & Pulse.
- * Emitter → straight table (starts N–S) → receiver. One turn, then pulse.
+ * Lesson 1 — 2×2 ring of elbows. One disc starts wrong.
  */
 export function buildTutorialBasics(): LevelData {
-  const width = 5;
-  const height = 3;
-  const cells = [
-    e(), e(), e(), e(), e(),
-    cell.emit(Dir.E), e(), e(), e(), cell.recv(),
-    e(), e(), e(), e(), e(),
-  ];
-  cells[1 * width + 2] = cell.empty(0);
-  return {
-    id: "tutorial_basics",
-    title: "Lesson 1 · Turn & Pulse",
-    width,
-    height,
-    par: 1,
-    undoLimit: 4,
-    pulseLimit: 5,
-    tokenBudget: 0,
-    tables: [table(0, 2, 1, Module.STRAIGHT, 0, 0, false)],
-    cells,
-    solution: [{ tableId: 0, delta: 1 }],
-    hint: "Select the disc → turn with ↺ / ↻ (or drag) → PULSE to fire.",
-    tutorial: true,
-  };
+  const w = 2;
+  const h = 2;
+  const ports = portsFromEdges(w, h, [
+    [0, 0, 1, 0],
+    [1, 0, 1, 1],
+    [1, 1, 0, 1],
+    [0, 1, 0, 0],
+  ]);
+  const level = denseFromPorts(
+    ports,
+    w,
+    h,
+    "tutorial_basics",
+    "Lesson 1 · Close the circuit",
+    "Turn discs so every mark meets a neighbor. Then PULSE.",
+  );
+  level.tables[0]!.rotationQ = (level.tables[0]!.rotationQ + 1) % 4;
+  level.solution = [{ tableId: 0, delta: -1 }];
+  level.par = 1;
+  return level;
 }
 
 /**
- * Lesson 2 — Channels.
- * Two lanes, two channels. Each straight starts wrong; turn both, then pulse.
+ * Lesson 2 — full 3×3 spanning tree (every cell a disc).
  */
 export function buildTutorialChannels(): LevelData {
-  const width = 5;
-  const height = 5;
-  const cells = Array.from({ length: width * height }, () => e());
-  cells[1 * width + 0] = cell.emit(Dir.E, 0);
-  cells[1 * width + 2] = cell.empty(0);
-  cells[1 * width + 4] = cell.recv(0);
-  cells[3 * width + 0] = cell.emit(Dir.E, 1);
-  cells[3 * width + 2] = cell.empty(1);
-  cells[3 * width + 4] = cell.recv(1);
-  return {
-    id: "tutorial_channels",
-    title: "Lesson 2 · Channels",
-    width,
-    height,
-    par: 2,
-    undoLimit: 5,
-    pulseLimit: 5,
-    tokenBudget: 0,
-    tables: [
-      table(0, 2, 1, Module.STRAIGHT, 0, 0, false),
-      table(1, 2, 3, Module.STRAIGHT, 0, 0, false),
-    ],
-    cells,
-    solution: [
-      { tableId: 0, delta: 1 },
-      { tableId: 1, delta: 1 },
-    ],
-    hint: "Solid ≠ dashed. Turn BOTH discs so each beam hits its matching receiver, then PULSE.",
-    tutorial: true,
-  };
-}
-
-/**
- * Lesson 3 — Depth (wormhole + barrier + mirror on the board).
- * Straight starts wrong; after the turn the beam enters a wormhole and
- * exits its twin toward the receiver through a one-way barrier.
- */
-export function buildTutorialDepth(): LevelData {
-  const width = 5;
-  const height = 5;
-  const cells = Array.from({ length: width * height }, () => e());
-  cells[2 * width + 0] = cell.emit(Dir.E);
-  cells[2 * width + 2] = cell.empty(0);
-  cells[2 * width + 3] = cell.worm(0);
-  cells[4 * width + 1] = cell.worm(0);
-  cells[4 * width + 2] = cell.barrier(Dir.E);
-  cells[4 * width + 3] = cell.recv();
-  // Tap-to-learn props (not on the critical path)
-  cells[0 * width + 4] = cell.mir(MirrorOri.SLASH);
-  cells[4 * width + 0] = cell.sink();
-  return {
-    id: "tutorial_depth",
-    title: "Lesson 3 · Depth",
-    width,
-    height,
-    par: 1,
-    undoLimit: 5,
-    pulseLimit: 5,
-    tokenBudget: 0,
-    tables: [table(0, 2, 2, Module.STRAIGHT, 0, 0, false)],
-    cells,
-    solution: [{ tableId: 0, delta: 1 }],
-    hint: "Turn the disc. The beam jumps through the wormhole, then passes the one-way barrier. Tap symbols to learn them.",
-    tutorial: true,
-  };
-}
-
-/**
- * Lesson 4 — Phase & Tokens (co-equal verbs with disc turns).
- * Flip the phase switch and place a token so the door opens and the
- * phase-locked receiver accepts the beam.
- */
-export function buildTutorialPhaseTokens(): LevelData {
-  const width = 5;
-  const height = 2;
-  const cells = Array.from({ length: width * height }, () => e());
-  cells[0 * width + 0] = cell.emit(Dir.E);
-  cells[0 * width + 1] = cell.phaseSwitch(0);
-  cells[0 * width + 2] = cell.tokenDoor(1);
-  cells[0 * width + 4] = cell.recv(0, -1, 1);
-  cells[1 * width + 1] = cell.pad(0, 1);
-  return {
-    id: "tutorial_phase_tokens",
-    title: "Lesson 4 · Phase & Tokens",
-    width,
-    height,
-    par: 2,
-    undoLimit: 5,
-    pulseLimit: 5,
-    tokenBudget: 1,
-    tables: [],
-    cells,
-    solution: [
-      { tableId: -1, delta: 0, x: 1, y: 0 },
-      { tableId: -2, delta: 0, x: 1, y: 1 },
-    ],
-    hint: "Tap the phase switch to arm it. Tap the pad to place your token. Then PULSE.",
-    tutorial: true,
-  };
+  const w = 3;
+  const h = 3;
+  // Spanning tree covering all 9 cells + one chord for a short loop.
+  const ports = portsFromEdges(w, h, [
+    [0, 0, 1, 0],
+    [1, 0, 2, 0],
+    [0, 0, 0, 1],
+    [1, 0, 1, 1],
+    [2, 0, 2, 1],
+    [0, 1, 0, 2],
+    [1, 1, 1, 2],
+    [2, 1, 2, 2],
+    [1, 2, 2, 2], // chord
+  ]);
+  const level = denseFromPorts(
+    ports,
+    w,
+    h,
+    "tutorial_depth",
+    "Lesson 2 · One network",
+    "Every stub must meet another. The whole board is one circuit.",
+  );
+  level.tables[4]!.rotationQ = (level.tables[4]!.rotationQ + 1) % 4;
+  level.tables[1]!.rotationQ = (level.tables[1]!.rotationQ + 2) % 4;
+  level.solution = [
+    { tableId: 4, delta: -1 },
+    { tableId: 1, delta: 1 },
+    { tableId: 1, delta: 1 },
+  ];
+  level.par = 3;
+  return level;
 }
 
 export type PointTarget =
@@ -151,132 +135,51 @@ export type PointBeat = {
   at: PointTarget;
 };
 
-/**
- * Showcase board for the finger-point tour — every major symbol laid out
- * so the coach can point at one thing at a time (not meant to be solved).
- *
- * Layout (7×5):
- *   ·  E→ ·  R  ·  /  ·
- *  W0 · [T] · W0 ·  F0
- *   ·  ·  ·  ·  ·  ·  ·
- *  B→ S  ·  □  · E1 R1
- *   ·  ·  ·  ·  ·  ·  ·
- */
 export function buildTutorialShowcase(): LevelData {
-  const width = 7;
-  const height = 5;
-  const cells = Array.from({ length: width * height }, () => e());
-  cells[0 * width + 1] = cell.emit(Dir.E, 0);
-  cells[0 * width + 3] = cell.recv(0);
-  cells[0 * width + 5] = cell.mir(MirrorOri.SLASH);
-  cells[1 * width + 0] = cell.worm(0);
-  cells[1 * width + 2] = cell.empty(0);
-  cells[1 * width + 4] = cell.worm(0);
-  cells[1 * width + 6] = cell.filter(0);
-  cells[3 * width + 0] = cell.barrier(Dir.E);
-  cells[3 * width + 1] = cell.sink();
-  cells[3 * width + 3] = cell.crate();
-  cells[3 * width + 5] = cell.emit(Dir.E, 1);
-  cells[3 * width + 6] = cell.recv(1);
-  return {
-    id: "tutorial_showcase",
-    title: "Meet the board",
-    width,
-    height,
-    par: 1,
-    undoLimit: 0,
-    pulseLimit: 0,
-    tokenBudget: 0,
-    tables: [table(0, 2, 1, Module.STRAIGHT, 1, 0, true)],
-    cells,
-    solution: [],
-    tutorial: true,
-  };
+  const level = buildTutorialBasics();
+  if (level.tables[0]) level.tables[0].rotationQ = (level.tables[0].rotationQ + 3) % 4;
+  level.id = "tutorial_showcase";
+  level.title = "Meet the board";
+  level.pulseLimit = 0;
+  level.solution = [];
+  return level;
 }
 
-/** Ordered finger-point beats for the showcase board. */
 export const SHOWCASE_POINTS: PointBeat[] = [
   {
-    title: "Emitter",
-    body: "This is where a beam starts. The arrow shows which way it fires when you press PULSE.",
-    at: { kind: "cell", x: 1, y: 0 },
-  },
-  {
-    title: "Receiver",
-    body: "This is the goal. Light it with the matching channel to clear the board. Wrong channel = spill, and that blocks the win.",
-    at: { kind: "cell", x: 3, y: 0 },
-  },
-  {
-    title: "Turntable",
-    body: "The spinning disc is your tool. Turn it so the beam path lines up — then pulse to fire.",
+    title: "Discs",
+    body: "Every cell is a disc. The marks show which sides are open.",
     at: { kind: "table", id: 0 },
   },
   {
-    title: "Mirror",
-    body: "Bends a beam by 90°. The slash angle decides which corner it takes.",
-    at: { kind: "cell", x: 5, y: 0 },
+    title: "Meet the marks",
+    body: "Two discs connect when open sides face each other. Open ends that meet nothing are wrong.",
+    at: { kind: "table", id: 1 },
   },
   {
-    title: "Wormhole",
-    body: "A beam that enters one portal exits its twin, keeping the same direction. Matching ticks mark a pair.",
-    at: { kind: "cell", x: 0, y: 1 },
+    title: "One circuit",
+    body: "Win when every mark meets a neighbor and the whole board is one network.",
+    at: { kind: "table", id: 2 },
   },
   {
-    title: "Filter",
-    body: "Only one channel may pass. Solid and dashed are different — the wrong one stops here.",
-    at: { kind: "cell", x: 6, y: 1 },
-  },
-  {
-    title: "Barrier",
-    body: "A one-way gate. Beams only pass while travelling through the open lane.",
-    at: { kind: "cell", x: 0, y: 3 },
-  },
-  {
-    title: "Sink",
-    body: "Absorbs any beam that hits it — a dead end. Route around sinks.",
-    at: { kind: "cell", x: 1, y: 3 },
-  },
-  {
-    title: "Channels",
-    body: "Solid and dashed are separate lanes. Each receiver only accepts its own channel — mix them up and you get spill.",
-    at: { kind: "cell", x: 5, y: 3 },
-  },
-  {
-    title: "Turn controls",
-    body: "Use ↺ / ↻ (or drag the disc) to rotate. Commit your turns before you fire.",
+    title: "Turn",
+    body: "Tap a disc, then use ↺ ↻ or drag to rotate.",
     at: { kind: "ui", id: "turn" },
   },
   {
     title: "Pulse",
-    body: "PULSE fires every emitter. You have a limited number of pulses — plan, then fire.",
+    body: "PULSE checks the circuit. Pulses are limited — think, then fire.",
     at: { kind: "ui", id: "pulse" },
   },
 ];
 
-/** Compact solved board for the first-time theme picker in-game look preview. */
 export function buildThemePreviewLevel(): LevelData {
-  const width = 5;
-  const height = 3;
-  const cells = [
-    e(), cell.worm(0), e(), e(), e(),
-    cell.emit(Dir.E), e(), e(), e(), cell.recv(),
-    e(), e(), e(), cell.worm(0), cell.mir(MirrorOri.SLASH),
-  ];
-  cells[1 * width + 2] = cell.empty(0);
-  return {
-    id: "theme_preview",
-    title: "Preview",
-    width,
-    height,
-    par: 1,
-    undoLimit: 1,
-    pulseLimit: 3,
-    tokenBudget: 0,
-    tables: [table(0, 2, 1, Module.STRAIGHT, 1, 0, false)],
-    cells,
-    solution: [],
-    tutorial: true,
-  };
+  const level = buildTutorialBasics();
+  if (level.tables[0]) level.tables[0].rotationQ = (level.tables[0].rotationQ + 3) % 4;
+  level.id = "theme_preview";
+  level.title = "Preview";
+  level.solution = [];
+  return level;
 }
 
 export function buildTutorialLevel(): LevelData {

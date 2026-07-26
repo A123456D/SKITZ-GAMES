@@ -15,12 +15,9 @@ export type CellData = {
   /** Emitter / receiver / filter / worm pair id. */
   channel: number;
   /**
-   * Polarity / armed / occupied:
-   * - emitters: starting beam phase
-   * - receivers: 0 = any phase, 1 = must arrive as phase B
-   * - PHASE_GATE: required phase
-   * - PHASE_SWITCH: 1 = armed (flips beams), 0 = inert
-   * - PAD: 1 = token present, 0 = empty socket
+   * Overloaded flag:
+   * - MIRROR: 1 = player-rotatable triangle, 0 = fixed
+   * - legacy phase/token kinds (unused in new levels): prior semantics
    */
   phase: number;
 };

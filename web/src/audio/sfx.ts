@@ -78,29 +78,37 @@ function tone(
 }
 
 export function sfxTick(): void {
-  tone(180 + Math.random() * 40, 0.03, "triangle", 0.03);
+  tone(190 + Math.random() * 35, 0.028, "triangle", 0.045);
 }
 
+/** Soft detent — paper ratchet, not arcade blip. */
 export function sfxSnap(): void {
-  tone(220, 0.05, "square", 0.06);
-  tone(440, 0.08, "triangle", 0.04, 0.02);
+  tone(95, 0.06, "sine", 0.07, 0, 55);
+  tone(240, 0.045, "triangle", 0.055);
+  tone(480, 0.06, "triangle", 0.03, 0.018);
 }
 
 export function sfxPortLink(): void {
-  tone(520, 0.07, "sine", 0.05, 0, 680);
+  tone(520, 0.08, "sine", 0.07, 0, 680);
 }
 
 export function sfxBeamHit(): void {
-  tone(90, 0.09, "sawtooth", 0.04, 0, 40);
+  tone(88, 0.1, "sine", 0.06, 0, 42);
 }
 
 export function sfxReceiverOn(): void {
-  tone(660, 0.12, "sine", 0.07);
-  tone(880, 0.14, "triangle", 0.05, 0.05);
+  tone(660, 0.12, "sine", 0.09);
+  tone(880, 0.14, "triangle", 0.06, 0.05);
+}
+
+/** Soft rubber thud when a check finds open ends. */
+export function sfxFail(): void {
+  tone(70, 0.14, "sine", 0.08, 0, 36);
+  tone(140, 0.09, "triangle", 0.04, 0.03);
 }
 
 export function sfxWin(): void {
-  tone(523, 0.15, "sine", 0.06);
-  tone(659, 0.18, "sine", 0.06, 0.1);
-  tone(784, 0.25, "triangle", 0.07, 0.2);
+  tone(523, 0.16, "sine", 0.08);
+  tone(659, 0.18, "sine", 0.075, 0.1);
+  tone(784, 0.28, "triangle", 0.09, 0.2);
 }

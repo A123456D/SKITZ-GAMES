@@ -1,8 +1,10 @@
-import { Kind } from "./cellKind";
-import { solve, type TurnResult } from "./beamSolver";
+import { Kind, rotateOri } from "./cellKind";
+import type { TurnResult } from "./beamSolver";
+import { solve } from "./networkSolver";
 import { cloneGrid, getCell, getTable, inBounds, type GridState } from "./gridState";
 import { buildState, type LevelData, type MoveStep } from "./levelData";
 import { rotateTable, setTableRotation } from "./rotateOps";
+import { rotateBoard } from "./boardTurn";
 
 export type PuzzleSession = {
   level: LevelData;
@@ -15,14 +17,10 @@ export type PuzzleSession = {
   moves: number;
   undosRemaining: number;
   pulsesUsed: number;
-  /** Tokens still in hand (not sitting on pads). */
-  tokensLeft: number;
   /** True after PULSE until the next rotate/undo/reset. */
   beamsVisible: boolean;
   selectedTable: number;
   history: GridState[];
-  /** Parallel to history: tokensLeft after each undoable action's prior state. */
-  tokenHistory: number[];
   prevLit: Set<string>;
 };
 
@@ -69,17 +67,8 @@ function syncLatent(session: PuzzleSession): void {
   session.latent.won = false;
 }
 
-function countPlacedTokens(state: GridState): number {
-  let n = 0;
-  for (const c of state.cells) {
-    if (c.kind === Kind.PAD && (c.phase ?? 0) === 1) n++;
-  }
-  return n;
-}
-
 function pushHistory(session: PuzzleSession): void {
   session.history.push(cloneGrid(session.state));
-  session.tokenHistory.push(session.tokensLeft);
 }
 
 export function loadLevel(level: LevelData): PuzzleSession {
@@ -89,8 +78,6 @@ export function loadLevel(level: LevelData): PuzzleSession {
   };
   const initial = buildState(normalized);
   const state = cloneGrid(initial);
-  const placed = countPlacedTokens(state);
-  const budget = normalized.tokenBudget;
   const session: PuzzleSession = {
     level: normalized,
     state,
@@ -98,13 +85,12 @@ export function loadLevel(level: LevelData): PuzzleSession {
     result: blankResult(),
     latent: solve(state),
     moves: 0,
-    undosRemaining: normalized.undoLimit > 0 ? normalized.undoLimit : 1,
+    // Undo is unlimited: only verification is rationed.
+    undosRemaining: Number.POSITIVE_INFINITY,
     pulsesUsed: 0,
-    tokensLeft: Math.max(0, budget - placed),
     beamsVisible: false,
     selectedTable: -1,
     history: [],
-    tokenHistory: [],
     prevLit: new Set(),
   };
   session.latent.won = false;
@@ -116,13 +102,12 @@ export function restart(session: PuzzleSession): void {
 }
 
 export function canUndo(session: PuzzleSession): boolean {
-  return session.history.length > 0 && session.undosRemaining > 0;
+  return session.history.length > 0;
 }
 
 export function undo(session: PuzzleSession): void {
   if (!canUndo(session)) return;
   session.state = session.history.pop()!;
-  session.tokensLeft = session.tokenHistory.pop() ?? session.tokensLeft;
   session.moves = Math.max(0, session.moves - 1);
   session.undosRemaining -= 1;
   syncLatent(session);
@@ -161,7 +146,6 @@ export function tryRotate(session: PuzzleSession, tableId: number, deltaQ: numbe
   pushHistory(session);
   if (!rotateTable(session.state, tableId, deltaQ)) {
     session.history.pop();
-    session.tokenHistory.pop();
     return false;
   }
   session.moves += 1;
@@ -191,7 +175,7 @@ export function commitRotationQ(session: PuzzleSession, tableId: number, rotatio
   if (table.link) {
     const partner = getTable(session.state, table.link.partner);
     if (partner && !partner.locked) {
-      let d = ((next - prevQ) % 4 + 4) % 4;
+      const d = ((next - prevQ) % 4 + 4) % 4;
       setTableRotation(session.state, partner.id, partner.rotationQ + d * table.link.sign);
     }
   }
@@ -207,81 +191,57 @@ export function commitRotationQ(session: PuzzleSession, tableId: number, rotatio
   return true;
 }
 
-/** Toggle a PHASE_SWITCH (armed ↔ inert). Counts as one move. */
-export function tryFlipPhase(session: PuzzleSession, x: number, y: number): boolean {
+/** Cycle a player-rotatable triangle (MIRROR with phase===1). */
+export function tryRotateTriangle(session: PuzzleSession, x: number, y: number, deltaQ = 1): boolean {
   if (session.result.won) return false;
   if (!inBounds(session.state, x, y)) return false;
   const c = getCell(session.state, x, y);
-  if (c.kind !== Kind.PHASE_SWITCH) return false;
+  if (c.kind !== Kind.MIRROR || (c.phase ?? 0) !== 1) return false;
   pushHistory(session);
-  c.phase = (c.phase ?? 0) ^ 1;
+  c.ori = rotateOri(c.ori, deltaQ);
   session.moves += 1;
   session.selectedTable = -1;
   syncLatent(session);
   hideBeams(session);
   session.result.moveApplied = true;
   session.result.tableId = -1;
-  session.result.deltaQ = 0;
+  session.result.deltaQ = deltaQ;
   return true;
 }
 
-/** Place a held token onto an empty PAD. Counts as one move. */
-export function tryPlaceToken(session: PuzzleSession, x: number, y: number): boolean {
+/**
+ * Rotate the whole board ±90°. Disc rotationQ stays world-fixed so the turn
+ * rearranges which disc orientations complete each route.
+ */
+export function tryBoardTurn(session: PuzzleSession, deltaQ: number): boolean {
   if (session.result.won) return false;
-  if (session.tokensLeft <= 0) return false;
-  if (!inBounds(session.state, x, y)) return false;
-  const c = getCell(session.state, x, y);
-  if (c.kind !== Kind.PAD || (c.phase ?? 0) === 1) return false;
+  const steps = ((deltaQ % 4) + 4) % 4;
+  if (steps === 0) return false;
   pushHistory(session);
-  c.phase = 1;
-  session.tokensLeft -= 1;
+  rotateBoard(session.state, deltaQ);
+  session.level = {
+    ...session.level,
+    width: session.state.width,
+    height: session.state.height,
+  };
   session.moves += 1;
   session.selectedTable = -1;
   syncLatent(session);
   hideBeams(session);
   session.result.moveApplied = true;
-  session.result.tableId = -1;
-  session.result.deltaQ = 0;
+  session.result.tableId = -3;
+  session.result.deltaQ = deltaQ;
   return true;
 }
 
-/** Pick a token back up from a PAD. Counts as one move. */
-export function tryPickupToken(session: PuzzleSession, x: number, y: number): boolean {
-  if (session.result.won) return false;
-  if (!inBounds(session.state, x, y)) return false;
-  const c = getCell(session.state, x, y);
-  if (c.kind !== Kind.PAD || (c.phase ?? 0) !== 1) return false;
-  pushHistory(session);
-  c.phase = 0;
-  session.tokensLeft += 1;
-  session.moves += 1;
-  session.selectedTable = -1;
-  syncLatent(session);
-  hideBeams(session);
-  session.result.moveApplied = true;
-  session.result.tableId = -1;
-  session.result.deltaQ = 0;
-  return true;
-}
-
-/** Tap a PAD: place if empty and holding a token, else pick up if occupied. */
-export function tryTogglePad(session: PuzzleSession, x: number, y: number): boolean {
-  if (!inBounds(session.state, x, y)) return false;
-  const c = getCell(session.state, x, y);
-  if (c.kind !== Kind.PAD) return false;
-  if ((c.phase ?? 0) === 1) return tryPickupToken(session, x, y);
-  return tryPlaceToken(session, x, y);
-}
-
-/** Replay one authored solution step (rotate / flip / place). */
+/** Replay one authored solution step (rotate / triangle / board turn). */
 export function applySolutionStep(session: PuzzleSession, step: MoveStep): boolean {
   if (step.tableId === -1) {
     if (step.x === undefined || step.y === undefined) return false;
-    return tryFlipPhase(session, step.x, step.y);
+    return tryRotateTriangle(session, step.x, step.y, step.delta || 1);
   }
-  if (step.tableId === -2) {
-    if (step.x === undefined || step.y === undefined) return false;
-    return tryPlaceToken(session, step.x, step.y);
+  if (step.tableId === -3) {
+    return tryBoardTurn(session, step.delta || 1);
   }
   return tryRotate(session, step.tableId, step.delta);
 }
@@ -291,9 +251,18 @@ export function previewSolve(session: PuzzleSession, tableId: number, rotationQ:
   return solve(session.state, map);
 }
 
+/**
+ * Verification is the only scarce resource, so score on pulses spent.
+ * Turning discs and undoing are free — thinking should never cost the player.
+ */
 export function stars(session: PuzzleSession): number {
   if (!session.result.won) return 0;
-  if (session.moves <= session.level.par) return 3;
-  if (session.moves <= session.level.par + 2) return 2;
+  if (session.pulsesUsed <= 1) return 3;
+  if (session.pulsesUsed === 2) return 2;
   return 1;
+}
+
+/** Out of pulses with the circuit still open — the attempt is over. */
+export function isFailed(session: PuzzleSession): boolean {
+  return !session.result.won && pulsesRemaining(session) === 0;
 }
