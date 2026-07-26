@@ -1,10 +1,20 @@
-/** Procedural paper SFX via Web Audio — no asset files. */
+/** Sample-based paper SFX with light playback variation. */
+
+type SfxId = "rustle" | "slide" | "crumple" | "flutter";
+
+const FILES: Record<SfxId, string> = {
+  rustle: "./sfx/paper_rustle.wav",
+  slide: "./sfx/paper_slide.wav",
+  crumple: "./sfx/paper_crumple.wav",
+  flutter: "./sfx/paper_flutter.wav",
+};
 
 let ctx: AudioContext | null = null;
 let unlocked = false;
 let master: GainNode | null = null;
-let noiseBuf: AudioBuffer | null = null;
-let sfxVol = 0.9;
+let sfxVol = 0.92;
+const buffers = new Map<SfxId, AudioBuffer>();
+let loadPromise: Promise<void> | null = null;
 
 function ac(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -30,16 +40,22 @@ function bus(): GainNode | null {
   return master;
 }
 
-function ensureNoise(): AudioBuffer | null {
+async function loadAll(): Promise<void> {
   const c = ac();
-  if (!c) return null;
-  if (noiseBuf) return noiseBuf;
-  const len = c.sampleRate * 1.2;
-  const buf = c.createBuffer(1, len, c.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
-  noiseBuf = buf;
-  return noiseBuf;
+  if (!c) return;
+  await Promise.all(
+    (Object.keys(FILES) as SfxId[]).map(async (id) => {
+      try {
+        const res = await fetch(FILES[id]);
+        if (!res.ok) return;
+        const raw = await res.arrayBuffer();
+        const buf = await c.decodeAudioData(raw.slice(0));
+        buffers.set(id, buf);
+      } catch {
+        /* ignore missing sample */
+      }
+    }),
+  );
 }
 
 export function unlockAudio(): void {
@@ -48,131 +64,46 @@ export function unlockAudio(): void {
   void c.resume();
   unlocked = true;
   bus();
-  ensureNoise();
+  if (!loadPromise) loadPromise = loadAll();
 }
 
-function playNoise(opts: {
-  dur: number;
-  gain: number;
-  freq: number;
-  q?: number;
-  type?: BiquadFilterType;
-  slideTo?: number;
-  when?: number;
-}): void {
+function play(id: SfxId, opts?: { gain?: number; rate?: number }): void {
   const c = ac();
   const out = bus();
-  const buf = ensureNoise();
+  const buf = buffers.get(id);
   if (!c || !out || !buf || !unlocked || sfxVol <= 0.001) return;
 
-  const t0 = c.currentTime + (opts.when ?? 0);
   const src = c.createBufferSource();
   src.buffer = buf;
-  src.loop = true;
-
-  const filter = c.createBiquadFilter();
-  filter.type = opts.type ?? "bandpass";
-  filter.frequency.setValueAtTime(opts.freq, t0);
-  if (opts.slideTo !== undefined) {
-    filter.frequency.exponentialRampToValueAtTime(
-      Math.max(80, opts.slideTo),
-      t0 + opts.dur,
-    );
-  }
-  filter.Q.value = opts.q ?? 1.2;
+  const baseRate = opts?.rate ?? 1;
+  // Slight random pitch so repeats don't feel identical
+  src.playbackRate.value = baseRate * (0.94 + Math.random() * 0.12);
 
   const g = c.createGain();
+  const gain = (opts?.gain ?? 1) * 0.85;
+  const t0 = c.currentTime;
   g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(opts.gain, t0 + 0.012);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + opts.dur);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.001, gain), t0 + 0.008);
+  g.gain.setValueAtTime(Math.max(0.001, gain), t0 + Math.max(0.02, buf.duration - 0.04));
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + buf.duration + 0.02);
 
-  src.connect(filter);
-  filter.connect(g);
+  src.connect(g);
   g.connect(out);
   src.start(t0);
-  src.stop(t0 + opts.dur + 0.03);
 }
 
-/** Soft rustle when a sticker lane lifts / drag starts. */
 export function sfxPaperRustle(): void {
-  playNoise({
-    dur: 0.09,
-    gain: 0.055,
-    freq: 1800,
-    slideTo: 900,
-    q: 0.7,
-    type: "bandpass",
-  });
-  playNoise({
-    dur: 0.07,
-    gain: 0.03,
-    freq: 4200,
-    slideTo: 2200,
-    q: 1.4,
-    type: "highpass",
-    when: 0.01,
-  });
+  play("rustle", { gain: 0.75, rate: 1.05 });
 }
 
-/** Sliding a row/column — paper scrape across the cube. */
 export function sfxPaperSlide(): void {
-  playNoise({
-    dur: 0.14,
-    gain: 0.07,
-    freq: 1200,
-    slideTo: 650,
-    q: 0.85,
-    type: "bandpass",
-  });
-  playNoise({
-    dur: 0.1,
-    gain: 0.035,
-    freq: 2800,
-    slideTo: 1400,
-    q: 1.1,
-    type: "bandpass",
-    when: 0.02,
-  });
+  play("slide", { gain: 0.9, rate: 1 });
 }
 
-/** Match clear — stickers crumpling like paper. */
 export function sfxPaperCrumple(): void {
-  playNoise({
-    dur: 0.22,
-    gain: 0.09,
-    freq: 900,
-    slideTo: 280,
-    q: 0.6,
-    type: "bandpass",
-  });
-  playNoise({
-    dur: 0.16,
-    gain: 0.05,
-    freq: 2400,
-    slideTo: 700,
-    q: 1.3,
-    type: "bandpass",
-    when: 0.03,
-  });
-  playNoise({
-    dur: 0.12,
-    gain: 0.04,
-    freq: 5000,
-    slideTo: 1800,
-    q: 0.9,
-    type: "highpass",
-    when: 0.05,
-  });
+  play("crumple", { gain: 1, rate: 0.98 });
 }
 
-/** Light flutter when the cube face snaps / orbit settles. */
 export function sfxPaperFlutter(): void {
-  playNoise({
-    dur: 0.08,
-    gain: 0.04,
-    freq: 2200,
-    slideTo: 1100,
-    q: 0.9,
-    type: "bandpass",
-  });
+  play("flutter", { gain: 0.7, rate: 1.08 });
 }
