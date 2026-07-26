@@ -44,8 +44,10 @@ export function levelTitle(diff: number): string {
 
 function profile(diff: number) {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, diff));
-  // Size is the difficulty lever: denser + larger = more ambiguous.
-  const size = d <= 2 ? 4 : d <= 5 ? 5 : d <= 10 ? 6 : d <= 15 ? 7 : 8;
+  // One more row/column each desk until the mobile-friendly cap — no long
+  // plateaus where several desks share the same board size.
+  // Desk 1 → 3×3, 2 → 4×4, …, 6+ → 8×8.
+  const size = Math.min(8, 2 + d);
   const extraEdges =
     d <= 2 ? 0 : d <= 6 ? 1 : d <= 12 ? 2 + Math.floor((d - 7) / 3) : 4;
   // Difficulty comes from board size and ambiguity, not from starving checks:

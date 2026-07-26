@@ -134,13 +134,18 @@ describe("dense procedural levels", () => {
   it("mid difficulty stays dense and solvable", () => {
     const level = generateLevel(5, 77);
     expect(level.tables.length).toBe(level.width * level.height);
-    expect(level.width).toBeGreaterThanOrEqual(5);
+    expect(level.width).toBe(7);
     const session = loadLevel(level);
     for (const step of level.solution) {
       expect(applySolutionStep(session, step)).toBe(true);
     }
     expect(pulse(session)).toBe(true);
     expect(session.result.won).toBe(true);
+  });
+
+  it("board size grows one step per desk until the cap", () => {
+    const sizes = [1, 2, 3, 4, 5, 6, 7, 10, 20].map((d) => generateLevel(d, 50 + d).width);
+    expect(sizes).toEqual([3, 4, 5, 6, 7, 8, 8, 8, 8]);
   });
 
   for (const d of [1, 3, 5, 8, 12]) {
