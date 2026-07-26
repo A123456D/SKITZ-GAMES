@@ -60,6 +60,31 @@ describe("findMatches / generate / resolve", () => {
     expect(groups[0]!.kind).toBe("flame");
     expect(groups[0]!.cells).toHaveLength(4);
   });
+  it("expands a row match into connected column extras", () => {
+    const groups = findMatches([
+      ["flame", "flame", "flame", "diamond"],
+      ["flame", "skull", "bolt", "star"],
+      ["heart", "bomb", "smiley", "headphones"],
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.kind).toBe("flame");
+    expect(groups[0]!.cells).toHaveLength(4);
+  });
+  it("cascades after an expanded clear", () => {
+    const resolved = resolveBoard(
+      [
+        ["flame", "flame", "flame"],
+        ["flame", "heart", "bolt"],
+        ["heart", "heart", "skull"],
+      ],
+      mulberry32(7),
+    );
+    // Row of 3 flames + connected flame clear; hearts may then match after gravity.
+    expect(resolved.scoreGain).toBeGreaterThan(0);
+    expect(resolved.totalCleared.some((c) => c.kind === "flame" && c.count >= 4)).toBe(
+      true,
+    );
+  });
   it("generates clean boards", () => {
     expect(findMatches(generateBoard(6, 42))).toHaveLength(0);
   });

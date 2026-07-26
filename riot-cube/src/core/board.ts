@@ -92,10 +92,18 @@ function key(r: number, c: number): string {
   return `${r},${c}`;
 }
 
-/** Find matches: 3+ in a row/col, or any 2×2 block of the same sticker. */
+function parseKey(k: string): Coord {
+  const [rs, cs] = k.split(",");
+  return { r: Number(rs), c: Number(cs) };
+}
+
+/**
+ * Find matches: 3+ in a row/col or 2×2 seeds, then flood-fill through
+ * orthogonally connected same stickers (L/T extras clear and cascade).
+ */
 export function findMatches(board: Board): MatchGroup[] {
   const n = boardSize(board);
-  const groups: MatchGroup[] = [];
+  const seed = new Set<string>();
 
   for (let r = 0; r < n; r++) {
     let c = 0;
@@ -108,9 +116,7 @@ export function findMatches(board: Board): MatchGroup[] {
       let end = c + 1;
       while (end < n && board[r]![end] === kind) end++;
       if (end - c >= 3) {
-        const cells: Coord[] = [];
-        for (let i = c; i < end; i++) cells.push({ r, c: i });
-        groups.push({ kind, cells });
+        for (let i = c; i < end; i++) seed.add(key(r, i));
       }
       c = end;
     }
@@ -127,9 +133,7 @@ export function findMatches(board: Board): MatchGroup[] {
       let end = r + 1;
       while (end < n && board[end]![c] === kind) end++;
       if (end - r >= 3) {
-        const cells: Coord[] = [];
-        for (let i = r; i < end; i++) cells.push({ r: i, c });
-        groups.push({ kind, cells });
+        for (let i = r; i < end; i++) seed.add(key(i, c));
       }
       r = end;
     }
@@ -144,17 +148,68 @@ export function findMatches(board: Board): MatchGroup[] {
         board[r + 1]![c] === kind &&
         board[r + 1]![c + 1] === kind
       ) {
-        groups.push({
-          kind,
-          cells: [
-            { r, c },
-            { r, c: c + 1 },
-            { r: r + 1, c },
-            { r: r + 1, c: c + 1 },
-          ],
-        });
+        seed.add(key(r, c));
+        seed.add(key(r, c + 1));
+        seed.add(key(r + 1, c));
+        seed.add(key(r + 1, c + 1));
       }
     }
+  }
+
+  if (seed.size === 0) return [];
+
+  // Expand through ortho-connected same-kind neighbors.
+  const matched = new Set<string>(seed);
+  const queue = [...seed];
+  const dirs: Array<[number, number]> = [
+    [0, 1],
+    [0, -1],
+    [1, 0],
+    [-1, 0],
+  ];
+  while (queue.length) {
+    const cur = queue.pop()!;
+    const { r, c } = parseKey(cur);
+    const kind = board[r]![c];
+    if (!kind) continue;
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr < 0 || nc < 0 || nr >= n || nc >= n) continue;
+      if (board[nr]![nc] !== kind) continue;
+      const nk = key(nr, nc);
+      if (matched.has(nk)) continue;
+      matched.add(nk);
+      queue.push(nk);
+    }
+  }
+
+  // One group per connected component inside the expanded set.
+  const groups: MatchGroup[] = [];
+  const seen = new Set<string>();
+  for (const start of matched) {
+    if (seen.has(start)) continue;
+    const { r: sr, c: sc } = parseKey(start);
+    const kind = board[sr]![sc];
+    if (!kind) continue;
+    const cells: Coord[] = [];
+    const q = [start];
+    seen.add(start);
+    while (q.length) {
+      const cur = q.pop()!;
+      const { r, c } = parseKey(cur);
+      cells.push({ r, c });
+      for (const [dr, dc] of dirs) {
+        const nr = r + dr;
+        const nc = c + dc;
+        const nk = key(nr, nc);
+        if (!matched.has(nk) || seen.has(nk)) continue;
+        if (board[nr]![nc] !== kind) continue;
+        seen.add(nk);
+        q.push(nk);
+      }
+    }
+    groups.push({ kind, cells });
   }
 
   return groups;
