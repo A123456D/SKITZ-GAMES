@@ -39,11 +39,3 @@ body {
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
   touch-action: none;
 }
-
-/* Landscape phones: rotate the portrait canvas to fill the wide viewport. */
-html[data-orient="landscape"] #game {
-  transform: rotate(90deg);
-  transform-origin: center center;
-  max-width: none;
-  max-height: none;
-}

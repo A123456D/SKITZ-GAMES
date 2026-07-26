@@ -50,7 +50,6 @@ import { detectQuality, getQuality } from "./view/quality";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
-let landscape = false;
 
 let session: Session = startSession(LEVEL_1);
 let floatText: { text: string; life: number } | null = null;
@@ -109,27 +108,13 @@ function cubeLayout(): CubeLayout {
   };
 }
 
-function useMobileLandscape(vw: number, vh: number): boolean {
-  // Only rotate on phone-like landscape — never on desktop wide screens.
-  if (vw <= vh) return false;
-  const coarse =
-    typeof window !== "undefined" &&
-    window.matchMedia("(pointer: coarse)").matches;
-  return coarse || vh <= 560;
-}
-
 function resize(): void {
   detectQuality();
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  landscape = useMobileLandscape(vw, vh);
-  document.documentElement.dataset.orient = landscape ? "landscape" : "portrait";
-
-  // In mobile landscape the canvas is CSS-rotated 90°, so fit against swapped axes.
-  const fitW = landscape ? vh : vw;
-  const fitH = landscape ? vw : vh;
+  // Keep the portrait canvas upright; letterbox to fit any orientation.
   const dpr = Math.min(window.devicePixelRatio || 1, getQuality().dprCap);
-  const scale = Math.min(fitW / W, fitH / H);
+  const scale = Math.min(vw / W, vh / H);
   canvas.style.width = `${W * scale}px`;
   canvas.style.height = `${H * scale}px`;
   canvas.width = Math.round(W * dpr);
@@ -139,18 +124,9 @@ function resize(): void {
 
 function canvasPoint(e: PointerEvent): { x: number; y: number } {
   const rect = canvas.getBoundingClientRect();
-  if (!landscape) {
-    return {
-      x: ((e.clientX - rect.left) / rect.width) * W,
-      y: ((e.clientY - rect.top) / rect.height) * H,
-    };
-  }
-  // rotate(90deg): map AABB coords back into portrait canvas space
-  const nx = (e.clientX - rect.left) / rect.width;
-  const ny = (e.clientY - rect.top) / rect.height;
   return {
-    x: ny * W,
-    y: (1 - nx) * H,
+    x: ((e.clientX - rect.left) / rect.width) * W,
+    y: ((e.clientY - rect.top) / rect.height) * H,
   };
 }
 
