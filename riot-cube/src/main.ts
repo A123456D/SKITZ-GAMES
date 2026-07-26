@@ -109,14 +109,23 @@ function cubeLayout(): CubeLayout {
   };
 }
 
+function useMobileLandscape(vw: number, vh: number): boolean {
+  // Only rotate on phone-like landscape — never on desktop wide screens.
+  if (vw <= vh) return false;
+  const coarse =
+    typeof window !== "undefined" &&
+    window.matchMedia("(pointer: coarse)").matches;
+  return coarse || vh <= 560;
+}
+
 function resize(): void {
   detectQuality();
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  landscape = vw > vh;
+  landscape = useMobileLandscape(vw, vh);
   document.documentElement.dataset.orient = landscape ? "landscape" : "portrait";
 
-  // In landscape the canvas is CSS-rotated 90°, so fit against swapped axes.
+  // In mobile landscape the canvas is CSS-rotated 90°, so fit against swapped axes.
   const fitW = landscape ? vh : vw;
   const fitH = landscape ? vw : vh;
   const dpr = Math.min(window.devicePixelRatio || 1, getQuality().dprCap);

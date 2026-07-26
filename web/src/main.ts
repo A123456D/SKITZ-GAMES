@@ -101,6 +101,14 @@ const ctx = canvas.getContext("2d")!;
 /** Aspect-correct fit inside the safe visual viewport (no stretch, no nav-bar clip). */
 let landscape = false;
 
+function useMobileLandscape(viewW: number, viewH: number): boolean {
+  if (viewW <= viewH) return false;
+  const coarse =
+    typeof window !== "undefined" &&
+    window.matchMedia("(pointer: coarse)").matches;
+  return coarse || viewH <= 560;
+}
+
 function fitGameToViewport(): void {
   const root = getComputedStyle(document.documentElement);
   const sat = parseFloat(root.getPropertyValue("--sat")) || 0;
@@ -113,10 +121,10 @@ function fitGameToViewport(): void {
   const vv = window.visualViewport;
   const viewW = vv?.width ?? window.innerWidth;
   const viewH = vv?.height ?? window.innerHeight;
-  landscape = viewW > viewH;
+  landscape = useMobileLandscape(viewW, viewH);
   document.documentElement.dataset.orient = landscape ? "landscape" : "portrait";
 
-  // Landscape: canvas is CSS-rotated 90°, so fit against swapped axes.
+  // Mobile landscape: canvas is CSS-rotated 90°, so fit against swapped axes.
   const availW = Math.max(1, (landscape ? viewH : viewW) - (landscape ? topPad + bottomPad : sal + sar));
   const availH = Math.max(1, (landscape ? viewW : viewH) - (landscape ? sal + sar : topPad + bottomPad));
   const scale = Math.min(availW / W, availH / H);
@@ -124,7 +132,6 @@ function fitGameToViewport(): void {
   const h = Math.max(1, Math.round(H * scale));
 
   if (landscape) {
-    // Center the pre-rotate box so after rotate(90deg) it fills the wide viewport.
     const left = Math.round((vv?.offsetLeft ?? 0) + (viewW - w) / 2);
     const top = Math.round((vv?.offsetTop ?? 0) + (viewH - h) / 2);
     canvas.style.left = `${left}px`;
