@@ -1072,7 +1072,7 @@ export function drawWheel(
   const sx = squash > 1 ? 1 / Math.sqrt(squash) : squash;
   stamp(
     ctx,
-    `face|${theme}|${pal}|${table.module}|${table.locked ? 1 : 0}|${table.link ? 1 : 0}|${rKey}|vint3d2`,
+    `face|${theme}|${pal}|${table.module}|${table.locked ? 1 : 0}|${table.link ? 1 : 0}|${rKey}|cyberHud1`,
     faceSize,
     faceSize,
     (c) => paintWheelFace(c, table, r, theme, lightFace, dark, face),
@@ -1306,7 +1306,8 @@ function paintWheelFace(
 ): void {
   const tri = theme === "retro";
   // Discs keep ports inset; triangles park them flush on the rim.
-  const portRad = r * 0.62;
+  // Cyber HUD dials seat sockets inside the neon bezel (matches reference).
+  const portRad = theme === "mono" ? r * 0.58 : r * 0.62;
 
   ctx.fillStyle = face;
   if (tri) pathKnobTriangle(ctx, r);
@@ -1316,53 +1317,102 @@ function paintWheelFace(
   }
   ctx.fill();
 
-  // CYBER enamel badge — recessed black well, glowing red laser rim, white studs.
+  // CYBER HUD dial — recessed carbon well + segmented neon-red bezel (matches reference).
   if (theme === "mono") {
+    const lite = prefersLiteMotion();
+    // Outer carbon plate.
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    const plate = ctx.createRadialGradient(-r * 0.25, -r * 0.3, 0, 0, 0, r);
+    plate.addColorStop(0, "#16161A");
+    plate.addColorStop(0.55, "#0A0A0C");
+    plate.addColorStop(1, "#050506");
+    ctx.fillStyle = plate;
+    ctx.fill();
+
     // Deep recessed well.
     ctx.beginPath();
-    ctx.arc(0, 0, r * 0.78, 0, Math.PI * 2);
-    const well = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.78);
-    well.addColorStop(0, "#050506");
-    well.addColorStop(0.7, "#0C0C0E");
-    well.addColorStop(1, "#121214");
+    ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
+    const well = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.72);
+    well.addColorStop(0, "#030304");
+    well.addColorStop(0.65, "#08080A");
+    well.addColorStop(1, "#101014");
     ctx.fillStyle = well;
     ctx.fill();
-    // Soft red core glow.
+
+    // Soft red core wash inside the well.
     ctx.beginPath();
-    ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2);
-    const core = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.7);
-    core.addColorStop(0, "rgba(255, 42, 42, 0.22)");
+    ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
+    const core = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.55);
+    core.addColorStop(0, "rgba(255, 42, 42, 0.16)");
     core.addColorStop(1, "rgba(255, 42, 42, 0)");
     ctx.fillStyle = core;
     ctx.fill();
-    // Hard red outer rim with bloom.
+
     ctx.save();
-    ctx.shadowColor = "#FF2A2A";
-    ctx.shadowBlur = Math.max(8, r * 0.22);
-    ctx.beginPath();
-    ctx.arc(0, 0, r - 1.2, 0, Math.PI * 2);
-    ctx.strokeStyle = "#FF2A2A";
-    ctx.lineWidth = Math.max(2.6, r * 0.08);
-    ctx.stroke();
-    ctx.restore();
-    // White inner lip.
-    ctx.beginPath();
-    ctx.arc(0, 0, r - Math.max(4.5, r * 0.14), 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(244, 244, 246, 0.85)";
-    ctx.lineWidth = Math.max(1.4, r * 0.035);
-    ctx.stroke();
-    // White rivet studs around the rim.
-    ctx.fillStyle = "#F4F4F6";
-    ctx.beginPath();
-    for (let i = 0; i < 12; i++) {
-      const a = (Math.PI * 2 * i) / 12 + Math.PI / 12;
-      const x = Math.cos(a) * r * 0.9;
-      const y = Math.sin(a) * r * 0.9;
-      const sr = Math.max(1.1, r * 0.035);
-      ctx.moveTo(x + sr, y);
-      ctx.arc(x, y, sr, 0, Math.PI * 2);
+    if (!lite) {
+      ctx.shadowColor = "#FF2A2A";
+      ctx.shadowBlur = Math.max(6, r * 0.18);
     }
-    ctx.fill();
+    // Thick segmented neon arcs around the rim.
+    ctx.strokeStyle = "#FF2A2A";
+    ctx.lineCap = "butt";
+    const arcR = r - Math.max(2.2, r * 0.055);
+    const segments = [
+      [0.08, 0.42],
+      [0.52, 0.78],
+      [1.05, 1.35],
+      [1.55, 1.88],
+      [2.1, 2.45],
+      [2.65, 2.95],
+      [3.25, 3.55],
+      [3.85, 4.2],
+      [4.55, 4.9],
+      [5.2, 5.55],
+      [5.85, 6.15],
+    ];
+    ctx.lineWidth = Math.max(2.8, r * 0.085);
+    for (const [a0, a1] of segments) {
+      ctx.beginPath();
+      ctx.arc(0, 0, arcR, a0, a1);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+
+    // Thin concentric HUD rings.
+    ctx.strokeStyle = "rgba(255, 42, 42, 0.55)";
+    ctx.lineWidth = Math.max(1, r * 0.022);
+    for (const rr of [0.92, 0.82, 0.74]) {
+      ctx.beginPath();
+      ctx.arc(0, 0, r * rr, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Degree tick marks.
+    ctx.strokeStyle = "#FF2A2A";
+    ctx.lineWidth = Math.max(0.9, r * 0.018);
+    ctx.globalAlpha = 0.85;
+    for (let i = 0; i < 48; i++) {
+      const a = (Math.PI * 2 * i) / 48;
+      const major = i % 4 === 0;
+      const inner = r * (major ? 0.78 : 0.84);
+      const outer = r * (major ? 0.95 : 0.91);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+      ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // Tiny notch accents at cardinals.
+    ctx.fillStyle = "#FF2A2A";
+    for (const a of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
+      const x = Math.cos(a) * r * 0.97;
+      const y = Math.sin(a) * r * 0.97;
+      const s = Math.max(1.4, r * 0.04);
+      ctx.fillRect(x - s / 2, y - s / 2, s, s);
+    }
+    ctx.restore();
   }
 
   // Generated knob texture, clipped to the knob shape. When present it supplies
@@ -1527,15 +1577,23 @@ function paintWheelFace(
     // Soft magenta bloom + pale-pink core — matches the neon beam reference.
     strokeNeonPinkBeam(ctx, () => strokeTraces(0, 0), r);
   } else if (theme === "mono") {
-    // Cyber laser trace — red glow bed with a bright white core.
+    // Cyber laser trace — solid neon-red tube (matches the HUD reference).
+    const lite = prefersLiteMotion();
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    if (!lite) {
+      ctx.shadowColor = "#FF2A2A";
+      ctx.shadowBlur = Math.max(6, r * 0.16);
+    }
     strokeTraces(0, 0);
     ctx.strokeStyle = "#FF2A2A";
-    ctx.lineWidth = Math.max(3.4, r * 0.13);
+    ctx.lineWidth = Math.max(2.8, r * 0.1);
     ctx.stroke();
+    ctx.shadowBlur = 0;
+    // Brighter core so the path stays readable without going white.
     strokeTraces(0, 0);
-    ctx.strokeStyle = "#F4F4F6";
-    ctx.lineWidth = Math.max(1.3, r * 0.045);
+    ctx.strokeStyle = "#FF6A6A";
+    ctx.lineWidth = Math.max(1.2, r * 0.04);
     ctx.stroke();
   } else {
     strokeTraces(0, 0);
@@ -1571,9 +1629,15 @@ function paintWheelFace(
     }
     ctx.fill();
   } else if (theme === "mono") {
-    // Cyber ports — black socket, red ring, white pinhole core.
-    const pr = Math.max(3.4, r * 0.11);
-    ctx.fillStyle = "#0A0A0C";
+    // Cyber ports — solid neon-red nodes (HUD endpoints from the reference).
+    const pr = Math.max(3.6, r * 0.115);
+    const lite = prefersLiteMotion();
+    ctx.save();
+    if (!lite) {
+      ctx.shadowColor = "#FF2A2A";
+      ctx.shadowBlur = Math.max(8, r * 0.22);
+    }
+    ctx.fillStyle = "#FF2A2A";
     ctx.beginPath();
     for (const port of ports) {
       const p = portPos(port);
@@ -1581,20 +1645,13 @@ function paintWheelFace(
       ctx.arc(p.x, p.y, pr, 0, Math.PI * 2);
     }
     ctx.fill();
-    ctx.strokeStyle = "#FF2A2A";
-    ctx.lineWidth = Math.max(1.6, r * 0.05);
+    ctx.restore();
+    // Hot core.
+    ctx.fillStyle = "#FF8A8A";
     ctx.beginPath();
     for (const port of ports) {
       const p = portPos(port);
-      ctx.moveTo(p.x + pr, p.y);
-      ctx.arc(p.x, p.y, pr, 0, Math.PI * 2);
-    }
-    ctx.stroke();
-    ctx.fillStyle = "#F4F4F6";
-    ctx.beginPath();
-    for (const port of ports) {
-      const p = portPos(port);
-      const ir = pr * 0.4;
+      const ir = pr * 0.42;
       ctx.moveTo(p.x + ir, p.y);
       ctx.arc(p.x, p.y, ir, 0, Math.PI * 2);
     }
