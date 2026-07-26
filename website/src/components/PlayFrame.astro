@@ -2,17 +2,12 @@
 interface Props {
 	title: string;
 	src: string;
-	backHref?: string;
 }
 
-const { title, src, backHref = '/games/' } = Astro.props;
+const { title, src } = Astro.props;
 ---
 
 <div class="play-shell">
-	<header class="play-chrome">
-		<a class="back" href={backHref}>← {title}</a>
-		<p class="hint">Tap once if audio does not start — mobile browsers require a gesture.</p>
-	</header>
 	<div class="play-stage">
 		<iframe
 			class="play-frame"
@@ -35,37 +30,6 @@ const { title, src, backHref = '/games/' } = Astro.props;
 		animation: rise 400ms var(--ease);
 	}
 
-	.play-chrome {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.75rem;
-		padding: 0.7rem 1rem;
-		padding-top: max(0.7rem, env(safe-area-inset-top));
-		background: #050505;
-		border-bottom: 1px dashed var(--line);
-	}
-
-	.back {
-		font-family: var(--font-display);
-		font-size: 0.95rem;
-		text-transform: uppercase;
-		color: var(--paper);
-		text-decoration: none;
-	}
-
-	.back:hover {
-		color: #fff;
-	}
-
-	.hint {
-		margin: 0;
-		font-family: var(--font-type);
-		font-size: 0.85rem;
-		color: var(--muted);
-	}
-
 	.play-stage {
 		flex: 1;
 		position: relative;
@@ -84,12 +48,10 @@ const { title, src, backHref = '/games/' } = Astro.props;
 	}
 
 	.play-shell,
-	.play-stage,
-	.back {
+	.play-stage {
 		-webkit-tap-highlight-color: transparent;
 	}
 
-	/* Phones: edge-to-edge game, floating back chip instead of a chrome bar. */
 	@media (max-width: 820px), (pointer: coarse) {
 		.play-shell {
 			position: fixed;
@@ -99,38 +61,6 @@ const { title, src, backHref = '/games/' } = Astro.props;
 			height: 100dvh;
 			min-height: 100dvh;
 			animation: none;
-		}
-
-		.play-chrome {
-			position: absolute;
-			z-index: 6;
-			top: max(0.45rem, env(safe-area-inset-top));
-			left: max(0.45rem, env(safe-area-inset-left));
-			right: auto;
-			bottom: auto;
-			gap: 0;
-			padding: 0;
-			background: transparent;
-			border: 0;
-			pointer-events: none;
-		}
-
-		.play-chrome .hint {
-			display: none;
-		}
-
-		.play-chrome .back {
-			pointer-events: auto;
-			display: inline-flex;
-			align-items: center;
-			padding: 0.45rem 0.7rem;
-			border-radius: 999px;
-			background: rgba(5, 5, 5, 0.72);
-			border: 1px solid rgba(255, 255, 255, 0.18);
-			font-size: 0.78rem;
-			letter-spacing: 0.04em;
-			backdrop-filter: blur(8px);
-			-webkit-backdrop-filter: blur(8px);
 		}
 
 		.play-stage {

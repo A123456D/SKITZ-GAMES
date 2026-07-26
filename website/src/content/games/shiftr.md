@@ -2,7 +2,7 @@
 title: Pulse Link
 tagline: Turn. Link. Pulse.
 summary: Turn precision wheels to aim lasers into receivers. A mobile-first laser puzzle — play free in the browser, including on iPhone.
-cover: /images/pulseconnector-logo.png
+cover: /images/pulse-link-logo.png
 screenshots: []
 featured: true
 released: true

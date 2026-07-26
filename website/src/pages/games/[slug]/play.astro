@@ -22,7 +22,7 @@ const src = `/games/${game.id}/${game.data.webPlayPath}`;
 	description={`Play ${game.data.title} free in your browser — works on desktop, Android, and iPhone.`}
 	bodyClass="play-page"
 >
-	<PlayFrame title={game.data.title} src={src} backHref={`/games/${game.id}/`} />
+	<PlayFrame title={game.data.title} src={src} />
 </BaseLayout>
 
 <style is:global>
