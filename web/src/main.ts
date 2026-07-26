@@ -98,6 +98,23 @@ type Screen = "menu" | "levels" | "play" | "pause" | "settings" | "how" | "tutor
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 
+/** Stretch the canvas to the visible viewport so phones never letterbox. */
+function fitGameToViewport(): void {
+  const vv = window.visualViewport;
+  const w = Math.max(1, Math.round(vv?.width ?? window.innerWidth));
+  const h = Math.max(1, Math.round(vv?.height ?? window.innerHeight));
+  const left = Math.round(vv?.offsetLeft ?? 0);
+  const top = Math.round(vv?.offsetTop ?? 0);
+  canvas.style.left = `${left}px`;
+  canvas.style.top = `${top}px`;
+  canvas.style.width = `${w}px`;
+  canvas.style.height = `${h}px`;
+}
+fitGameToViewport();
+window.addEventListener("resize", fitGameToViewport);
+window.visualViewport?.addEventListener("resize", fitGameToViewport);
+window.visualViewport?.addEventListener("scroll", fitGameToViewport);
+
 loadLogo();
 
 // Per-theme selector logos, shown on the theme chips in place of palette swatches.

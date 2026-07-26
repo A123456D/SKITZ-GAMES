@@ -297,14 +297,12 @@ export function syncDomTheme(): void {
   body.style.background = colors.VOID;
   body.style.color = colors.INK;
   if (game) {
-    game.style.background = colors.PAPER;
-    game.style.borderColor = colors.INK_HAIR;
-    game.style.boxShadow = isDarkTheme()
-      ? `0 16px 48px ${colors.VOID}aa`
-      : `0 12px 40px ${colors.INK}18`;
+    game.style.background = colors.VOID;
+    game.style.border = "none";
+    game.style.boxShadow = "none";
   }
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", colors.PAPER);
+  if (meta) meta.setAttribute("content", colors.VOID);
 }
 
 export function applyTheme(id: ThemeId): void {

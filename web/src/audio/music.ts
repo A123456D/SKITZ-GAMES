@@ -66,6 +66,8 @@ let transitioning = false;
 let fadeRaf = 0;
 let crossfadePoll = 0;
 let resumeChain: Promise<void> = Promise.resolve();
+/** Bumped to cancel in-flight crossfades (theme bed swaps). */
+let playEpoch = 0;
 /** Cached once — display-mode does not change mid-session. */
 const useElementVolume = typeof window !== "undefined" && isStandaloneApp();
 
@@ -289,6 +291,7 @@ function fadeGain(el: HTMLAudioElement, to: number, ms: number, from?: number): 
 
 async function beginCrossfade(hard: boolean): Promise<void> {
   if (transitioning) return;
+  const epoch = playEpoch;
   transitioning = true;
   cancelFade();
 
@@ -311,10 +314,12 @@ async function beginCrossfade(hard: boolean): Promise<void> {
   try {
     await to.play();
   } catch {
+    if (epoch !== playEpoch) return;
     transitioning = false;
     watchCrossfade();
     return;
   }
+  if (epoch !== playEpoch) return;
 
   const ms = hard ? 700 : crossfadeMs;
   const fromStart = Math.max(getGain(from), targetLevel() * 0.001);
@@ -323,6 +328,11 @@ async function beginCrossfade(hard: boolean): Promise<void> {
 
   await new Promise<void>((resolve) => {
     const step = (now: number) => {
+      if (epoch !== playEpoch) {
+        fadeRaf = 0;
+        resolve();
+        return;
+      }
       const p = Math.min(1, (now - t0) / Math.max(1, ms));
       // Equal-power crossfade — constant perceived level through the blend.
       const angle = p * Math.PI * 0.5;
@@ -337,6 +347,8 @@ async function beginCrossfade(hard: boolean): Promise<void> {
     fadeRaf = requestAnimationFrame(step);
   });
 
+  if (epoch !== playEpoch) return;
+
   from.pause();
   try {
     from.currentTime = 0;
@@ -349,6 +361,29 @@ async function beginCrossfade(hard: boolean): Promise<void> {
   preloadNext();
   transitioning = false;
   watchCrossfade();
+}
+
+function abortMusicTransition(): void {
+  playEpoch += 1;
+  transitioning = false;
+  cancelFade();
+  stopCrossfadePoll();
+  if (a) {
+    try {
+      a.pause();
+    } catch {
+      /* ignore */
+    }
+    if (graphReady) setGain(a, 0);
+  }
+  if (b) {
+    try {
+      b.pause();
+    } catch {
+      /* ignore */
+    }
+    if (graphReady) setGain(b, 0);
+  }
 }
 
 function poolFor(next: MusicBed): string[] {
@@ -406,9 +441,16 @@ function loadManifest(): Promise<void> {
  * Always reshuffles and starts a random track for that theme's playlist.
  */
 export function setMusicThemeBed(next: MusicBed): void {
+  const bedChanged = bed !== next;
   bed = next;
   const pool = poolFor(next);
-  if (!pool.length && !ambientTracks.length && !cyberTracks.length && !retroTracks.length && !punkTracks.length) {
+  if (
+    !pool.length &&
+    !ambientTracks.length &&
+    !cyberTracks.length &&
+    !retroTracks.length &&
+    !punkTracks.length
+  ) {
     // Manifest not loaded yet — applyTheme may race ahead of unlock.
     tracks = [];
     bag = [];
@@ -423,7 +465,11 @@ export function setMusicThemeBed(next: MusicBed): void {
   lastTrack = avoid;
   refillBag();
   lastTrack = null;
-  if (started && unlocked && tracks.length) {
+
+  // Theme beds must switch immediately — don't wait for the current track to end,
+  // and don't let an in-flight crossfade swallow the bed change.
+  if (started && unlocked && tracks.length && bedChanged) {
+    abortMusicTransition();
     void beginCrossfade(true);
   }
 }
