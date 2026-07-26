@@ -32,8 +32,9 @@ let winFlashBorn = -1;
 
 // A dense 8x8 win touches 64 hubs; unbounded ripples and confetti there cost
 // more than the whole board draw, which showed up as a stutter on the win card.
-const MAX_RINGS = 40;
-const MAX_FLECKS = 140;
+// Headroom so a multi-link rotation never has its connect sparks dropped.
+const MAX_RINGS = 72;
+const MAX_FLECKS = 180;
 
 export function clearFeel(): void {
   rings = [];
@@ -42,7 +43,33 @@ export function clearFeel(): void {
 }
 
 function pushRing(x: number, y: number, now: number, color: string, maxR: number, life = 0.42, width = 2.2): void {
+  if (rings.length >= MAX_RINGS) return;
   rings.push({ x, y, born: now, life, maxR, color, width });
+}
+
+function pushFleck(
+  x: number,
+  y: number,
+  now: number,
+  color: string,
+  speed: number,
+  angle: number,
+  size: number,
+  life = 0.38,
+): void {
+  if (flecks.length >= MAX_FLECKS) return;
+  flecks.push({
+    x,
+    y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed - 8,
+    born: now,
+    life,
+    size,
+    color,
+    rot: Math.random() * Math.PI,
+    spin: (Math.random() - 0.5) * 6,
+  });
 }
 
 /**
@@ -73,6 +100,61 @@ export function triggerRouteAck(_state: unknown, layout: Layout, latent: TurnRes
     const c = cellCenter(layout, p);
     pushRing(c.x, c.y, now, P.INK_FAINT, layout.cell * 0.7, 0.5, 1.4);
   }
+}
+
+/** Per-theme spark colours: [primary, secondary]. */
+function connectColors(): [string, string] {
+  switch (getThemeId()) {
+    case "retro":
+      return ["#FF6EC7", "#5CFFF8"];
+    case "punk":
+      return ["#C8FF00", "#FF2D95"];
+    case "mono":
+      return ["#FF2A2A", "#F4F4F6"];
+    default:
+      return [P.INK, P.INK_SOFT];
+  }
+}
+
+/** One socket pop: tight ring pair plus a few outward flecks. */
+function pushSocketPop(x: number, y: number, now: number, cell: number): void {
+  const [main, accent] = connectColors();
+  const r = cell * 0.19;
+  pushRing(x, y, now, main, r, 0.3, 2.2);
+  pushRing(x, y, now + 0.04, accent, r * 0.6, 0.24, 1.3);
+  for (let i = 0; i < 4; i++) {
+    const a = (Math.PI * 2 * i) / 4 + Math.random() * 0.4;
+    pushFleck(x, y, now, i % 2 ? accent : main, 24 + Math.random() * 20, a, 1.8, 0.3);
+  }
+}
+
+/**
+ * Satisfying pop on BOTH sockets of a newly matched edge, plus a bright seam
+ * flash where the two rims meet. Kept small so it never fights the board.
+ */
+export function triggerSocketConnect(
+  layout: Layout,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  now: number,
+): void {
+  const a = cellCenter(layout, from);
+  const b = cellCenter(layout, to);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  // Sockets sit inset from each hub centre, on the rim facing the neighbour.
+  const inset = layout.cell * 0.3;
+  const cell = layout.cell;
+
+  pushSocketPop(a.x + ux * inset, a.y + uy * inset, now, cell);
+  pushSocketPop(b.x - ux * inset, b.y - uy * inset, now, cell);
+
+  // Seam flash right between the two sockets.
+  const [main] = connectColors();
+  pushRing((a.x + b.x) * 0.5, (a.y + b.y) * 0.5, now, main, cell * 0.16, 0.26, 1.6);
 }
 
 /** Quiet paper burst when the circuit closes. */
@@ -122,16 +204,16 @@ export function drawFeel(ctx: CanvasRenderingContext2D, now: number): void {
   if (winFlashBorn >= 0) {
     const t = (now - winFlashBorn) / 0.55;
     if (t < 1) {
-      const a = (1 - t) * (theme === "retro" || theme === "mono" ? 0.22 : theme === "dusk" ? 0.16 : calm ? 0.1 : 0.14);
+      const a = (1 - t) * (theme === "retro" ? 0.22 : calm ? 0.1 : 0.14);
       ctx.save();
       ctx.fillStyle =
         theme === "retro"
           ? `rgba(199,125,255,${a})`
-          : theme === "dusk"
-            ? `rgba(90,214,165,${a * 0.8})`
-          : theme === "mono"
-            ? `rgba(255,255,255,${a})`
-            : `rgba(255,255,255,${a})`;
+          : theme === "punk"
+            ? `rgba(200,255,0,${a})`
+            : theme === "mono"
+              ? `rgba(255,42,42,${a})`
+              : `rgba(255,255,255,${a})`;
       ctx.fillRect(0, 0, W, H);
       ctx.restore();
     }

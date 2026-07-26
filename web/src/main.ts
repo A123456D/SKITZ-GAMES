@@ -27,11 +27,12 @@ import {
   recordClear,
   setTheme,
   setVolumes,
+  setMusicMuted,
   storeActiveRun,
   type ActiveRunData,
   type SaveData,
 } from "./app/save";
-import { onMusicScreen, unlockMusic } from "./audio/music";
+import { onMusicScreen, unlockMusic, skipMusicTrack, canSkipMusicNext } from "./audio/music";
 import {
   unlockAudio,
   sfxBeamHit,
@@ -41,6 +42,8 @@ import {
   sfxTick,
   sfxWin,
   sfxFail,
+  sfxPulse,
+  sfxPopup,
 } from "./audio/sfx";
 
 function unlockAllAudio(): void {
@@ -64,9 +67,11 @@ import {
   drawLogo,
   drawOptics,
   drawPointCoach,
+  drawRetroConnections,
   drawRoundButton,
   drawTitle,
   drawVolumeSlider,
+  drawMuteBox,
   drawWheel,
   hitCircle,
   hitRect,
@@ -76,7 +81,7 @@ import {
   type Layout,
   type SliderRect,
 } from "./view/draw";
-import { clearFeel, drawFeel, triggerRouteAck, triggerVictoryFeel } from "./view/feel";
+import { clearFeel, drawFeel, triggerRouteAck, triggerSocketConnect, triggerVictoryFeel } from "./view/feel";
 import type { TurnResult } from "./core/beamSolver";
 import {
   THEME_LABELS,
@@ -95,6 +100,19 @@ const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 
 loadLogo();
+
+// Per-theme selector logos, shown on the theme chips in place of palette swatches.
+const themeLogoImgs: Partial<Record<ThemeId, HTMLImageElement>> = {};
+const themeLogoReady: Partial<Record<ThemeId, boolean>> = {};
+for (const id of THEME_ORDER) {
+  const img = new Image();
+  img.onload = () => {
+    themeLogoReady[id] = true;
+  };
+  img.src = `./theme-logo-${id}.png`;
+  themeLogoImgs[id] = img;
+}
+
 let save: SaveData = loadSave();
 applyTheme(save.theme);
 
@@ -141,7 +159,7 @@ const TUTORIAL_FLOW: TutStep[] = [
     kind: "card",
     title: "WELCOME",
     body: [
-      "Pulse Shifter is a dense circuit puzzle.",
+      "Pulseconnector is a dense circuit puzzle.",
       "Every cell is a disc. Turn them until",
       "every mark meets a neighbor — one network.",
     ],
@@ -327,6 +345,7 @@ function startLevel(i: number, newSeed = true): void {
   dismissInspect();
   clearWinState();
   clearFeel();
+  resetSocketLinks();
   screen = "play";
   persistRun();
 }
@@ -396,6 +415,7 @@ function restoreSavedRun(): boolean {
   beamProgress = 1;
   settledTables = new Set(session.state.tables.map((t) => t.id));
   clearWinState();
+  resetSocketLinks();
   if (session.result.won) pendingWin = true;
   screen = "play";
   return true;
@@ -450,6 +470,7 @@ function startPointTour(step: TutPoint): void {
   dismissInspect();
   clearWinState();
   clearFeel();
+  resetSocketLinks();
   screen = "play";
 }
 
@@ -471,6 +492,7 @@ function startTutorialBoard(step?: TutPlay): void {
   dismissInspect();
   clearWinState();
   clearFeel();
+  resetSocketLinks();
   const firstOpen = session.state.tables.find((t) => !t.locked);
   if (firstOpen) selectTable(session, firstOpen.id);
   screen = "play";
@@ -577,6 +599,50 @@ function playEvents(before: TurnResult, after: TurnResult): void {
   if (portHits > prevPorts) sfxPortLink();
 }
 
+function linkEdgeKey(a: { x: number; y: number }, b: { x: number; y: number }): string {
+  const ak = `${a.x},${a.y}`;
+  const bk = `${b.x},${b.y}`;
+  return ak < bk ? `${ak}|${bk}` : `${bk}|${ak}`;
+}
+
+/** Matched socket pairs currently on the board, keyed per undirected edge. */
+let linkKeys = new Set<string>();
+/** Set after a load/reset so the next sync adopts links without celebrating. */
+let seedLinks = true;
+
+/** Adopt the current links silently — used on level load, restore and reset. */
+function resetSocketLinks(): void {
+  linkKeys = new Set();
+  seedLinks = true;
+}
+
+/**
+ * Fires the connect effect for every socket pair that became matched since the
+ * last check. Driven from the frame loop so no rotation path can miss it —
+ * buttons, drag-snap, geared partners and undo all flow through here.
+ */
+function syncSocketLinks(): void {
+  if (!session) return;
+  const next = new Set<string>();
+  const fresh: { from: { x: number; y: number }; to: { x: number; y: number } }[] = [];
+  for (const beam of session.latent.beams) {
+    for (const seg of beam.segments) {
+      const k = linkEdgeKey(seg.from, seg.to);
+      if (next.has(k)) continue;
+      next.add(k);
+      if (!seedLinks && !linkKeys.has(k)) fresh.push({ from: seg.from, to: seg.to });
+    }
+  }
+  linkKeys = next;
+  if (seedLinks) {
+    seedLinks = false;
+    return;
+  }
+  if (!fresh.length || !layout) return;
+  for (const edge of fresh) triggerSocketConnect(layout, edge.from, edge.to, time);
+  sfxPortLink();
+}
+
 function doRotate(dq: number): void {
   if (!session || victory || pendingWin) return;
   if (session.selectedTable < 0) return;
@@ -599,6 +665,7 @@ function doRotate(dq: number): void {
   displayResult = session.result;
   beamProgress = 1;
   sfxSnap();
+  syncSocketLinks();
   persistRun();
 }
 
@@ -607,6 +674,7 @@ function doPulse(): void {
   dismissInspect();
   const before = session.result;
   if (!pulse(session)) return;
+  sfxPulse();
   displayResult = session.result;
   beamProgress = 0;
   playEvents(before, session.result);
@@ -616,6 +684,7 @@ function doPulse(): void {
     winRevealAt = 0;
   } else if (isFailed(session)) {
     sfxFail();
+    sfxPopup();
   } else if ((session.result.spillReceivers?.length ?? 0) > 0) {
     sfxFail();
   }
@@ -687,7 +756,11 @@ function openSettings(from: Screen): void {
 }
 
 function applySlider(id: string, value: number): void {
-  if (id === "vol_music") setVolumes(save, value, save.sfxVol);
+  if (id === "vol_music") {
+    // Dragging music volume unmutes so the slider is audible again.
+    if (save.musicMuted) setMusicMuted(save, false);
+    setVolumes(save, value, save.sfxVol);
+  }
   if (id === "vol_sfx") setVolumes(save, save.musicVol, value);
 }
 
@@ -780,6 +853,7 @@ canvas.addEventListener("pointerup", () => {
   if (changed) {
     settledTables.add(tableId);
     sfxSnap();
+    syncSocketLinks();
     persistRun();
   }
 });
@@ -798,6 +872,14 @@ document.addEventListener("visibilitychange", () => {
 
 function onButton(id: string): void {
   unlockAllAudio();
+  if (id === "music_next") {
+    skipMusicTrack(1);
+    return;
+  }
+  if (id === "mute_music") {
+    setMusicMuted(save, !save.musicMuted);
+    return;
+  }
   if (id === "play") {
     if (session && !inTutorial) {
       screen = "play";
@@ -959,6 +1041,7 @@ function onButton(id: string): void {
     restart(session);
     layout = boardLayout(session.state);
     clearWinState();
+    resetSocketLinks();
     settledTables = new Set();
   rotTween = null;
   squashUntil = 0;
@@ -1001,6 +1084,7 @@ function commitVictory(): void {
   }
   victory = true;
   pendingWin = false;
+  sfxPopup();
   sfxWin();
 }
 
@@ -1024,41 +1108,79 @@ function roundRectPath(
 
 function drawThemeChip(rect: ButtonRect, id: ThemeId, active: boolean): void {
   const t = THEMES[id];
+  const r = 12;
   ctx.save();
-  ctx.shadowColor = "rgba(35,28,22,0.28)";
+  // Card drop shadow.
+  ctx.shadowColor = "rgba(20,16,12,0.32)";
   ctx.shadowBlur = 10;
   ctx.shadowOffsetY = 4;
+  roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, r);
   ctx.fillStyle = t.PAPER;
-  ctx.strokeStyle = active ? t.SELECT : t.INK_HAIR;
-  ctx.lineWidth = active ? 3 : 1.5;
-  roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 10);
   ctx.fill();
-  ctx.stroke();
   ctx.shadowBlur = 0;
-  const sw = (rect.w - 20) / 3;
-  for (let i = 0; i < 3; i++) {
-    // Disc · ink · paper — one clean swatch trio, no accent rainbow.
-    ctx.fillStyle = i === 0 ? t.TABLE_FILL : i === 1 ? t.INK : t.PAPER_DARK;
-    ctx.beginPath();
-    ctx.arc(rect.x + 14 + i * (sw + 4) + sw / 2, rect.y + 28, 7, 0, Math.PI * 2);
-    ctx.fill();
-    if (i === 0) {
-      ctx.strokeStyle = t.INK;
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
+  ctx.shadowOffsetY = 0;
+
+  const img = themeLogoImgs[id];
+  if (img && themeLogoReady[id]) {
+    // Cover-fit the square theme logo so its own art fills the chip.
+    ctx.save();
+    roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, r);
+    ctx.clip();
+    const iw = img.naturalWidth || 1;
+    const ih = img.naturalHeight || 1;
+    const scale = Math.max(rect.w / iw, rect.h / ih);
+    const dw = iw * scale;
+    const dh = ih * scale;
+    ctx.drawImage(img, rect.x + (rect.w - dw) / 2, rect.y + (rect.h - dh) / 2, dw, dh);
+    // Bottom scrim so the label always reads over the art.
+    const band = 28;
+    const g = ctx.createLinearGradient(0, rect.y + rect.h - band, 0, rect.y + rect.h);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, "rgba(0,0,0,0.78)");
+    ctx.fillStyle = g;
+    ctx.fillRect(rect.x, rect.y + rect.h - band, rect.w, band);
+    ctx.restore();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = font(800, 12);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(THEME_LABELS[id], rect.x + rect.w / 2, rect.y + rect.h - 9);
+  } else {
+    // Fallback swatch trio while the logo art loads.
+    const sw = (rect.w - 20) / 3;
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle =
+        i === 0
+          ? t.TABLE_FILL
+          : i === 1
+            ? id === "punk"
+              ? t.INK_SOFT
+              : t.INK
+            : id === "punk"
+              ? t.SELECT
+              : t.PAPER_DARK;
+      ctx.beginPath();
+      ctx.arc(rect.x + 14 + i * (sw + 4) + sw / 2, rect.y + 28, 7, 0, Math.PI * 2);
+      ctx.fill();
     }
+    ctx.fillStyle = t.OBJ;
+    ctx.font = font(700, 11);
+    ctx.textAlign = "center";
+    ctx.fillText(THEME_LABELS[id], rect.x + rect.w / 2, rect.y + 58);
   }
-  ctx.fillStyle = t.OBJ;
-  ctx.font = font(700, 11);
-  ctx.textAlign = "center";
-  ctx.fillText(THEME_LABELS[id], rect.x + rect.w / 2, rect.y + 58);
+
+  // Border + active highlight on top.
+  roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, r);
+  ctx.strokeStyle = active ? t.SELECT : "rgba(255,255,255,0.28)";
+  ctx.lineWidth = active ? 3 : 1.5;
+  ctx.stroke();
   ctx.restore();
 }
 
 function drawThemeGrid(y0: number): void {
   const gap = 10;
-  const tw = 100;
-  const cols = 3;
+  const tw = 150;
+  const cols = 2;
   const totalW = cols * tw + (cols - 1) * gap;
   const startX = (W - totalW) / 2;
   const active = getThemeId();
@@ -1081,10 +1203,18 @@ function pushVolumeSliders(y: number): void {
   const music: SliderRect = {
     x: 90,
     y,
-    w: 540,
+    w: 430,
     h: 44,
     id: "vol_music",
     value: save.musicVol,
+    labelW: 78,
+  };
+  const mute: ButtonRect = {
+    x: 536,
+    y: y + 6,
+    w: 32,
+    h: 32,
+    id: "mute_music",
   };
   const sfx: SliderRect = {
     x: 90,
@@ -1093,10 +1223,13 @@ function pushVolumeSliders(y: number): void {
     h: 44,
     id: "vol_sfx",
     value: save.sfxVol,
+    labelW: 48,
   };
   drawVolumeSlider(ctx, music, "MUSIC", time);
+  drawMuteBox(ctx, mute, save.musicMuted);
   drawVolumeSlider(ctx, sfx, "SFX", time);
   sliders.push(music, sfx);
+  buttons.push(mute);
 }
 
 function drawInfoPages(
@@ -1112,7 +1245,7 @@ function drawInfoPages(
 ): void {
   buttons = [];
   sliders = [];
-  drawBackground(ctx);
+  drawBackground(ctx, time);
   drawLogo(ctx, W / 2, 36, 260);
   const p = pages[page];
   ctx.fillStyle = P.INK;
@@ -1148,7 +1281,7 @@ function drawInfoPages(
 }
 
 function goHome(): void {
-  // Always the in-game Pulse Shifter menu (PLAY / LEVELS / …). Never leave the iframe.
+  // Always the in-game Pulseconnector menu (PLAY / LEVELS / …). Never leave the iframe.
   persistRun();
   dismissInspect();
   inTutorial = false;
@@ -1160,8 +1293,7 @@ function goHome(): void {
 function drawMenu(): void {
   buttons = [];
   sliders = [];
-  drawBackground(ctx);
-  drawHeadphonesBadge();
+  drawBackground(ctx, time);
   drawLogo(ctx, W / 2, 108, 280);
   const play: ButtonRect = { x: 120, y: 450, w: 480, h: 68, id: "play" };
   const levelsBtn: ButtonRect = { x: 120, y: 535, w: 480, h: 60, id: "levels" };
@@ -1180,38 +1312,96 @@ function drawMenu(): void {
   ctx.fillText("Wormholes. Walls. Scarce pulses. Think before you fire.", W / 2, 920);
 }
 
-function drawHeadphonesBadge(): void {
-  const cx = W / 2;
-  const cy = 36;
-  const radius = 18;
+/** Floating “best with headphones” tip + skip controls — every screen / theme. */
+function pushMusicChrome(): void {
+  const baseX = 34;
+  const baseY = 36;
+  const bobX = Math.sin(time * 1.15) * 5 + Math.cos(time * 0.65) * 2.5;
+  const bobY = Math.cos(time * 0.95) * 6 + Math.sin(time * 1.35) * 2;
+  const cx = baseX + bobX;
+  const cy = baseY + bobY;
+  const radius = 15;
+
   ctx.save();
+  ctx.globalAlpha = 0.82;
   ctx.strokeStyle = P.INK_SOFT;
   ctx.fillStyle = P.INK_SOFT;
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = 2.8;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
   ctx.beginPath();
-  ctx.arc(cx, cy, radius, Math.PI, 0);
+  ctx.arc(cx, cy, radius, Math.PI * 0.95, Math.PI * 0.05);
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.roundRect(cx - radius - 4, cy - 1, 8, 18, 3);
-  ctx.roundRect(cx + radius - 4, cy - 1, 8, 18, 3);
+  ctx.roundRect(cx - radius - 3.5, cy - 2, 7, 15, 2.5);
+  ctx.roundRect(cx + radius - 3.5, cy - 2, 7, 15, 2.5);
   ctx.stroke();
 
-  ctx.globalAlpha = 0.78;
-  ctx.font = font(600, 13);
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText("BEST WITH", cx, 78);
+  ctx.globalAlpha = 0.72;
+  ctx.font = font(600, 10);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("BEST WITH HEADPHONES", cx + radius + 12, cy + 1);
+  ctx.restore();
+
+  const nextEnabled = canSkipMusicNext();
+  // Relative sizing keeps the control usable as the 720-wide canvas scales
+  // down on phones and up on desktop.
+  const inset = Math.max(14, W * 0.02);
+  const buttonW = Math.max(118, Math.min(150, W * 0.2));
+  const next: ButtonRect = { x: inset, y: 68, w: buttonW, h: 40, id: "music_next" };
+  drawMusicSkipButton(next, nextEnabled);
+  buttons.push(next);
+}
+
+/** Next-track media icon (triangle + bar) and a clear text label. */
+function drawMusicSkipButton(rect: ButtonRect, enabled: boolean): void {
+  ctx.save();
+  ctx.globalAlpha = enabled ? 0.9 : 0.3;
+  ctx.fillStyle = P.TABLE_FILL;
+  ctx.strokeStyle = P.INK_SOFT;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  const iconX = rect.x + 18;
+  const iconY = rect.y + rect.h / 2;
+  ctx.fillStyle = P.INK;
+  ctx.strokeStyle = P.INK;
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  // Vertical bar
+  const barX = iconX + 7;
+  ctx.beginPath();
+  ctx.moveTo(barX, iconY - 7);
+  ctx.lineTo(barX, iconY + 7);
+  ctx.stroke();
+
+  // Triangle pointing in skip direction
+  ctx.beginPath();
+  ctx.moveTo(iconX - 6, iconY - 7);
+  ctx.lineTo(iconX + 5, iconY);
+  ctx.lineTo(iconX - 6, iconY + 7);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.font = font(700, 11);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("SKIP TRACK", rect.x + 36, rect.y + rect.h / 2 + 0.5);
   ctx.restore();
 }
 
 function drawSettings(): void {
   buttons = [];
   sliders = [];
-  drawBackground(ctx);
+  drawBackground(ctx, time);
   drawTitle(ctx, "SETTINGS");
   ctx.fillStyle = P.INK;
   ctx.font = font(700, 18);
@@ -1237,7 +1427,7 @@ function drawSettings(): void {
 function drawThemePick(): void {
   buttons = [];
   sliders = [];
-  drawBackground(ctx);
+  drawBackground(ctx, time);
   drawLogo(ctx, W / 2, 24, 180);
   ctx.fillStyle = P.INK;
   ctx.font = font(700, 24);
@@ -1313,7 +1503,7 @@ function drawTutorialCard(): void {
   }
   buttons = [];
   sliders = [];
-  drawBackground(ctx);
+  drawBackground(ctx, time);
   drawLogo(ctx, W / 2, 36, 240);
   ctx.fillStyle = P.INK;
   ctx.font = font(700, 28);
@@ -1350,7 +1540,7 @@ function drawTutorialCard(): void {
 function drawLevels(): void {
   buttons = [];
   sliders = [];
-  drawBackground(ctx);
+  drawBackground(ctx, time);
   const from = levelPage * PAGE_SIZE + 1;
   const to = Math.min(DIFFICULTY_COUNT, (levelPage + 1) * PAGE_SIZE);
   drawTitle(ctx, `LEVELS ${String(from).padStart(3, "0")}–${String(to).padStart(3, "0")} · FRESH EACH PLAY`);
@@ -1397,7 +1587,7 @@ function drawLevels(): void {
 function drawPause(): void {
   buttons = [];
   sliders = [];
-  drawBackground(ctx);
+  drawBackground(ctx, time);
   drawTitle(ctx, "PAUSED");
   ctx.fillStyle = P.INK_SOFT;
   ctx.font = font(600, 16);
@@ -1426,7 +1616,7 @@ function drawPlay(): void {
   const spill = session.beamsVisible ? net.looseEnds : 0;
   const pLeft = pulsesRemaining(session);
   const pLim = session.level.pulseLimit > 0 ? session.level.pulseLimit : 3;
-  drawBackground(ctx);
+  drawBackground(ctx, time);
   const flowStep = inTutorial ? TUTORIAL_FLOW[tutorialStep] : null;
   const tutLabel =
     tutorialPhase === "point"
@@ -1463,6 +1653,7 @@ function drawPlay(): void {
       id: "vol_sfx",
       value: save.sfxVol,
       compact: true,
+      labelW: 28,
     };
     drawVolumeSlider(ctx, music, "MUS", time, true);
     drawVolumeSlider(ctx, sfx, "SFX", time, true);
@@ -1497,6 +1688,15 @@ function drawPlay(): void {
       discSquash(t.id),
     );
   }
+
+  // Retro socket-to-socket tubes — drawn after knobs so they stay plugged into
+  // the floating cyan nodes (same float + live rotation as the triangles).
+  drawRetroConnections(ctx, session.state, layout, {
+    time,
+    selectedId: session.selectedTable,
+    visualRotOf: visualRot,
+  });
+
   if (session.beamsVisible) {
     drawBeams(ctx, layout, result, beamProgress);
   }
@@ -1624,6 +1824,8 @@ function drawPlay(): void {
 function frame(now: number): void {
   time = now / 1000;
   if (beamProgress < 1 && !drag) beamProgress = Math.min(1, beamProgress + 0.042);
+  // Catch links formed by any path (board turns, geared partners, undo).
+  if (session && !drag) syncSocketLinks();
 
   if (pendingWin && !drag && beamProgress >= 1) {
     fireVictoryFeel();
@@ -1648,6 +1850,8 @@ function frame(now: number): void {
   else if (screen === "tutorial") drawTutorialCard();
   else if (screen === "theme_pick") drawThemePick();
   else drawPlay();
+
+  pushMusicChrome();
 
   onMusicScreen(screen);
   requestAnimationFrame(frame);

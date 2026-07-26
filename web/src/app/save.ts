@@ -14,6 +14,7 @@ export type SaveData = {
   theme: ThemeId;
   musicVol: number;
   sfxVol: number;
+  musicMuted: boolean;
   tutorialDone: boolean;
   themePicked: boolean;
 };
@@ -38,7 +39,9 @@ function clamp01(v: unknown, fallback: number): number {
 
 function migrateTheme(raw: unknown): ThemeId {
   if (raw === "synthwave" || raw === "wave") return "retro";
-  if (raw === "pastel") return "dusk";
+  // Retired light boards fold into Ink; retired night boards into Mono.
+  if (raw === "pastel" || raw === "dusk") return "mono";
+  if (raw === "red" || raw === "blue") return "paper";
   return isThemeId(raw) ? raw : "paper";
 }
 
@@ -52,13 +55,14 @@ function freshSave(firstRun: boolean): SaveData {
     theme: "paper",
     musicVol: 0.7,
     sfxVol: 0.85,
+    musicMuted: false,
     tutorialDone: !firstRun,
     themePicked: !firstRun,
   };
 }
 
 export function applyAudioFromSave(save: SaveData): void {
-  setMusicVolume(save.musicVol);
+  setMusicVolume(save.musicMuted ? 0 : save.musicVol);
   setSfxVolume(save.sfxVol);
 }
 
@@ -84,6 +88,7 @@ export function loadSave(): SaveData {
         theme: migrateTheme(d.theme),
         musicVol: clamp01(d.musicVol, 0.7),
         sfxVol: clamp01(d.sfxVol, 0.85),
+        musicMuted: !!d.musicMuted,
         tutorialDone: true,
         themePicked: true,
       };
@@ -103,6 +108,7 @@ export function loadSave(): SaveData {
       theme: migrateTheme(d.theme),
       musicVol: clamp01(d.musicVol, 0.7),
       sfxVol: clamp01(d.sfxVol, 0.85),
+      musicMuted: !!d.musicMuted,
       tutorialDone: !!d.tutorialDone,
       themePicked: !!d.themePicked,
     };
@@ -130,6 +136,12 @@ export function setTheme(save: SaveData, theme: ThemeId): void {
 export function setVolumes(save: SaveData, music: number, sfx: number): void {
   save.musicVol = clamp01(music, save.musicVol);
   save.sfxVol = clamp01(sfx, save.sfxVol);
+  applyAudioFromSave(save);
+  writeSave(save);
+}
+
+export function setMusicMuted(save: SaveData, muted: boolean): void {
+  save.musicMuted = muted;
   applyAudioFromSave(save);
   writeSave(save);
 }

@@ -1,6 +1,6 @@
 /** Live theme palette — draw code reads `colors` (mutable). */
 
-export type ThemeId = "paper" | "dusk" | "red" | "blue" | "mono" | "retro";
+export type ThemeId = "paper" | "mono" | "retro" | "punk";
 
 export type ThemeColors = {
   VOID: string;
@@ -131,93 +131,64 @@ function cleanBoard(
 
 export const THEMES: Record<ThemeId, ThemeColors> = {
   /**
-   * INK — cream paper, taupe knobs, charcoal paths.
-   * Matches the reference look with no colored discs.
+   * INK — crumpled sketchbook paper, white embossed cutout knobs,
+   * hard black fineliner paths. Matches the hand-drawn reference.
    */
   paper: pack(
     cleanBoard(
-      "#F4F0E8", // paper
-      "#E6E0D4", // paper dark
-      "#EDE8DF", // void
-      "#2C2A26", // ink
-      "#4A4640", // ink soft
-      "#8A857C", // ink faint
-      "#C4BEB2", // ink hair
-      "#B8B2A6", // disc taupe — matches the reference cardstock
-      "#C4BEB2", // button
-      "#9A9488", // shade
+      "#FBF9F4", // smooth warm-white paper, matching the knob stock
+      "#E8E2D6", // paper dark / torn edge
+      "#E4DED2", // outer desk / void
+      "#1A1A1A", // fineliner ink
+      "#3A3A3A", // ink soft
+      "#7A7A72", // faded ink
+      "#C8C2B6", // hairlines
+      "#FBF9F4", // white paper disc cutout
+      "#F5F2EA", // button stock
+      "#D4CEC2", // soft shade under cutouts
     ),
   ),
   /**
-   * RED — same clean paper board, rose-tinted.
+   * CYBER — white / red futuristic console: bright panels, red laser accents,
+   * black signal marks. Internal id stays `mono` for save compatibility.
    */
-  red: pack(
-    cleanBoard(
-      "#F8EDEA", // warmer rose paper
-      "#EAD6D0",
-      "#F2E6E2",
-      "#5C2E2C", // deep rose ink
-      "#8A504C",
-      "#B8908C",
-      "#D8C4C0",
-      "#C9A8A2", // rose-taupe discs
-      "#D4B8B2",
-      "#A87872",
-    ),
-  ),
-  /**
-   * BLUE — same clean paper board, slate-tinted.
-   */
-  blue: pack(
-    cleanBoard(
-      "#ECF1F6",
-      "#D4DEE8",
-      "#E4EAF0",
-      "#243848",
-      "#3E5870",
-      "#7A90A4",
-      "#B0C0D0",
-      "#A0B0C0",
-      "#B0C0D0",
-      "#7088A0",
-    ),
-  ),
-  /**
-   * DUSK — quiet night paper: navy field, light-grey knobs, single soft ink.
-   */
-  dusk: pack(
-    cleanBoard(
-      "#0E2448",
-      "#16345F",
-      "#071228",
-      "#E8EEF8",
-      "#C0CCE0",
-      "#7E96BC",
-      "#2A4A78",
-      "#D0D6E0",
-      "#1A3058",
-      "#0A1B38",
-      "#E8EEF8",
-    ),
-  ),
-  /**
-   * MONO — black field, grey knobs, white ink.
-   */
-  mono: pack(
-    cleanBoard(
-      "#0A0A0A",
-      "#141414",
-      "#000000",
-      "#F0F0F0",
-      "#C8C8C8",
-      "#888888",
-      "#3A3A3A",
-      "#2A2A2A",
-      "#1A1A1A",
-      "#404040",
-      "#FFFFFF",
-    ),
-  ),
+  mono: {
+    VOID: "#E8E8EC",
+    PAPER: "#F7F7F9",
+    PAPER_DARK: "#E2E2E8",
+    INK: "#121214",
+    INK_SOFT: "#FF2A2A",
+    INK_FAINT: "#8A8A92",
+    INK_HAIR: "#D0D0D6",
+    SELECT: "#FF2A2A",
+    FILL: "#FFFFFF",
+    SHADE: "#D8D8DE",
+    OBJ: "#FF2A2A",
+    BLOCK: "#121214",
+    BARRIER: "#FF2A2A",
+    TABLE_FILL: "#111114",
+    TABLE: "#FF2A2A",
+    TABLE_OUTLINE: "#121214",
+    WORM: "#FF2A2A",
+    MIRROR: "#121214",
+    SINK: "#FF2A2A",
+    FILTER: "#121214",
+    CH0: "#FF2A2A",
+    CH1: "#FF6A6A",
+    CH2: "#121214",
+    PRIMARY: "#121214",
+    ACCENT: "#FF2A2A",
+    TEXT: "#121214",
+    MUTED: "#8A8A92",
+    SUCCESS: "#FF2A2A",
+    WARN: "#FF2A2A",
+    RIM_IDLE: "#FF2A2A",
+    RIM_SEL: "#121214",
+    FLOOR: "#F7F7F9",
+    METAL_DARK: "#D8D8DE",
+    METAL_MID: "#FFFFFF",
+    METAL_LIGHT: "#FFFFFF",
+  },
   /**
    * RETRO — still night, still cyan, but one accent only (no rainbow objects).
    */
@@ -231,13 +202,14 @@ export const THEMES: Record<ThemeId, ThemeColors> = {
     INK_HAIR: "#3A2860",
     SELECT: "#5CFFF8",
     FILL: "#1A0A3A",
-    SHADE: "#2A1450",
+    SHADE: "#10081A",
     OBJ: "#5CFFF8",
     BLOCK: "#5CFFF8",
     BARRIER: "#5CFFF8",
-    TABLE_FILL: "#1A0A3A",
+    // Dark plum cardstock with neon retrowave edge and signal traces.
+    TABLE_FILL: "#1A0A30",
     TABLE: "#5CFFF8",
-    TABLE_OUTLINE: "#3AD0D8",
+    TABLE_OUTLINE: "#FF6EC7",
     WORM: "#5CFFF8",
     MIRROR: "#5CFFF8",
     SINK: "#5CFFF8",
@@ -246,17 +218,44 @@ export const THEMES: Record<ThemeId, ThemeColors> = {
     CH1: "#A8F0F4",
     CH2: "#3AD0D8",
   }),
+  /**
+   * PUNK — xerox flyer grit, black enamel badges, acid lime + hot magenta.
+   * Hard edges and sticker energy — no soft purple glow.
+   */
+  punk: pack({
+    VOID: "#050505",
+    PAPER: "#0E0E0E",
+    PAPER_DARK: "#161616",
+    INK: "#F2F0E8",
+    INK_SOFT: "#C8FF00",
+    INK_FAINT: "#8A8878",
+    INK_HAIR: "#2A2A2A",
+    SELECT: "#FF2D95",
+    FILL: "#1A1A1A",
+    SHADE: "#0A0A0A",
+    OBJ: "#C8FF00",
+    BLOCK: "#F2F0E8",
+    BARRIER: "#FF2D95",
+    TABLE_FILL: "#141414",
+    TABLE: "#C8FF00",
+    TABLE_OUTLINE: "#FF2D95",
+    WORM: "#C8FF00",
+    MIRROR: "#F2F0E8",
+    SINK: "#FF2D95",
+    FILTER: "#C8FF00",
+    CH0: "#C8FF00",
+    CH1: "#E8FF66",
+    CH2: "#FF2D95",
+  }),
 };
 
-export const THEME_ORDER: ThemeId[] = ["paper", "dusk", "red", "blue", "mono", "retro"];
+export const THEME_ORDER: ThemeId[] = ["paper", "mono", "retro", "punk"];
 
 export const THEME_LABELS: Record<ThemeId, string> = {
   paper: "INK",
-  dusk: "DUSK",
-  red: "RED",
-  blue: "BLUE",
-  mono: "MONO",
+  mono: "CYBER",
   retro: "RETRO",
+  punk: "PUNK",
 };
 
 export const colors: ThemeColors = { ...THEMES.paper };
@@ -267,14 +266,14 @@ export function getThemeId(): ThemeId {
   return currentId;
 }
 
-/** Light paper-board themes (cream / tinted paper). */
+/** Light paper-board themes (cream / white boards). */
 export function isLightTheme(id: ThemeId = currentId): boolean {
-  return id === "paper" || id === "red" || id === "blue";
+  return id === "paper" || id === "mono";
 }
 
 /** Dark night-board themes. */
 export function isDarkTheme(id: ThemeId = currentId): boolean {
-  return id === "dusk" || id === "mono" || id === "retro";
+  return id === "retro" || id === "punk";
 }
 
 export function isThemeId(v: unknown): v is ThemeId {
@@ -286,6 +285,8 @@ export function channelColor(channel: number): string {
   if (channel === 2) return colors.CH2;
   return colors.CH0;
 }
+
+import { setMusicThemeBed } from "../audio/music";
 
 /** Sync page chrome to match canvas theme. */
 export function syncDomTheme(): void {
@@ -310,4 +311,7 @@ export function applyTheme(id: ThemeId): void {
   currentId = id;
   Object.assign(colors, THEMES[id]);
   syncDomTheme();
+  setMusicThemeBed(
+    id === "retro" ? "retro" : id === "punk" ? "punk" : id === "mono" ? "cyber" : "ambient",
+  );
 }

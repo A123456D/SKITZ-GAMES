@@ -13,17 +13,35 @@
  */
 
 type PlaylistManifest = {
-  tracks: string[];
+  tracks?: string[];
+  ambient?: string[];
+  cyber?: string[];
+  retro?: string[];
+  punk?: string[];
+  /** Per-bed opener pool — the first track after a bed starts comes from here. */
+  leads?: Record<string, string[]>;
   crossfadeMs?: number;
 };
+
+export type MusicBed = "ambient" | "cyber" | "retro" | "punk";
 
 let musicVol = 0.7;
 let unlocked = false;
 let started = false;
+let ambientTracks: string[] = [];
+let cyberTracks: string[] = [];
+let retroTracks: string[] = [];
+let punkTracks: string[] = [];
+let leadsByBed: Partial<Record<MusicBed, string[]>> = {};
 let tracks: string[] = [];
+let bed: MusicBed = "ambient";
 let crossfadeMs = 2800;
 let bag: string[] = [];
 let lastTrack: string | null = null;
+/** Recently finished/skipped tracks — used for skip-previous. */
+let history: string[] = [];
+/** When set, the next takeNext() returns this instead of shuffling. */
+let forcedNext: string | null = null;
 let screenToken = "";
 let manifestPromise: Promise<void> | null = null;
 
@@ -58,6 +76,7 @@ function refillBag(): void {
   bag = [...tracks];
   if (bag.length <= 1) return;
   shuffleInPlace(bag);
+  // Avoid opening on the same track we just left when possible.
   if (lastTrack && bag[0] === lastTrack && bag.length > 1) {
     const swap = 1 + Math.floor(Math.random() * (bag.length - 1));
     const tmp = bag[0]!;
@@ -74,9 +93,21 @@ function peekNext(): string | null {
 
 function takeNext(): string | null {
   if (!tracks.length) return null;
+  if (forcedNext) {
+    const pick = forcedNext;
+    forcedNext = null;
+    lastTrack = pick;
+    return pick;
+  }
   if (!bag.length) refillBag();
   const pick = bag.shift() ?? null;
-  if (pick) lastTrack = pick;
+  if (pick) {
+    if (lastTrack) {
+      history.push(lastTrack);
+      if (history.length > 24) history.shift();
+    }
+    lastTrack = pick;
+  }
   return pick;
 }
 
@@ -136,8 +167,11 @@ function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
 }
 
+/** Music sits under the effects, so the bed is trimmed well below the slider. */
+const MUSIC_TRIM = 0.18;
+
 function targetLevel(): number {
-  return clamp01(musicVol * duckGain);
+  return clamp01(musicVol * duckGain * MUSIC_TRIM);
 }
 
 function setGain(el: HTMLAudioElement, value: number): void {
@@ -288,24 +322,102 @@ async function beginCrossfade(hard: boolean): Promise<void> {
   watchCrossfade();
 }
 
+function poolFor(next: MusicBed): string[] {
+  if (next === "retro") return retroTracks;
+  if (next === "punk") return punkTracks;
+  if (next === "cyber") return cyberTracks;
+  return ambientTracks;
+}
+
 function loadManifest(): Promise<void> {
-  if (tracks.length) return Promise.resolve();
+  if (ambientTracks.length || cyberTracks.length || retroTracks.length || punkTracks.length) {
+    return Promise.resolve();
+  }
   if (manifestPromise) return manifestPromise;
   manifestPromise = (async () => {
     try {
-      const res = await fetch("./music/playlist.json", { cache: "force-cache" });
+      const res = await fetch("./music/playlist.json", { cache: "no-cache" });
       if (!res.ok) return;
       const data = (await res.json()) as PlaylistManifest;
-      tracks = (data.tracks ?? []).filter((t) => typeof t === "string" && t.length > 0);
+      const clean = (list: unknown): string[] =>
+        Array.isArray(list)
+          ? list.filter((t): t is string => typeof t === "string" && t.length > 0)
+          : [];
+      ambientTracks = clean(data.ambient);
+      cyberTracks = clean(data.cyber);
+      retroTracks = clean(data.retro);
+      punkTracks = clean(data.punk);
+      leadsByBed = {};
+      if (data.leads && typeof data.leads === "object") {
+        for (const [key, list] of Object.entries(data.leads)) {
+          leadsByBed[key as MusicBed] = clean(list);
+        }
+      }
+      // Older single-list manifests fall back as the ambient bed.
+      if (!ambientTracks.length) ambientTracks = clean(data.tracks);
+      tracks = poolFor(bed);
+      if (!tracks.length) tracks = ambientTracks;
       if (typeof data.crossfadeMs === "number" && data.crossfadeMs > 0) {
         // Floor at 2s — short fades amplify mobile decode pops.
         crossfadeMs = Math.max(2000, data.crossfadeMs);
       }
     } catch {
+      ambientTracks = [];
+      cyberTracks = [];
+      retroTracks = [];
+      punkTracks = [];
       tracks = [];
     }
   })();
   return manifestPromise;
+}
+
+/**
+ * Swap the music bed when the visual theme changes.
+ * Always reshuffles and starts a random track for that theme's playlist.
+ */
+export function setMusicThemeBed(next: MusicBed): void {
+  bed = next;
+  const pool = poolFor(next);
+  if (!pool.length && !ambientTracks.length && !cyberTracks.length && !retroTracks.length && !punkTracks.length) {
+    // Manifest not loaded yet — applyTheme may race ahead of unlock.
+    tracks = [];
+    bag = [];
+    return;
+  }
+  tracks = pool.length ? pool : ambientTracks;
+  // Keep lastTrack briefly so refillBag can avoid an instant repeat, then clear history.
+  const avoid = lastTrack;
+  bag = [];
+  history = [];
+  forcedNext = null;
+  lastTrack = avoid;
+  refillBag();
+  lastTrack = null;
+  if (started && unlocked && tracks.length) {
+    void beginCrossfade(true);
+  }
+}
+
+/** Skip forward (or back) in the current theme bed. */
+export function skipMusicTrack(dir: 1 | -1 = 1): void {
+  if (!unlocked || !started || transitioning || tracks.length < 2) return;
+  if (dir < 0) {
+    const prev = history.pop();
+    if (!prev) return;
+    // Put the current track back so it can come around again.
+    if (lastTrack) bag.unshift(lastTrack);
+    forcedNext = prev;
+  }
+  void beginCrossfade(true);
+}
+
+export function canSkipMusicPrev(): boolean {
+  return unlocked && started && !transitioning && history.length > 0 && tracks.length > 1;
+}
+
+export function canSkipMusicNext(): boolean {
+  return unlocked && started && !transitioning && tracks.length > 1;
 }
 
 export function setMusicVolume(v: number): void {
@@ -330,6 +442,9 @@ export function unlockMusic(): void {
 export async function ensureMusicPlaying(): Promise<void> {
   if (!unlocked) return;
   await loadManifest();
+  // Theme may have been set before the manifest arrived.
+  const pool = poolFor(bed);
+  tracks = pool.length ? pool : ambientTracks;
   if (!tracks.length) return;
   ensureGraph();
   await resumeChain;

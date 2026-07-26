@@ -1,11 +1,35 @@
 {
   "crossfadeMs": 2800,
-  "tracks": [
-    "midnight-arcade-drift.mp3",
-    "midnight-arcade-drift-2.mp3",
+  "ambient": [
     "paper-drift.mp3",
     "paper-drift-2.mp3",
+    "velvet-table-tap.mp3",
+    "velvet-table-tap-2.mp3"
+  ],
+  "cyber": [
+    "cyber-1.mp3",
+    "cyber-2.mp3",
+    "cyber-3.mp3",
+    "cyber-4.mp3",
+    "cyber-5.mp3",
+    "cyber-6.mp3"
+  ],
+  "retro": [
+    "midnight-arcade-drift.mp3",
+    "midnight-arcade-drift-2.mp3",
     "paper-lantern-drift.mp3",
     "paper-lantern-drift-2.mp3"
-  ]
+  ],
+  "punk": [
+    "paper-cup-summer.mp3",
+    "paper-cup-summer-2.mp3",
+    "backseat-banana-peel.mp3",
+    "backseat-banana-peel-2.mp3"
+  ],
+  "leads": {
+    "punk": [
+      "paper-cup-summer.mp3",
+      "paper-cup-summer-2.mp3"
+    ]
+  }
 }
