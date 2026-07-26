@@ -208,62 +208,66 @@ func _draw_sticker(kind: String, pos: Vector2, s: float, flash: float) -> void:
 	draw_rect(outer, Color("#111111"), false, 3.0)
 	draw_rect(inner, cols["fill"], true)
 	draw_rect(inner, Color("#111111"), false, 2.0)
-	_draw_icon(kind, outer.get_center(), s / 92.0)
+	_draw_icon(kind, outer.get_center(), s)
 	if flash > 0.0:
 		draw_rect(outer, Color(1, 1, 1, 0.35 * flash), true)
 
 
-func _draw_icon(kind: String, center: Vector2, scale: float) -> void:
-	var cols: Dictionary = TileKind.colors(kind)
+## Icons fit inside the sticker face. `s` is cell size in pixels.
+func _draw_icon(kind: String, center: Vector2, s: float) -> void:
+	var u := s * 0.28
+	var ink := Color("#111111")
+	var lw := maxf(1.5, s * 0.03)
 	match kind:
 		TileKind.HEART:
+			# Contrast glyph on pink face
 			var pts := PackedVector2Array([
-				center + Vector2(0, 14) * scale * 5.0,
-				center + Vector2(-18, 0) * scale * 5.0,
-				center + Vector2(-10, -12) * scale * 5.0,
-				center + Vector2(0, -4) * scale * 5.0,
-				center + Vector2(10, -12) * scale * 5.0,
-				center + Vector2(18, 0) * scale * 5.0,
+				center + Vector2(0, 0.95) * u,
+				center + Vector2(-1.05, 0.05) * u,
+				center + Vector2(-0.55, -0.75) * u,
+				center + Vector2(0, -0.2) * u,
+				center + Vector2(0.55, -0.75) * u,
+				center + Vector2(1.05, 0.05) * u,
 			])
-			draw_colored_polygon(pts, cols["fill"])
-			draw_polyline(pts + PackedVector2Array([pts[0]]), Color("#111111"), 2.0, true)
+			draw_colored_polygon(pts, Color("#1a1a1a"))
+			draw_polyline(pts + PackedVector2Array([pts[0]]), ink, lw, true)
 		TileKind.BOLT:
 			var pts := PackedVector2Array([
-				center + Vector2(2, -18) * scale * 4.5,
-				center + Vector2(-8, 2) * scale * 4.5,
-				center + Vector2(2, 2) * scale * 4.5,
-				center + Vector2(-2, 18) * scale * 4.5,
-				center + Vector2(10, -2) * scale * 4.5,
-				center + Vector2(0, -2) * scale * 4.5,
+				center + Vector2(0.15, -1.05) * u,
+				center + Vector2(-0.55, 0.1) * u,
+				center + Vector2(0.1, 0.1) * u,
+				center + Vector2(-0.15, 1.05) * u,
+				center + Vector2(0.65, -0.1) * u,
+				center + Vector2(-0.05, -0.1) * u,
 			])
-			draw_colored_polygon(pts, cols["fill"])
-			draw_polyline(pts + PackedVector2Array([pts[0]]), Color("#111111"), 2.0, true)
+			draw_colored_polygon(pts, Color("#1a1a1a"))
+			draw_polyline(pts + PackedVector2Array([pts[0]]), ink, lw, true)
 		TileKind.STAR:
 			var pts := PackedVector2Array()
 			for i in 5:
 				var a := -PI / 2.0 + float(i) * TAU / 5.0
 				var b := a + PI / 5.0
-				pts.append(center + Vector2(cos(a), sin(a)) * 18.0 * scale * 4.5)
-				pts.append(center + Vector2(cos(b), sin(b)) * 8.0 * scale * 4.5)
-			draw_colored_polygon(pts, cols["fill"])
-			draw_polyline(pts + PackedVector2Array([pts[0]]), Color("#111111"), 2.0, true)
+				pts.append(center + Vector2(cos(a), sin(a)) * u)
+				pts.append(center + Vector2(cos(b), sin(b)) * u * 0.42)
+			draw_colored_polygon(pts, Color("#1a1a1a"))
+			draw_polyline(pts + PackedVector2Array([pts[0]]), ink, lw, true)
 		TileKind.DIAMOND:
 			var pts := PackedVector2Array([
-				center + Vector2(0, -16) * scale * 4.5,
-				center + Vector2(16, 0) * scale * 4.5,
-				center + Vector2(0, 16) * scale * 4.5,
-				center + Vector2(-16, 0) * scale * 4.5,
+				center + Vector2(0, -1.0) * u,
+				center + Vector2(0.9, 0) * u,
+				center + Vector2(0, 1.0) * u,
+				center + Vector2(-0.9, 0) * u,
 			])
-			draw_colored_polygon(pts, cols["fill"])
-			draw_polyline(pts + PackedVector2Array([pts[0]]), Color("#111111"), 2.0, true)
+			draw_colored_polygon(pts, Color("#0a1628"))
+			draw_polyline(pts + PackedVector2Array([pts[0]]), ink, lw, true)
 		TileKind.FLAME:
-			draw_circle(center + Vector2(0, 2) * scale * 4.0, 14.0 * scale * 4.0, cols["fill"])
-			draw_circle(center + Vector2(0, -2) * scale * 4.0, 8.0 * scale * 4.0, cols["accent"])
+			draw_circle(center + Vector2(0, 0.1) * u, u * 0.72, Color("#ffe566"))
+			draw_circle(center + Vector2(0, -0.15) * u, u * 0.38, Color("#fff3a8"))
 		TileKind.SKULL:
-			draw_circle(center + Vector2(0, -2) * scale * 4.0, 14.0 * scale * 4.0, Color("#f2f2f2"))
-			draw_line(center + Vector2(-7, -4) * scale * 4.0, center + Vector2(-2, 0) * scale * 4.0, Color("#111111"), 2.0)
-			draw_line(center + Vector2(-2, -4) * scale * 4.0, center + Vector2(-7, 0) * scale * 4.0, Color("#111111"), 2.0)
-			draw_line(center + Vector2(2, -4) * scale * 4.0, center + Vector2(7, 0) * scale * 4.0, Color("#111111"), 2.0)
-			draw_line(center + Vector2(7, -4) * scale * 4.0, center + Vector2(2, 0) * scale * 4.0, Color("#111111"), 2.0)
+			draw_circle(center + Vector2(0, -0.08) * u, u * 0.72, Color("#f2f2f2"))
+			draw_line(center + Vector2(-0.38, -0.28) * u, center + Vector2(-0.12, 0.02) * u, ink, lw)
+			draw_line(center + Vector2(-0.12, -0.28) * u, center + Vector2(-0.38, 0.02) * u, ink, lw)
+			draw_line(center + Vector2(0.12, -0.28) * u, center + Vector2(0.38, 0.02) * u, ink, lw)
+			draw_line(center + Vector2(0.38, -0.28) * u, center + Vector2(0.12, 0.02) * u, ink, lw)
 		_:
-			draw_circle(center, 10.0 * scale * 4.0, cols["fill"])
+			draw_circle(center, u * 0.45, Color("#1a1a1a"))
