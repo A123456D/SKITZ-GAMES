@@ -33,23 +33,23 @@ const desktop = [
 const androidHref = downloads.android;
 const showPlayStore = Boolean(playStoreUrl);
 const playHref = `/games/${slug}/play/`;
-const canInstallAndroid = platforms.web;
+const canInstallAndroid = platforms.web || platforms.android;
 ---
 
 <section class="downloads" aria-labelledby="downloads-heading">
-	<h2 id="downloads-heading" class="section-title">Get it on your phone</h2>
+	<h2 id="downloads-heading" class="section-title">Download &amp; install</h2>
 	<p class="muted intro">
-		On Android, install {title} like an app from Chrome — home screen icon, fullscreen, no Play
-		Store needed.
+		Play free in the browser. On Android, install {title} from Chrome — home-screen icon,
+		fullscreen, no store required.
 	</p>
 
 	{
 		canInstallAndroid && (
-			<div class="block">
+			<div class="block install-block" id="install">
 				<h3>Android — install</h3>
 				<div class="btn-row">
-					<a class="btn" href={playHref}>
-						Open game
+					<a class="btn" href={playHref} id="install-open">
+						Open game to install
 					</a>
 					{androidHref && (
 						<a class="btn btn-ghost" href={androidHref} download>
@@ -62,14 +62,16 @@ const canInstallAndroid = platforms.web;
 						</a>
 					)}
 				</div>
-				<details class="help" open>
+				<details class="help" id="install-help" open>
 					<summary>How to install</summary>
 					<ol>
-						<li>Open the game in <strong>Chrome</strong> on your Android phone.</li>
+						<li>
+							Tap <strong>Open game to install</strong> (Chrome on Android).
+						</li>
 						<li>
 							Tap the menu (⋮) → <strong>Install app</strong> or <strong>Add to Home screen</strong>.
 						</li>
-						<li>Confirm — {title} appears on your home screen and launches fullscreen.</li>
+						<li>Confirm — {title} lands on your home screen and opens fullscreen.</li>
 					</ol>
 				</details>
 			</div>
@@ -98,6 +100,23 @@ const canInstallAndroid = platforms.web;
 	}
 </section>
 
+<script>
+	function focusInstall() {
+		const hash = window.location.hash;
+		if (hash !== '#install' && hash !== '#downloads') return;
+		const block = document.getElementById('install');
+		if (!block) return;
+		const help = document.getElementById('install-help');
+		if (help instanceof HTMLDetailsElement) help.open = true;
+		block.classList.add('is-focused');
+		block.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		window.setTimeout(() => block.classList.remove('is-focused'), 2200);
+	}
+
+	focusInstall();
+	window.addEventListener('hashchange', focusInstall);
+</script>
+
 <style>
 	.downloads {
 		padding: 2rem 0 0.5rem;
@@ -112,6 +131,23 @@ const canInstallAndroid = platforms.web;
 	.block {
 		padding: 1.25rem 0;
 		border-top: 1px dashed var(--line);
+	}
+
+	.install-block {
+		padding: 1.35rem 1.15rem;
+		margin: 0.35rem 0 0.5rem;
+		border: 3px solid var(--paper);
+		background: rgba(255, 255, 255, 0.04);
+		box-shadow: 6px 6px 0 var(--skitz-yellow);
+		clip-path: polygon(0 6%, 3% 0, 100% 0, 100% 92%, 97% 100%, 0 100%);
+		transition:
+			box-shadow 220ms var(--ease),
+			background 220ms var(--ease);
+	}
+
+	.install-block.is-focused {
+		background: rgba(232, 163, 23, 0.12);
+		box-shadow: 8px 8px 0 var(--skitz-red);
 	}
 
 	.block h3 {

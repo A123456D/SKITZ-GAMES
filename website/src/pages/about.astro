@@ -4,7 +4,7 @@ import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 ---
 
-<BaseLayout title="About" description="About SKITZ games & apps.">
+<BaseLayout title="About" description="About SKITZ — freemium sticker games slapped on the web.">
 	<SiteHeader />
 	<main class="site-main">
 		<section class="section">
@@ -13,12 +13,14 @@ import SiteFooter from '../components/SiteFooter.astro';
 				<h1 class="section-title">About SKITZ</h1>
 				<div class="sticker about-card">
 					<p>
-						SKITZ games &amp; apps is a sticker on the internet for the things we make. Play free
-						in the browser — including on iPhone — or download builds for Windows and Android.
+						SKITZ is a loud little mark for the games we slap on the internet — purple, red,
+						green, blue, yellow, black. Browser-first puzzles you can play on phone or PC.
 					</p>
 					<p>
-						No accounts. No paywalls. Just the games.
+						<strong>Freemium, not gated:</strong> the core run is free. Android install from Chrome
+						is free. If we add cosmetics, tip jars, or packs later, they stay optional.
 					</p>
+					<p>No accounts to start. No “watch an ad to fold.” Just the games — and optional support.</p>
 				</div>
 			</div>
 		</section>
@@ -35,6 +37,7 @@ import SiteFooter from '../components/SiteFooter.astro';
 	.about-card {
 		padding: 1.6rem 1.5rem 1.4rem;
 		transform: rotate(-0.7deg);
+		box-shadow: 8px 9px 0 var(--skitz-purple);
 	}
 
 	.about-card p {

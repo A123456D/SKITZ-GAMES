@@ -9,7 +9,7 @@ const games = (await getCollection('games'))
 	.sort((a, b) => a.data.title.localeCompare(b.data.title));
 ---
 
-<BaseLayout description="SKITZ games & apps — play Pulsefold and Pulse Link free in the browser, including on iPhone.">
+<BaseLayout description="SKITZ — sticker-bright indie games. Free to play in the browser, install on Android, tip only if you want.">
 	<SiteHeader />
 	<main class="site-main">
 		<section class="hero">
@@ -24,7 +24,10 @@ const games = (await getCollection('games'))
 					/>
 				</div>
 				<h1 class="sr-only">SKITZ games & apps</h1>
-				<p class="hero__line">slapped on the web — free to play, free to download.</p>
+				<p class="hero__line">
+					Color-slap puzzles on the web. Free to play. Freemium extras later — never paywalled to
+					start.
+				</p>
 				<div class="btn-row hero__cta">
 					<a class="btn" href="/games/">Browse games</a>
 					{
@@ -35,6 +38,11 @@ const games = (await getCollection('games'))
 						)
 					}
 				</div>
+				<ul class="hero__chips" aria-label="What you get">
+					<li>Free web play</li>
+					<li>Android install</li>
+					<li>Optional tips</li>
+				</ul>
 			</div>
 		</section>
 	</main>
@@ -54,7 +62,7 @@ const games = (await getCollection('games'))
 	.hero__inner {
 		display: grid;
 		justify-items: center;
-		gap: 1.2rem;
+		gap: 1.15rem;
 		padding: 2.5rem 0 3.5rem;
 	}
 
@@ -62,7 +70,9 @@ const games = (await getCollection('games'))
 		background: #fff;
 		padding: 0.85rem 1rem 1rem;
 		transform: rotate(-1.6deg);
-		box-shadow: 10px 12px 0 #000;
+		box-shadow:
+			10px 12px 0 #000,
+			0 0 0 3px var(--skitz-yellow);
 		clip-path: polygon(
 			1.5% 2%,
 			8% 0%,
@@ -103,7 +113,7 @@ const games = (await getCollection('games'))
 	}
 
 	.hero__line {
-		max-width: 26rem;
+		max-width: 28rem;
 		margin: 0;
 		font-family: var(--font-type);
 		font-size: clamp(1.05rem, 2.4vw, 1.28rem);
@@ -114,5 +124,37 @@ const games = (await getCollection('games'))
 	.hero__cta {
 		justify-content: center;
 		animation: rise 700ms var(--ease) 140ms both;
+	}
+
+	.hero__chips {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.55rem;
+		list-style: none;
+		margin: 0.35rem 0 0;
+		padding: 0;
+		animation: rise 700ms var(--ease) 200ms both;
+	}
+
+	.hero__chips li {
+		font-family: var(--font-type);
+		font-size: 0.85rem;
+		color: var(--mark);
+		background: var(--paper);
+		border: 2px solid #000;
+		padding: 0.35rem 0.7rem;
+		box-shadow: 3px 3px 0 var(--skitz-green);
+		transform: rotate(-1deg);
+	}
+
+	.hero__chips li:nth-child(2) {
+		box-shadow: 3px 3px 0 var(--skitz-blue);
+		transform: rotate(1.2deg);
+	}
+
+	.hero__chips li:nth-child(3) {
+		box-shadow: 3px 3px 0 var(--skitz-red);
+		transform: rotate(-0.4deg);
 	}
 </style>

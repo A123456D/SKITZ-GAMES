@@ -37,7 +37,7 @@ const { title, summary, tagline, cover, platforms, downloads, appStoreUrl, playS
 								</a>
 							)
 						}
-						<a class="btn btn-ghost" href="#downloads">Download</a>
+						<a class="btn btn-ghost" href="#install">Download</a>
 					</div>
 				</div>
 				<div class="detail-hero__art">
@@ -63,6 +63,29 @@ const { title, summary, tagline, cover, platforms, downloads, appStoreUrl, playS
 					playStoreUrl={playStoreUrl}
 					platforms={platforms}
 				/>
+			</div>
+		</section>
+
+		<section class="section freemium">
+			<div class="wrap">
+				<p class="eyebrow">freemium</p>
+				<h2 class="section-title">Play free. Tip if you want.</h2>
+				<div class="freemium-grid">
+					<div class="sticker freemium-card">
+						<h3>Free forever core</h3>
+						<p>
+							Full web play, Android install from Chrome, and the main puzzle loop — no account
+							wall, no forced ads to start.
+						</p>
+					</div>
+					<div class="sticker freemium-card freemium-card--tilt">
+						<h3>Optional extras</h3>
+						<p>
+							Cosmetics, tip jars, or later DLC-style packs may show up. They never gate the
+							base game — support is optional.
+						</p>
+					</div>
+				</div>
 			</div>
 		</section>
 	</main>
@@ -103,6 +126,38 @@ const { title, summary, tagline, cover, platforms, downloads, appStoreUrl, playS
 	.detail-hero__art {
 		max-width: 340px;
 		margin-inline: auto;
+		background: #fff;
+		padding: 0.65rem;
+		box-shadow: 8px 9px 0 var(--skitz-purple);
+		clip-path: polygon(
+			1.5% 2%,
+			8% 0%,
+			18% 2.5%,
+			32% 0.5%,
+			48% 2%,
+			62% 0%,
+			78% 2.2%,
+			92% 0.8%,
+			100% 3%,
+			98.5% 18%,
+			100% 34%,
+			98% 52%,
+			100% 68%,
+			98.5% 84%,
+			100% 97%,
+			86% 100%,
+			70% 98%,
+			52% 100%,
+			34% 98.5%,
+			18% 100%,
+			4% 97.5%,
+			0% 84%,
+			1.5% 68%,
+			0% 50%,
+			2% 32%,
+			0% 14%
+		);
+		transform: rotate(1.4deg);
 	}
 
 	.detail-hero__art img {
@@ -115,5 +170,44 @@ const { title, summary, tagline, cover, platforms, downloads, appStoreUrl, playS
 		max-width: 40rem;
 		color: var(--muted);
 		font-family: var(--font-type);
+	}
+
+	.freemium-grid {
+		display: grid;
+		gap: 1rem;
+		margin-top: 0.5rem;
+	}
+
+	@media (min-width: 720px) {
+		.freemium-grid {
+			grid-template-columns: 1fr 1fr;
+			gap: 1.25rem;
+		}
+	}
+
+	.freemium-card {
+		padding: 1.35rem 1.25rem 1.2rem;
+		transform: rotate(-0.8deg);
+	}
+
+	.freemium-card--tilt {
+		transform: rotate(1deg);
+		box-shadow: 7px 8px 0 var(--skitz-blue);
+	}
+
+	.freemium-card h3 {
+		font-family: var(--font-type);
+		font-size: 1.15rem;
+		text-transform: none;
+		letter-spacing: 0;
+		margin: 0 0 0.55rem;
+		color: var(--mark);
+	}
+
+	.freemium-card p {
+		margin: 0;
+		font-family: var(--font-type);
+		color: var(--mark);
+		font-size: 1.02rem;
 	}
 </style>

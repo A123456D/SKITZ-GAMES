@@ -1,7 +1,7 @@
 ---
 title: Pulsefold
 tagline: Fold lines. Pulse matches. Clear the desk.
-summary: Fold a row or column to flip tiles, then pulse to clear groups of 3+. Play free in the browser — including on iPhone — or install on Android from Chrome.
+summary: Fold a row or column to flip tiles, then pulse to clear groups of 3+. Free in the browser (and on iPhone) — install on Android from Chrome. Freemium extras optional.
 cover: /images/pulsefold-logo.png
 screenshots: []
 featured: true
@@ -18,6 +18,6 @@ webPlayPath: web/index.html
 downloads: {}
 ---
 
-Pulsefold is a mobile & PC puzzle game from SKITZ: **fold** a line to flip Front ↔ Back tiles, then **pulse** to clear groups of 3+. Desks to climb, undo, and a short tutorial for new players.
+Pulsefold is a SKITZ desk-clearer: **fold** a line to flip Front ↔ Back, then **pulse** to clear groups of 3+. Climb desks that grow in size, undo when you misread the board, and learn the loop in a short tutorial.
 
-Play online right here in the browser, or install on Android from Chrome (menu → Install app) for a home-screen fullscreen launch.
+**Free to play** online. **Free to install** on Android via Chrome (Install app). Tip jars or cosmetics may show up later — they won’t lock the desks.

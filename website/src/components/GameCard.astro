@@ -53,6 +53,16 @@ const { href, title, summary, cover, genre } = Astro.props;
 
 	.game-item__media {
 		max-width: 210px;
+		background: #fff;
+		padding: 0.45rem;
+		box-shadow: 5px 6px 0 var(--skitz-red);
+		clip-path: polygon(2% 4%, 96% 0%, 100% 94%, 4% 100%);
+		transform: rotate(-1.2deg);
+	}
+
+	.game-link:nth-child(even) .game-item__media {
+		box-shadow: 5px 6px 0 var(--skitz-blue);
+		transform: rotate(1deg);
 	}
 
 	.game-item__media img {
