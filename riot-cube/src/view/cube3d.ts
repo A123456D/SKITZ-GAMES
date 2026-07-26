@@ -90,7 +90,8 @@ function applyRot(v: Vec3, rx: number, ry: number): Vec3 {
 }
 
 function project(v: Vec3, scale: number): Vec2 {
-  const persp = 3.2 / (3.2 + v.z);
+  // +Z toward the camera. Near faces (larger z) must appear bigger.
+  const persp = 3.6 / (3.6 - v.z);
   return { x: v.x * scale * persp, y: v.y * scale * persp };
 }
 
@@ -251,7 +252,7 @@ export function drawCube3D(
     );
     order.push({ i: i as FaceId, depth: center.z, nZ: n.z });
   }
-  order.sort((a, b) => a.depth - b.depth);
+  order.sort((a, b) => a.depth - b.depth); // far (small z) first
 
   for (const f of order) {
     drawFace(ctx, layout, f.i, faces[f.i]!, opts, f.i === opts.activeFace);
