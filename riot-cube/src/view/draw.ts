@@ -82,6 +82,14 @@ function hitRect(
   return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
 }
 
+export function hitUiRect(
+  r: { x: number; y: number; w: number; h: number },
+  x: number,
+  y: number,
+): boolean {
+  return hitRect(r, x, y);
+}
+
 export function hitFlip(
   layout: Layout,
   x: number,
@@ -443,3 +451,171 @@ export function drawEndOverlay(
   ctx.font = "800 22px 'Chakra Petch', sans-serif";
   ctx.fillText(opts.won ? "AGAIN" : "RETRY", 310, 676);
 }
+
+export type UiRect = { x: number; y: number; w: number; h: number };
+
+export const MENU_BTN: UiRect = { x: 490, y: 28, w: 72, h: 46 };
+
+export function drawMenuButton(ctx: CanvasRenderingContext2D): void {
+  const { x, y, w, h } = MENU_BTN;
+  ctx.fillStyle = "#111";
+  roundRect(ctx, x, y, w, h, 5);
+  ctx.fill();
+  ctx.strokeStyle = "#c8ff3d";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "#c8ff3d";
+  ctx.font = "800 14px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("MENU", x + w / 2, y + h / 2 + 1);
+}
+
+function drawPaperButton(
+  ctx: CanvasRenderingContext2D,
+  r: UiRect,
+  label: string,
+  opts?: { fill?: string; text?: string; tape?: string },
+): void {
+  ctx.fillStyle = opts?.fill ?? "#f3efe6";
+  roundRect(ctx, r.x, r.y, r.w, r.h, 8);
+  ctx.fill();
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  if (opts?.tape) {
+    ctx.fillStyle = opts.tape;
+    ctx.fillRect(r.x + 18, r.y - 8, 56, 14);
+  }
+  ctx.fillStyle = opts?.text ?? "#111";
+  ctx.font = "800 26px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
+}
+
+export const HOME_PLAY: UiRect = { x: 150, y: 720, w: 420, h: 78 };
+export const HOME_SETTINGS: UiRect = { x: 150, y: 820, w: 420, h: 70 };
+
+export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
+  drawDesk(ctx);
+
+  // Title scrap
+  ctx.fillStyle = "#f3efe6";
+  roundRect(ctx, 70, 220, 580, 160, 8);
+  ctx.fill();
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.fillStyle = "#ff2d6a";
+  ctx.fillRect(110, 205, 120, 22);
+  ctx.fillStyle = "#111";
+  ctx.font = "800 64px 'Permanent Marker', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("RIOT CUBE", W / 2, 310);
+  ctx.font = "600 22px 'Patrick Hand', sans-serif";
+  ctx.fillStyle = "#333";
+  ctx.fillText("Twist faces. Rip matches. Cascade hard.", W / 2, 350);
+
+  // Accent sticker strip
+  ctx.fillStyle = "#1b1b1b";
+  roundRect(ctx, 120, 430, 480, 200, 8);
+  ctx.fill();
+  ctx.fillStyle = "#c8ff3d";
+  ctx.fillRect(160, 418, 70, 16);
+  ctx.fillStyle = "#f3efe6";
+  ctx.font = "600 20px 'Patrick Hand', sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("• Slide a row or column to twist", 160, 490);
+  ctx.fillText("• Match 3+ (lines, squares, L/T)", 160, 530);
+  ctx.fillText("• Spin the cube — only the face", 160, 570);
+  ctx.fillText("  you look at scores", 160, 600);
+
+  drawPaperButton(ctx, HOME_PLAY, "PLAY", {
+    fill: "#ff2d6a",
+    text: "#fff",
+    tape: "#c8ff3d",
+  });
+  drawPaperButton(ctx, HOME_SETTINGS, "SETTINGS", {
+    fill: "#f3efe6",
+    text: "#111",
+    tape: "#ff2d6a",
+  });
+}
+
+export const PAUSE_RESUME: UiRect = { x: 160, y: 420, w: 400, h: 72 };
+export const PAUSE_SETTINGS: UiRect = { x: 160, y: 520, w: 400, h: 68 };
+export const PAUSE_HOME: UiRect = { x: 160, y: 610, w: 400, h: 68 };
+
+export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = "rgba(0,0,0,0.72)";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = "#f3efe6";
+  roundRect(ctx, 100, 300, 520, 440, 10);
+  ctx.fill();
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.fillStyle = "#ff2d6a";
+  ctx.fillRect(140, 288, 90, 18);
+
+  ctx.fillStyle = "#111";
+  ctx.font = "800 40px 'Permanent Marker', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("MENU", W / 2, 370);
+
+  drawPaperButton(ctx, PAUSE_RESUME, "RESUME", {
+    fill: "#c8ff3d",
+    text: "#111",
+  });
+  drawPaperButton(ctx, PAUSE_SETTINGS, "SETTINGS", {
+    fill: "#f3efe6",
+    text: "#111",
+  });
+  drawPaperButton(ctx, PAUSE_HOME, "HOME", {
+    fill: "#111",
+    text: "#c8ff3d",
+  });
+}
+
+export const SETTINGS_VOL: UiRect = { x: 140, y: 480, w: 440, h: 80 };
+export const SETTINGS_BACK: UiRect = { x: 140, y: 600, w: 440, h: 70 };
+
+export function drawSettingsScreen(
+  ctx: CanvasRenderingContext2D,
+  opts: { sfxVol: number },
+): void {
+  drawDesk(ctx);
+
+  ctx.fillStyle = "#f3efe6";
+  roundRect(ctx, 80, 260, 560, 500, 10);
+  ctx.fill();
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.fillStyle = "#c8ff3d";
+  ctx.fillRect(120, 248, 100, 18);
+
+  ctx.fillStyle = "#111";
+  ctx.font = "800 42px 'Permanent Marker', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("SETTINGS", W / 2, 340);
+
+  ctx.font = "600 20px 'Patrick Hand', sans-serif";
+  ctx.fillStyle = "#333";
+  ctx.fillText("Tap sound to cycle volume", W / 2, 390);
+
+  const volLabel =
+    opts.sfxVol <= 0.001 ? "MUTED" : opts.sfxVol < 0.55 ? "SOFT" : "NORMAL";
+  drawPaperButton(ctx, SETTINGS_VOL, `SOUND  ·  ${volLabel}`, {
+    fill: "#111",
+    text: "#c8ff3d",
+  });
+  drawPaperButton(ctx, SETTINGS_BACK, "BACK", {
+    fill: "#ff2d6a",
+    text: "#fff",
+  });
+}
+

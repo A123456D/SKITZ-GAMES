@@ -22,9 +22,22 @@ import {
   drawDesk,
   drawEndOverlay,
   drawHint,
+  drawHomeScreen,
   drawHud,
+  drawMenuButton,
+  drawPauseMenu,
+  drawSettingsScreen,
   hitRetry,
+  hitUiRect,
   hitVolumeButton,
+  HOME_PLAY,
+  HOME_SETTINGS,
+  MENU_BTN,
+  PAUSE_HOME,
+  PAUSE_RESUME,
+  PAUSE_SETTINGS,
+  SETTINGS_BACK,
+  SETTINGS_VOL,
 } from "./view/draw";
 import {
   drawCube3D,
@@ -50,6 +63,10 @@ import { detectQuality, getQuality } from "./view/quality";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
+
+type Screen = "home" | "play" | "menu" | "settings";
+let screen: Screen = "home";
+let settingsFrom: Screen = "home";
 
 let session: Session = startSession(LEVEL_1);
 let floatText: { text: string; life: number } | null = null;
@@ -162,7 +179,57 @@ function activeMotion(): {
   return { axis: null, index: -1, offset: 0, hovering: false };
 }
 
+function resetPlayVisuals(): void {
+  floatText = null;
+  visualBoard = null;
+  crumples = [];
+  crumpleT = 0;
+  pendingTwist = null;
+  busy = false;
+  drag = null;
+  orbitDrag = null;
+  rotating = false;
+  springUv = 0;
+  springAxis = null;
+  springIndex = -1;
+  rotX = DEFAULT_ROT_X;
+  rotY = DEFAULT_ROT_Y;
+  targetRotX = rotX;
+  targetRotY = rotY;
+}
+
+function goHome(): void {
+  screen = "home";
+  resetPlayVisuals();
+  session = startSession(LEVEL_1);
+  syncActiveFace();
+  paint();
+}
+
+function startPlay(): void {
+  resetPlayVisuals();
+  session = startSession(LEVEL_1);
+  syncActiveFace();
+  screen = "play";
+  paint();
+}
+
+function openSettings(from: Screen): void {
+  settingsFrom = from;
+  screen = "settings";
+  paint();
+}
+
 function paint(): void {
+  if (screen === "home") {
+    drawHomeScreen(ctx);
+    return;
+  }
+  if (screen === "settings") {
+    drawSettingsScreen(ctx, { sfxVol: getSfxVolume() });
+    return;
+  }
+
   drawDesk(ctx);
   drawHud(ctx, {
     title: session.level.title,
@@ -171,6 +238,7 @@ function paint(): void {
     goals: session.goals,
     sfxVol: getSfxVolume(),
   });
+  drawMenuButton(ctx);
 
   const layout = cubeLayout();
   const motion = activeMotion();
@@ -233,9 +301,17 @@ function paint(): void {
       stars: starsForScore(session.score, session.level.starScores),
     });
   }
+
+  if (screen === "menu") {
+    drawPauseMenu(ctx);
+  }
 }
 
 function tick(): void {
+  if (screen !== "play") {
+    requestAnimationFrame(tick);
+    return;
+  }
   let dirty = false;
   if (floatText) {
     floatText.life -= 0.02;
@@ -381,31 +457,89 @@ canvas.addEventListener("pointerdown", (e) => {
   unlockAudio();
   canvas.setPointerCapture(e.pointerId);
   const p = canvasPoint(e);
+
+  if (screen === "home") {
+    if (hitUiRect(HOME_PLAY, p.x, p.y)) {
+      sfxPaperFlutter();
+      startPlay();
+      return;
+    }
+    if (hitUiRect(HOME_SETTINGS, p.x, p.y)) {
+      sfxPaperRustle();
+      openSettings("home");
+      return;
+    }
+    return;
+  }
+
+  if (screen === "settings") {
+    if (hitUiRect(SETTINGS_VOL, p.x, p.y)) {
+      cycleSfxVolume();
+      paint();
+      return;
+    }
+    if (hitUiRect(SETTINGS_BACK, p.x, p.y)) {
+      sfxPaperRustle();
+      screen = settingsFrom === "settings" ? "home" : settingsFrom;
+      paint();
+      return;
+    }
+    return;
+  }
+
+  if (screen === "menu") {
+    if (hitUiRect(PAUSE_RESUME, p.x, p.y)) {
+      sfxPaperRustle();
+      screen = "play";
+      paint();
+      return;
+    }
+    if (hitUiRect(PAUSE_SETTINGS, p.x, p.y)) {
+      sfxPaperRustle();
+      openSettings("menu");
+      return;
+    }
+    if (hitUiRect(PAUSE_HOME, p.x, p.y)) {
+      sfxPaperFlutter();
+      goHome();
+      return;
+    }
+    return;
+  }
+
+  // screen === "play"
   if (session.status !== "playing") {
     if (hitVolumeButton(p.x, p.y)) {
       cycleSfxVolume();
       paint();
       return;
     }
+    if (hitUiRect(MENU_BTN, p.x, p.y)) {
+      drag = null;
+      orbitDrag = null;
+      screen = "menu";
+      paint();
+      return;
+    }
     if (hitRetry(p.x, p.y)) {
       session = restartSession(session);
-      floatText = null;
-      visualBoard = null;
-      crumples = [];
-      crumpleT = 0;
-      pendingTwist = null;
-      busy = false;
-      orbitDrag = null;
-      rotating = false;
-      rotX = DEFAULT_ROT_X;
-      rotY = DEFAULT_ROT_Y;
-      targetRotX = rotX;
-      targetRotY = rotY;
+      resetPlayVisuals();
+      syncActiveFace();
       paint();
     }
     return;
   }
   if (busy) return;
+
+  if (hitUiRect(MENU_BTN, p.x, p.y)) {
+    drag = null;
+    orbitDrag = null;
+    rotating = false;
+    screen = "menu";
+    sfxPaperRustle();
+    paint();
+    return;
+  }
 
   if (hitVolumeButton(p.x, p.y)) {
     cycleSfxVolume();
@@ -449,7 +583,7 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 
 canvas.addEventListener("pointermove", (e) => {
-  if (session.status !== "playing" || busy) return;
+  if (screen !== "play" || session.status !== "playing" || busy) return;
   const p = canvasPoint(e);
 
   if (orbitDrag) {
@@ -492,6 +626,7 @@ canvas.addEventListener("pointermove", (e) => {
 });
 
 function endDrag(): void {
+  if (screen !== "play") return;
   if (orbitDrag) {
     endOrbitDrag();
     paint();
@@ -525,6 +660,7 @@ function endDrag(): void {
 
 canvas.addEventListener("pointerup", endDrag);
 canvas.addEventListener("pointercancel", () => {
+  if (screen !== "play") return;
   if (orbitDrag) {
     endOrbitDrag();
   }
