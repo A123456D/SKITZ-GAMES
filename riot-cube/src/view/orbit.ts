@@ -1,15 +1,13 @@
 /**
- * Cube orbit mapping — KEEP STABLE.
+ * Cube orbit mapping — KEEP STABLE. Change only with user confirmation + tests.
  *
  * Screen space: +dx = finger right, +dy = finger down.
- * Cube: negative rotX → TOP face, positive rotX → BOTTOM.
- *          positive rotY → LEFT face, negative rotY → RIGHT.
  *
- * Free-drag matches the ˄ › ˅ ‹ buttons:
- *   drag up / ˄  → TOP
- *   drag down / ˅ → BOTTOM
- *   drag right → LEFT coming around (same sign as ‹ step)
- *   drag left  → RIGHT coming around (same sign as › step)
+ * Grab-the-object (finger drags the cube with it) — drag and arrows share signs:
+ *   up   (drag up / ˄)  → BOTTOM face comes forward
+ *   down (drag down / ˅) → TOP face comes forward
+ *   right (drag right / same as ‹ step) → LEFT
+ *   left  → RIGHT
  */
 import { facingFace, type FaceId } from "./cube3d";
 
@@ -23,8 +21,8 @@ export function applyOrbitDrag(
   dy: number,
   sens = ORBIT_DRAG_SENS,
 ): { rotX: number; rotY: number } {
-  // +dy (finger down) increases rotX → BOTTOM; -dy (finger up) → TOP.
-  let rotX = rotX0 + dy * sens;
+  // Grab-style: finger up (dy < 0) increases rotX → BOTTOM.
+  let rotX = rotX0 - dy * sens;
   const rotY = rotY0 + dx * sens;
   rotX = Math.max(-SNAP_Q, Math.min(SNAP_Q, rotX));
   return { rotX, rotY };
@@ -35,8 +33,9 @@ export function orbitStepDelta(
 ): { dRotX: number; dRotY: number } {
   if (dir === "left") return { dRotX: 0, dRotY: SNAP_Q };
   if (dir === "right") return { dRotX: 0, dRotY: -SNAP_Q };
-  if (dir === "up") return { dRotX: -SNAP_Q, dRotY: 0 };
-  return { dRotX: SNAP_Q, dRotY: 0 };
+  // Match free-drag: ˄ = tip up = BOTTOM forward
+  if (dir === "up") return { dRotX: SNAP_Q, dRotY: 0 };
+  return { dRotX: -SNAP_Q, dRotY: 0 };
 }
 
 /** Face reached after a full quarter-turn step from front. */
