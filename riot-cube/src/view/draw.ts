@@ -93,7 +93,7 @@ export function hitFlip(
 }
 
 export function hitRetry(x: number, y: number): boolean {
-  return x >= 200 && x <= 520 && y >= 660 && y <= 730;
+  return x >= 230 && x <= 490 && y >= 640 && y <= 694;
 }
 
 function roundRect(
@@ -243,63 +243,63 @@ export function drawHud(
 ): void {
   // Title scrap
   ctx.fillStyle = "#f3efe6";
-  roundRect(ctx, 40, 36, 280, 64, 6);
+  roundRect(ctx, 36, 28, 210, 46, 5);
   ctx.fill();
   ctx.strokeStyle = "#111";
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 3;
   ctx.stroke();
   ctx.fillStyle = "#ff2d6a";
-  ctx.fillRect(52, 28, 70, 18);
+  ctx.fillRect(46, 22, 48, 12);
   ctx.fillStyle = "#111";
-  ctx.font = "800 34px 'Permanent Marker', sans-serif";
+  ctx.font = "800 24px 'Permanent Marker', sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText("RIOT CUBE", 58, 78);
+  ctx.fillText("RIOT CUBE", 50, 58);
 
   ctx.fillStyle = "#111";
-  roundRect(ctx, 340, 40, 130, 58, 6);
+  roundRect(ctx, 260, 30, 96, 42, 5);
   ctx.fill();
   ctx.fillStyle = "#c8ff3d";
-  ctx.font = "700 18px 'Chakra Petch', sans-serif";
-  ctx.fillText("MOVES", 356, 64);
+  ctx.font = "700 12px 'Chakra Petch', sans-serif";
+  ctx.fillText("MOVES", 274, 46);
   ctx.fillStyle = "#fff";
-  ctx.font = "800 28px 'Chakra Petch', sans-serif";
-  ctx.fillText(String(opts.moves), 356, 90);
+  ctx.font = "800 20px 'Chakra Petch', sans-serif";
+  ctx.fillText(String(opts.moves), 274, 64);
 
   ctx.fillStyle = "#f3efe6";
-  roundRect(ctx, 488, 36, 130, 62, 6);
+  roundRect(ctx, 370, 28, 100, 46, 5);
   ctx.fill();
   ctx.strokeStyle = "#111";
   ctx.stroke();
   ctx.fillStyle = "#111";
-  ctx.font = "700 16px 'Chakra Petch', sans-serif";
-  ctx.fillText("SCORE", 504, 60);
-  ctx.font = "800 26px 'Chakra Petch', sans-serif";
-  ctx.fillText(String(opts.score), 504, 88);
+  ctx.font = "700 12px 'Chakra Petch', sans-serif";
+  ctx.fillText("SCORE", 384, 46);
+  ctx.font = "800 20px 'Chakra Petch', sans-serif";
+  ctx.fillText(String(opts.score), 384, 66);
 
   drawVolumeButton(ctx, opts.sfxVol ?? 0.4);
 
   ctx.fillStyle = "#f7f3ea";
-  roundRect(ctx, 40, 120, 640, 150, 6);
+  roundRect(ctx, 36, 88, 648, 96, 5);
   ctx.fill();
   ctx.strokeStyle = "#111";
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 3;
   ctx.stroke();
   ctx.fillStyle = "#111";
-  ctx.font = "800 22px 'Permanent Marker', sans-serif";
-  ctx.fillText(opts.title + "  ·  GOALS", 70, 158);
+  ctx.font = "800 15px 'Permanent Marker', sans-serif";
+  ctx.fillText(opts.title + "  ·  GOALS", 56, 112);
 
   opts.goals.forEach((g, i) => {
-    const gx = 70 + i * 200;
-    const gy = 175;
-    drawStickerSprite(ctx, g.kind, gx, gy, 52, 1, 0);
+    const gx = 56 + i * 160;
+    const gy = 122;
+    drawStickerSprite(ctx, g.kind, gx, gy, 36, 1, 0);
     ctx.fillStyle = "#111";
-    ctx.font = "800 26px 'Chakra Petch', sans-serif";
-    ctx.fillText(`${g.have}/${g.need}`, gx + 64, gy + 36);
+    ctx.font = "800 18px 'Chakra Petch', sans-serif";
+    ctx.fillText(`${g.have}/${g.need}`, gx + 46, gy + 26);
   });
 }
 
-export const VOL_BTN = { x: 640, y: 36, w: 56, h: 62 };
+export const VOL_BTN = { x: 656, y: 28, w: 42, h: 46 };
 
 export function hitVolumeButton(x: number, y: number): boolean {
   return (
@@ -313,10 +313,10 @@ export function hitVolumeButton(x: number, y: number): boolean {
 function drawVolumeButton(ctx: CanvasRenderingContext2D, vol: number): void {
   const { x, y, w, h } = VOL_BTN;
   ctx.fillStyle = "#f3efe6";
-  roundRect(ctx, x, y, w, h, 6);
+  roundRect(ctx, x, y, w, h, 5);
   ctx.fill();
   ctx.strokeStyle = "#111";
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2;
   ctx.stroke();
 
   const cx = x + w / 2;
@@ -324,33 +324,33 @@ function drawVolumeButton(ctx: CanvasRenderingContext2D, vol: number): void {
   ctx.fillStyle = "#111";
   // Speaker body
   ctx.beginPath();
-  ctx.moveTo(cx - 12, cy - 7);
-  ctx.lineTo(cx - 4, cy - 7);
-  ctx.lineTo(cx + 4, cy - 14);
-  ctx.lineTo(cx + 4, cy + 14);
-  ctx.lineTo(cx - 4, cy + 7);
-  ctx.lineTo(cx - 12, cy + 7);
+  ctx.moveTo(cx - 9, cy - 5);
+  ctx.lineTo(cx - 3, cy - 5);
+  ctx.lineTo(cx + 3, cy - 10);
+  ctx.lineTo(cx + 3, cy + 10);
+  ctx.lineTo(cx - 3, cy + 5);
+  ctx.lineTo(cx - 9, cy + 5);
   ctx.closePath();
   ctx.fill();
 
   if (vol <= 0.001) {
     ctx.strokeStyle = "#ff2d6a";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(cx + 8, cy - 10);
-    ctx.lineTo(cx + 18, cy + 10);
-    ctx.moveTo(cx + 18, cy - 10);
-    ctx.lineTo(cx + 8, cy + 10);
+    ctx.moveTo(cx + 6, cy - 7);
+    ctx.lineTo(cx + 13, cy + 7);
+    ctx.moveTo(cx + 13, cy - 7);
+    ctx.lineTo(cx + 6, cy + 7);
     ctx.stroke();
   } else {
     ctx.strokeStyle = "#111";
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(cx + 4, cy, 8, -0.6, 0.6);
+    ctx.arc(cx + 3, cy, 6, -0.6, 0.6);
     ctx.stroke();
     if (vol > 0.5) {
       ctx.beginPath();
-      ctx.arc(cx + 4, cy, 14, -0.7, 0.7);
+      ctx.arc(cx + 3, cy, 10, -0.7, 0.7);
       ctx.stroke();
     }
   }
@@ -404,14 +404,14 @@ export function drawStickerSprite(
 
 export function drawHint(ctx: CanvasRenderingContext2D, text: string): void {
   ctx.fillStyle = "#1b1b1b";
-  roundRect(ctx, 48, 1080, 624, 100, 6);
+  roundRect(ctx, 48, 1148, 624, 64, 5);
   ctx.fill();
   ctx.fillStyle = "#c8ff3d";
-  ctx.fillRect(80, 1070, 64, 18);
+  ctx.fillRect(72, 1140, 44, 12);
   ctx.fillStyle = "#f3efe6";
-  ctx.font = "600 22px 'Patrick Hand', sans-serif";
+  ctx.font = "600 15px 'Patrick Hand', sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText(text, 72, 1138);
+  ctx.fillText(text, 64, 1186);
 }
 
 export function drawEndOverlay(
@@ -421,25 +421,25 @@ export function drawEndOverlay(
   ctx.fillStyle = "rgba(0,0,0,0.62)";
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = opts.won ? "#f3efe6" : "#2a1a1a";
-  roundRect(ctx, 90, 420, 540, 360, 8);
+  roundRect(ctx, 120, 460, 480, 280, 8);
   ctx.fill();
   ctx.strokeStyle = "#111";
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 3;
   ctx.stroke();
   ctx.fillStyle = opts.won ? "#111" : "#ff2d6a";
-  ctx.font = "800 48px 'Permanent Marker', sans-serif";
-  ctx.fillText(opts.won ? "CLEARED!" : "OUT OF MOVES", 130, 500);
+  ctx.font = "800 36px 'Permanent Marker', sans-serif";
+  ctx.fillText(opts.won ? "CLEARED!" : "OUT OF MOVES", 150, 520);
   ctx.fillStyle = opts.won ? "#111" : "#f3efe6";
-  ctx.font = "700 28px 'Chakra Petch', sans-serif";
-  ctx.fillText(`SCORE  ${opts.score}`, 130, 560);
+  ctx.font = "700 20px 'Chakra Petch', sans-serif";
+  ctx.fillText(`SCORE  ${opts.score}`, 150, 560);
   if (opts.won) {
-    ctx.font = "800 36px 'Permanent Marker', sans-serif";
-    ctx.fillText("★".repeat(opts.stars) + "☆".repeat(3 - opts.stars), 130, 620);
+    ctx.font = "800 28px 'Permanent Marker', sans-serif";
+    ctx.fillText("★".repeat(opts.stars) + "☆".repeat(3 - opts.stars), 150, 600);
   }
   ctx.fillStyle = "#ff2d6a";
-  roundRect(ctx, 200, 660, 320, 70, 8);
+  roundRect(ctx, 230, 640, 260, 54, 7);
   ctx.fill();
   ctx.fillStyle = "#fff";
-  ctx.font = "800 32px 'Chakra Petch', sans-serif";
-  ctx.fillText(opts.won ? "AGAIN" : "RETRY", 300, 708);
+  ctx.font = "800 22px 'Chakra Petch', sans-serif";
+  ctx.fillText(opts.won ? "AGAIN" : "RETRY", 310, 676);
 }

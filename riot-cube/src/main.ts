@@ -101,7 +101,7 @@ let orbitBtns: ReturnType<typeof drawCubeOrbitButtons> | null = null;
 function cubeLayout(): CubeLayout {
   return {
     cx: W / 2,
-    cy: 620,
+    cy: 600,
     scale: 215,
     rotX,
     rotY,
@@ -204,14 +204,14 @@ function paint(): void {
 
   const faceName = ["FRONT", "BACK", "RIGHT", "LEFT", "TOP", "BOTTOM"][session.face];
   ctx.fillStyle = "#f3efe6";
-  ctx.font = "700 16px 'Chakra Petch', sans-serif";
+  ctx.font = "700 12px 'Chakra Petch', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(`FACE · ${faceName}`, W / 2, 980);
+  ctx.fillText(`FACE · ${faceName}`, W / 2, 1008);
 
   drawHint(
     ctx,
     session.status === "playing"
-      ? "Drag a row/col — stickers slide in from the side faces. Drag around the cube to spin."
+      ? "Drag a row/col to slide stickers. Drag around the cube to spin."
       : session.status === "won"
         ? "Rip. Match. Repeat."
         : "Try another twist path.",
@@ -221,8 +221,8 @@ function paint(): void {
     ctx.save();
     ctx.globalAlpha = Math.min(1, floatText.life * 2);
     ctx.fillStyle = "#c8ff3d";
-    ctx.font = "800 42px 'Permanent Marker', sans-serif";
-    ctx.fillText(floatText.text, W / 2 - 80, 300);
+    ctx.font = "800 28px 'Permanent Marker', sans-serif";
+    ctx.fillText(floatText.text, W / 2 - 60, 250);
     ctx.restore();
   }
 
