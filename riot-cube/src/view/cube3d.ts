@@ -163,19 +163,36 @@ export function hitFrontUV(
 ): { face: FaceId; u: number; v: number } | null {
   const q = frontFaceScreenQuad(layout);
   if (!q) return null;
-  // Bilinear inverse for mostly-rectangular front face
   const { tl, tr, br, bl } = q;
-  // Approximate with normalized position in AABB then refine
   const minX = Math.min(tl.x, tr.x, br.x, bl.x);
   const maxX = Math.max(tl.x, tr.x, br.x, bl.x);
   const minY = Math.min(tl.y, tr.y, br.y, bl.y);
   const maxY = Math.max(tl.y, tr.y, br.y, bl.y);
   if (x < minX || x > maxX || y < minY || y > maxY) return null;
 
-  // Solve for u,v using two-triangle barycentric on TL-TR-BR and TL-BR-BL
   const hit = hitInQuad(x, y, tl, tr, br, bl);
   if (!hit) return null;
   return { face: q.face, u: hit.u, v: hit.v };
+}
+
+/** Convert a screen-space drag delta into face UV delta (works outside the face). */
+export function screenDeltaToFaceUV(
+  layout: CubeLayout,
+  dx: number,
+  dy: number,
+): { du: number; dv: number } | null {
+  const q = frontFaceScreenQuad(layout);
+  if (!q) return null;
+  const ux = q.tr.x - q.tl.x;
+  const uy = q.tr.y - q.tl.y;
+  const vx = q.bl.x - q.tl.x;
+  const vy = q.bl.y - q.tl.y;
+  const det = ux * vy - uy * vx;
+  if (Math.abs(det) < 1e-6) return null;
+  return {
+    du: (dx * vy - dy * vx) / det,
+    dv: (ux * dy - uy * dx) / det,
+  };
 }
 
 function hitInQuad(
@@ -313,96 +330,101 @@ function drawFace(
   }
   ctx.restore();
 
-  const gap = 0.03;
+  const gap = 0.04;
   const cell = (1 - gap * (n - 1)) / n;
+  const activeLift =
+    isActive && opts.motion.hovering && opts.motion.axis ? 0.045 : 0;
 
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      const kind = board[r]![c];
-      if (!kind && !(isActive && crumpleMap.has(`${r},${c}`))) continue;
+  const drawCell = (r: number, c: number, movingOnly: boolean) => {
+    const moving = Boolean(
+      isActive &&
+        opts.motion.axis &&
+        opts.motion.hovering &&
+        ((opts.motion.axis === "row" && opts.motion.index === r) ||
+          (opts.motion.axis === "col" && opts.motion.index === c)),
+    );
+    if (movingOnly !== moving) return;
 
-      let u0 = c / n;
-      let v0 = r / n;
-      let u1 = (c + 1) / n;
-      let v1 = (r + 1) / n;
+    const crumple = isActive ? crumpleMap.get(`${r},${c}`) : undefined;
+    const kind = crumple?.kind ?? board[r]![c];
+    if (!kind) return;
 
-      // Shrink for gap
-      const cu = (u0 + u1) / 2;
-      const cv = (v0 + v1) / 2;
-      const hs = cell / 2;
-      u0 = cu - hs;
-      u1 = cu + hs;
-      v0 = cv - hs;
-      v1 = cv + hs;
-
-      if (isActive && opts.motion.axis === "row" && opts.motion.index === r) {
-        const shift = opts.motion.offset; // in UV units (caller converts)
-        u0 += shift;
-        u1 += shift;
-      }
-      if (isActive && opts.motion.axis === "col" && opts.motion.index === c) {
-        const shift = opts.motion.offset;
-        v0 += shift;
-        v1 += shift;
+    const copies = moving ? [-1, 0, 1] : [0];
+    for (const copy of copies) {
+      let uCenter = (c + 0.5) / n;
+      let vCenter = (r + 0.5) / n;
+      if (moving && opts.motion.axis === "row") {
+        uCenter += opts.motion.offset + copy;
+      } else if (moving && opts.motion.axis === "col") {
+        vCenter += opts.motion.offset + copy;
+      } else if (copy !== 0) {
+        continue;
       }
 
-      // Wrap copies for active face continuous scroll
-      const copies =
-        isActive && opts.motion.axis && opts.motion.hovering ? [-1, 0, 1] : [0];
-      for (const copy of copies) {
-        let uu0 = u0;
-        let uu1 = u1;
-        let vv0 = v0;
-        let vv1 = v1;
-        if (opts.motion.axis === "row") {
-          uu0 += copy;
-          uu1 += copy;
-        } else if (opts.motion.axis === "col") {
-          vv0 += copy;
-          vv1 += copy;
-        } else if (copy !== 0) continue;
-
-        // Only draw if overlaps face
-        if (uu1 < 0 || uu0 > 1 || vv1 < 0 || vv0 > 1) continue;
-        const cu0 = Math.max(0, uu0);
-        const cu1 = Math.min(1, uu1);
-        const cv0 = Math.max(0, vv0);
-        const cv1 = Math.min(1, vv1);
-        if (cu1 - cu0 < 0.001 || cv1 - cv0 < 0.001) continue;
-
-        const p0 = project(applyRot(facePoint(geom, cu0, cv0), layout.rotX, layout.rotY), layout.scale);
-        const p1 = project(applyRot(facePoint(geom, cu1, cv0), layout.rotX, layout.rotY), layout.scale);
-        const p2 = project(applyRot(facePoint(geom, cu1, cv1), layout.rotX, layout.rotY), layout.scale);
-        const p3 = project(applyRot(facePoint(geom, cu0, cv1), layout.rotX, layout.rotY), layout.scale);
-        const s0 = { x: layout.cx + p0.x, y: layout.cy + p0.y };
-        const s1 = { x: layout.cx + p1.x, y: layout.cy + p1.y };
-        const s2 = { x: layout.cx + p2.x, y: layout.cy + p2.y };
-        const s3 = { x: layout.cx + p3.x, y: layout.cy + p3.y };
-
-        const crumple = isActive ? crumpleMap.get(`${r},${c}`) : undefined;
-        if (crumple) {
-          const bx = Math.min(s0.x, s1.x, s2.x, s3.x);
-          const by = Math.min(s0.y, s1.y, s2.y, s3.y);
-          const bw = Math.max(s0.x, s1.x, s2.x, s3.x) - bx;
-          const bh = Math.max(s0.y, s1.y, s2.y, s3.y) - by;
-          const s = Math.min(bw, bh);
-          drawCrumpledSticker(ctx, crumple.kind, bx, by, s, crumple.t, crumple.seed);
-          continue;
-        }
-        if (!kind) continue;
-
-        const lift =
-          isActive &&
-          opts.motion.hovering &&
-          ((opts.motion.axis === "row" && opts.motion.index === r) ||
-            (opts.motion.axis === "col" && opts.motion.index === c))
-            ? 1
-            : 0;
-        drawStickerOnQuad(ctx, kind, s0, s1, s2, s3, lift);
+      const u0 = uCenter - cell / 2;
+      const u1 = uCenter + cell / 2;
+      const v0 = vCenter - cell / 2;
+      const v1 = vCenter + cell / 2;
+      if (u1 < -0.02 || u0 > 1.02 || v1 < -0.02 || v0 > 1.02) continue;
+      if (uCenter < -0.25 || uCenter > 1.25 || vCenter < -0.25 || vCenter > 1.25) {
+        continue;
       }
+
+      const liftAmt = moving ? activeLift : 0;
+      const s0 = facePointLifted(geom, u0, v0, liftAmt, layout);
+      const s1 = facePointLifted(geom, u1, v0, liftAmt, layout);
+      const s2 = facePointLifted(geom, u1, v1, liftAmt, layout);
+      const s3 = facePointLifted(geom, u0, v1, liftAmt, layout);
+
+      if (crumple && copy === 0) {
+        const bx = Math.min(s0.x, s1.x, s2.x, s3.x);
+        const by = Math.min(s0.y, s1.y, s2.y, s3.y);
+        const bw = Math.max(s0.x, s1.x, s2.x, s3.x) - bx;
+        const bh = Math.max(s0.y, s1.y, s2.y, s3.y) - by;
+        drawCrumpledSticker(
+          ctx,
+          crumple.kind,
+          bx,
+          by,
+          Math.min(bw, bh),
+          crumple.t,
+          crumple.seed,
+        );
+        continue;
+      }
+      if (crumple) continue;
+
+      drawStickerOnQuad(ctx, kind, s0, s1, s2, s3, q, moving);
     }
+  };
+
+  // Stationary first, then the sliding strip so lift reads on top.
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) drawCell(r, c, false);
+  }
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) drawCell(r, c, true);
   }
   ctx.restore();
+}
+
+function facePointLifted(
+  geom: FaceGeom,
+  u: number,
+  v: number,
+  lift: number,
+  layout: CubeLayout,
+): Vec2 {
+  const local = facePoint(geom, u, v);
+  // Lift along face normal so stickers hover off the paper in 3D
+  const lifted: Vec3 = {
+    x: local.x + geom.normal.x * lift,
+    y: local.y + geom.normal.y * lift,
+    z: local.z + geom.normal.z * lift,
+  };
+  const w = applyRot(lifted, layout.rotX, layout.rotY);
+  const p = project(w, layout.scale);
+  return { x: layout.cx + p.x, y: layout.cy + p.y };
 }
 
 function lerp2(a: Vec2, b: Vec2, t: number): Vec2 {
@@ -416,25 +438,28 @@ function drawStickerOnQuad(
   tr: Vec2,
   br: Vec2,
   bl: Vec2,
-  lift: number,
+  faceQuad: Vec2[],
+  hovering: boolean,
 ): void {
-  const bx = Math.min(tl.x, tr.x, br.x, bl.x);
-  const by = Math.min(tl.y, tr.y, br.y, bl.y);
-  const bw = Math.max(tl.x, tr.x, br.x, bl.x) - bx;
-  const bh = Math.max(tl.y, tr.y, br.y, bl.y) - by;
-  const s = Math.min(bw, bh) * (lift ? 1.06 : 1);
-  const x = bx + (bw - s) / 2;
-  const y = by + (bh - s) / 2 - (lift ? 6 : 0);
-  // Clip to face quad so stickers don't spill off cube edges
+  const cx = (tl.x + tr.x + br.x + bl.x) / 4;
+  const cy = (tl.y + tr.y + br.y + bl.y) / 4;
+  const bw = (Math.hypot(tr.x - tl.x, tr.y - tl.y) + Math.hypot(br.x - bl.x, br.y - bl.y)) / 2;
+  const bh = (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) / 2;
+  const s = Math.min(bw, bh) * (hovering ? 1.02 : 1);
+  const x = cx - s / 2;
+  const y = cy - s / 2;
+
   ctx.save();
+  // Clip to the paper face so wrap peeks stay on the cube
   ctx.beginPath();
-  ctx.moveTo(tl.x, tl.y);
-  ctx.lineTo(tr.x, tr.y);
-  ctx.lineTo(br.x, br.y);
-  ctx.lineTo(bl.x, bl.y);
+  ctx.moveTo(faceQuad[0]!.x, faceQuad[0]!.y);
+  ctx.lineTo(faceQuad[1]!.x, faceQuad[1]!.y);
+  ctx.lineTo(faceQuad[2]!.x, faceQuad[2]!.y);
+  ctx.lineTo(faceQuad[3]!.x, faceQuad[3]!.y);
   ctx.closePath();
   ctx.clip();
-  drawStickerSprite(ctx, kind, x, y, s, 1, lift ? 8 : 0);
+  // Soft shadow only — lift itself is done in 3D along the face normal
+  drawStickerSprite(ctx, kind, x, y, s, 1, hovering ? 3 : 0);
   ctx.restore();
 }
 

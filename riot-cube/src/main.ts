@@ -31,6 +31,7 @@ import {
   facingFace,
   hitFrontUV,
   hitOrbitButton,
+  screenDeltaToFaceUV,
   type CubeLayout,
 } from "./view/cube3d";
 import { loadStickers } from "./view/stickers";
@@ -58,10 +59,12 @@ let springUv = 0;
 let springAxis: "row" | "col" | null = null;
 let springIndex = -1;
 
-let rotX = 0.18;
-let rotY = -0.22;
-let targetRotX = 0.18;
-let targetRotY = -0.22;
+const DEFAULT_ROT_X = 0.08;
+const DEFAULT_ROT_Y = -0.1;
+let rotX = DEFAULT_ROT_X;
+let rotY = DEFAULT_ROT_Y;
+let targetRotX = DEFAULT_ROT_X;
+let targetRotY = DEFAULT_ROT_Y;
 let rotating = false;
 
 let visualBoard: Board | null = null;
@@ -299,8 +302,8 @@ canvas.addEventListener("pointerdown", (e) => {
       crumpleT = 0;
       pendingTwist = null;
       busy = false;
-      rotX = 0.18;
-      rotY = -0.22;
+      rotX = DEFAULT_ROT_X;
+      rotY = DEFAULT_ROT_Y;
       targetRotX = rotX;
       targetRotY = rotY;
       paint();
@@ -340,14 +343,11 @@ canvas.addEventListener("pointermove", (e) => {
   if (!drag || session.status !== "playing" || rotating || busy) return;
   const p = canvasPoint(e);
   const layout = cubeLayout();
-  const hit = hitFrontUV(layout, p.x, p.y);
-  // Fall back to pixel delta mapped roughly to UV
-  let du = (p.x - drag.x0) / (layout.scale * 1.6);
-  let dv = (p.y - drag.y0) / (layout.scale * 1.6);
-  if (hit) {
-    du = hit.u - drag.u0;
-    dv = hit.v - drag.v0;
-  }
+  // Map drag in the facing face's screen axes so wrap peeks track the finger
+  // even when the pointer leaves the face quad.
+  const mapped = screenDeltaToFaceUV(layout, p.x - drag.x0, p.y - drag.y0);
+  const du = mapped?.du ?? (p.x - drag.x0) / (layout.scale * 2);
+  const dv = mapped?.dv ?? (p.y - drag.y0) / (layout.scale * 2);
 
   if (!drag.axis) {
     if (Math.abs(du) < 0.03 && Math.abs(dv) < 0.03) return;
@@ -383,9 +383,11 @@ function endDrag(): void {
   }
   const dir: 1 | -1 = steps > 0 ? 1 : -1;
   const amount = Math.min(session.level.size - 1, Math.abs(steps));
-  springAxis = axis;
-  springIndex = index;
-  springUv = offsetUv - steps / session.level.size;
+  // Board already jumps to the committed twist — don't keep a residual offset
+  // on top of that (it made the wrap peek disagree with the landed stickers).
+  springAxis = null;
+  springIndex = -1;
+  springUv = 0;
   doTwist({ axis, index, dir, amount });
 }
 
