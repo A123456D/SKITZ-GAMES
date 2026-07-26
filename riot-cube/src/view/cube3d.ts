@@ -484,27 +484,28 @@ function paintPaperTexture(
   ctx.clip();
 
   if (tex) {
-    // Rotate UV corners per face so sides don't look identical.
-    const uv: Vec2[] = [
-      { x: 0, y: 0 },
-      { x: 1, y: 0 },
-      { x: 1, y: 1 },
-      { x: 0, y: 1 },
-    ];
-    const rot = faceIndex % 4;
-    const mapped = uv.map((_, i) => uv[(i + rot) % 4]!);
-    if (faceIndex % 2 === 1) {
-      for (const p of mapped) p.x = 1 - p.x;
-    }
-    drawImageOnQuad(ctx, tex, q, mapped);
+    // Slight per-face crop so sides aren't identical (no rotate — that made seams crawl).
+    const inset = 0.08;
+    const ox = (faceIndex % 3) * 0.04;
+    const oy = Math.floor(faceIndex / 2) * 0.05;
+    const u0 = ox;
+    const v0 = oy;
+    const u1 = 1 - inset + ox * 0.2;
+    const v1 = 1 - inset + oy * 0.2;
+    drawImageOnQuad(ctx, tex, q, [
+      { x: u0, y: v0 },
+      { x: u1, y: v0 },
+      { x: u1, y: v1 },
+      { x: u0, y: v1 },
+    ]);
     if (!isActive) {
-      ctx.fillStyle = "rgba(40, 30, 18, 0.18)";
+      ctx.fillStyle = "rgba(40, 30, 18, 0.12)";
       ctx.fill();
     }
   }
 
-  // Lined paper blue rules on top of the photo
-  ctx.strokeStyle = isActive ? "rgba(80,140,200,0.22)" : "rgba(80,140,200,0.12)";
+  // Soft notebook rules (lower alpha to avoid shimmer while rotating)
+  ctx.strokeStyle = isActive ? "rgba(80,140,200,0.16)" : "rgba(80,140,200,0.09)";
   ctx.lineWidth = 1;
   for (let i = 1; i < 8; i++) {
     const t = i / 8;
@@ -519,46 +520,85 @@ function paintPaperTexture(
   ctx.restore();
 }
 
-/** Affine-map an image onto a screen-space quad via two triangles. */
+/**
+ * Map texture onto a screen quad with an NxN grid.
+ * A single two-triangle affine map creates a diagonal seam / crawling shadows
+ * under perspective while the cube rotates.
+ */
 function drawImageOnQuad(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: CanvasImageSource,
   q: Vec2[],
   uv: Vec2[],
+  divisions = 8,
 ): void {
-  const w = img.naturalWidth;
-  const h = img.naturalHeight;
-  drawImageTriangle(
-    ctx,
-    img,
-    q[0]!,
-    q[1]!,
-    q[2]!,
-    uv[0]!.x * w,
-    uv[0]!.y * h,
-    uv[1]!.x * w,
-    uv[1]!.y * h,
-    uv[2]!.x * w,
-    uv[2]!.y * h,
-  );
-  drawImageTriangle(
-    ctx,
-    img,
-    q[0]!,
-    q[2]!,
-    q[3]!,
-    uv[0]!.x * w,
-    uv[0]!.y * h,
-    uv[2]!.x * w,
-    uv[2]!.y * h,
-    uv[3]!.x * w,
-    uv[3]!.y * h,
-  );
+  const w =
+    "naturalWidth" in img && (img as HTMLImageElement).naturalWidth
+      ? (img as HTMLImageElement).naturalWidth
+      : (img as HTMLCanvasElement).width;
+  const h =
+    "naturalHeight" in img && (img as HTMLImageElement).naturalHeight
+      ? (img as HTMLImageElement).naturalHeight
+      : (img as HTMLCanvasElement).height;
+
+  for (let j = 0; j < divisions; j++) {
+    for (let i = 0; i < divisions; i++) {
+      // Slight overlap hides hairline gaps between cells
+      const pad = 0.002;
+      const su0 = Math.max(0, i / divisions - pad);
+      const su1 = Math.min(1, (i + 1) / divisions + pad);
+      const sv0 = Math.max(0, j / divisions - pad);
+      const sv1 = Math.min(1, (j + 1) / divisions + pad);
+
+      const p00 = bilerp(q, su0, sv0);
+      const p10 = bilerp(q, su1, sv0);
+      const p11 = bilerp(q, su1, sv1);
+      const p01 = bilerp(q, su0, sv1);
+
+      const t00 = bilerp(uv, su0, sv0);
+      const t10 = bilerp(uv, su1, sv0);
+      const t11 = bilerp(uv, su1, sv1);
+      const t01 = bilerp(uv, su0, sv1);
+
+      drawImageTriangle(
+        ctx,
+        img,
+        p00,
+        p10,
+        p11,
+        t00.x * w,
+        t00.y * h,
+        t10.x * w,
+        t10.y * h,
+        t11.x * w,
+        t11.y * h,
+      );
+      drawImageTriangle(
+        ctx,
+        img,
+        p00,
+        p11,
+        p01,
+        t00.x * w,
+        t00.y * h,
+        t11.x * w,
+        t11.y * h,
+        t01.x * w,
+        t01.y * h,
+      );
+    }
+  }
+}
+
+function bilerp(q: Vec2[], u: number, v: number): Vec2 {
+  const a = lerp2(q[0]!, q[1]!, u);
+  const b = lerp2(q[3]!, q[2]!, u);
+  return lerp2(a, b, v);
 }
 
 function drawImageTriangle(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: CanvasImageSource,
   p0: Vec2,
   p1: Vec2,
   p2: Vec2,
@@ -597,7 +637,6 @@ function drawImageTriangle(
       p2.y * (u0 * v1 - u1 * v0)) /
     denom;
 
-  // Compose with current transform (keeps devicePixelRatio scale).
   const cur = ctx.getTransform();
   ctx.setTransform(
     a * cur.a + d * cur.c,
