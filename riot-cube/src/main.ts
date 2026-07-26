@@ -455,9 +455,9 @@ canvas.addEventListener("pointermove", (e) => {
   if (orbitDrag) {
     const dx = p.x - orbitDrag.x0;
     const dy = p.y - orbitDrag.y0;
-    // Drag right → RIGHT face (matches ›). Drag up → TOP (matches ˄).
-    rotY = orbitDrag.rotY0 - dx * ORBIT_DRAG_SENS;
-    rotX = orbitDrag.rotX0 + dy * ORBIT_DRAG_SENS;
+    // Horizontal restored; vertical inverted from prior build.
+    rotY = orbitDrag.rotY0 + dx * ORBIT_DRAG_SENS;
+    rotX = orbitDrag.rotX0 - dy * ORBIT_DRAG_SENS;
     // Keep pitch in a playable range (allow full top/bottom snaps)
     rotX = Math.max(-SNAP_Q, Math.min(SNAP_Q, rotX));
     targetRotX = rotX;
