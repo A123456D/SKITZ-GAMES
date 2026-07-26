@@ -8,10 +8,14 @@ import {
 import type { Goal, LevelDef, TileKind, Twist } from "./types";
 
 export type GameStatus = "playing" | "won" | "lost";
+export type FaceId = 0 | 1;
 
 export type Session = {
   level: LevelDef;
+  /** Active face board (alias into faces[face]). */
   board: Board;
+  faces: [Board, Board];
+  face: FaceId;
   movesLeft: number;
   score: number;
   goals: Goal[];
@@ -31,13 +35,19 @@ export function starsForScore(score: number, thresholds: [number, number, number
 export function startSession(level: LevelDef): Session {
   const seed = level.seed ?? hashId(level.id);
   const rng = mulberry32(seed ^ 0x9e3779b9);
-  const board = level.board
+  const front = level.board
     ? level.board.map((row) => row.slice())
     : generateBoard(level.size, seed);
+  const back = level.boardBack
+    ? level.boardBack.map((row) => row.slice())
+    : generateBoard(level.size, seed ^ 0x85ebca6b);
 
+  const faces: [Board, Board] = [front, back];
   return {
     level,
-    board,
+    faces,
+    face: 0,
+    board: faces[0],
     movesLeft: level.moves,
     score: 0,
     goals: level.goals.map((g) => ({ ...g, have: 0 })),
@@ -76,7 +86,7 @@ export type TwistResult = {
   combo: number;
 };
 
-/** Spend one move, twist a slice, resolve cascades. */
+/** Spend one move, twist active face, resolve cascades. */
 export function applyTwist(session: Session, twist: Twist): TwistResult {
   if (session.status !== "playing" || session.movesLeft <= 0) {
     return { session, didTwist: false, scoreGain: 0, combo: 0 };
@@ -89,6 +99,9 @@ export function applyTwist(session: Session, twist: Twist): TwistResult {
   const score = session.score + resolved.scoreGain;
   const comboPeak = Math.max(session.comboPeak, resolved.combo);
 
+  const faces: [Board, Board] = [...session.faces] as [Board, Board];
+  faces[session.face] = resolved.board;
+
   let status: GameStatus = "playing";
   if (goalsMet(goals)) status = "won";
   else if (movesLeft <= 0) status = "lost";
@@ -96,7 +109,8 @@ export function applyTwist(session: Session, twist: Twist): TwistResult {
   return {
     session: {
       ...session,
-      board: resolved.board,
+      faces,
+      board: faces[session.face]!,
       movesLeft,
       score,
       goals,
@@ -107,6 +121,17 @@ export function applyTwist(session: Session, twist: Twist): TwistResult {
     didTwist: true,
     scoreGain: resolved.scoreGain,
     combo: resolved.combo,
+  };
+}
+
+/** Flip cube to the other face (free — does not spend a move). */
+export function flipFace(session: Session, dir: 1 | -1 = 1): Session {
+  if (session.status !== "playing") return session;
+  const face = ((session.face + dir + 2) % 2) as FaceId;
+  return {
+    ...session,
+    face,
+    board: session.faces[face]!,
   };
 }
 

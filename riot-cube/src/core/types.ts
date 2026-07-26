@@ -1,4 +1,4 @@
-/** Tile kinds for Phase 1 flat board. */
+/** Sticker symbols (plain 8-ball excluded). */
 export const TILE_KINDS = [
   "skull",
   "heart",
@@ -6,6 +6,11 @@ export const TILE_KINDS = [
   "star",
   "flame",
   "diamond",
+  "headphones",
+  "bomb",
+  "spray",
+  "smiley",
+  "sneaker",
 ] as const;
 
 export type TileKind = (typeof TILE_KINDS)[number];
@@ -22,6 +27,8 @@ export type Twist = {
   index: number;
   /** +1 = right/down, -1 = left/up */
   dir: 1 | -1;
+  /** How many cells to shift (default 1). */
+  amount?: number;
 };
 
 export type Goal = {
@@ -36,10 +43,11 @@ export type LevelDef = {
   size: number;
   moves: number;
   goals: { kind: TileKind; need: number }[];
-  /** Optional fixed board; otherwise generated. */
+  /** Optional fixed front face. */
   board?: TileKind[][];
+  /** Optional fixed back face. */
+  boardBack?: TileKind[][];
   seed?: number;
-  /** Score thresholds for 1/2/3 stars. */
   starScores: [number, number, number];
 };
 

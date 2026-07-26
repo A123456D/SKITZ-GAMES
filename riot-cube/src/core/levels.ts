@@ -1,27 +1,37 @@
 import type { LevelDef, TileKind } from "./types";
 
-const L1_BOARD: TileKind[][] = [
+/** Front face opener — varied stickers, no opening matches of 3. */
+const FRONT: TileKind[][] = [
   ["skull", "heart", "bolt", "star", "flame", "diamond"],
-  ["heart", "skull", "star", "bolt", "diamond", "flame"],
-  ["bolt", "star", "heart", "flame", "skull", "diamond"],
-  ["star", "flame", "diamond", "skull", "heart", "bolt"],
-  ["flame", "diamond", "skull", "heart", "bolt", "star"],
-  ["diamond", "bolt", "flame", "star", "skull", "heart"],
+  ["heart", "skull", "star", "headphones", "diamond", "flame"],
+  ["bolt", "star", "heart", "flame", "skull", "bomb"],
+  ["star", "flame", "diamond", "skull", "heart", "spray"],
+  ["flame", "diamond", "skull", "smiley", "bolt", "star"],
+  ["diamond", "bomb", "flame", "star", "sneaker", "heart"],
 ];
 
-/** Hand-tuned opener: twisting row 1 right creates a heart line. */
+const BACK: TileKind[][] = [
+  ["sneaker", "spray", "smiley", "bomb", "headphones", "skull"],
+  ["spray", "sneaker", "bomb", "smiley", "skull", "headphones"],
+  ["smiley", "bomb", "sneaker", "headphones", "heart", "bolt"],
+  ["bomb", "headphones", "spray", "star", "flame", "diamond"],
+  ["headphones", "skull", "heart", "bolt", "star", "flame"],
+  ["skull", "heart", "bolt", "star", "diamond", "sneaker"],
+];
+
 export const LEVEL_1: LevelDef = {
   id: "level-1",
   title: "LEVEL 1",
   size: 6,
-  moves: 24,
+  moves: 28,
   goals: [
-    { kind: "heart", need: 12 },
+    { kind: "heart", need: 10 },
     { kind: "skull", need: 8 },
-    { kind: "bolt", need: 8 },
+    { kind: "flame", need: 8 },
   ],
-  board: L1_BOARD,
-  starScores: [400, 800, 1400],
+  board: FRONT,
+  boardBack: BACK,
+  starScores: [400, 900, 1500],
 };
 
 export const LEVELS: LevelDef[] = [LEVEL_1];

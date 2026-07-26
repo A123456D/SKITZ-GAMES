@@ -1,47 +1,59 @@
-import type { TileKind } from "../core/types";
+import type { Goal, TileKind } from "../core/types";
+import { stickerImage } from "./stickers";
 
 export const W = 720;
 export const H = 1280;
 
-export const COLORS: Record<
-  TileKind,
-  { fill: string; ink: string; accent: string }
-> = {
-  skull: { fill: "#1a1a1a", ink: "#f5f5f5", accent: "#ff2d6a" },
-  heart: { fill: "#ff2d6a", ink: "#1a1a1a", accent: "#fff" },
-  bolt: { fill: "#c8ff3d", ink: "#1a1a1a", accent: "#fff" },
-  star: { fill: "#ffd60a", ink: "#1a1a1a", accent: "#fff" },
-  flame: { fill: "#ff6b1a", ink: "#1a1a1a", accent: "#ffe566" },
-  diamond: { fill: "#3d9bff", ink: "#0a1628", accent: "#fff" },
-};
-
 export type Layout = {
+  pageX: number;
+  pageY: number;
+  pageW: number;
+  pageH: number;
   boardX: number;
   boardY: number;
   boardSize: number;
   cell: number;
   gap: number;
+  stride: number;
+  flipLeft: { x: number; y: number; w: number; h: number };
+  flipRight: { x: number; y: number; w: number; h: number };
 };
 
 export function boardLayout(size: number): Layout {
-  const margin = 48;
-  const boardSize = W - margin * 2;
-  const gap = 8;
+  const pageX = 48;
+  const pageW = W - 96;
+  const pageY = 300;
+  const pageH = 720;
+  const margin = 36;
+  const boardSize = Math.min(pageW - margin * 2, pageH - margin * 2 - 20);
+  const gap = 10;
   const cell = (boardSize - gap * (size - 1)) / size;
-  const boardY = 340;
-  return { boardX: margin, boardY, boardSize, cell, gap };
+  const stride = cell + gap;
+  const boardX = pageX + (pageW - boardSize) / 2;
+  const boardY = pageY + (pageH - boardSize) / 2;
+  const flipH = 88;
+  const flipW = 44;
+  const flipY = boardY + boardSize / 2 - flipH / 2;
+  return {
+    pageX,
+    pageY,
+    pageW,
+    pageH,
+    boardX,
+    boardY,
+    boardSize,
+    cell,
+    gap,
+    stride,
+    flipLeft: { x: pageX - 8, y: flipY, w: flipW, h: flipH },
+    flipRight: { x: pageX + pageW - flipW + 8, y: flipY, w: flipW, h: flipH },
+  };
 }
 
-export function cellRect(layout: Layout, r: number, c: number): {
-  x: number;
-  y: number;
-  s: number;
-} {
-  const s = layout.cell;
+export function cellBase(layout: Layout, r: number, c: number): { x: number; y: number } {
   return {
-    x: layout.boardX + c * (s + layout.gap),
-    y: layout.boardY + r * (s + layout.gap),
-    s,
+    x: layout.boardX + c * layout.stride,
+    y: layout.boardY + r * layout.stride,
   };
 }
 
@@ -53,13 +65,35 @@ export function hitCell(
 ): { r: number; c: number } | null {
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size; c++) {
-      const rect = cellRect(layout, r, c);
-      if (x >= rect.x && x <= rect.x + rect.s && y >= rect.y && y <= rect.y + rect.s) {
+      const p = cellBase(layout, r, c);
+      if (x >= p.x && x <= p.x + layout.cell && y >= p.y && y <= p.y + layout.cell) {
         return { r, c };
       }
     }
   }
   return null;
+}
+
+function hitRect(
+  r: { x: number; y: number; w: number; h: number },
+  x: number,
+  y: number,
+): boolean {
+  return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+}
+
+export function hitFlip(
+  layout: Layout,
+  x: number,
+  y: number,
+): 1 | -1 | null {
+  if (hitRect(layout.flipLeft, x, y)) return -1;
+  if (hitRect(layout.flipRight, x, y)) return 1;
+  return null;
+}
+
+export function hitRetry(x: number, y: number): boolean {
+  return x >= 200 && x <= 520 && y >= 660 && y <= 730;
 }
 
 function roundRect(
@@ -80,266 +114,121 @@ function roundRect(
   ctx.closePath();
 }
 
-export function drawBackground(ctx: CanvasRenderingContext2D): void {
+export function drawDesk(ctx: CanvasRenderingContext2D): void {
   const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#141414");
-  g.addColorStop(0.55, "#0c0c0c");
-  g.addColorStop(1, "#1a120e");
+  g.addColorStop(0, "#1a1410");
+  g.addColorStop(1, "#0c0a08");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
-
-  ctx.save();
-  ctx.globalAlpha = 0.07;
-  for (let i = 0; i < 40; i++) {
-    ctx.fillStyle = i % 2 ? "#ff2d6a" : "#c8ff3d";
-    const x = (i * 97) % W;
-    const y = (i * 173) % H;
-    ctx.fillRect(x, y, 3, 3);
-  }
-  ctx.restore();
 }
 
-export function drawPaperScrap(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  fill: string,
-  opts?: { rotate?: number; lined?: boolean },
-): void {
+export function drawPage(ctx: CanvasRenderingContext2D, layout: Layout, flipT: number): void {
+  const { pageX, pageY, pageW, pageH } = layout;
   ctx.save();
-  ctx.translate(x + w / 2, y + h / 2);
-  ctx.rotate(opts?.rotate ?? 0);
-  ctx.translate(-w / 2, -h / 2);
+  // Perspective-ish squash during flip
+  const cx = pageX + pageW / 2;
+  const scaleX = Math.max(0.04, Math.abs(Math.cos(flipT * Math.PI)));
+  ctx.translate(cx, pageY + pageH / 2);
+  ctx.scale(scaleX, 1);
+  ctx.translate(-cx, -(pageY + pageH / 2));
 
-  ctx.shadowColor = "rgba(0,0,0,0.55)";
-  ctx.shadowBlur = 12;
-  ctx.shadowOffsetY = 6;
+  // Page shadow
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  roundRect(ctx, pageX + 10, pageY + 14, pageW, pageH, 8);
+  ctx.fill();
 
-  ctx.fillStyle = fill;
+  // Lined notebook page
+  const paper = ctx.createLinearGradient(pageX, pageY, pageX + pageW, pageY + pageH);
+  paper.addColorStop(0, "#f7f1e4");
+  paper.addColorStop(1, "#ebe2d0");
+  ctx.fillStyle = paper;
+  roundRect(ctx, pageX, pageY, pageW, pageH, 6);
+  ctx.fill();
   ctx.strokeStyle = "#111";
   ctx.lineWidth = 4;
-  roundRect(ctx, 0, 0, w, h, 6);
-  ctx.fill();
-  ctx.shadowColor = "transparent";
   ctx.stroke();
 
-  if (opts?.lined) {
-    ctx.strokeStyle = "rgba(80,140,200,0.35)";
-    ctx.lineWidth = 1.5;
-    for (let ly = 18; ly < h - 8; ly += 16) {
-      ctx.beginPath();
-      ctx.moveTo(10, ly);
-      ctx.lineTo(w - 10, ly);
-      ctx.stroke();
-    }
-  }
-
-  ctx.restore();
-}
-
-export function drawTape(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  color: string,
-  rot = -0.12,
-): void {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(rot);
-  ctx.globalAlpha = 0.88;
-  ctx.fillStyle = color;
-  ctx.fillRect(0, 0, w, h);
-  ctx.globalAlpha = 0.2;
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, w, h * 0.35);
-  ctx.restore();
-}
-
-function drawIcon(
-  ctx: CanvasRenderingContext2D,
-  kind: TileKind,
-  cx: number,
-  cy: number,
-  scale: number,
-): void {
-  const colors = COLORS[kind];
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
-  ctx.fillStyle = colors.ink;
-  ctx.strokeStyle = colors.ink;
-  ctx.lineWidth = 3;
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-
-  switch (kind) {
-    case "skull": {
-      ctx.fillStyle = "#f2f2f2";
-      ctx.beginPath();
-      ctx.arc(0, -4, 16, Math.PI, 0);
-      ctx.lineTo(14, 10);
-      ctx.quadraticCurveTo(0, 18, -14, 10);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = "#111";
-      ctx.stroke();
-      ctx.strokeStyle = "#111";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(-8, -6);
-      ctx.lineTo(-3, -1);
-      ctx.moveTo(-3, -6);
-      ctx.lineTo(-8, -1);
-      ctx.moveTo(3, -6);
-      ctx.lineTo(8, -1);
-      ctx.moveTo(8, -6);
-      ctx.lineTo(3, -1);
-      ctx.stroke();
-      break;
-    }
-    case "heart": {
-      ctx.fillStyle = colors.fill;
-      ctx.beginPath();
-      ctx.moveTo(0, 14);
-      ctx.bezierCurveTo(-22, 0, -14, -16, 0, -6);
-      ctx.bezierCurveTo(14, -16, 22, 0, 0, 14);
-      ctx.fill();
-      ctx.strokeStyle = "#111";
-      ctx.stroke();
-      break;
-    }
-    case "bolt": {
-      ctx.fillStyle = colors.fill;
-      ctx.beginPath();
-      ctx.moveTo(2, -18);
-      ctx.lineTo(-8, 2);
-      ctx.lineTo(2, 2);
-      ctx.lineTo(-2, 18);
-      ctx.lineTo(10, -2);
-      ctx.lineTo(0, -2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = "#111";
-      ctx.stroke();
-      break;
-    }
-    case "star": {
-      ctx.fillStyle = colors.fill;
-      ctx.beginPath();
-      for (let i = 0; i < 5; i++) {
-        const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
-        const b = a + Math.PI / 5;
-        ctx.lineTo(Math.cos(a) * 18, Math.sin(a) * 18);
-        ctx.lineTo(Math.cos(b) * 8, Math.sin(b) * 8);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = "#111";
-      ctx.stroke();
-      break;
-    }
-    case "flame": {
-      ctx.fillStyle = colors.fill;
-      ctx.beginPath();
-      ctx.moveTo(0, 16);
-      ctx.quadraticCurveTo(-16, 4, -8, -10);
-      ctx.quadraticCurveTo(-2, 2, 0, -16);
-      ctx.quadraticCurveTo(4, 0, 10, -6);
-      ctx.quadraticCurveTo(16, 6, 0, 16);
-      ctx.fill();
-      ctx.fillStyle = colors.accent;
-      ctx.beginPath();
-      ctx.moveTo(0, 10);
-      ctx.quadraticCurveTo(-6, 2, -2, -4);
-      ctx.quadraticCurveTo(2, 4, 6, 0);
-      ctx.quadraticCurveTo(8, 8, 0, 10);
-      ctx.fill();
-      ctx.strokeStyle = "#111";
-      ctx.beginPath();
-      ctx.moveTo(0, 16);
-      ctx.quadraticCurveTo(-16, 4, -8, -10);
-      ctx.quadraticCurveTo(-2, 2, 0, -16);
-      ctx.quadraticCurveTo(4, 0, 10, -6);
-      ctx.quadraticCurveTo(16, 6, 0, 16);
-      ctx.stroke();
-      break;
-    }
-    case "diamond": {
-      ctx.fillStyle = colors.fill;
-      ctx.beginPath();
-      ctx.moveTo(0, -16);
-      ctx.lineTo(16, 0);
-      ctx.lineTo(0, 16);
-      ctx.lineTo(-16, 0);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = "#111";
-      ctx.stroke();
-      ctx.strokeStyle = "rgba(255,255,255,0.55)";
-      ctx.beginPath();
-      ctx.moveTo(0, -8);
-      ctx.lineTo(8, 0);
-      ctx.stroke();
-      break;
-    }
-  }
-  ctx.restore();
-}
-
-export function drawSticker(
-  ctx: CanvasRenderingContext2D,
-  kind: TileKind,
-  x: number,
-  y: number,
-  s: number,
-  opts?: { flash?: number; scale?: number },
-): void {
-  const pad = s * 0.06;
-  const scale = opts?.scale ?? 1;
-  const cx = x + s / 2;
-  const cy = y + s / 2;
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
-  ctx.translate(-cx, -cy);
-
-  ctx.shadowColor = "rgba(0,0,0,0.45)";
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetY = 4;
-
-  // White die-cut border
-  ctx.fillStyle = "#f7f7f2";
-  roundRect(ctx, x + pad * 0.3, y + pad * 0.3, s - pad * 0.6, s - pad * 0.6, s * 0.16);
-  ctx.fill();
-  ctx.shadowColor = "transparent";
-  ctx.strokeStyle = "#111";
-  ctx.lineWidth = 3.5;
-  ctx.stroke();
-
-  // Inner color face
-  const colors = COLORS[kind];
-  ctx.fillStyle = colors.fill;
-  roundRect(ctx, x + pad * 1.4, y + pad * 1.4, s - pad * 2.8, s - pad * 2.8, s * 0.12);
-  ctx.fill();
-  ctx.strokeStyle = "#111";
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  drawIcon(ctx, kind, cx, cy, s / 92);
-
-  if (opts?.flash && opts.flash > 0) {
-    ctx.fillStyle = `rgba(255,255,255,${0.35 * opts.flash})`;
-    roundRect(ctx, x + pad * 0.3, y + pad * 0.3, s - pad * 0.6, s - pad * 0.6, s * 0.16);
+  // Binder holes
+  ctx.fillStyle = "#d8d0c0";
+  for (let i = 0; i < 6; i++) {
+    const hy = pageY + 60 + i * 100;
+    ctx.beginPath();
+    ctx.arc(pageX + 18, hy, 7, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 
+  // Blue lines
+  ctx.strokeStyle = "rgba(80,140,200,0.28)";
+  ctx.lineWidth = 1.5;
+  for (let y = pageY + 48; y < pageY + pageH - 20; y += 28) {
+    ctx.beginPath();
+    ctx.moveTo(pageX + 40, y);
+    ctx.lineTo(pageX + pageW - 20, y);
+    ctx.stroke();
+  }
+  // Red margin
+  ctx.strokeStyle = "rgba(220,80,80,0.35)";
+  ctx.beginPath();
+  ctx.moveTo(pageX + 48, pageY + 20);
+  ctx.lineTo(pageX + 48, pageY + pageH - 20);
+  ctx.stroke();
+
+  // Masking tape
+  ctx.save();
+  ctx.translate(pageX + 80, pageY - 6);
+  ctx.rotate(-0.08);
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = "#ffd60a";
+  ctx.fillRect(0, 0, 110, 22);
   ctx.restore();
+  ctx.save();
+  ctx.translate(pageX + pageW - 140, pageY + pageH - 10);
+  ctx.rotate(0.1);
+  ctx.globalAlpha = 0.8;
+  ctx.fillStyle = "#ff2d6a";
+  ctx.fillRect(0, 0, 90, 20);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+export function drawFlipButtons(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  face: number,
+): void {
+  const drawBtn = (
+    r: { x: number; y: number; w: number; h: number },
+    label: string,
+  ) => {
+    ctx.save();
+    ctx.fillStyle = "#111";
+    roundRect(ctx, r.x, r.y, r.w, r.h, 10);
+    ctx.fill();
+    ctx.strokeStyle = "#c8ff3d";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = "#c8ff3d";
+    ctx.font = "800 28px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2);
+    ctx.restore();
+  };
+  drawBtn(layout.flipLeft, "‹");
+  drawBtn(layout.flipRight, "›");
+
+  ctx.fillStyle = "#f3efe6";
+  ctx.font = "700 16px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(
+    face === 0 ? "FRONT" : "BACK",
+    layout.pageX + layout.pageW / 2,
+    layout.pageY + layout.pageH + 28,
+  );
 }
 
 export function drawHud(
@@ -348,18 +237,27 @@ export function drawHud(
     title: string;
     moves: number;
     score: number;
-    goals: { kind: TileKind; need: number; have: number }[];
+    goals: Goal[];
   },
 ): void {
   // Title scrap
-  drawPaperScrap(ctx, 40, 36, 280, 64, "#f3efe6", { rotate: -0.02 });
-  drawTape(ctx, 52, 28, 70, 18, "#ff2d6a", -0.18);
+  ctx.fillStyle = "#f3efe6";
+  roundRect(ctx, 40, 36, 280, 64, 6);
+  ctx.fill();
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.fillStyle = "#ff2d6a";
+  ctx.fillRect(52, 28, 70, 18);
   ctx.fillStyle = "#111";
-  ctx.font = "800 34px 'Permanent Marker', 'Comic Sans MS', sans-serif";
+  ctx.font = "800 34px 'Permanent Marker', sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
   ctx.fillText("RIOT CUBE", 58, 78);
 
-  // Moves
-  drawPaperScrap(ctx, 360, 40, 150, 58, "#111", { rotate: 0.03 });
+  ctx.fillStyle = "#111";
+  roundRect(ctx, 360, 40, 150, 58, 6);
+  ctx.fill();
   ctx.fillStyle = "#c8ff3d";
   ctx.font = "700 18px 'Chakra Petch', sans-serif";
   ctx.fillText("MOVES", 378, 64);
@@ -367,39 +265,90 @@ export function drawHud(
   ctx.font = "800 28px 'Chakra Petch', sans-serif";
   ctx.fillText(String(opts.moves), 378, 90);
 
-  // Score
-  drawPaperScrap(ctx, 530, 36, 150, 62, "#f3efe6", { rotate: -0.04 });
-  drawTape(ctx, 620, 28, 50, 16, "#ffd60a", 0.2);
+  ctx.fillStyle = "#f3efe6";
+  roundRect(ctx, 530, 36, 150, 62, 6);
+  ctx.fill();
+  ctx.strokeStyle = "#111";
+  ctx.stroke();
   ctx.fillStyle = "#111";
   ctx.font = "700 16px 'Chakra Petch', sans-serif";
   ctx.fillText("SCORE", 548, 60);
   ctx.font = "800 26px 'Chakra Petch', sans-serif";
   ctx.fillText(String(opts.score), 548, 88);
 
-  // Goals panel
-  drawPaperScrap(ctx, 40, 120, 640, 170, "#f7f3ea", { lined: true, rotate: 0.01 });
-  drawTape(ctx, 70, 112, 90, 20, "#9ad0ff", -0.08);
+  ctx.fillStyle = "#f7f3ea";
+  roundRect(ctx, 40, 120, 640, 150, 6);
+  ctx.fill();
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 4;
+  ctx.stroke();
   ctx.fillStyle = "#111";
   ctx.font = "800 22px 'Permanent Marker', sans-serif";
   ctx.fillText(opts.title + "  ·  GOALS", 70, 158);
 
-  const slotW = 180;
   opts.goals.forEach((g, i) => {
-    const gx = 70 + i * slotW;
-    const gy = 180;
-    drawSticker(ctx, g.kind, gx, gy, 56);
+    const gx = 70 + i * 200;
+    const gy = 175;
+    drawStickerSprite(ctx, g.kind, gx, gy, 52, 1, 0);
     ctx.fillStyle = "#111";
-    ctx.font = "800 28px 'Chakra Petch', sans-serif";
-    ctx.fillText(`${g.have}/${g.need}`, gx + 70, gy + 40);
+    ctx.font = "800 26px 'Chakra Petch', sans-serif";
+    ctx.fillText(`${g.have}/${g.need}`, gx + 64, gy + 36);
   });
 }
 
+/** Draw sticker image without a square cell — floating on the page. */
+export function drawStickerSprite(
+  ctx: CanvasRenderingContext2D,
+  kind: TileKind,
+  x: number,
+  y: number,
+  s: number,
+  scale = 1,
+  lift = 0,
+): void {
+  const img = stickerImage(kind);
+  const cx = x + s / 2;
+  const cy = y + s / 2 - lift;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
+  ctx.translate(-cx, -cy);
+
+  if (lift > 0) {
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 16 + lift;
+    ctx.shadowOffsetY = 8 + lift * 0.3;
+  } else {
+    ctx.shadowColor = "rgba(0,0,0,0.2)";
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 3;
+  }
+
+  if (img) {
+    ctx.drawImage(img, x, y - lift, s, s);
+  } else {
+    ctx.fillStyle = "#f7f7f2";
+    roundRect(ctx, x, y - lift, s, s, s * 0.2);
+    ctx.fill();
+    ctx.fillStyle = "#111";
+    ctx.font = `800 ${Math.floor(s * 0.22)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(kind.slice(0, 3).toUpperCase(), cx, cy);
+  }
+  ctx.restore();
+}
+
 export function drawHint(ctx: CanvasRenderingContext2D, text: string): void {
-  drawPaperScrap(ctx, 48, 1120, 624, 90, "#1b1b1b", { rotate: -0.01 });
-  drawTape(ctx, 80, 1110, 64, 18, "#c8ff3d", 0.1);
+  ctx.fillStyle = "#1b1b1b";
+  roundRect(ctx, 48, 1080, 624, 100, 6);
+  ctx.fill();
+  ctx.fillStyle = "#c8ff3d";
+  ctx.fillRect(80, 1070, 64, 18);
   ctx.fillStyle = "#f3efe6";
   ctx.font = "600 22px 'Patrick Hand', sans-serif";
-  ctx.fillText(text, 72, 1174);
+  ctx.textAlign = "left";
+  ctx.fillText(text, 72, 1138);
 }
 
 export function drawEndOverlay(
@@ -408,32 +357,26 @@ export function drawEndOverlay(
 ): void {
   ctx.fillStyle = "rgba(0,0,0,0.62)";
   ctx.fillRect(0, 0, W, H);
-
-  drawPaperScrap(ctx, 90, 420, 540, 360, opts.won ? "#f3efe6" : "#2a1a1a", {
-    rotate: -0.015,
-  });
-  drawTape(ctx, 140, 408, 120, 24, opts.won ? "#c8ff3d" : "#ff2d6a", -0.12);
-
+  ctx.fillStyle = opts.won ? "#f3efe6" : "#2a1a1a";
+  roundRect(ctx, 90, 420, 540, 360, 8);
+  ctx.fill();
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 4;
+  ctx.stroke();
   ctx.fillStyle = opts.won ? "#111" : "#ff2d6a";
   ctx.font = "800 48px 'Permanent Marker', sans-serif";
   ctx.fillText(opts.won ? "CLEARED!" : "OUT OF MOVES", 130, 500);
-
   ctx.fillStyle = opts.won ? "#111" : "#f3efe6";
   ctx.font = "700 28px 'Chakra Petch', sans-serif";
   ctx.fillText(`SCORE  ${opts.score}`, 130, 560);
-
   if (opts.won) {
     ctx.font = "800 36px 'Permanent Marker', sans-serif";
     ctx.fillText("★".repeat(opts.stars) + "☆".repeat(3 - opts.stars), 130, 620);
   }
-
-  // Retry button look
-  drawPaperScrap(ctx, 200, 660, 320, 70, "#ff2d6a", { rotate: 0.02 });
+  ctx.fillStyle = "#ff2d6a";
+  roundRect(ctx, 200, 660, 320, 70, 8);
+  ctx.fill();
   ctx.fillStyle = "#fff";
   ctx.font = "800 32px 'Chakra Petch', sans-serif";
   ctx.fillText(opts.won ? "AGAIN" : "RETRY", 300, 708);
-}
-
-export function hitRetry(x: number, y: number): boolean {
-  return x >= 200 && x <= 520 && y >= 660 && y <= 730;
 }

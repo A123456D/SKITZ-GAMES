@@ -61,16 +61,16 @@ export function generateBoard(size: number, seed: number): Board {
 export function twistBoard(board: Board, twist: Twist): Board {
   const next = cloneBoard(board);
   const n = boardSize(next);
+  const amount = Math.max(1, twist.amount ?? 1);
+  const shift = (((twist.dir * amount) % n) + n) % n;
   if (twist.axis === "row") {
     const row = next[twist.index]!;
-    const shift = ((twist.dir % n) + n) % n;
     const copy = row.slice();
     for (let c = 0; c < n; c++) {
       row[c] = copy[(c - shift + n) % n]!;
     }
   } else {
     const copy = Array.from({ length: n }, (_, r) => next[r]![twist.index]!);
-    const shift = ((twist.dir % n) + n) % n;
     for (let r = 0; r < n; r++) {
       next[r]![twist.index] = copy[(r - shift + n) % n]!;
     }
