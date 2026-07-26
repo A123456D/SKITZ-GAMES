@@ -98,6 +98,34 @@ describe("session + cube", () => {
     expect(facingFace(0, 0)).toBe(0);
   });
 
+  it("does not clear matches on non-active faces", () => {
+    const session = startSession({
+      id: "side-match",
+      title: "Side",
+      size: 3,
+      moves: 5,
+      goals: [{ kind: "heart", need: 99 }],
+      starScores: [10, 20, 30],
+      board: [
+        ["star", "flame", "bolt"],
+        ["skull", "diamond", "star"],
+        ["flame", "bolt", "skull"],
+      ],
+    });
+    // Three hearts on the back face, on a strip this twist won't touch (row 0
+    // while we twist front row 2).
+    session.faces[1] = [
+      ["heart", "heart", "heart"],
+      ["star", "flame", "bolt"],
+      ["skull", "diamond", "star"],
+    ];
+    const result = applyTwist(session, { axis: "row", index: 2, dir: 1 });
+    expect(result.didTwist).toBe(true);
+    expect(result.scoreGain).toBe(0);
+    expect(result.session.goals[0]!.have).toBe(0);
+    expect(result.session.faces[1]![0]).toEqual(["heart", "heart", "heart"]);
+  });
+
   it("wins on goal clear", () => {
     const session = startSession({
       id: "g",

@@ -94,6 +94,7 @@ export function applyTwist(session: Session, twist: Twist): TwistResult {
   }
 
   const facesTwisted = twistCubeFaces(session.faces, session.face, twist);
+  // Matches only count on the active (camera-facing) face — never other sides.
   const resolved = resolveBoard(facesTwisted[session.face]!, session.rng);
   const goals = applyClearsToGoals(session.goals, resolved.totalCleared);
   const movesLeft = session.movesLeft - 1;
