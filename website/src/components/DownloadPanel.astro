@@ -21,7 +21,7 @@ interface Props {
 	};
 }
 
-const { slug, downloads, appStoreUrl, playStoreUrl, platforms } = Astro.props;
+const { slug, downloads, playStoreUrl, platforms } = Astro.props;
 
 const desktop = [
 	{ key: 'windows', label: 'Windows', href: downloads.windows },
@@ -30,16 +30,50 @@ const desktop = [
 ].filter((item) => item.href);
 
 const androidHref = downloads.android;
-const showIosStore = Boolean(appStoreUrl);
 const showPlayStore = Boolean(playStoreUrl);
+const playHref = `/games/${slug}/play/`;
+const canInstallAndroid = platforms.web;
 ---
 
 <section class="downloads" aria-labelledby="downloads-heading">
-	<h2 id="downloads-heading" class="section-title">Download free</h2>
+	<h2 id="downloads-heading" class="section-title">Get it on your phone</h2>
 	<p class="muted intro">
-		Desktop and Android builds install on your device. On iPhone, play in Safari — App Store links
-		show up here when a native build is live.
+		On Android, install Pulse Link like an app from Chrome — home screen icon, fullscreen, no
+		Play Store needed.
 	</p>
+
+	{
+		canInstallAndroid && (
+			<div class="block">
+				<h3>Android — install</h3>
+				<div class="btn-row">
+					<a class="btn" href={playHref}>
+						Open game
+					</a>
+					{androidHref && (
+						<a class="btn btn-ghost" href={androidHref} download>
+							Download APK
+						</a>
+					)}
+					{showPlayStore && (
+						<a class="btn btn-ghost" href={playStoreUrl} rel="noopener noreferrer" target="_blank">
+							Google Play
+						</a>
+					)}
+				</div>
+				<details class="help" open>
+					<summary>How to install</summary>
+					<ol>
+						<li>Open the game in <strong>Chrome</strong> on your Android phone.</li>
+						<li>
+							Tap the menu (⋮) → <strong>Install app</strong> or <strong>Add to Home screen</strong>.
+						</li>
+						<li>Confirm — Pulse Link appears on your home screen and launches fullscreen.</li>
+					</ol>
+				</details>
+			</div>
+		)
+	}
 
 	{
 		desktop.length > 0 && (
@@ -57,71 +91,8 @@ const showPlayStore = Boolean(playStoreUrl);
 	}
 
 	{
-		(androidHref || showPlayStore) && (
-			<div class="block">
-				<h3>Android</h3>
-				<div class="btn-row">
-					{androidHref && (
-						<a class="btn" href={androidHref} download>
-							Download APK
-						</a>
-					)}
-					{showPlayStore && (
-						<a class="btn btn-ghost" href={playStoreUrl} rel="noopener noreferrer" target="_blank">
-							Google Play
-						</a>
-					)}
-				</div>
-				<details class="help">
-					<summary>How to install the APK</summary>
-					<ol>
-						<li>Open the download on your phone (Chrome works well).</li>
-						<li>If prompted, allow installs from the browser.</li>
-						<li>Open the APK and tap Install.</li>
-					</ol>
-				</details>
-			</div>
-		)
-	}
-
-	<div class="block">
-		<h3>iPhone</h3>
-		{
-			showIosStore ? (
-				<div class="btn-row">
-					<a class="btn" href={appStoreUrl} rel="noopener noreferrer" target="_blank">
-						App Store
-					</a>
-					{platforms.web && (
-						<a class="btn btn-ghost" href={`/games/${slug}/play/`}>
-							Or play in Safari
-						</a>
-					)}
-				</div>
-			) : (
-				<>
-					<p class="muted">
-						iOS does not allow free sideloaded installs from websites. Play online in Safari
-						instead — no app install needed.
-					</p>
-					{
-						platforms.web && (
-							<a class="btn" href={`/games/${slug}/play/`}>
-								Play in browser
-							</a>
-						)
-					}
-				</>
-			)
-		}
-	</div>
-
-	{
-		desktop.length === 0 && !androidHref && !showPlayStore && !showIosStore && (
-			<p class="muted">
-				Download builds are not published yet. You can still{' '}
-				{platforms.web ? <a href={`/games/${slug}/play/`}>play online</a> : 'check back soon'}.
-			</p>
+		desktop.length === 0 && !canInstallAndroid && !androidHref && !showPlayStore && (
+			<p class="muted">Downloads are not published yet.</p>
 		)
 	}
 </section>

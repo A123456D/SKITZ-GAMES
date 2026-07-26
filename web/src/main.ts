@@ -1855,3 +1855,11 @@ function frame(now: number): void {
 void loadUiFonts().finally(() => {
   requestAnimationFrame(frame);
 });
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("./sw.js").catch(() => {
+      /* offline install is best-effort */
+    });
+  });
+}

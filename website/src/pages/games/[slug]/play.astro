@@ -1,6 +1,4 @@
 ---
-import BaseLayout from '../../../layouts/BaseLayout.astro';
-import PlayFrame from '../../../components/PlayFrame.astro';
 import { getCollection } from 'astro:content';
 
 export async function getStaticPaths() {
@@ -14,39 +12,6 @@ export async function getStaticPaths() {
 }
 
 const { game } = Astro.props;
-const src = `/games/${game.id}/${game.data.webPlayPath}`;
+// Top-level navigation (not iframe) so Android Chrome can install the PWA.
+return Astro.redirect(`/games/${game.id}/${game.data.webPlayPath}`);
 ---
-
-<BaseLayout
-	title={`Play ${game.data.title}`}
-	description={`Play ${game.data.title} free in your browser — works on desktop, Android, and iPhone.`}
-	bodyClass="play-page"
->
-	<PlayFrame title={game.data.title} src={src} />
-</BaseLayout>
-
-<style is:global>
-	.play-page {
-		background: #000;
-		margin: 0;
-		overflow: hidden;
-		height: 100%;
-		min-height: 100dvh;
-	}
-
-	html:has(.play-page) {
-		height: 100%;
-		overflow: hidden;
-	}
-
-	.play-page::before {
-		opacity: 0.04;
-	}
-
-	@media (max-width: 820px), (pointer: coarse) {
-		.play-page::before,
-		.play-page::after {
-			display: none;
-		}
-	}
-</style>
