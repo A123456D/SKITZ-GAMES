@@ -29,6 +29,7 @@ import {
   drawCube3D,
   drawCubeOrbitButtons,
   facingFace,
+  facingFaceDot,
   hitFrontUV,
   hitOrbitButton,
   screenDeltaToFaceUV,
@@ -354,7 +355,9 @@ canvas.addEventListener("pointerdown", (e) => {
   if (rotating) return;
 
   const layout = cubeLayout();
-  const hit = hitFrontUV(layout, p.x, p.y);
+  // Only twist when the face is mostly head-on; angled views are for looking around.
+  const headOn = facingFaceDot(rotX, rotY) >= 0.88;
+  const hit = headOn ? hitFrontUV(layout, p.x, p.y) : null;
   if (hit && hit.face === session.face) {
     const n = session.level.size;
     const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
@@ -373,7 +376,7 @@ canvas.addEventListener("pointerdown", (e) => {
     return;
   }
 
-  // Drag around / on the cube (not on the sticker face) = free aim
+  // Drag anywhere in the play band = free aim with your finger
   if (inCubeOrbitZone(layout, p.x, p.y)) {
     beginOrbitDrag(p.x, p.y);
   }

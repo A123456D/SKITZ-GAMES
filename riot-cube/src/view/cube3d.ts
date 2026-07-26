@@ -3,7 +3,6 @@ import type { FaceId } from "../core/session";
 import type { TileKind } from "../core/types";
 import { drawCrumpledSticker } from "./crumple";
 import { drawStickerSprite } from "./draw";
-import { stickerImage } from "./stickers";
 
 export type Vec3 = { x: number; y: number; z: number };
 export type Vec2 = { x: number; y: number };
@@ -139,6 +138,12 @@ export function facingFace(rotX: number, rotY: number): FaceId {
     }
   }
   return best;
+}
+
+/** How head-on the facing face is (1 = dead-on, ~0 = edge-on). */
+export function facingFaceDot(rotX: number, rotY: number): number {
+  const face = facingFace(rotX, rotY);
+  return applyRot(FACES[face]!.normal, rotX, rotY).z;
 }
 
 export function frontFaceScreenQuad(
@@ -335,90 +340,99 @@ function drawFace(
   const stride = 1 / n;
   const cell = (1 - gap * (n - 1)) / n;
   const pad = (stride - cell) / 2;
-  const activeLift =
-    isActive && opts.motion.hovering && opts.motion.axis ? 0.045 : 0;
+  const movingRow =
+    isActive && opts.motion.hovering && opts.motion.axis === "row"
+      ? opts.motion.index
+      : -1;
+  const movingCol =
+    isActive && opts.motion.hovering && opts.motion.axis === "col"
+      ? opts.motion.index
+      : -1;
+  const liftAmt = movingRow >= 0 || movingCol >= 0 ? 0.045 : 0;
 
-  const drawCell = (r: number, c: number, movingOnly: boolean) => {
-    const moving = Boolean(
-      isActive &&
-        opts.motion.axis &&
-        opts.motion.hovering &&
-        ((opts.motion.axis === "row" && opts.motion.index === r) ||
-          (opts.motion.axis === "col" && opts.motion.index === c)),
-    );
-    if (movingOnly !== moving) return;
-
-    const crumple = isActive ? crumpleMap.get(`${r},${c}`) : undefined;
-    const kind = crumple?.kind ?? board[r]![c];
-    if (!kind) return;
-
-    // Match the flat board: modulo-wrap into the face, plus ±1 copies so the
-    // far-side stickers slide in continuously instead of leaving an empty gap.
-    const copies = moving ? [-1, 0, 1] : [0];
-    for (const copy of copies) {
-      let u0: number;
-      let v0: number;
-      let u1: number;
-      let v1: number;
-
-      if (moving && opts.motion.axis === "row") {
-        const uLeft =
-          ((((c * stride + opts.motion.offset) % 1) + 1) % 1) + copy;
-        u0 = uLeft + pad;
-        u1 = u0 + cell;
-        v0 = r * stride + pad;
-        v1 = v0 + cell;
-      } else if (moving && opts.motion.axis === "col") {
-        const vTop =
-          ((((r * stride + opts.motion.offset) % 1) + 1) % 1) + copy;
-        u0 = c * stride + pad;
-        u1 = u0 + cell;
-        v0 = vTop + pad;
-        v1 = v0 + cell;
-      } else {
-        u0 = c * stride + pad;
-        u1 = u0 + cell;
-        v0 = r * stride + pad;
-        v1 = v0 + cell;
-      }
-
-      // Must overlap the paper face in UV
-      if (u1 <= 0 || u0 >= 1 || v1 <= 0 || v0 >= 1) continue;
-
-      const liftAmt = moving ? activeLift : 0;
-      const s0 = facePointLifted(geom, u0, v0, liftAmt, layout);
-      const s1 = facePointLifted(geom, u1, v0, liftAmt, layout);
-      const s2 = facePointLifted(geom, u1, v1, liftAmt, layout);
-      const s3 = facePointLifted(geom, u0, v1, liftAmt, layout);
-
-      if (crumple && copy === 0) {
-        const bx = Math.min(s0.x, s1.x, s2.x, s3.x);
-        const by = Math.min(s0.y, s1.y, s2.y, s3.y);
-        const bw = Math.max(s0.x, s1.x, s2.x, s3.x) - bx;
-        const bh = Math.max(s0.y, s1.y, s2.y, s3.y) - by;
-        drawCrumpledSticker(
-          ctx,
-          crumple.kind,
-          bx,
-          by,
-          Math.min(bw, bh),
-          crumple.t,
-          crumple.seed,
-        );
-        continue;
-      }
-      if (crumple) continue;
-
-      drawStickerOnQuad(ctx, kind, s0, s1, s2, s3, q, moving);
+  const paintSticker = (
+    kind: TileKind,
+    u0: number,
+    v0: number,
+    u1: number,
+    v1: number,
+    hovering: boolean,
+    crumple?: CrumpleDraw,
+  ) => {
+    if (u1 <= 0 || u0 >= 1 || v1 <= 0 || v0 >= 1) return;
+    const s0 = facePointLifted(geom, u0, v0, hovering ? liftAmt : 0, layout);
+    const s1 = facePointLifted(geom, u1, v0, hovering ? liftAmt : 0, layout);
+    const s2 = facePointLifted(geom, u1, v1, hovering ? liftAmt : 0, layout);
+    const s3 = facePointLifted(geom, u0, v1, hovering ? liftAmt : 0, layout);
+    if (crumple) {
+      const bx = Math.min(s0.x, s1.x, s2.x, s3.x);
+      const by = Math.min(s0.y, s1.y, s2.y, s3.y);
+      const bw = Math.max(s0.x, s1.x, s2.x, s3.x) - bx;
+      const bh = Math.max(s0.y, s1.y, s2.y, s3.y) - by;
+      drawCrumpledSticker(
+        ctx,
+        crumple.kind,
+        bx,
+        by,
+        Math.min(bw, bh),
+        crumple.t,
+        crumple.seed,
+      );
+      return;
     }
+    drawStickerOnQuad(ctx, kind, s0, s1, s2, s3, q, hovering);
   };
 
-  // Stationary first, then the sliding strip so lift reads on top.
+  // Stationary stickers (skip the sliding strip — drawn next)
   for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) drawCell(r, c, false);
+    for (let c = 0; c < n; c++) {
+      if (r === movingRow || c === movingCol) continue;
+      const crumple = crumpleMap.get(`${r},${c}`);
+      const kind = crumple?.kind ?? board[r]![c];
+      if (!kind) continue;
+      paintSticker(
+        kind,
+        c * stride + pad,
+        r * stride + pad,
+        c * stride + pad + cell,
+        r * stride + pad + cell,
+        false,
+        crumple,
+      );
+    }
   }
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) drawCell(r, c, true);
+
+  // Sliding strip: place each source cell on an infinite lane at
+  // (index + offset) so ±n copies bring the real far-side stickers in.
+  // This matches twistBoard: +offset → content shifts +U/+V, far edge enters.
+  if (movingRow >= 0) {
+    const r = movingRow;
+    const off = opts.motion.offset;
+    for (let d = -n; d < 2 * n; d++) {
+      const sourceC = ((d % n) + n) % n;
+      const crumple = d >= 0 && d < n ? crumpleMap.get(`${r},${sourceC}`) : undefined;
+      const kind = crumple?.kind ?? board[r]![sourceC];
+      if (!kind) continue;
+      const u0 = d * stride + pad + off;
+      const u1 = u0 + cell;
+      const v0 = r * stride + pad;
+      const v1 = v0 + cell;
+      paintSticker(kind, u0, v0, u1, v1, true, crumple && d === sourceC ? crumple : undefined);
+    }
+  } else if (movingCol >= 0) {
+    const c = movingCol;
+    const off = opts.motion.offset;
+    for (let d = -n; d < 2 * n; d++) {
+      const sourceR = ((d % n) + n) % n;
+      const crumple = d >= 0 && d < n ? crumpleMap.get(`${sourceR},${c}`) : undefined;
+      const kind = crumple?.kind ?? board[sourceR]![c];
+      if (!kind) continue;
+      const u0 = c * stride + pad;
+      const u1 = u0 + cell;
+      const v0 = d * stride + pad + off;
+      const v1 = v0 + cell;
+      paintSticker(kind, u0, v0, u1, v1, true, crumple && d === sourceR ? crumple : undefined);
+    }
   }
   ctx.restore();
 }
@@ -456,7 +470,6 @@ function drawStickerOnQuad(
   faceQuad: Vec2[],
   hovering: boolean,
 ): void {
-  const img = stickerImage(kind);
   const cx = (tl.x + tr.x + br.x + bl.x) / 4;
   const cy = (tl.y + tr.y + br.y + bl.y) / 4;
   const bw =
@@ -465,7 +478,7 @@ function drawStickerOnQuad(
   const bh =
     (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) /
     2;
-  const s = Math.min(bw, bh) * (hovering ? 1.02 : 1);
+  const s = Math.min(bw, bh) * (hovering ? 1.03 : 1);
 
   ctx.save();
   ctx.beginPath();
@@ -476,33 +489,9 @@ function drawStickerOnQuad(
   ctx.closePath();
   ctx.clip();
 
-  // Affine-map the sticker onto the cell quad so edge peeks stay glued to the face
-  // instead of floating as a screen-aligned square that misses the clip.
-  const x0 = tl.x;
-  const y0 = tl.y;
-  const x1 = tr.x - tl.x;
-  const y1 = tr.y - tl.y;
-  const x2 = bl.x - tl.x;
-  const y2 = bl.y - tl.y;
-
-  if (hovering) {
-    ctx.shadowColor = "rgba(0,0,0,0.4)";
-    ctx.shadowBlur = 12;
-    ctx.shadowOffsetY = 5;
-  } else {
-    ctx.shadowColor = "rgba(0,0,0,0.2)";
-    ctx.shadowBlur = 5;
-    ctx.shadowOffsetY = 2;
-  }
-
-  if (img && Math.abs(x1 * y2 - y1 * x2) > 1e-3) {
-    ctx.save();
-    ctx.transform(x1, y1, x2, y2, x0, y0);
-    ctx.drawImage(img, 0, 0, 1, 1);
-    ctx.restore();
-  } else {
-    drawStickerSprite(ctx, kind, cx - s / 2, cy - s / 2, s, 1, hovering ? 3 : 0);
-  }
+  // Sprite at the projected cell center — stable for wrap peeks (affine on
+  // off-face UV quads was distorting "some" edge stickers into the wrong look).
+  drawStickerSprite(ctx, kind, cx - s / 2, cy - s / 2, s, 1, hovering ? 3 : 0);
   ctx.restore();
 }
 
