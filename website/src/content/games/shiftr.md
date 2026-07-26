@@ -1,8 +1,8 @@
 ---
-title: Pulse Shifter
-tagline: Shift. Link. Pulse.
+title: Pulse Link
+tagline: Turn. Link. Pulse.
 summary: Turn precision wheels to aim lasers into receivers. A mobile-first laser puzzle — play free in the browser, including on iPhone.
-cover: /images/shiftr-logo.png
+cover: /images/pulseconnector-logo.png
 screenshots: []
 featured: true
 released: true
@@ -18,6 +18,6 @@ webPlayPath: web/index.html
 downloads: {}
 ---
 
-Pulse Shifter is a mobile-first laser puzzle from SKITZ: **tap a wheel**, turn **↺ / ↻**, and reconnect cyan beams until every receiver lights.
+Pulse Link is a mobile-first laser puzzle from SKITZ: **tap a wheel**, turn **↺ / ↻**, and reconnect cyan beams until every receiver lights.
 
 Play online right here in the browser. Native downloads will appear when packages are published.

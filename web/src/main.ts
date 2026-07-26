@@ -159,7 +159,7 @@ const TUTORIAL_FLOW: TutStep[] = [
     kind: "card",
     title: "WELCOME",
     body: [
-      "Pulseconnector is a dense circuit puzzle.",
+      "Pulse Link is a dense circuit puzzle.",
       "Every cell is a disc. Turn them until",
       "every mark meets a neighbor — one network.",
     ],
@@ -1286,7 +1286,7 @@ function drawInfoPages(
 }
 
 function goHome(): void {
-  // Always the in-game Pulseconnector menu (PLAY / LEVELS / …). Never leave the iframe.
+  // Always the in-game Pulse Link menu (PLAY / LEVELS / …). Never leave the iframe.
   persistRun();
   dismissInspect();
   inTutorial = false;
@@ -1299,7 +1299,8 @@ function drawMenu(): void {
   buttons = [];
   sliders = [];
   drawBackground(ctx, time);
-  drawLogo(ctx, W / 2, 108, 280);
+  // Mark + wordmark; keep clear of the PLAY stack starting at y 450.
+  drawLogo(ctx, W / 2, 72, 320);
   const play: ButtonRect = { x: 120, y: 450, w: 480, h: 68, id: "play" };
   const levelsBtn: ButtonRect = { x: 120, y: 535, w: 480, h: 60, id: "levels" };
   const tutBtn: ButtonRect = { x: 120, y: 610, w: 480, h: 60, id: "tutorial" };

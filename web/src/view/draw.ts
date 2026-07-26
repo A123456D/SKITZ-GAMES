@@ -151,6 +151,7 @@ export function drawBackground(ctx: CanvasRenderingContext2D, time = 0): void {
     if (!bctx) {
       paintBackground(ctx, theme);
       if (theme === "mono") paintCyberMotion(ctx, time);
+      if (theme === "retro") paintRetroMotion(ctx, time);
       return;
     }
     bctx.clearRect(0, 0, W, H);
@@ -159,6 +160,7 @@ export function drawBackground(ctx: CanvasRenderingContext2D, time = 0): void {
   }
   ctx.drawImage(bgCache, 0, 0);
   if (theme === "mono") paintCyberMotion(ctx, time);
+  if (theme === "retro") paintRetroMotion(ctx, time);
 }
 
 function paintBackground(ctx: CanvasRenderingContext2D, theme: ThemeId): void {
@@ -622,6 +624,147 @@ function paintCyberMotion(ctx: CanvasRenderingContext2D, time: number): void {
     ctx.fillRect(x, y, 14, 2);
     ctx.fillRect(x, y, 2, 8 * (top ? 1 : -1));
   }
+
+  ctx.restore();
+}
+
+/**
+ * Per-frame RETRO motion — synth sun breathe, grid crawl, star twinkle, CRT wash.
+ * Soft and edge-weighted so the board stays readable.
+ */
+function paintRetroMotion(ctx: CanvasRenderingContext2D, time: number): void {
+  const horizon = H * 0.52;
+  const vx = W * 0.5;
+  const pulse = 0.5 + 0.5 * Math.sin(time * 1.55);
+  const pulse2 = 0.5 + 0.5 * Math.sin(time * 2.1 + 0.8);
+
+  ctx.save();
+
+  // Twinkling stars in the upper sky (deterministic positions).
+  for (let i = 0; i < 28; i++) {
+    const sx = ((i * 97 + 41) % 1000) / 1000;
+    const sy = ((i * 53 + 17) % 1000) / 1000;
+    const x = 24 + sx * (W - 48);
+    const y = 28 + sy * (horizon - 70);
+    const twinkle = 0.5 + 0.5 * Math.sin(time * (1.2 + (i % 5) * 0.35) + i * 0.7);
+    const a = 0.15 + twinkle * 0.55;
+    const r = 0.8 + (i % 3) * 0.55 + twinkle * 0.4;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = i % 4 === 0 ? "#5CFFF8" : i % 4 === 1 ? "#FF9DE0" : "#FFFFFF";
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Breathing magenta/violet sun glow on the horizon.
+  const glowR = W * (0.3 + pulse * 0.1);
+  const glow = ctx.createRadialGradient(vx, horizon, 0, vx, horizon, glowR);
+  glow.addColorStop(0, `rgba(255, 110, 199, ${0.1 + pulse * 0.12})`);
+  glow.addColorStop(0.4, `rgba(199, 125, 255, ${0.05 + pulse * 0.05})`);
+  glow.addColorStop(1, "rgba(255, 110, 199, 0)");
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, horizon - glowR, W, glowR * 1.6);
+
+  // Neon horizon shimmer — magenta core, cyan lips.
+  ctx.globalAlpha = 0.25 + pulse2 * 0.35;
+  ctx.strokeStyle = "#FF6EC7";
+  ctx.lineWidth = 2.2;
+  ctx.shadowColor = "#FF6EC7";
+  ctx.shadowBlur = 12 + pulse * 10;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.12, horizon);
+  ctx.lineTo(W * 0.88, horizon);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.35 + pulse * 0.3;
+  ctx.strokeStyle = "#5CFFF8";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.28, horizon);
+  ctx.lineTo(W * 0.72, horizon);
+  ctx.stroke();
+
+  // Perspective floor lines crawling toward the camera.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, horizon, W, H - horizon);
+  ctx.clip();
+  const scroll = ((time * 0.42) % 1 + 1) % 1;
+  ctx.strokeStyle = "#FF6EC7";
+  ctx.lineWidth = 1.15;
+  for (let i = 0; i < 10; i++) {
+    const u = (i + scroll) / 10;
+    const y = horizon + (H - horizon) * Math.pow(u, 1.55);
+    ctx.globalAlpha = 0.08 + (1 - u) * 0.28;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+  // Subtle ray sway so the grid feels alive.
+  const rayShift = Math.sin(time * 0.35) * 0.035;
+  ctx.strokeStyle = "#C77DFF";
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12 + rayShift;
+    const x0 = t * W;
+    ctx.globalAlpha = 0.06 + (1 - Math.abs(t - 0.5) * 2) * 0.1;
+    ctx.beginPath();
+    ctx.moveTo(x0, H);
+    ctx.lineTo(vx + (x0 - vx) * 0.06, horizon);
+    ctx.stroke();
+  }
+  // Center vanishing ray — cyan pulse.
+  ctx.globalAlpha = 0.2 + pulse * 0.25;
+  ctx.strokeStyle = "#5CFFF8";
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.moveTo(vx, horizon);
+  ctx.lineTo(vx, H);
+  ctx.stroke();
+  ctx.restore();
+
+  // Soft CRT scan band drifting down.
+  const scanY = ((time * 70) % (H + 180)) - 90;
+  const scan = ctx.createLinearGradient(0, scanY - 50, 0, scanY + 50);
+  scan.addColorStop(0, "rgba(92, 255, 248, 0)");
+  scan.addColorStop(0.5, "rgba(255, 110, 199, 0.05)");
+  scan.addColorStop(1, "rgba(92, 255, 248, 0)");
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = scan;
+  ctx.fillRect(0, scanY - 50, W, 100);
+
+  // Fine scanlines.
+  ctx.globalAlpha = 0.035;
+  ctx.fillStyle = "#5CFFF8";
+  const lineOff = Math.floor(time * 22) % 3;
+  for (let y = lineOff; y < H; y += 3) {
+    ctx.fillRect(0, y, W, 1);
+  }
+
+  // Neon corner ticks that breathe.
+  const m = 28;
+  const arm = 12 + pulse * 10;
+  ctx.lineCap = "square";
+  ctx.lineWidth = 1.7;
+  ctx.globalAlpha = 0.45 + pulse * 0.4;
+  const corners: [number, number, number, number, string][] = [
+    [m, m, 1, 1, "#5CFFF8"],
+    [W - m, m, -1, 1, "#FF6EC7"],
+    [m, H - m, 1, -1, "#FF6EC7"],
+    [W - m, H - m, -1, -1, "#5CFFF8"],
+  ];
+  for (const [bx, by, sx, sy, col] of corners) {
+    ctx.strokeStyle = col;
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.moveTo(bx + sx * arm, by + sy * 5);
+    ctx.lineTo(bx + sx * 5, by + sy * 5);
+    ctx.lineTo(bx + sx * 5, by + sy * arm);
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
 
   ctx.restore();
 }
@@ -2528,12 +2671,19 @@ export type SliderRect = {
 
 let logoImg: HTMLImageElement | null = null;
 let logoReady = false;
+/** Cached tinted mark: theme|size → canvas. Avoids alloc every frame (mobile-hostile). */
+const logoTintCache = new Map<string, HTMLCanvasElement>();
 
 export function loadLogo(): void {
   if (logoImg) return;
   logoImg = new Image();
   logoImg.onload = () => {
     logoReady = true;
+    logoTintCache.clear();
+  };
+  logoImg.onerror = () => {
+    logoReady = false;
+    logoImg = null;
   };
   // File lives in public/; alpha punched so it tints cleanly per theme.
   logoImg.src = "./logo-pulseconnector.png";
@@ -2547,64 +2697,89 @@ function logoTintColor(): string {
   return P.INK;
 }
 
-/** Brand mark from logo asset, tinted to the active theme. */
-export function drawLogo(ctx: CanvasRenderingContext2D, cx: number, top: number, width = 420): void {
-  const tint = logoTintColor();
-  const h = width; // asset is square
-  const x = cx - width / 2;
-  const y = top;
-
-  if (logoReady && logoImg) {
-    ctx.save();
-    const scratch = document.createElement("canvas");
-    scratch.width = Math.max(1, Math.round(width));
-    scratch.height = Math.max(1, Math.round(h));
-    const sctx = scratch.getContext("2d")!;
-    // Logo PNG stores the mark as white+alpha. Tint through that alpha.
-    sctx.drawImage(logoImg, 0, 0, scratch.width, scratch.height);
-    sctx.globalCompositeOperation = "source-in";
-    sctx.fillStyle = tint;
-    sctx.fillRect(0, 0, scratch.width, scratch.height);
-    ctx.drawImage(scratch, x, y, width, h);
-    ctx.restore();
-    return;
+function tintedLogoMark(size: number, tint: string): HTMLCanvasElement | null {
+  if (!logoReady || !logoImg || !logoImg.naturalWidth) return null;
+  const key = `${getThemeId()}|${tint}|${size}`;
+  const hit = logoTintCache.get(key);
+  if (hit) return hit;
+  const scratch = document.createElement("canvas");
+  scratch.width = size;
+  scratch.height = size;
+  const sctx = scratch.getContext("2d");
+  if (!sctx) return null;
+  sctx.clearRect(0, 0, size, size);
+  sctx.drawImage(logoImg, 0, 0, size, size);
+  sctx.globalCompositeOperation = "source-in";
+  sctx.fillStyle = tint;
+  sctx.fillRect(0, 0, size, size);
+  logoTintCache.set(key, scratch);
+  // Cap cache growth if themes thrash.
+  if (logoTintCache.size > 12) {
+    const first = logoTintCache.keys().next().value;
+    if (first) logoTintCache.delete(first);
   }
+  return scratch;
+}
 
-  // Fallback vector while the PNG loads (matches the Pulseconnector mark).
-  const scale = width / 420;
-  const cy = top + 70 * scale;
-  const R = 54 * scale;
+function drawLogoVectorMark(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  tint: string,
+): void {
   ctx.save();
   ctx.strokeStyle = tint;
   ctx.fillStyle = tint;
-  ctx.lineWidth = Math.max(1.5, 2 * scale);
+  ctx.lineWidth = Math.max(1.5, radius * 0.045);
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(cx, cy, 7 * scale, 0, Math.PI * 2);
+  ctx.arc(cx, cy, radius * 0.13, 0, Math.PI * 2);
   ctx.fill();
   for (const a of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
     ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(a) * 14 * scale, cy + Math.sin(a) * 14 * scale);
-    ctx.lineTo(cx + Math.cos(a) * 42 * scale, cy + Math.sin(a) * 42 * scale);
+    ctx.moveTo(cx + Math.cos(a) * radius * 0.26, cy + Math.sin(a) * radius * 0.26);
+    ctx.lineTo(cx + Math.cos(a) * radius * 0.78, cy + Math.sin(a) * radius * 0.78);
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(cx + Math.cos(a) * 48 * scale, cy + Math.sin(a) * 48 * scale, 5.5 * scale, 0, Math.PI * 2);
+    ctx.arc(cx + Math.cos(a) * radius * 0.9, cy + Math.sin(a) * radius * 0.9, radius * 0.1, 0, Math.PI * 2);
     ctx.stroke();
   }
   for (const a of [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4]) {
-    const s = 5 * scale;
-    const px = cx + Math.cos(a) * 34 * scale;
-    const py = cy + Math.sin(a) * 34 * scale;
+    const s = radius * 0.1;
+    const px = cx + Math.cos(a) * radius * 0.63;
+    const py = cy + Math.sin(a) * radius * 0.63;
     ctx.fillRect(px - s / 2, py - s / 2, s, s);
   }
+  ctx.restore();
+}
+
+/** Brand mark + wordmark, tinted to the active theme. Always draws the title. */
+export function drawLogo(ctx: CanvasRenderingContext2D, cx: number, top: number, width = 420): void {
+  const tint = logoTintColor();
+  const scale = width / 420;
+  const markSize = Math.round(Math.max(96, width * 0.55));
+  const markCy = top + markSize * 0.52;
+  const wordY = top + markSize + 28 * scale;
+
+  const tinted = tintedLogoMark(markSize, tint);
+  if (tinted) {
+    ctx.drawImage(tinted, cx - markSize / 2, top, markSize, markSize);
+  } else {
+    drawLogoVectorMark(ctx, cx, markCy, markSize * 0.42, tint);
+  }
+
+  ctx.save();
+  ctx.fillStyle = tint;
+  ctx.strokeStyle = tint;
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
   ctx.font = font(700, Math.round(36 * scale));
-  ctx.fillText("PULSECONNECTOR", cx, top + 180 * scale);
-  const divY = top + 218 * scale;
+  ctx.fillText("PULSE LINK", cx, wordY);
+  const divY = wordY + 28 * scale;
   ctx.lineWidth = Math.max(1, 1.5 * scale);
   ctx.beginPath();
   ctx.moveTo(cx - 70 * scale, divY);
@@ -2616,7 +2791,7 @@ export function drawLogo(ctx: CanvasRenderingContext2D, cx: number, top: number,
   ctx.arc(cx, divY, 3.5 * scale, 0, Math.PI * 2);
   ctx.fill();
   ctx.font = font(600, Math.round(13 * scale));
-  ctx.fillText("TURN. LINK. PULSE.", cx, top + 242 * scale);
+  ctx.fillText("TURN. LINK. PULSE.", cx, divY + 24 * scale);
   ctx.restore();
 }
 
@@ -2643,7 +2818,7 @@ export function drawTitle(ctx: CanvasRenderingContext2D, subtitle?: string): voi
     ctx.restore();
     ctx.font = fontHand(34);
     ctx.textAlign = "center";
-    ctx.fillText("PULSECONNECTOR", W / 2, 62);
+    ctx.fillText("PULSE LINK", W / 2, 62);
     ctx.fillStyle = P.INK_FAINT;
     ctx.font = fontHand(15);
     ctx.fillText(subtitle ?? "TURN. LINK. PULSE.", W / 2, 88);
@@ -2656,7 +2831,7 @@ export function drawTitle(ctx: CanvasRenderingContext2D, subtitle?: string): voi
     ctx.shadowBlur = 14;
     ctx.fillStyle = "#5CFFF8";
     ctx.font = fontRetro(26, 800);
-    ctx.fillText("PULSECONNECTOR", W / 2, 58);
+    ctx.fillText("PULSE LINK", W / 2, 58);
     ctx.shadowBlur = 6;
     ctx.fillStyle = "#FF9DE0";
     ctx.font = fontRetro(12, 600);
@@ -2669,11 +2844,11 @@ export function drawTitle(ctx: CanvasRenderingContext2D, subtitle?: string): voi
     ctx.textAlign = "center";
     ctx.fillStyle = "#C8FF00";
     ctx.font = fontPunk(30);
-    ctx.fillText("PULSECONNECTOR", W / 2, 60);
+    ctx.fillText("PULSE LINK", W / 2, 60);
     // Magenta offset stamp — xerox misregister.
     ctx.globalAlpha = 0.55;
     ctx.fillStyle = "#FF2D95";
-    ctx.fillText("PULSECONNECTOR", W / 2 + 2, 62);
+    ctx.fillText("PULSE LINK", W / 2 + 2, 62);
     ctx.globalAlpha = 1;
     ctx.fillStyle = "#F2F0E8";
     ctx.font = fontPunk(13);
@@ -2688,10 +2863,10 @@ export function drawTitle(ctx: CanvasRenderingContext2D, subtitle?: string): voi
     ctx.globalAlpha = 0.45;
     ctx.fillStyle = "#FF2A2A";
     ctx.font = fontCyber(27, 700);
-    ctx.fillText("PULSECONNECTOR", W / 2 + 2, 59);
+    ctx.fillText("PULSE LINK", W / 2 + 2, 59);
     ctx.globalAlpha = 1;
     ctx.fillStyle = "#121214";
-    ctx.fillText("PULSECONNECTOR", W / 2, 58);
+    ctx.fillText("PULSE LINK", W / 2, 58);
     ctx.fillStyle = "#FF2A2A";
     ctx.font = fontCyber(12, 600);
     ctx.fillText(subtitle ?? "TURN. LINK. PULSE.", W / 2, 84);
@@ -2700,7 +2875,7 @@ export function drawTitle(ctx: CanvasRenderingContext2D, subtitle?: string): voi
   }
   ctx.font = font(700, 28);
   ctx.textAlign = "center";
-  ctx.fillText("PULSECONNECTOR", W / 2, 58);
+  ctx.fillText("PULSE LINK", W / 2, 58);
   ctx.fillStyle = P.INK_FAINT;
   ctx.font = font(600, 14);
   ctx.fillText(subtitle ?? "TURN. LINK. PULSE.", W / 2, 84);
