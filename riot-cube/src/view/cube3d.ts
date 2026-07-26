@@ -258,6 +258,8 @@ export function drawCube3D(
     motion: CubeMotion;
     crumples: CrumpleDraw[];
     paper?: boolean;
+    /** Unshifted faces for lane peeks (defaults to `faces`). */
+    sourceFaces?: Board[];
   },
 ): void {
   type FaceDraw = { i: FaceId; depth: number; nZ: number };
@@ -293,11 +295,13 @@ function drawFace(
     motion: CubeMotion;
     crumples: CrumpleDraw[];
     paper?: boolean;
+    sourceFaces?: Board[];
   },
   isActive: boolean,
 ): void {
   const geom = FACES[faceIndex]!;
   const board = faces[faceIndex]!;
+  const source = (opts.sourceFaces ?? faces) as CubeFaces;
   const n = board.length;
   const crumpleMap = new Map(
     opts.crumples.filter(() => isActive).map((c) => [`${c.r},${c.c}`, c] as const),
@@ -408,7 +412,7 @@ function drawFace(
   if (movingRow >= 0) {
     const r = movingRow;
     const items = lanePreview(
-      faces as CubeFaces,
+      source,
       faceIndex,
       "row",
       r,
@@ -426,7 +430,7 @@ function drawFace(
   } else if (movingCol >= 0) {
     const c = movingCol;
     const items = lanePreview(
-      faces as CubeFaces,
+      source,
       faceIndex,
       "col",
       c,

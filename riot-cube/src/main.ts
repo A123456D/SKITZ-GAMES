@@ -14,7 +14,7 @@ import {
   matchedCells,
   type Board,
 } from "./core/board";
-import { twistCubeFaces } from "./core/cubeTwist";
+import { twistCubeFaces, previewCubeFaces } from "./core/cubeTwist";
 import type { TileKind, Twist } from "./core/types";
 import {
   W,
@@ -60,8 +60,8 @@ let springUv = 0;
 let springAxis: "row" | "col" | null = null;
 let springIndex = -1;
 
-const DEFAULT_ROT_X = 0.035;
-const DEFAULT_ROT_Y = -0.045;
+const DEFAULT_ROT_X = 0.04;
+const DEFAULT_ROT_Y = -0.05;
 let rotX = DEFAULT_ROT_X;
 let rotY = DEFAULT_ROT_Y;
 let targetRotX = DEFAULT_ROT_X;
@@ -75,7 +75,8 @@ let orbitDrag: {
   rotX0: number;
   rotY0: number;
 } | null = null;
-const ORBIT_DRAG_SENS = 0.0065; // radians per canvas pixel
+const ORBIT_DRAG_SENS = 0.0042; // radians per canvas pixel
+const SNAP_Q = Math.PI / 2;
 
 let visualBoard: Board | null = null;
 type Crumple = { r: number; c: number; kind: TileKind; seed: number };
@@ -158,15 +159,31 @@ function paint(): void {
   });
 
   const layout = cubeLayout();
-  const faces = session.faces.map((f, i) =>
+  const motion = activeMotion();
+  const sourceFaces = session.faces;
+  let displayFaces = sourceFaces;
+  if (motion.axis && motion.hovering && !visualBoard) {
+    const previewed = previewCubeFaces(
+      sourceFaces,
+      session.face,
+      motion.axis,
+      motion.index,
+      motion.offset,
+    );
+    displayFaces = sourceFaces.map((f, i) =>
+      i === session.face ? f : previewed[i]!,
+    ) as Session["faces"];
+  }
+  displayFaces = displayFaces.map((f, i) =>
     i === session.face && visualBoard ? visualBoard : f,
   ) as Session["faces"];
 
-  drawCube3D(ctx, layout, faces, {
+  drawCube3D(ctx, layout, displayFaces, {
     activeFace: session.face,
-    motion: activeMotion(),
+    motion,
     crumples: crumples.map((c) => ({ ...c, t: crumpleT })),
     paper: true,
+    sourceFaces,
   });
 
   orbitBtns = drawCubeOrbitButtons(ctx, layout.cx, layout.cy, layout.scale, W, H);
@@ -292,17 +309,37 @@ function inCubeOrbitZone(_layout: CubeLayout, x: number, y: number): boolean {
   return y > 300 && y < 1000 && x > 24 && x < W - 24;
 }
 
+function snapAngles(rx: number, ry: number): { x: number; y: number } {
+  // Snap to axis-aligned face views. Keep a tiny tip only on the home pose
+  // so the front view stays slightly 3D without leaving other faces crooked.
+  let x = Math.round(rx / SNAP_Q) * SNAP_Q;
+  let y = Math.round(ry / SNAP_Q) * SNAP_Q;
+  if (Math.abs(x) < 0.001 && Math.abs(y) < 0.001) {
+    x = DEFAULT_ROT_X;
+    y = DEFAULT_ROT_Y;
+  }
+  return { x, y };
+}
+
 function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
-  if (busy || drag || orbitDrag || session.status !== "playing") return;
-  const q = Math.PI / 2;
-  let tx = Math.round((rotX - DEFAULT_ROT_X) / q) * q + DEFAULT_ROT_X;
-  let ty = Math.round((rotY - DEFAULT_ROT_Y) / q) * q + DEFAULT_ROT_Y;
-  if (dir === "left") ty += q;
-  if (dir === "right") ty -= q;
-  if (dir === "up") tx -= q;
-  if (dir === "down") tx += q;
-  targetRotX = tx;
-  targetRotY = ty;
+  if (busy || drag || session.status !== "playing") return;
+  orbitDrag = null;
+  const snapped = snapAngles(rotX, rotY);
+  let tx = snapped.x;
+  let ty = snapped.y;
+  // Step from the pure grid, not from the tiny home tip
+  if (Math.abs(tx - DEFAULT_ROT_X) < 0.02 && Math.abs(ty - DEFAULT_ROT_Y) < 0.02) {
+    tx = 0;
+    ty = 0;
+  }
+  if (dir === "left") ty += SNAP_Q;
+  if (dir === "right") ty -= SNAP_Q;
+  if (dir === "up") tx -= SNAP_Q;
+  if (dir === "down") tx += SNAP_Q;
+  // Re-apply home tip if we landed on front
+  const landed = snapAngles(tx, ty);
+  targetRotX = landed.x;
+  targetRotY = landed.y;
   rotating = true;
 }
 
@@ -314,10 +351,9 @@ function beginOrbitDrag(x: number, y: number): void {
 function endOrbitDrag(): void {
   if (!orbitDrag) return;
   orbitDrag = null;
-  // Soft-settle onto the nearest playable face
-  const q = Math.PI / 2;
-  targetRotX = Math.round((rotX - DEFAULT_ROT_X) / q) * q + DEFAULT_ROT_X;
-  targetRotY = Math.round((rotY - DEFAULT_ROT_Y) / q) * q + DEFAULT_ROT_Y;
+  const snapped = snapAngles(rotX, rotY);
+  targetRotX = snapped.x;
+  targetRotY = snapped.y;
   rotating = true;
 }
 
@@ -353,12 +389,10 @@ canvas.addEventListener("pointerdown", (e) => {
     }
   }
 
-  if (rotating) return;
-
   const layout = cubeLayout();
-  // Only twist when the face is mostly head-on; angled views are for looking around.
-  const headOn = facingFaceDot(rotX, rotY) >= 0.88;
-  const hit = headOn ? hitFrontUV(layout, p.x, p.y) : null;
+  // Twist when reasonably facing a face; otherwise orbit
+  const headOn = facingFaceDot(rotX, rotY) >= 0.75;
+  const hit = headOn && !rotating ? hitFrontUV(layout, p.x, p.y) : null;
   if (hit && hit.face === session.face) {
     const n = session.level.size;
     const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
@@ -377,7 +411,6 @@ canvas.addEventListener("pointerdown", (e) => {
     return;
   }
 
-  // Drag anywhere in the play band = free aim with your finger
   if (inCubeOrbitZone(layout, p.x, p.y)) {
     beginOrbitDrag(p.x, p.y);
   }
@@ -392,8 +425,8 @@ canvas.addEventListener("pointermove", (e) => {
     const dy = p.y - orbitDrag.y0;
     rotY = orbitDrag.rotY0 + dx * ORBIT_DRAG_SENS;
     rotX = orbitDrag.rotX0 + dy * ORBIT_DRAG_SENS;
-    // Keep pitch from flipping over the poles too wildly
-    rotX = Math.max(-Math.PI * 0.85, Math.min(Math.PI * 0.85, rotX));
+    // Keep pitch in a playable range (no upside-down diamond views)
+    rotX = Math.max(-SNAP_Q * 0.95, Math.min(SNAP_Q * 0.95, rotX));
     targetRotX = rotX;
     targetRotY = rotY;
     syncActiveFace();

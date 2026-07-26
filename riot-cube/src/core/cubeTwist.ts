@@ -175,8 +175,23 @@ export function lanePreview(
   return out;
 }
 
-export function cloneCubeFaces(faces: CubeFaces): CubeFaces {
-  return cloneFaces(faces);
+/** Apply integer-cell belt shift for live neighbor-face preview while dragging. */
+export function previewCubeFaces(
+  faces: CubeFaces,
+  active: FaceId,
+  axis: "row" | "col",
+  index: number,
+  offsetUv: number,
+): CubeFaces {
+  const n = faces[0]!.length;
+  const belt = sliceBelt(active, axis, index, n);
+  const kinds = belt.map((ref) => read(faces, ref));
+  const len = kinds.length;
+  // Neighbors jump per cell; active face uses smooth lanePreview separately
+  const shift = Math.round(offsetUv * n);
+  if (shift === 0) return faces;
+  const shifted = shiftKinds(kinds, shift);
+  const next = cloneFaces(faces);
+  for (let i = 0; i < len; i++) write(next, belt[i]!, shifted[i]!);
+  return next;
 }
-
-export type { Board };
