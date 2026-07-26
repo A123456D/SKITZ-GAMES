@@ -39,7 +39,7 @@ export function boardLayout(state: GridState): Layout {
   // Dense boards: tight gaps so the grid reads as one tiled circuit.
   const padX = 18;
   const boardTop = 236;
-  const boardBottom = 1070;
+  const boardBottom = 1050;
   const availW = W - padX * 2;
   const availH = boardBottom - boardTop;
   const rough = Math.min(availW / state.width, availH / state.height);

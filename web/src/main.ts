@@ -525,8 +525,8 @@ function pointTargetPos(beat: PointBeat): { x: number; y: number } | null {
     const t = session.state.tables.find((tb) => tb.id === at.id);
     return t ? cellCenter(layout, t.hub) : null;
   }
-  if (at.id === "pulse") return { x: 282, y: 1118 };
-  if (at.id === "turn") return { x: 220, y: 1205 };
+  if (at.id === "pulse") return { x: 282, y: 1094 };
+  if (at.id === "turn") return { x: 175, y: 1228 };
   return null;
 }
 
@@ -540,17 +540,17 @@ function drawPointTourOverlay(): void {
 
   // When the tour points at turn/pulse, show those controls dimmed for context.
   if (beat.at.kind === "ui") {
-    const undoBtn: ButtonRect = { x: 28, y: 1090, w: 130, h: 56, id: "noop" };
-    const pulseBtn: ButtonRect = { x: 172, y: 1090, w: 220, h: 56, id: "noop" };
-    const resetBtn: ButtonRect = { x: 406, y: 1090, w: 130, h: 56, id: "noop" };
-    const menuBtn: ButtonRect = { x: 550, y: 1090, w: 142, h: 56, id: "noop" };
+    const undoBtn: ButtonRect = { x: 28, y: 1068, w: 130, h: 52, id: "noop" };
+    const pulseBtn: ButtonRect = { x: 172, y: 1068, w: 220, h: 52, id: "noop" };
+    const resetBtn: ButtonRect = { x: 406, y: 1068, w: 130, h: 52, id: "noop" };
+    const menuBtn: ButtonRect = { x: 550, y: 1068, w: 142, h: 52, id: "noop" };
     drawGlassButton(ctx, undoBtn, "UNDO", false, time, false);
     drawGlassButton(ctx, pulseBtn, "PULSE", beat.at.id === "pulse", time, false);
     drawGlassButton(ctx, resetBtn, "RESET", false, time, false);
     drawGlassButton(ctx, menuBtn, "MENU", false, time, false);
-    const rotR = 38;
-    drawRoundButton(ctx, 220, 1205, rotR, "↺", beat.at.id === "turn", time);
-    drawRoundButton(ctx, 500, 1205, rotR, "↻", beat.at.id === "turn", time);
+    const rotR = 56;
+    drawRoundButton(ctx, 175, 1228, rotR, "↺", beat.at.id === "turn", time);
+    drawRoundButton(ctx, 545, 1228, rotR, "↻", beat.at.id === "turn", time);
   }
 
   const targetLow =
@@ -1732,11 +1732,12 @@ function drawPlay(): void {
     }
   }
 
-  // Order: UNDO · PULSE · RESET · MENU
-  const undoBtn: ButtonRect = { x: 28, y: 1090, w: 130, h: 56, id: "undo" };
-  const pulseBtn: ButtonRect = { x: 172, y: 1090, w: 220, h: 56, id: "pulse" };
-  const resetBtn: ButtonRect = { x: 406, y: 1090, w: 130, h: 56, id: "reset" };
-  const menuBtn: ButtonRect = { x: 550, y: 1090, w: 142, h: 56, id: "menu" };
+  // Order: UNDO · PULSE · RESET · MENU (kept smaller / higher so turn
+  // buttons can be fat-finger friendly without overlapping them).
+  const undoBtn: ButtonRect = { x: 28, y: 1068, w: 130, h: 52, id: "undo" };
+  const pulseBtn: ButtonRect = { x: 172, y: 1068, w: 220, h: 52, id: "pulse" };
+  const resetBtn: ButtonRect = { x: 406, y: 1068, w: 130, h: 52, id: "reset" };
+  const menuBtn: ButtonRect = { x: 550, y: 1068, w: 142, h: 52, id: "menu" };
   drawGlassButton(ctx, undoBtn, "UNDO", false, time);
   drawGlassButton(ctx, pulseBtn, `PULSE ${pLeft}`, canPulse(session) && !victory && !pendingWin, time);
   drawGlassButton(ctx, resetBtn, "RESET", false, time);
@@ -1746,12 +1747,15 @@ function drawPlay(): void {
   const enabled = session.selectedTable >= 0 && !victory && !pendingWin && !drag;
   const sel = session.state.tables.find((t) => t.id === session!.selectedTable);
   const canTurn = enabled && sel && !sel.locked;
-  const rotR = 38;
-  drawRoundButton(ctx, 220, 1205, rotR, "↺", !!canTurn, time);
-  drawRoundButton(ctx, 500, 1205, rotR, "↻", !!canTurn, time);
+  const rotR = 56;
+  const turnY = 1228;
+  const turnL = 175;
+  const turnR = 545;
+  drawRoundButton(ctx, turnL, turnY, rotR, "↺", !!canTurn, time);
+  drawRoundButton(ctx, turnR, turnY, rotR, "↻", !!canTurn, time);
   buttons.push(
-    { x: 220 - rotR, y: 1205 - rotR, w: rotR * 2, h: rotR * 2, id: "ccw" },
-    { x: 500 - rotR, y: 1205 - rotR, w: rotR * 2, h: rotR * 2, id: "cw" },
+    { x: turnL - rotR, y: turnY - rotR, w: rotR * 2, h: rotR * 2, id: "ccw" },
+    { x: turnR - rotR, y: turnY - rotR, w: rotR * 2, h: rotR * 2, id: "cw" },
   );
 
   if (victory || victoryAlpha > 0) {
