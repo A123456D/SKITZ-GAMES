@@ -6,14 +6,17 @@ import { Dir, type Vec2 } from "./cellKind";
 import { buildState, cell, move, type LevelData, type MoveStep } from "./levelData";
 import { Module as M, makeTable, type TableDef } from "./tableDef";
 import { moduleForPorts } from "./portWiring";
-import { applyPlayerRotation, setTableRotation } from "./rotateOps";
+import { setTableRotation } from "./rotateOps";
 import { applySolutionStep, loadLevel, pulse } from "./puzzleSession";
-import { analyzeNetwork, solve } from "./networkSolver";
-import { cloneGrid } from "./gridState";
+import { analyzeNetwork, buildFastNet, fastWon, solve } from "./networkSolver";
 
 export const DIFFICULTY_COUNT = 20;
 
 type Rng = () => number;
+
+function now(): number {
+  return typeof performance !== "undefined" ? performance.now() : Date.now();
+}
 
 function mulberry32(seed: number): Rng {
   let a = seed >>> 0;
@@ -151,10 +154,11 @@ function emptyGrid(w: number, h: number) {
   return Array.from({ length: w * h }, () => cell.empty());
 }
 
-function actorIds(tables: TableDef[]): number[] {
-  return tables.filter((t) => !t.locked).map((t) => t.id);
-}
-
+/**
+ * Rejects boards a player could stumble into within a couple of turns.
+ * Runs on flat rotation arrays (no grid cloning) because it is the hot loop of
+ * generation — a slow version here is what used to stall the game for seconds.
+ */
 function hasCheapSolve(
   level: LevelData,
   exactDepth: number,
@@ -162,33 +166,33 @@ function hasCheapSolve(
   probes: number,
 ): boolean {
   const start = buildState(level);
-  if (solve(start).won) return true;
-  const acts = actorIds(start.tables);
+  const net = buildFastNet(start);
+  if (!net) return solve(start).won;
+  const base = net.rotations;
+  if (fastWon(net, base)) return true;
+  const acts = net.movable;
   if (!acts.length) return false;
 
-  const keyOf = (g: ReturnType<typeof buildState>) =>
-    g.tables.map((t) => t.rotationQ).join("");
-
-  const seen = new Set<string>([keyOf(start)]);
-  let frontier = [start];
+  const keyOf = (rots: Int8Array): string => String.fromCharCode(...rots);
+  const seen = new Set<string>([keyOf(base)]);
+  let frontier: Int8Array[] = [base];
   let nodes = 0;
   const cap = 8000;
-  for (let depth = 0; depth < exactDepth; depth++) {
-    const next: typeof frontier = [];
+  outer: for (let depth = 0; depth < exactDepth; depth++) {
+    const next: Int8Array[] = [];
     for (const cur of frontier) {
-      for (const id of acts) {
-        const table = cur.tables.find((t) => t.id === id)!;
+      for (const slot of acts) {
         for (let q = 0; q < 4; q++) {
-          if (q === table.rotationQ) continue;
-          if (nodes >= cap) break;
-          const g = cloneGrid(cur);
-          if (!applyPlayerRotation(g, id, q)) continue;
-          const k = keyOf(g);
+          if (q === cur[slot]) continue;
+          if (nodes >= cap) break outer;
+          const cand = Int8Array.from(cur);
+          cand[slot] = q;
+          const k = keyOf(cand);
           if (seen.has(k)) continue;
           seen.add(k);
           nodes++;
-          if (solve(g).won) return true;
-          next.push(g);
+          if (fastWon(net, cand)) return true;
+          next.push(cand);
         }
       }
     }
@@ -201,16 +205,16 @@ function hasCheapSolve(
     rngState = (Math.imul(rngState ^ (rngState >>> 15), 1 | rngState) + 0x6d2b79f5) | 0;
     return ((rngState >>> 0) % 100000) / 100000;
   };
+  const walk = new Int8Array(net.discCount);
   for (let p = 0; p < probes; p++) {
-    const g = cloneGrid(start);
+    walk.set(base);
     const len = 2 + Math.floor(rand() * (probeLen - 1));
     for (let s = 0; s < len; s++) {
-      const id = acts[Math.floor(rand() * acts.length)]!;
-      const table = g.tables.find((t) => t.id === id)!;
+      const slot = acts[Math.floor(rand() * acts.length)]!;
       let q = Math.floor(rand() * 4);
-      if (q === table.rotationQ) q = (q + 1) % 4;
-      applyPlayerRotation(g, id, q);
-      if (solve(g).won) return true;
+      if (q === walk[slot]) q = (q + 1) % 4;
+      walk[slot] = q;
+      if (fastWon(net, walk)) return true;
     }
   }
   return false;
@@ -223,6 +227,7 @@ function scrambleAndVerify(
   rng: Rng,
   opts: ReturnType<typeof profile>,
   difficulty: number,
+  skipAntiCheap = false,
 ): LevelData | null {
   const cells = emptyGrid(w, h);
   const solved: LevelData = {
@@ -294,10 +299,12 @@ function scrambleAndVerify(
 
   if (solve(buildState(level)).won) return null;
 
-  const exactDepth = difficulty >= 8 ? 2 : 3;
-  const probeLen = difficulty >= 10 ? 5 : 4;
-  const probes = difficulty >= 10 ? 1200 : 800;
-  if (hasCheapSolve(level, exactDepth, probeLen, probes)) return null;
+  if (!skipAntiCheap) {
+    const exactDepth = difficulty >= 8 ? 2 : 3;
+    const probeLen = difficulty >= 10 ? 5 : 4;
+    const probes = difficulty >= 10 ? 1200 : 800;
+    if (hasCheapSolve(level, exactDepth, probeLen, probes)) return null;
+  }
 
   const session = loadLevel(level);
   for (const step of solution) {
@@ -308,11 +315,19 @@ function scrambleAndVerify(
   return level;
 }
 
+/**
+ * Generation must never block a frame long enough to feel like a freeze, so it
+ * runs against a wall-clock budget: once spent, quality filters relax rather
+ * than letting a slow device keep searching.
+ */
+const BUDGET_MS = 120;
+
 export function generateLevel(difficulty: number, seed: number): LevelData {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, difficulty));
   const rng = mulberry32((seed >>> 0) ^ Math.imul(d, 0x9e3779b9));
   const opts = profile(d);
   const attempts = d >= 15 ? 400 : d >= 8 ? 250 : 150;
+  const started = now();
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     const w = opts.size;
@@ -322,7 +337,8 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
     const edges = buildTopology(w, h, extras, rng);
     const ports = portsFromEdges(w, h, edges);
     const tables = tablesFromPorts(w, h, ports);
-    const level = scrambleAndVerify(tables, w, h, rng, opts, d);
+    const overBudget = now() - started > BUDGET_MS;
+    const level = scrambleAndVerify(tables, w, h, rng, opts, d, overBudget);
     if (level) return level;
   }
 
@@ -332,7 +348,7 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
   const ports = portsFromEdges(w, w, edges);
   const tables = tablesFromPorts(w, w, ports);
   const soft = { ...opts, size: w, minMoves: 3, extraEdges: 0 };
-  const level = scrambleAndVerify(tables, w, w, rng, soft, d);
+  const level = scrambleAndVerify(tables, w, w, rng, soft, d, true);
   if (level) return level;
 
   throw new Error(`levelGen failed for difficulty ${d} seed ${seed}`);

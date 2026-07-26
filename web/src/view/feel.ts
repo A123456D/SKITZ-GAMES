@@ -30,6 +30,11 @@ let rings: Ring[] = [];
 let flecks: Fleck[] = [];
 let winFlashBorn = -1;
 
+// A dense 8x8 win touches 64 hubs; unbounded ripples and confetti there cost
+// more than the whole board draw, which showed up as a stutter on the win card.
+const MAX_RINGS = 40;
+const MAX_FLECKS = 140;
+
 export function clearFeel(): void {
   rings = [];
   flecks = [];
@@ -53,6 +58,7 @@ export function triggerRouteAck(_state: unknown, layout: Layout, latent: TurnRes
         const k = `${p.x},${p.y}`;
         if (seen.has(k)) continue;
         seen.add(k);
+        if (rings.length >= MAX_RINGS) continue;
         const c = cellCenter(layout, p);
         pushRing(c.x, c.y, now + delay, P.INK, layout.cell * 0.55, 0.4, 1.8);
         delay += 0.012;
@@ -77,13 +83,18 @@ export function triggerVictoryFeel(layout: Layout, receivers: Vec2[], now: numbe
   const palette = calm
     ? [P.INK, P.INK_SOFT, P.SHADE, P.PAPER_DARK]
     : [P.CH0, P.CH1, P.CH2, P.TABLE, P.SELECT, P.BLOCK];
-  const points = receivers.length ? receivers : [{ x: 0, y: 0 }];
+  const all = receivers.length ? receivers : [{ x: 0, y: 0 }];
+  // Spread the burst over a sample of hubs rather than every one.
+  const budget = Math.max(1, Math.floor(MAX_RINGS / 2));
+  const stride = Math.max(1, Math.ceil(all.length / budget));
+  const points = all.filter((_, i) => i % stride === 0);
+  const perPoint = Math.max(3, Math.floor(MAX_FLECKS / points.length));
   points.forEach((p, idx) => {
     const c = receivers.length ? cellCenter(layout, p) : { x: W / 2, y: H * 0.42 };
     const t = now + idx * 0.05;
     pushRing(c.x, c.y, t, calm ? P.INK : P.CH0, layout.cell * 0.85, 0.65, 2);
     pushRing(c.x, c.y, t + 0.08, P.INK_HAIR, layout.cell * 1.15, 0.5, 1.4);
-    const n = calm ? 6 : 10;
+    const n = Math.min(calm ? 6 : 10, perPoint);
     for (let i = 0; i < n; i++) {
       const a = (Math.PI * 2 * i) / n + Math.random() * 0.3;
       const speed = (calm ? 28 : 40) + Math.random() * (calm ? 40 : 70);
@@ -139,12 +150,16 @@ export function drawFeel(ctx: CanvasRenderingContext2D, now: number): void {
     ctx.strokeStyle = r.color;
     ctx.globalAlpha = alpha;
     ctx.lineWidth = Math.max(1, r.width * (1 - u * 0.7));
+    // A win can spawn a ring per disc, so no per-ring blur: on retro the extra
+    // weight comes from a second wider stroke instead.
     if (theme === "retro") {
-      ctx.shadowColor = r.color;
-      ctx.shadowBlur = 8 * (1 - u);
+      ctx.globalAlpha = alpha * 0.35;
+      ctx.lineWidth = Math.max(1, r.width * (1 - u * 0.7)) * 2.4;
+      ctx.stroke();
+      ctx.globalAlpha = alpha;
+      ctx.lineWidth = Math.max(1, r.width * (1 - u * 0.7));
     }
     ctx.stroke();
-    ctx.shadowBlur = 0;
   }
 
   flecks = flecks.filter((f) => now - f.born < f.life);

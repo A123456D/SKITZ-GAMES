@@ -1250,11 +1250,16 @@ function drawThemePick(): void {
   ctx.fillText("You can change this anytime in Settings.", W / 2, 1010);
 }
 
+/** The preview board is fixed, so build and solve it once, not every frame. */
+let previewBoard: { state: ReturnType<typeof buildState>; result: TurnResult } | null = null;
+
 /** Mini in-game board vignette so theme pick shows real play colors. */
 function drawThemeGamePreview(top: number): void {
-  const level = buildThemePreviewLevel();
-  const state = buildState(level);
-  const result = solve(state);
+  if (!previewBoard) {
+    const built = buildState(buildThemePreviewLevel());
+    previewBoard = { state: built, result: solve(built) };
+  }
+  const { state, result } = previewBoard;
   const cell = 44;
   const gap = 4;
   const boardW = state.width * (cell + gap) - gap;
@@ -1409,7 +1414,7 @@ function drawPlay(): void {
   sliders = [];
   if (!session || !layout) return;
   const result = displayResult ?? session.result;
-  const net = analyzeNetwork(session.state);
+  const net = analyzeNetwork(session.state, undefined, true);
   const lit = session.beamsVisible && result.won ? net.discCount : 0;
   const need = session.beamsVisible ? net.discCount : 0;
   const spill = session.beamsVisible ? net.looseEnds : 0;
