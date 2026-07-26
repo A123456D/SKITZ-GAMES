@@ -464,7 +464,7 @@ function lerp2(a: Vec2, b: Vec2, t: number): Vec2 {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
-/** Map the generated crumple texture onto the face quad. */
+/** Crumple photo under the same blue lined-paper look. */
 function paintPaperTexture(
   ctx: CanvasRenderingContext2D,
   q: Vec2[],
@@ -492,19 +492,18 @@ function paintPaperTexture(
     const rot = faceIndex % 4;
     const mapped = uv.map((_, i) => uv[(i + rot) % 4]!);
     if (faceIndex % 2 === 1) {
-      // Mirror every other face
       for (const p of mapped) p.x = 1 - p.x;
     }
-    ctx.globalAlpha = isActive ? 0.92 : 0.72;
+    // Keep the cream paper base; crumple is a soft overlay, not a replacement.
+    ctx.globalAlpha = isActive ? 0.45 : 0.32;
+    ctx.globalCompositeOperation = "multiply";
     drawImageOnQuad(ctx, tex, q, mapped);
+    ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
-    // Warm paper tint over the photo so stickers stay readable
-    ctx.fillStyle = isActive ? "rgba(244,238,224,0.28)" : "rgba(229,220,200,0.38)";
-    ctx.fill();
   }
 
-  // Soft ruled lines on top of the crumple photo
-  ctx.strokeStyle = isActive ? "rgba(80,140,200,0.14)" : "rgba(80,140,200,0.08)";
+  // Lined paper — same blue ruled lines as before
+  ctx.strokeStyle = isActive ? "rgba(80,140,200,0.2)" : "rgba(80,140,200,0.14)";
   ctx.lineWidth = 1;
   for (let i = 1; i < 8; i++) {
     const t = i / 8;
