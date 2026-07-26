@@ -7,10 +7,20 @@
  *  2. Created a fresh Audio() at crossfade time with no preload (5–7 MB MP3s).
  *  3. Ran two cold decodes overlapping while the game loop also ducked volume.
  *
- * Fix: two persistent elements ping-pong, volume via Web Audio GainNodes,
- * next track preloaded into the idle slot, and crossfade starts near track end
- * once the next file is already buffering.
+ * Fix: two persistent elements ping-pong, volume via Web Audio GainNodes in
+ * the browser, next track preloaded into the idle slot, and crossfade starts
+ * near track end once the next file is already buffering.
+ *
+ * Installed Android PWAs are different: MediaElementSource + a second
+ * AudioContext (SFX) causes mid-track volume pumping. Standalone apps play
+ * music through HTMLAudioElement.volume on the media stream instead.
  */
+
+import {
+  getSharedAudioContext,
+  isStandaloneApp,
+  resumeSharedAudioContext,
+} from "./sharedContext";
 
 type PlaylistManifest = {
   tracks?: string[];
@@ -51,16 +61,17 @@ let usingA = true;
 let ctx: AudioContext | null = null;
 let gainA: GainNode | null = null;
 let gainB: GainNode | null = null;
-let busComp: DynamicsCompressorNode | null = null;
 let graphReady = false;
 let transitioning = false;
 let fadeRaf = 0;
 let crossfadePoll = 0;
 let resumeChain: Promise<void> = Promise.resolve();
+/** Cached once — display-mode does not change mid-session. */
+const useElementVolume = typeof window !== "undefined" && isStandaloneApp();
 
 function trackUrl(file: string): string {
   // Bust HTTP caches so phones pick up re-leveled cyber beds.
-  return `./music/${file}?v=8`;
+  return `./music/${file}?v=9`;
 }
 
 function shuffleInPlace(list: string[]): void {
@@ -115,7 +126,7 @@ function makeSlot(): HTMLAudioElement {
   const el = new Audio();
   el.preload = "auto";
   el.loop = false;
-  el.volume = 1; // level is GainNode-only — element volume stays max
+  el.volume = useElementVolume ? 0 : 1;
   el.setAttribute("playsinline", "true");
   el.setAttribute("webkit-playsinline", "true");
   return el;
@@ -129,26 +140,24 @@ function ensureSlots(): void {
 function ensureGraph(): void {
   if (graphReady) return;
   ensureSlots();
-  const Ctor =
-    window.AudioContext ||
-    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  if (!Ctor) return;
-  ctx = new Ctor();
+
+  // Installed Android app: keep music on the media element stream. Routing
+  // through MediaElementSource + a separate SFX AudioContext pumps the bed.
+  if (useElementVolume) {
+    a!.volume = 0;
+    b!.volume = 0;
+    graphReady = true;
+    return;
+  }
+
+  ctx = getSharedAudioContext();
+  if (!ctx) return;
   gainA = ctx.createGain();
   gainB = ctx.createGain();
-  // Soft bus glue — keeps beds with remaining arrangement dips (cyber intros /
-  // breakdowns) from reading as volume changes. Gains stay well above silence.
-  busComp = ctx.createDynamicsCompressor();
-  busComp.threshold.value = -24;
-  busComp.knee.value = 12;
-  busComp.ratio.value = 2.5;
-  busComp.attack.value = 0.03;
-  busComp.release.value = 0.28;
   gainA.gain.value = 0;
   gainB.gain.value = 0;
-  gainA.connect(busComp);
-  gainB.connect(busComp);
-  busComp.connect(ctx.destination);
+  gainA.connect(ctx.destination);
+  gainB.connect(ctx.destination);
   // createMediaElementSource may only be called once per element.
   ctx.createMediaElementSource(a!).connect(gainA);
   ctx.createMediaElementSource(b!).connect(gainB);
@@ -176,20 +185,30 @@ function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
 }
 
-/** Music sits under the effects, so the bed is trimmed well below the slider. */
+/**
+ * Browser path attenuates in a GainNode (element stays at 1).
+ * Standalone path sets HTMLAudioElement.volume directly — needs a higher trim.
+ */
 const MUSIC_TRIM = 0.04;
+const ELEMENT_MUSIC_TRIM = 0.42;
 
 function targetLevel(): number {
-  return clamp01(musicVol * MUSIC_TRIM);
+  return clamp01(musicVol * (useElementVolume ? ELEMENT_MUSIC_TRIM : MUSIC_TRIM));
 }
 
 function setGain(el: HTMLAudioElement, value: number): void {
   if (!graphReady) return;
-  gainOf(el).gain.value = clamp01(value);
+  const v = clamp01(value);
+  if (useElementVolume) {
+    el.volume = v;
+    return;
+  }
+  gainOf(el).gain.value = v;
 }
 
 function getGain(el: HTMLAudioElement): number {
   if (!graphReady) return 0;
+  if (useElementVolume) return el.volume;
   return gainOf(el).gain.value;
 }
 
@@ -346,7 +365,7 @@ function loadManifest(): Promise<void> {
   if (manifestPromise) return manifestPromise;
   manifestPromise = (async () => {
     try {
-      const res = await fetch("./music/playlist.json?v=8", { cache: "no-cache" });
+      const res = await fetch("./music/playlist.json?v=9", { cache: "no-cache" });
       if (!res.ok) return;
       const data = (await res.json()) as PlaylistManifest;
       const clean = (list: unknown): string[] =>
@@ -443,9 +462,7 @@ export function getMusicVolume(): number {
 export function unlockMusic(): void {
   unlocked = true;
   ensureGraph();
-  if (ctx?.state === "suspended") {
-    resumeChain = ctx.resume().then(() => undefined).catch(() => undefined);
-  }
+  resumeChain = resumeSharedAudioContext();
   void ensureMusicPlaying();
 }
 
@@ -510,12 +527,10 @@ export function onMusicScreen(screen: string): void {
   void ensureMusicPlaying();
 }
 
-/** Android standalone PWAs suspend the audio graph in the background. */
+/** Android standalone PWAs suspend Web Audio / media when backgrounded. */
 function resumeMusicAfterForeground(): void {
-  if (!unlocked || !graphReady || !ctx) return;
-  if (ctx.state === "suspended") {
-    resumeChain = ctx.resume().then(() => undefined).catch(() => undefined);
-  }
+  if (!unlocked || !graphReady) return;
+  resumeChain = resumeSharedAudioContext();
   void resumeChain.then(() => {
     if (!transitioning) applyActiveGain();
     void ensureMusicPlaying();

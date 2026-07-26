@@ -1,6 +1,7 @@
 /** Procedural SFX via Web Audio — no asset files required. */
 
-let ctx: AudioContext | null = null;
+import { getSharedAudioContext, resumeSharedAudioContext } from "./sharedContext";
+
 let unlocked = false;
 let sfxVol = 0.85;
 let master: GainNode | null = null;
@@ -17,20 +18,7 @@ function busLevel(): number {
 }
 
 function ac(): AudioContext | null {
-  if (
-    typeof AudioContext === "undefined" &&
-    typeof (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext ===
-      "undefined"
-  ) {
-    return null;
-  }
-  if (!ctx) {
-    const Ctor =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    ctx = new Ctor();
-  }
-  return ctx;
+  return getSharedAudioContext();
 }
 
 function bus(): GainNode | null {
@@ -57,7 +45,7 @@ export function getSfxVolume(): number {
 export function unlockAudio(): void {
   const c = ac();
   if (!c) return;
-  if (c.state === "suspended") void c.resume();
+  void resumeSharedAudioContext();
   unlocked = true;
   bus();
 }
