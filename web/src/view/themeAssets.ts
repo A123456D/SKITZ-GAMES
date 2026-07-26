@@ -32,7 +32,7 @@ const SKIP_KNOB: Partial<Record<ThemeId, boolean>> = { mono: true };
 /** Themes that paint their backdrop procedurally (skip heavy/outdated bg.png). */
 const SKIP_BG: Partial<Record<ThemeId, boolean>> = { mono: true };
 
-/** Coarse pointers / small viewports skip multi‑MB theme bitmaps for smoother mobile play. */
+/** Coarse pointers / small viewports skip optional multi-MB art for smoother mobile play. */
 function preferLightArt(): boolean {
   if (typeof window === "undefined") return false;
   try {
@@ -78,8 +78,11 @@ export function ensureThemeArt(id: ThemeId): void {
   const light = preferLightArt();
   const dir = `./themes/${id}`;
   void (async () => {
+    // Punk's generated backdrop is core to its identity, so retain it on mobile.
+    // Grit and knob textures remain optional there to keep memory use controlled.
+    const loadBackground = !SKIP_BG[id] && (!light || id === "punk");
     const [bg, knobs, grit, banner] = await Promise.all([
-      SKIP_BG[id] || light ? Promise.resolve(null) : loadImg(`${dir}/bg.png`),
+      loadBackground ? loadImg(`${dir}/bg.png`) : Promise.resolve(null),
       SKIP_KNOB[id] || light ? Promise.resolve(null) : loadImg(`${dir}/knob.png`),
       HAS_GRIT[id] && !light ? loadImg(`${dir}/grit.png`) : Promise.resolve(null),
       HAS_BANNER[id] && !light ? loadImg(`${dir}/banner.png`) : Promise.resolve(null),
