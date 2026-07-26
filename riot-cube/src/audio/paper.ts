@@ -1,6 +1,5 @@
 /**
- * Procedural sticker/cube SFX via Web Audio — no asset fetch/decode.
- * (Sample WAVs were failing silently on mobile + some web hosts.)
+ * Light, crisp procedural SFX via Web Audio — no asset fetch/decode.
  */
 
 const VOL_KEY = "riotcube_sfx_vol";
@@ -93,21 +92,14 @@ export function cycleSfxVolume(): number {
   const next = VOL_STEPS[(i + 1) % VOL_STEPS.length]!;
   setSfxVolume(next);
   if (next > 0) {
-    // Confirm the new level (also primes delayed unlocks).
-    tone(520, 0.06, "sine", 0.06);
-    tone(720, 0.07, "triangle", 0.04, 0.04);
+    pluck(880, 0.05, 0.045);
+    pluck(1180, 0.06, 0.03, 0.04);
   }
   return next;
 }
 
-function tone(
-  freq: number,
-  dur: number,
-  type: OscillatorType,
-  gain: number,
-  when = 0,
-  slideTo?: number,
-): void {
+/** Soft sine pluck with a tiny high shimmer — light and crisp. */
+function pluck(freq: number, dur: number, gain: number, when = 0, slideTo?: number): void {
   const c = ac();
   const out = bus();
   if (!c || !out || !unlocked || sfxVol <= 0.001) return;
@@ -115,23 +107,39 @@ function tone(
 
   const t0 = c.currentTime + when;
   const osc = c.createOscillator();
+  const shimmer = c.createOscillator();
   const g = c.createGain();
-  osc.type = type;
+  const sg = c.createGain();
+
+  osc.type = "sine";
   osc.frequency.setValueAtTime(freq, t0);
   if (slideTo !== undefined) {
     osc.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), t0 + dur);
   }
+
+  shimmer.type = "triangle";
+  shimmer.frequency.setValueAtTime(freq * 2.02, t0);
+
   g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(Math.max(0.001, gain), t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.001, gain), t0 + 0.006);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+  sg.gain.setValueAtTime(0.0001, t0);
+  sg.gain.exponentialRampToValueAtTime(Math.max(0.001, gain * 0.22), t0 + 0.004);
+  sg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.55);
+
   osc.connect(g);
+  shimmer.connect(sg);
   g.connect(out);
+  sg.connect(out);
   osc.start(t0);
-  osc.stop(t0 + dur + 0.03);
+  shimmer.start(t0);
+  osc.stop(t0 + dur + 0.02);
+  shimmer.stop(t0 + dur + 0.02);
 }
 
-/** Soft noise burst (sticker slide / rustle). */
-function noiseBurst(dur: number, gain: number, when = 0, hp = 400, lp = 2800): void {
+/** Brief bright air burst — paper tick, not a thud. */
+function airTick(dur: number, gain: number, when = 0): void {
   const c = ac();
   const out = bus();
   if (!c || !out || !unlocked || sfxVol <= 0.001) return;
@@ -140,53 +148,52 @@ function noiseBurst(dur: number, gain: number, when = 0, hp = 400, lp = 2800): v
   const n = Math.max(1, Math.floor(c.sampleRate * dur));
   const buf = c.createBuffer(1, n, c.sampleRate);
   const data = buf.getChannelData(0);
-  for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
+  for (let i = 0; i < n; i++) {
+    const env = 1 - i / n;
+    data[i] = (Math.random() * 2 - 1) * env * env;
+  }
 
   const t0 = c.currentTime + when;
   const src = c.createBufferSource();
   src.buffer = buf;
 
-  const hip = c.createBiquadFilter();
-  hip.type = "highpass";
-  hip.frequency.value = hp;
-
-  const lop = c.createBiquadFilter();
-  lop.type = "lowpass";
-  lop.frequency.value = lp;
+  const bp = c.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 2400;
+  bp.Q.value = 0.9;
 
   const g = c.createGain();
   g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(Math.max(0.001, gain), t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.001, gain), t0 + 0.004);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
 
-  src.connect(hip);
-  hip.connect(lop);
-  lop.connect(g);
+  src.connect(bp);
+  bp.connect(g);
   g.connect(out);
   src.start(t0);
   src.stop(t0 + dur + 0.02);
 }
 
 export function sfxPaperRustle(): void {
-  noiseBurst(0.05, 0.09, 0, 600, 3200);
-  tone(220 + Math.random() * 40, 0.04, "triangle", 0.04);
+  airTick(0.028, 0.045);
+  pluck(640 + Math.random() * 40, 0.035, 0.032);
 }
 
 export function sfxPaperSlide(): void {
-  noiseBurst(0.08, 0.1, 0, 350, 2400);
-  tone(160, 0.07, "sine", 0.05, 0, 90);
-  tone(340, 0.05, "triangle", 0.035, 0.02);
+  airTick(0.04, 0.05);
+  pluck(520, 0.05, 0.038, 0, 680);
+  pluck(780, 0.04, 0.022, 0.02);
 }
 
 export function sfxPaperCrumple(): void {
-  noiseBurst(0.12, 0.12, 0, 200, 1800);
-  tone(90, 0.1, "sine", 0.07, 0, 48);
-  tone(180, 0.08, "triangle", 0.045, 0.03);
-  tone(420, 0.06, "square", 0.02, 0.05);
+  airTick(0.05, 0.055);
+  pluck(660, 0.06, 0.04);
+  pluck(880, 0.07, 0.035, 0.035, 1100);
+  pluck(1240, 0.08, 0.028, 0.07);
 }
 
 export function sfxPaperFlutter(): void {
-  tone(380, 0.05, "triangle", 0.055);
-  tone(520, 0.07, "sine", 0.05, 0.03, 640);
-  noiseBurst(0.04, 0.05, 0.01, 800, 3600);
+  pluck(740, 0.045, 0.036);
+  pluck(990, 0.055, 0.03, 0.03, 1180);
+  airTick(0.025, 0.03, 0.015);
 }
