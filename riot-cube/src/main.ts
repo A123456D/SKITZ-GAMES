@@ -254,7 +254,10 @@ function tick(): void {
     dirty = true;
     if (crumpleT >= 1 && pendingTwist) finishCrumple();
   }
-  if (dirty || drag || orbitDrag || crumples.length || rotating) paint();
+  // Keep painting while a lane is hovered so sticker bob/wobble animates.
+  if (dirty || drag || orbitDrag || crumples.length || rotating || springAxis) {
+    paint();
+  }
   requestAnimationFrame(tick);
 }
 

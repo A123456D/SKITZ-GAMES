@@ -326,21 +326,7 @@ function drawFace(
   ctx.lineWidth = isActive ? 4 : 2.5;
   ctx.stroke();
 
-  // Lined paper hint
-  ctx.save();
-  ctx.clip();
-  ctx.strokeStyle = "rgba(80,140,200,0.2)";
-  ctx.lineWidth = 1;
-  for (let i = 1; i < 8; i++) {
-    const t = i / 8;
-    const a = lerp2(q[0]!, q[3]!, t);
-    const b = lerp2(q[1]!, q[2]!, t);
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
-  }
-  ctx.restore();
+  paintPaperTexture(ctx, q, faceIndex, isActive);
 
   const gap = 0.04;
   const stride = 1 / n;
@@ -354,7 +340,12 @@ function drawFace(
     isActive && opts.motion.hovering && opts.motion.axis === "col"
       ? opts.motion.index
       : -1;
-  const liftAmt = movingRow >= 0 || movingCol >= 0 ? 0.045 : 0;
+  const hoverT = performance.now() / 1000;
+  const liftPulse =
+    movingRow >= 0 || movingCol >= 0
+      ? 0.038 + 0.01 * Math.sin(hoverT * 3.4)
+      : 0;
+  const liftAmt = liftPulse;
 
   const paintSticker = (
     kind: TileKind,
@@ -386,7 +377,7 @@ function drawFace(
       );
       return;
     }
-    drawStickerOnQuad(ctx, kind, s0, s1, s2, s3, q, hovering);
+    drawStickerOnQuad(ctx, kind, s0, s1, s2, s3, q, hovering, hoverT);
   };
 
   // Stationary stickers (skip the sliding strip — drawn next)
@@ -472,6 +463,114 @@ function lerp2(a: Vec2, b: Vec2, t: number): Vec2 {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
+/** Soft lined paper + fold creases + light grain, clipped to the face quad. */
+function paintPaperTexture(
+  ctx: CanvasRenderingContext2D,
+  q: Vec2[],
+  faceIndex: number,
+  isActive: boolean,
+): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(q[0]!.x, q[0]!.y);
+  ctx.lineTo(q[1]!.x, q[1]!.y);
+  ctx.lineTo(q[2]!.x, q[2]!.y);
+  ctx.lineTo(q[3]!.x, q[3]!.y);
+  ctx.closePath();
+  ctx.clip();
+
+  // Ruled lines
+  ctx.strokeStyle = isActive ? "rgba(80,140,200,0.18)" : "rgba(80,140,200,0.12)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 8; i++) {
+    const t = i / 8;
+    const a = lerp2(q[0]!, q[3]!, t);
+    const b = lerp2(q[1]!, q[2]!, t);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  // Fold banding — soft shade bands that read as paper bent at creases
+  const bands = [
+    { t: 0.22, w: 0.07, a: 0.07 },
+    { t: 0.55, w: 0.05, a: 0.055 },
+    { t: 0.78, w: 0.06, a: 0.06 },
+  ];
+  for (const band of bands) {
+    const a0 = lerp2(q[0]!, q[3]!, band.t - band.w);
+    const b0 = lerp2(q[1]!, q[2]!, band.t - band.w);
+    const a1 = lerp2(q[0]!, q[3]!, band.t + band.w);
+    const b1 = lerp2(q[1]!, q[2]!, band.t + band.w);
+    const g = ctx.createLinearGradient(a0.x, a0.y, a1.x, a1.y);
+    g.addColorStop(0, "rgba(90,70,40,0)");
+    g.addColorStop(0.45, `rgba(70,52,28,${band.a})`);
+    g.addColorStop(0.55, `rgba(255,250,235,${band.a * 0.55})`);
+    g.addColorStop(1, "rgba(90,70,40,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(a0.x, a0.y);
+    ctx.lineTo(b0.x, b0.y);
+    ctx.lineTo(b1.x, b1.y);
+    ctx.lineTo(a1.x, a1.y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Crease strokes — slightly bent fold lines
+  const creases: Array<[number, number, number, number, number]> = [
+    [0.08, 0.12, 0.92, 0.38, 0.14],
+    [0.15, 0.72, 0.88, 0.55, 0.11],
+    [0.35, 0.05, 0.62, 0.95, 0.1],
+    [0.05, 0.48, 0.95, 0.62, 0.09],
+  ];
+  for (const [u0, v0, u1, v1, alpha] of creases) {
+    const p0 = bilerp(q, u0, v0);
+    const p1 = bilerp(q, u1, v1);
+    const mid = bilerp(q, (u0 + u1) * 0.5 + 0.04 * ((faceIndex % 3) - 1), (v0 + v1) * 0.5);
+    ctx.strokeStyle = `rgba(60,45,25,${isActive ? alpha : alpha * 0.7})`;
+    ctx.lineWidth = isActive ? 1.35 : 1;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    ctx.quadraticCurveTo(mid.x, mid.y, p1.x, p1.y);
+    ctx.stroke();
+    // Highlight twin for paper-fold sheen
+    ctx.strokeStyle = `rgba(255,252,240,${isActive ? alpha * 0.55 : alpha * 0.35})`;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(p0.x + 1.2, p0.y + 1.2);
+    ctx.quadraticCurveTo(mid.x + 1, mid.y + 1, p1.x + 1.2, p1.y + 1.2);
+    ctx.stroke();
+  }
+
+  // Deterministic paper grain (no Math.random flicker)
+  let seed = (faceIndex + 1) * 9973;
+  const next = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+  ctx.fillStyle = isActive ? "rgba(40,30,18,0.045)" : "rgba(40,30,18,0.03)";
+  for (let i = 0; i < 90; i++) {
+    const u = next();
+    const v = next();
+    const p = bilerp(q, u, v);
+    const r = 0.6 + next() * 1.4;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function bilerp(q: Vec2[], u: number, v: number): Vec2 {
+  const a = lerp2(q[0]!, q[1]!, u);
+  const b = lerp2(q[3]!, q[2]!, u);
+  return lerp2(a, b, v);
+}
+
 function drawStickerOnQuad(
   ctx: CanvasRenderingContext2D,
   kind: TileKind,
@@ -481,6 +580,7 @@ function drawStickerOnQuad(
   bl: Vec2,
   faceQuad: Vec2[],
   hovering: boolean,
+  hoverT = 0,
 ): void {
   const cx = (tl.x + tr.x + br.x + bl.x) / 4;
   const cy = (tl.y + tr.y + br.y + bl.y) / 4;
@@ -490,7 +590,11 @@ function drawStickerOnQuad(
   const bh =
     (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) /
     2;
-  const s = Math.min(bw, bh) * (hovering ? 1.03 : 1);
+  const phase = hoverT * 4.2 + cx * 0.02 + cy * 0.015;
+  const bob = hovering ? Math.sin(phase) * 2.4 : 0;
+  const wobble = hovering ? Math.sin(phase * 0.85 + 0.6) * 0.045 : 0;
+  const breathe = hovering ? 1.04 + Math.sin(phase * 0.7) * 0.025 : 1;
+  const s = Math.min(bw, bh) * breathe;
 
   ctx.save();
   ctx.beginPath();
@@ -501,9 +605,13 @@ function drawStickerOnQuad(
   ctx.closePath();
   ctx.clip();
 
+  ctx.translate(cx, cy + bob);
+  ctx.rotate(wobble);
+  ctx.translate(-cx, -cy - bob);
+
   // Sprite at the projected cell center — stable for wrap peeks (affine on
   // off-face UV quads was distorting "some" edge stickers into the wrong look).
-  drawStickerSprite(ctx, kind, cx - s / 2, cy - s / 2, s, 1, hovering ? 3 : 0);
+  drawStickerSprite(ctx, kind, cx - s / 2, cy - s / 2 + bob, s, 1, hovering ? 4 + bob : 0);
   ctx.restore();
 }
 
