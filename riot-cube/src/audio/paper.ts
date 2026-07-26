@@ -1,4 +1,4 @@
-/** Sample-based paper SFX with light playback variation. */
+/** Real Mixkit paper samples with light playback shaping. */
 
 type SfxId = "rustle" | "slide" | "crumple" | "flutter";
 
@@ -67,7 +67,10 @@ export function unlockAudio(): void {
   if (!loadPromise) loadPromise = loadAll();
 }
 
-function play(id: SfxId, opts?: { gain?: number; rate?: number }): void {
+function play(
+  id: SfxId,
+  opts?: { gain?: number; rate?: number; brightness?: number },
+): void {
   const c = ac();
   const out = bus();
   const buf = buffers.get(id);
@@ -76,34 +79,39 @@ function play(id: SfxId, opts?: { gain?: number; rate?: number }): void {
   const src = c.createBufferSource();
   src.buffer = buf;
   const baseRate = opts?.rate ?? 1;
-  // Slight random pitch so repeats don't feel identical
-  src.playbackRate.value = baseRate * (0.94 + Math.random() * 0.12);
+  src.playbackRate.value = baseRate * (0.97 + Math.random() * 0.06);
+
+  const filter = c.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = opts?.brightness ?? 3800;
+  filter.Q.value = 0.65;
 
   const g = c.createGain();
-  const gain = (opts?.gain ?? 1) * 0.85;
+  const gain = (opts?.gain ?? 1) * 0.7;
   const t0 = c.currentTime;
   g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(Math.max(0.001, gain), t0 + 0.008);
-  g.gain.setValueAtTime(Math.max(0.001, gain), t0 + Math.max(0.02, buf.duration - 0.04));
+  g.gain.exponentialRampToValueAtTime(Math.max(0.001, gain), t0 + 0.01);
+  g.gain.setValueAtTime(Math.max(0.001, gain), t0 + Math.max(0.02, buf.duration - 0.05));
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + buf.duration + 0.02);
 
-  src.connect(g);
+  src.connect(filter);
+  filter.connect(g);
   g.connect(out);
   src.start(t0);
 }
 
 export function sfxPaperRustle(): void {
-  play("rustle", { gain: 0.75, rate: 1.05 });
+  play("rustle", { gain: 0.7, rate: 1.02, brightness: 3600 });
 }
 
 export function sfxPaperSlide(): void {
-  play("slide", { gain: 0.9, rate: 1 });
+  play("slide", { gain: 0.85, rate: 1, brightness: 3400 });
 }
 
 export function sfxPaperCrumple(): void {
-  play("crumple", { gain: 1, rate: 0.98 });
+  play("crumple", { gain: 0.95, rate: 0.96, brightness: 3200 });
 }
 
 export function sfxPaperFlutter(): void {
-  play("flutter", { gain: 0.7, rate: 1.08 });
+  play("flutter", { gain: 0.65, rate: 1.04, brightness: 4000 });
 }

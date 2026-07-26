@@ -1,0 +1,5 @@
+rustle: Mixkit "Paper quick movement" (id 2380) — https://assets.mixkit.co/active_storage/sfx/2380/2380-preview.mp3
+slide: Mixkit "Paper slide" (id 1530) — https://assets.mixkit.co/active_storage/sfx/1530/1530-preview.mp3
+crumple: Mixkit "Crumpled paper" (id 2389) — https://assets.mixkit.co/active_storage/sfx/2389/2389-preview.mp3
+flutter: Mixkit "Big paper page turn" (id 1105) — https://assets.mixkit.co/active_storage/sfx/1105/1105-preview.mp3
+License: Mixkit License (free for commercial use)
