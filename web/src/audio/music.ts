@@ -51,6 +51,7 @@ let usingA = true;
 let ctx: AudioContext | null = null;
 let gainA: GainNode | null = null;
 let gainB: GainNode | null = null;
+let busComp: DynamicsCompressorNode | null = null;
 let graphReady = false;
 let transitioning = false;
 let fadeRaf = 0;
@@ -58,7 +59,8 @@ let crossfadePoll = 0;
 let resumeChain: Promise<void> = Promise.resolve();
 
 function trackUrl(file: string): string {
-  return `./music/${file}`;
+  // Bust HTTP caches so phones pick up re-leveled cyber beds.
+  return `./music/${file}?v=8`;
 }
 
 function shuffleInPlace(list: string[]): void {
@@ -134,10 +136,19 @@ function ensureGraph(): void {
   ctx = new Ctor();
   gainA = ctx.createGain();
   gainB = ctx.createGain();
+  // Soft bus glue — keeps beds with remaining arrangement dips (cyber intros /
+  // breakdowns) from reading as volume changes. Gains stay well above silence.
+  busComp = ctx.createDynamicsCompressor();
+  busComp.threshold.value = -24;
+  busComp.knee.value = 12;
+  busComp.ratio.value = 2.5;
+  busComp.attack.value = 0.03;
+  busComp.release.value = 0.28;
   gainA.gain.value = 0;
   gainB.gain.value = 0;
-  gainA.connect(ctx.destination);
-  gainB.connect(ctx.destination);
+  gainA.connect(busComp);
+  gainB.connect(busComp);
+  busComp.connect(ctx.destination);
   // createMediaElementSource may only be called once per element.
   ctx.createMediaElementSource(a!).connect(gainA);
   ctx.createMediaElementSource(b!).connect(gainB);
@@ -335,7 +346,7 @@ function loadManifest(): Promise<void> {
   if (manifestPromise) return manifestPromise;
   manifestPromise = (async () => {
     try {
-      const res = await fetch("./music/playlist.json", { cache: "no-cache" });
+      const res = await fetch("./music/playlist.json?v=8", { cache: "no-cache" });
       if (!res.ok) return;
       const data = (await res.json()) as PlaylistManifest;
       const clean = (list: unknown): string[] =>
