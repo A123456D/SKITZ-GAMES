@@ -1,4 +1,5 @@
 import type { TileKind } from "../core/types";
+import { getQuality } from "./quality";
 import { stickerImage } from "./stickers";
 
 /** Deterministic 0..1 noise from cell seed + grid coords. */
@@ -36,12 +37,14 @@ export function drawCrumpledSticker(
   ctx.scale(scale, scale);
   ctx.translate(-cx, -cy);
 
-  // Soft crumple shadow
-  ctx.shadowColor = `rgba(0,0,0,${0.25 + 0.35 * ease})`;
-  ctx.shadowBlur = 8 + 18 * ease;
-  ctx.shadowOffsetY = 4 + 10 * ease;
+  // Soft crumple shadow (skip on low-end — canvas shadows are costly)
+  if (getQuality().stickerShadows) {
+    ctx.shadowColor = `rgba(0,0,0,${0.25 + 0.35 * ease})`;
+    ctx.shadowBlur = 8 + 18 * ease;
+    ctx.shadowOffsetY = 4 + 10 * ease;
+  }
 
-  const grid = 4; // 4x4 quads = 5x5 verts
+  const grid = getQuality().stickerShadows ? 4 : 2; // 4x4 quads = 5x5 verts
   const verts: { x: number; y: number; u: number; v: number }[] = [];
   for (let gy = 0; gy <= grid; gy++) {
     for (let gx = 0; gx <= grid; gx++) {

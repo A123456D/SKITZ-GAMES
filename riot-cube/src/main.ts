@@ -36,11 +36,13 @@ import {
   type CubeLayout,
 } from "./view/cube3d";
 import { loadStickers } from "./view/stickers";
+import { detectQuality, getQuality } from "./view/quality";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
 
 let session: Session = startSession(LEVEL_1);
+let paintThrottle = 0;
 let floatText: { text: string; life: number } | null = null;
 
 type DragState = {
@@ -98,7 +100,8 @@ function cubeLayout(): CubeLayout {
 }
 
 function resize(): void {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  detectQuality();
+  const dpr = Math.min(window.devicePixelRatio || 1, getQuality().dprCap);
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const scale = Math.min(vw / W, vh / H);
@@ -254,9 +257,16 @@ function tick(): void {
     dirty = true;
     if (crumpleT >= 1 && pendingTwist) finishCrumple();
   }
-  // Keep painting while a lane is hovered so sticker bob/wobble animates.
-  if (dirty || drag || orbitDrag || crumples.length || rotating || springAxis) {
-    paint();
+  const needsPaint =
+    dirty || drag || orbitDrag || crumples.length || rotating || springAxis;
+  // On low-end / mobile, throttle continuous drag/orbit paints ~30fps.
+  if (needsPaint) {
+    if (!getQuality().hoverAnim && (drag || orbitDrag) && !dirty && !crumples.length) {
+      paintThrottle = (paintThrottle + 1) % 2;
+      if (paintThrottle === 0) paint();
+    } else {
+      paint();
+    }
   }
   requestAnimationFrame(tick);
 }

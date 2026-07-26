@@ -1,31 +1,63 @@
-const CACHE = "riot-cube-v1";
-const ASSETS = ["./", "./index.html", "./manifest.webmanifest"];
+const CACHE = "riot-cube-v3";
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // Activate immediately so clients pick up the new caching strategy.
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
-    ).then(() => self.clients.claim()),
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k.startsWith("riot-cube-")).map((k) => caches.delete(k))),
+      )
+      .then(() => self.clients.claim()),
   );
 });
+
+function shouldNetworkFirst(req, url) {
+  if (req.mode === "navigate") return true;
+  const path = url.pathname;
+  if (path.endsWith(".html") || path.endsWith("/")) return true;
+  if (path.includes("/assets/")) return true;
+  if (/\.(js|css|webmanifest)$/i.test(path)) return true;
+  return false;
+}
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      const fetched = fetch(req)
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (shouldNetworkFirst(req, url)) {
+    // Prefer fresh build files so deploys show up without hard-clearing cache.
+    event.respondWith(
+      fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(req, copy));
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(req, copy));
+          }
           return res;
         })
-        .catch(() => cached);
-      return cached || fetched;
+        .catch(() => caches.match(req).then((cached) => cached || Response.error())),
+    );
+    return;
+  }
+
+  // Stickers / static art: cache-first is fine.
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      if (cached) return cached;
+      return fetch(req).then((res) => {
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(req, copy));
+        }
+        return res;
+      });
     }),
   );
 });

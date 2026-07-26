@@ -4,6 +4,7 @@ import type { CubeFaces, FaceId } from "../core/session";
 import type { TileKind } from "../core/types";
 import { drawCrumpledSticker } from "./crumple";
 import { drawStickerSprite } from "./draw";
+import { getQuality } from "./quality";
 
 export type Vec3 = { x: number; y: number; z: number };
 export type Vec2 = { x: number; y: number };
@@ -281,7 +282,7 @@ export function drawCube3D(
   order.sort((a, b) => a.depth - b.depth); // far (small z) first
 
   for (const f of order) {
-    drawFace(ctx, layout, f.i, faces, opts, f.i === opts.activeFace);
+    drawFace(ctx, layout, f.i, faces, opts, f.i === opts.activeFace, f.nZ);
   }
 }
 
@@ -298,11 +299,14 @@ function drawFace(
     sourceFaces?: Board[];
   },
   isActive: boolean,
+  faceNz: number,
 ): void {
   const geom = FACES[faceIndex]!;
   const board = faces[faceIndex]!;
   const source = (opts.sourceFaces ?? faces) as CubeFaces;
   const n = board.length;
+  const quality = getQuality();
+  const drawStickers = faceNz >= quality.minFaceNzForStickers;
   const crumpleMap = new Map(
     opts.crumples.filter(() => isActive).map((c) => [`${c.r},${c.c}`, c] as const),
   );
@@ -356,10 +360,17 @@ function drawFace(
       : -1;
   const hoverT = performance.now() / 1000;
   const liftPulse =
-    movingRow >= 0 || movingCol >= 0
+    quality.hoverAnim && (movingRow >= 0 || movingCol >= 0)
       ? 0.038 + 0.01 * Math.sin(hoverT * 3.4)
-      : 0;
+      : movingRow >= 0 || movingCol >= 0
+        ? 0.04
+        : 0;
   const liftAmt = liftPulse;
+
+  if (!drawStickers) {
+    ctx.restore();
+    return;
+  }
 
   const paintSticker = (
     kind: TileKind,
@@ -488,6 +499,7 @@ function drawStickerOnQuad(
   hovering: boolean,
   hoverT = 0,
 ): void {
+  const quality = getQuality();
   const cx = (tl.x + tr.x + br.x + bl.x) / 4;
   const cy = (tl.y + tr.y + br.y + bl.y) / 4;
   const bw =
@@ -496,10 +508,11 @@ function drawStickerOnQuad(
   const bh =
     (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) /
     2;
+  const anim = quality.hoverAnim && hovering;
   const phase = hoverT * 4.2 + cx * 0.02 + cy * 0.015;
-  const bob = hovering ? Math.sin(phase) * 2.4 : 0;
-  const wobble = hovering ? Math.sin(phase * 0.85 + 0.6) * 0.045 : 0;
-  const breathe = hovering ? 1.04 + Math.sin(phase * 0.7) * 0.025 : 1;
+  const bob = anim ? Math.sin(phase) * 2.4 : 0;
+  const wobble = anim ? Math.sin(phase * 0.85 + 0.6) * 0.045 : 0;
+  const breathe = anim ? 1.04 + Math.sin(phase * 0.7) * 0.025 : hovering ? 1.03 : 1;
   const s = Math.min(bw, bh) * breathe;
 
   ctx.save();
@@ -511,13 +524,22 @@ function drawStickerOnQuad(
   ctx.closePath();
   ctx.clip();
 
-  ctx.translate(cx, cy + bob);
-  ctx.rotate(wobble);
-  ctx.translate(-cx, -cy - bob);
+  if (anim) {
+    ctx.translate(cx, cy + bob);
+    ctx.rotate(wobble);
+    ctx.translate(-cx, -cy - bob);
+  }
 
-  // Sprite at the projected cell center — stable for wrap peeks (affine on
-  // off-face UV quads was distorting "some" edge stickers into the wrong look).
-  drawStickerSprite(ctx, kind, cx - s / 2, cy - s / 2 + bob, s, 1, hovering ? 4 + bob : 0);
+  drawStickerSprite(
+    ctx,
+    kind,
+    cx - s / 2,
+    cy - s / 2 + bob,
+    s,
+    1,
+    hovering ? (anim ? 4 + bob : 3) : 0,
+    quality.stickerShadows,
+  );
   ctx.restore();
 }
 

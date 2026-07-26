@@ -305,6 +305,7 @@ export function drawStickerSprite(
   s: number,
   scale = 1,
   lift = 0,
+  shadows = true,
 ): void {
   const img = stickerImage(kind);
   const cx = x + s / 2;
@@ -314,14 +315,16 @@ export function drawStickerSprite(
   ctx.scale(scale, scale);
   ctx.translate(-cx, -cy);
 
-  if (lift > 0) {
-    ctx.shadowColor = "rgba(0,0,0,0.45)";
-    ctx.shadowBlur = 16 + lift;
-    ctx.shadowOffsetY = 8 + lift * 0.3;
-  } else {
-    ctx.shadowColor = "rgba(0,0,0,0.2)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
+  if (shadows) {
+    if (lift > 0) {
+      ctx.shadowColor = "rgba(0,0,0,0.45)";
+      ctx.shadowBlur = 16 + lift;
+      ctx.shadowOffsetY = 8 + lift * 0.3;
+    } else {
+      ctx.shadowColor = "rgba(0,0,0,0.2)";
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetY = 3;
+    }
   }
 
   if (img) {
