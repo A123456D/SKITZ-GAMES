@@ -2881,7 +2881,7 @@ export function loadLogo(): void {
     logoImg = null;
   };
   // Alpha-punched mark in public/; tints cleanly per theme.
-  logoImg.src = "./logo-pulseconnector.png?v=5";
+  logoImg.src = "./logo-pulse-link.png?v=7";
 }
 
 function logoTintColor(): string {

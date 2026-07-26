@@ -1,5 +1,5 @@
 /* Pulse Link — Android install / offline cache. */
-const CACHE = "pulse-link-v6";
+const CACHE = "pulse-link-v7";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
