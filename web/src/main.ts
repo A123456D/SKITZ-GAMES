@@ -98,13 +98,28 @@ type Screen = "menu" | "levels" | "play" | "pause" | "settings" | "how" | "tutor
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 
-/** Stretch the canvas to the visible viewport so phones never letterbox. */
+/** Aspect-correct fit inside the safe visual viewport (no stretch, no nav-bar clip). */
 function fitGameToViewport(): void {
+  const root = getComputedStyle(document.documentElement);
+  const sat = parseFloat(root.getPropertyValue("--sat")) || 0;
+  const sar = parseFloat(root.getPropertyValue("--sar")) || 0;
+  const sab = parseFloat(root.getPropertyValue("--sab")) || 0;
+  const sal = parseFloat(root.getPropertyValue("--sal")) || 0;
+  // Some Android Chrome builds report 0 for the 3-button bar; keep a floor.
+  const bottomPad = Math.max(sab, 12);
+  const topPad = Math.max(sat, 4);
+
   const vv = window.visualViewport;
-  const w = Math.max(1, Math.round(vv?.width ?? window.innerWidth));
-  const h = Math.max(1, Math.round(vv?.height ?? window.innerHeight));
-  const left = Math.round(vv?.offsetLeft ?? 0);
-  const top = Math.round(vv?.offsetTop ?? 0);
+  const viewW = vv?.width ?? window.innerWidth;
+  const viewH = vv?.height ?? window.innerHeight;
+  const availW = Math.max(1, viewW - sal - sar);
+  const availH = Math.max(1, viewH - topPad - bottomPad);
+  const scale = Math.min(availW / W, availH / H);
+  const w = Math.max(1, Math.round(W * scale));
+  const h = Math.max(1, Math.round(H * scale));
+  const left = Math.round((vv?.offsetLeft ?? 0) + sal + (availW - w) / 2);
+  const top = Math.round((vv?.offsetTop ?? 0) + topPad + (availH - h) / 2);
+
   canvas.style.left = `${left}px`;
   canvas.style.top = `${top}px`;
   canvas.style.width = `${w}px`;
@@ -543,7 +558,7 @@ function pointTargetPos(beat: PointBeat): { x: number; y: number } | null {
     return t ? cellCenter(layout, t.hub) : null;
   }
   if (at.id === "pulse") return { x: 282, y: 1094 };
-  if (at.id === "turn") return { x: 175, y: 1228 };
+  if (at.id === "turn") return { x: 175, y: 1208 };
   return null;
 }
 
@@ -566,8 +581,8 @@ function drawPointTourOverlay(): void {
     drawGlassButton(ctx, resetBtn, "RESET", false, time, false);
     drawGlassButton(ctx, menuBtn, "MENU", false, time, false);
     const rotR = 56;
-    drawRoundButton(ctx, 175, 1228, rotR, "↺", beat.at.id === "turn", time);
-    drawRoundButton(ctx, 545, 1228, rotR, "↻", beat.at.id === "turn", time);
+    drawRoundButton(ctx, 175, 1208, rotR, "↺", beat.at.id === "turn", time);
+    drawRoundButton(ctx, 545, 1208, rotR, "↻", beat.at.id === "turn", time);
   }
 
   const targetLow =
@@ -1765,7 +1780,8 @@ function drawPlay(): void {
   const sel = session.state.tables.find((t) => t.id === session!.selectedTable);
   const canTurn = enabled && sel && !sel.locked;
   const rotR = 56;
-  const turnY = 1228;
+  // Keep a clear margin above the canvas floor so circles aren't clipped.
+  const turnY = 1208;
   const turnL = 175;
   const turnR = 545;
   drawRoundButton(ctx, turnL, turnY, rotR, "↺", !!canTurn, time);
