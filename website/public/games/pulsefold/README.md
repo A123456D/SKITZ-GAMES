@@ -15,11 +15,13 @@ npm run build
 
 PulseFold’s Vite config uses `base: "./"` so assets work under this path.
 
+## Android install
+
+The web build is a PWA (manifest + service worker). On the game page, **Download → Android — install** walks players through Chrome → Install app. No APK required.
+
 ## Optional downloads later
 
 | File | Notes |
 | --- | --- |
 | `downloads/Pulsefold-windows.zip` | If you package a desktop wrapper |
-| `downloads/Pulsefold.apk` | If you wrap for Android (e.g. Capacitor / TWA) |
-
-Until those exist, the site points players to **Play online** (including iPhone Safari).
+| `downloads/Pulsefold.apk` | Optional native wrap (Capacitor / TWA) |
