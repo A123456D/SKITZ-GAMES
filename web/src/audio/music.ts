@@ -3,24 +3,21 @@
  *
  * Mobile (Android Chrome / iOS Safari) stuttered because the old player:
  *  1. Touched HTMLAudioElement.volume every animation frame (iOS ignores it;
- *     Android often glitches when both players decode + volume-rampa).
+ *     Android often glitches when both players decode + volume-ramp).
  *  2. Created a fresh Audio() at crossfade time with no preload (5–7 MB MP3s).
  *  3. Ran two cold decodes overlapping while the game loop also ducked volume.
  *
- * Fix: two persistent elements ping-pong, volume via Web Audio GainNodes in
- * the browser, next track preloaded into the idle slot, and crossfade starts
- * near track end once the next file is already buffering.
+ * Fix: two persistent elements ping-pong, volume via Web Audio GainNodes on
+ * one shared AudioContext with SFX, next track preloaded into the idle slot,
+ * and crossfade starts near track end once the next file is already buffering.
  *
- * Installed Android PWAs are different: MediaElementSource + a second
- * AudioContext (SFX) causes mid-track volume pumping. Standalone apps play
- * music through HTMLAudioElement.volume on the media stream instead.
+ * Dual AudioContexts duck each other on Android. Splitting music onto the
+ * HTML media stream (element.volume) while SFX stay in Web Audio also lets
+ * the OS duck the bed under every tick — so installed PWAs use the same
+ * shared GainNode path as the browser tab.
  */
 
-import {
-  getSharedAudioContext,
-  isStandaloneApp,
-  resumeSharedAudioContext,
-} from "./sharedContext";
+import { getSharedAudioContext, resumeSharedAudioContext } from "./sharedContext";
 
 type PlaylistManifest = {
   tracks?: string[];
@@ -68,8 +65,6 @@ let crossfadePoll = 0;
 let resumeChain: Promise<void> = Promise.resolve();
 /** Bumped to cancel in-flight crossfades (theme bed swaps). */
 let playEpoch = 0;
-/** Cached once — display-mode does not change mid-session. */
-const useElementVolume = typeof window !== "undefined" && isStandaloneApp();
 
 function trackUrl(file: string): string {
   // Bust HTTP caches so phones pick up re-leveled cyber beds.
@@ -166,7 +161,7 @@ function makeSlot(): HTMLAudioElement {
   const el = new Audio();
   el.preload = "auto";
   el.loop = false;
-  el.volume = useElementVolume ? 0 : 1;
+  el.volume = 1;
   el.setAttribute("playsinline", "true");
   el.setAttribute("webkit-playsinline", "true");
   return el;
@@ -180,15 +175,6 @@ function ensureSlots(): void {
 function ensureGraph(): void {
   if (graphReady) return;
   ensureSlots();
-
-  // Installed Android app: keep music on the media element stream. Routing
-  // through MediaElementSource + a separate SFX AudioContext pumps the bed.
-  if (useElementVolume) {
-    a!.volume = 0;
-    b!.volume = 0;
-    graphReady = true;
-    return;
-  }
 
   ctx = getSharedAudioContext();
   if (!ctx) return;
@@ -225,30 +211,20 @@ function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
 }
 
-/**
- * Browser path attenuates in a GainNode (element stays at 1).
- * Standalone path sets HTMLAudioElement.volume directly — needs a higher trim.
- */
+/** Attenuates in a GainNode (element stays at 1) — same path for web + Android PWA. */
 const MUSIC_TRIM = 0.04;
-const ELEMENT_MUSIC_TRIM = 0.42;
 
 function targetLevel(): number {
-  return clamp01(musicVol * (useElementVolume ? ELEMENT_MUSIC_TRIM : MUSIC_TRIM));
+  return clamp01(musicVol * MUSIC_TRIM);
 }
 
 function setGain(el: HTMLAudioElement, value: number): void {
   if (!graphReady) return;
-  const v = clamp01(value);
-  if (useElementVolume) {
-    el.volume = v;
-    return;
-  }
-  gainOf(el).gain.value = v;
+  gainOf(el).gain.value = clamp01(value);
 }
 
 function getGain(el: HTMLAudioElement): number {
   if (!graphReady) return 0;
-  if (useElementVolume) return el.volume;
   return gainOf(el).gain.value;
 }
 
