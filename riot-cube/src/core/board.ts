@@ -39,7 +39,7 @@ export function randomKind(rng: () => number, exclude?: TileKind[]): TileKind {
   return pool[Math.floor(rng() * pool.length)]!;
 }
 
-/** Fill board with no pre-existing matches of 3+. */
+/** Fill board with no pre-existing matches (3+ lines or 2×2 squares). */
 export function generateBoard(size: number, seed: number): Board {
   const rng = mulberry32(seed);
   const board = createEmpty(size);
@@ -51,6 +51,16 @@ export function generateBoard(size: number, seed: number): Board {
       }
       if (r >= 2 && board[r - 1]![c] === board[r - 2]![c]) {
         banned.push(board[r - 1]![c]!);
+      }
+      // Avoid completing a 2×2 of the same sticker
+      if (
+        r >= 1 &&
+        c >= 1 &&
+        board[r - 1]![c - 1] &&
+        board[r - 1]![c - 1] === board[r - 1]![c] &&
+        board[r - 1]![c] === board[r]![c - 1]
+      ) {
+        banned.push(board[r - 1]![c - 1]!);
       }
       board[r]![c] = randomKind(rng, banned);
     }
@@ -82,7 +92,7 @@ function key(r: number, c: number): string {
   return `${r},${c}`;
 }
 
-/** Find all match groups of length >= 3 (rows and columns). Overlaps share cells. */
+/** Find matches: 3+ in a row/col, or any 2×2 block of the same sticker. */
 export function findMatches(board: Board): MatchGroup[] {
   const n = boardSize(board);
   const groups: MatchGroup[] = [];
@@ -122,6 +132,28 @@ export function findMatches(board: Board): MatchGroup[] {
         groups.push({ kind, cells });
       }
       r = end;
+    }
+  }
+
+  for (let r = 0; r < n - 1; r++) {
+    for (let c = 0; c < n - 1; c++) {
+      const kind = board[r]![c];
+      if (
+        kind &&
+        board[r]![c + 1] === kind &&
+        board[r + 1]![c] === kind &&
+        board[r + 1]![c + 1] === kind
+      ) {
+        groups.push({
+          kind,
+          cells: [
+            { r, c },
+            { r, c: c + 1 },
+            { r: r + 1, c },
+            { r: r + 1, c: c + 1 },
+          ],
+        });
+      }
     }
   }
 

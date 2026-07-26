@@ -1,6 +1,6 @@
 import type { LevelDef, TileKind } from "./types";
 
-/** Front face opener — varied stickers, no opening matches of 3. */
+/** Front face opener — varied stickers, no opening matches. */
 const FRONT: TileKind[][] = [
   ["skull", "heart", "bolt", "star", "flame", "diamond"],
   ["heart", "skull", "star", "headphones", "diamond", "flame"],

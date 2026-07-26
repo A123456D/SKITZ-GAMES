@@ -50,6 +50,16 @@ describe("findMatches / generate / resolve", () => {
       ]),
     ).toHaveLength(1);
   });
+  it("finds 2x2 square matches", () => {
+    const groups = findMatches([
+      ["skull", "flame", "flame", "diamond"],
+      ["bomb", "flame", "flame", "star"],
+      ["heart", "bolt", "skull", "smiley"],
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.kind).toBe("flame");
+    expect(groups[0]!.cells).toHaveLength(4);
+  });
   it("generates clean boards", () => {
     expect(findMatches(generateBoard(6, 42))).toHaveLength(0);
   });
