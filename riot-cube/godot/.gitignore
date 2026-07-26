@@ -1,0 +1,8 @@
+# Godot 4 local
+.godot/
+*.translation
+export_credentials.cfg
+android/.build/
+*.apk
+*.aab
+*.so

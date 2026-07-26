@@ -20,4 +20,4 @@ downloads: {}
 
 **RIOT CUBE** is a SKITZ match puzzle: **swipe** to twist a row or column, **rip** matches of 3+, and clear level goals before moves run out. Score earns stars.
 
-Phase 1 ships a flat slice-twist board. A full **3D cube** is the planned end state — same rules, more faces.
+Phase 1 ships a flat slice-twist board (web + Godot). A full **3D cube** is the planned end state on Godot first — same rules, more faces.
