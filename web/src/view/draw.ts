@@ -3463,17 +3463,17 @@ export function drawVolumeSlider(
   const ink = theme === "paper";
   const retro = theme === "retro";
   const isCompact = compact || !!rect.compact;
-  const knobR = isCompact ? 7 : 11;
-  const trackThick = isCompact ? 2.5 : 4;
+  const knobR = isCompact ? 9 : 14;
+  const trackThick = isCompact ? 3.5 : 5.5;
   const labelW = rect.labelW ?? (isCompact ? 42 : 110);
   void time;
   ctx.save();
   ctx.fillStyle = retro ? "#FF9DE0" : theme === "mono" ? "#FF6A6A" : P.INK_FAINT;
   ctx.font = ink
-    ? fontHand(isCompact ? 13 : 16)
+    ? fontHand(isCompact ? 14 : 18)
     : theme === "mono"
-      ? fontCyber(isCompact ? 11 : 13, 600)
-      : font(700, isCompact ? 11 : 14);
+      ? fontCyber(isCompact ? 12 : 15, 600)
+      : font(700, isCompact ? 12 : 16);
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText(label, rect.x, rect.y + rect.h / 2);

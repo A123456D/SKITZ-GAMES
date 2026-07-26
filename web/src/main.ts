@@ -1173,29 +1173,29 @@ function drawThemeGrid(y0: number): void {
 
 function pushVolumeSliders(y: number): void {
   const music: SliderRect = {
-    x: 90,
+    x: 76,
     y,
-    w: 430,
-    h: 44,
+    w: 456,
+    h: 52,
     id: "vol_music",
     value: save.musicVol,
-    labelW: 78,
+    labelW: 86,
   };
   const mute: ButtonRect = {
-    x: 536,
-    y: y + 6,
-    w: 32,
-    h: 32,
+    x: 548,
+    y: y + 7,
+    w: 38,
+    h: 38,
     id: "mute_music",
   };
   const sfx: SliderRect = {
-    x: 90,
-    y: y + 56,
-    w: 540,
-    h: 44,
+    x: 76,
+    y: y + 66,
+    w: 568,
+    h: 52,
     id: "vol_sfx",
     value: save.sfxVol,
-    labelW: 48,
+    labelW: 56,
   };
   drawVolumeSlider(ctx, music, "MUSIC", time);
   drawMuteBox(ctx, mute, save.musicMuted);
@@ -1634,19 +1634,19 @@ function drawPlay(): void {
       pLim,
     );
     const music: SliderRect = {
-      x: W / 2 - 140,
+      x: W / 2 - 180,
       y: 158,
-      w: 160,
-      h: 22,
+      w: 180,
+      h: 30,
       id: "vol_music",
       value: save.musicVol,
       compact: true,
     };
     const sfx: SliderRect = {
-      x: W / 2 + 20,
+      x: W / 2,
       y: 158,
-      w: 160,
-      h: 22,
+      w: 180,
+      h: 30,
       id: "vol_sfx",
       value: save.sfxVol,
       compact: true,
