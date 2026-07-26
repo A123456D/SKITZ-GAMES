@@ -423,8 +423,9 @@ canvas.addEventListener("pointermove", (e) => {
   if (orbitDrag) {
     const dx = p.x - orbitDrag.x0;
     const dy = p.y - orbitDrag.y0;
+    // Screen Y is down; invert so dragging up tips the cube up
     rotY = orbitDrag.rotY0 + dx * ORBIT_DRAG_SENS;
-    rotX = orbitDrag.rotX0 + dy * ORBIT_DRAG_SENS;
+    rotX = orbitDrag.rotX0 - dy * ORBIT_DRAG_SENS;
     // Keep pitch in a playable range (no upside-down diamond views)
     rotX = Math.max(-SNAP_Q * 0.95, Math.min(SNAP_Q * 0.95, rotX));
     targetRotX = rotX;
