@@ -452,7 +452,8 @@ canvas.addEventListener("pointermove", (e) => {
       drag.index = drag.c;
     }
   }
-  drag.offsetUv = drag.axis === "row" ? du : -dv;
+  // Column: finger down (+V) pulls content down so TOP slides in from the top edge.
+  drag.offsetUv = drag.axis === "row" ? du : dv;
   paint();
 });
 
