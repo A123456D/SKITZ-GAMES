@@ -66,6 +66,14 @@ let rotY = DEFAULT_ROT_Y;
 let targetRotX = DEFAULT_ROT_X;
 let targetRotY = DEFAULT_ROT_Y;
 let rotating = false;
+/** While set, cube spins continuously in that direction. */
+let orbitHold: "left" | "right" | "up" | "down" | null = null;
+let orbitHoldAt = 0;
+let orbitHoldStartX = 0;
+let orbitHoldStartY = 0;
+const ORBIT_HOLD_SPEED = 0.028; // rad/frame — slow look-around
+const ORBIT_TAP_MS = 200;
+const ORBIT_TAP_RAD = 0.15;
 
 let visualBoard: Board | null = null;
 type Crumple = { r: number; c: number; kind: TileKind; seed: number };
@@ -159,11 +167,15 @@ function paint(): void {
     paper: true,
   });
 
-  if (!rotating) {
-    orbitBtns = drawCubeOrbitButtons(ctx, layout.cx, layout.cy, layout.scale, W, H);
-  } else {
-    orbitBtns = null;
-  }
+  orbitBtns = drawCubeOrbitButtons(
+    ctx,
+    layout.cx,
+    layout.cy,
+    layout.scale,
+    W,
+    H,
+    orbitHold,
+  );
 
   const faceName = ["FRONT", "BACK", "RIGHT", "LEFT", "TOP", "BOTTOM"][session.face];
   ctx.fillStyle = "#f3efe6";
@@ -174,7 +186,7 @@ function paint(): void {
   drawHint(
     ctx,
     session.status === "playing"
-      ? "Drag stickers on the front face. Orbit buttons turn the 3D cube."
+      ? "Drag stickers to twist. Hold ‹ › ˄ ˅ to spin the cube."
       : session.status === "won"
         ? "Rip. Match. Repeat."
         : "Try another twist path.",
@@ -214,8 +226,17 @@ function tick(): void {
     }
     dirty = true;
   }
-  if (rotating) {
-    const speed = 0.12;
+  if (orbitHold) {
+    if (orbitHold === "left") rotY += ORBIT_HOLD_SPEED;
+    if (orbitHold === "right") rotY -= ORBIT_HOLD_SPEED;
+    if (orbitHold === "up") rotX -= ORBIT_HOLD_SPEED;
+    if (orbitHold === "down") rotX += ORBIT_HOLD_SPEED;
+    targetRotX = rotX;
+    targetRotY = rotY;
+    syncActiveFace();
+    dirty = true;
+  } else if (rotating) {
+    const speed = 0.14;
     rotX += (targetRotX - rotX) * speed;
     rotY += (targetRotY - rotY) * speed;
     if (Math.abs(targetRotX - rotX) < 0.01 && Math.abs(targetRotY - rotY) < 0.01) {
@@ -231,7 +252,7 @@ function tick(): void {
     dirty = true;
     if (crumpleT >= 1 && pendingTwist) finishCrumple();
   }
-  if (dirty || drag || crumples.length || rotating) paint();
+  if (dirty || drag || crumples.length || rotating || orbitHold) paint();
   requestAnimationFrame(tick);
 }
 
@@ -280,13 +301,38 @@ function doTwist(twist: Twist): void {
   paint();
 }
 
-function startOrbit(dir: "left" | "right" | "up" | "down"): void {
-  if (rotating || busy || drag || session.status !== "playing") return;
-  const step = Math.PI / 2;
-  if (dir === "left") targetRotY += step;
-  if (dir === "right") targetRotY -= step;
-  if (dir === "up") targetRotX -= step;
-  if (dir === "down") targetRotX += step;
+function beginOrbitHold(dir: "left" | "right" | "up" | "down"): void {
+  if (busy || drag || session.status !== "playing") return;
+  rotating = false;
+  orbitHold = dir;
+  orbitHoldAt = performance.now();
+  orbitHoldStartX = rotX;
+  orbitHoldStartY = rotY;
+}
+
+/** Snap to the nearest face, or treat a quick press as a 90° step. */
+function releaseOrbitHold(): void {
+  if (!orbitHold) return;
+  const dir = orbitHold;
+  const heldMs = performance.now() - orbitHoldAt;
+  const moved = Math.hypot(rotX - orbitHoldStartX, rotY - orbitHoldStartY);
+  orbitHold = null;
+  const q = Math.PI / 2;
+
+  if (heldMs < ORBIT_TAP_MS && moved < ORBIT_TAP_RAD) {
+    // Quick tap: jump one face in that direction from the starting pose
+    let tx = Math.round((orbitHoldStartX - DEFAULT_ROT_X) / q) * q + DEFAULT_ROT_X;
+    let ty = Math.round((orbitHoldStartY - DEFAULT_ROT_Y) / q) * q + DEFAULT_ROT_Y;
+    if (dir === "left") ty += q;
+    if (dir === "right") ty -= q;
+    if (dir === "up") tx -= q;
+    if (dir === "down") tx += q;
+    targetRotX = tx;
+    targetRotY = ty;
+  } else {
+    targetRotX = Math.round((rotX - DEFAULT_ROT_X) / q) * q + DEFAULT_ROT_X;
+    targetRotY = Math.round((rotY - DEFAULT_ROT_Y) / q) * q + DEFAULT_ROT_Y;
+  }
   rotating = true;
 }
 
@@ -302,6 +348,8 @@ canvas.addEventListener("pointerdown", (e) => {
       crumpleT = 0;
       pendingTwist = null;
       busy = false;
+      orbitHold = null;
+      rotating = false;
       rotX = DEFAULT_ROT_X;
       rotY = DEFAULT_ROT_Y;
       targetRotX = rotX;
@@ -310,15 +358,19 @@ canvas.addEventListener("pointerdown", (e) => {
     }
     return;
   }
-  if (rotating || busy) return;
+  if (busy) return;
 
+  // Orbit buttons stay clickable even while a snap-rotate is finishing
   if (orbitBtns) {
     const orb = hitOrbitButton(orbitBtns, p.x, p.y);
     if (orb) {
-      startOrbit(orb);
+      beginOrbitHold(orb);
+      paint();
       return;
     }
   }
+
+  if (rotating || orbitHold) return;
 
   const layout = cubeLayout();
   const hit = hitFrontUV(layout, p.x, p.y);
@@ -340,7 +392,7 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 
 canvas.addEventListener("pointermove", (e) => {
-  if (!drag || session.status !== "playing" || rotating || busy) return;
+  if (!drag || session.status !== "playing" || rotating || orbitHold || busy) return;
   const p = canvasPoint(e);
   const layout = cubeLayout();
   // Map drag in the facing face's screen axes so wrap peeks track the finger
@@ -364,6 +416,11 @@ canvas.addEventListener("pointermove", (e) => {
 });
 
 function endDrag(): void {
+  if (orbitHold) {
+    releaseOrbitHold();
+    paint();
+    return;
+  }
   if (!drag) return;
   const axis = drag.axis;
   const index = drag.index;
@@ -393,6 +450,9 @@ function endDrag(): void {
 
 canvas.addEventListener("pointerup", endDrag);
 canvas.addEventListener("pointercancel", () => {
+  if (orbitHold) {
+    releaseOrbitHold();
+  }
   if (drag?.axis) {
     springAxis = drag.axis;
     springIndex = drag.index;
