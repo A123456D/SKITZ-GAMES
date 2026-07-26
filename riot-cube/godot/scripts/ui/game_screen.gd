@@ -26,6 +26,7 @@ func _ready() -> void:
 	board.mouse_filter = Control.MOUSE_FILTER_STOP
 	_board_host.add_child(board)
 	board.twist_requested.connect(_on_twist)
+	board.move_finished.connect(_refresh)
 	_retry.pressed.connect(_on_retry)
 	_overlay.visible = false
 	session.start(RiotLevels.level_1())
@@ -64,6 +65,7 @@ func _panel_style(color: Color) -> StyleBoxFlat:
 	sb.content_margin_bottom = 10
 	return sb
 
+
 func _refresh() -> void:
 	_title.text = "RIOT CUBE"
 	_moves.text = "MOVES\n%d" % session.moves_left
@@ -74,7 +76,7 @@ func _refresh() -> void:
 	_goals.text = "GOALS  ·  " + "   ".join(parts)
 
 	if session.status == "playing":
-		_hint.text = "Swipe a row or column — matches of 3+ rip clear."
+		_hint.text = "Drag a row or column — matches burst with juice."
 		_overlay.visible = false
 	elif session.status == "won":
 		_hint.text = "Rip. Match. Repeat."
@@ -94,21 +96,18 @@ func _refresh() -> void:
 
 
 func _on_twist(twist: Dictionary) -> void:
-	var before: Array = RiotBoard.clone_board(session.board)
-	var result: Dictionary = session.apply_twist(twist)
+	var pre: Array = board.capture_visual()
+	var result: Dictionary = session.begin_twist(twist)
 	if not result["did_twist"]:
+		board.reset_anim_state()
 		return
-	board.flash_changes(before)
-	var combo: int = int(result["combo"])
-	var gain: int = int(result["score_gain"])
-	if combo > 1:
-		board.show_float("COMBO x%d" % combo)
-	elif gain > 0:
-		board.show_float("+%d" % gain)
+	board.set_visual(pre)
+	board.play_twist(twist, result["waves"])
 
 
 func _on_retry() -> void:
 	session.restart()
+	board.reset_anim_state()
 	_overlay.visible = false
 
 

@@ -12,6 +12,7 @@ var status: String = "playing" ## playing | won | lost
 var combo_peak: int = 0
 var rng: Callable
 var last_twist: Dictionary = {}
+var busy: bool = false
 
 
 static func stars_for_score(p_score: int, thresholds: Array) -> int:
@@ -52,6 +53,7 @@ func start(p_level: Dictionary) -> void:
 	status = "playing"
 	combo_peak = 0
 	last_twist = {}
+	busy = false
 	changed.emit()
 
 
@@ -66,32 +68,40 @@ func _goals_met() -> bool:
 	return true
 
 
-func apply_twist(twist: Dictionary) -> Dictionary:
-	if status != "playing" or moves_left <= 0:
-		return {"did_twist": false, "score_gain": 0, "combo": 0}
-	var twisted := RiotBoard.twist_board(board, twist)
-	var resolved := RiotBoard.resolve_board(twisted, rng)
-	for item in resolved["total_cleared"]:
+## Spend a move and return twisted board + resolve waves (does not apply waves yet).
+func begin_twist(twist: Dictionary) -> Dictionary:
+	if status != "playing" or moves_left <= 0 or busy:
+		return {"did_twist": false, "waves": [], "twisted": []}
+	busy = true
+	var twisted: Array = RiotBoard.twist_board(board, twist)
+	var waves: Array = RiotBoard.resolve_waves(twisted, rng)
+	moves_left -= 1
+	last_twist = twist.duplicate()
+	board = twisted
+	changed.emit()
+	return {"did_twist": true, "waves": waves, "twisted": twisted}
+
+
+func apply_wave(wave: Dictionary) -> void:
+	score += int(wave["score_gain"])
+	combo_peak = maxi(combo_peak, int(wave["combo"]))
+	for item in wave["cleared"]:
 		var kind := str(item["kind"])
 		var count := int(item["count"])
 		for g in goals:
 			if str(g["kind"]) == kind:
 				g["have"] = mini(int(g["need"]), int(g["have"]) + count)
-	moves_left -= 1
-	score += int(resolved["score_gain"])
-	combo_peak = maxi(combo_peak, int(resolved["combo"]))
-	board = resolved["board"]
-	last_twist = twist.duplicate()
+	board = RiotBoard.clone_board(wave["board_after"])
+	changed.emit()
+
+
+func end_twist() -> void:
+	busy = false
 	if _goals_met():
 		status = "won"
 	elif moves_left <= 0:
 		status = "lost"
 	changed.emit()
-	return {
-		"did_twist": true,
-		"score_gain": int(resolved["score_gain"]),
-		"combo": int(resolved["combo"]),
-	}
 
 
 func stars() -> int:

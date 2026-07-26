@@ -167,24 +167,19 @@ static func refill_board(board: Array, rng: Callable) -> Array:
 
 
 static func resolve_board(board: Array, rng: Callable) -> Dictionary:
-	var current := clone_board(board)
+	var waves := resolve_waves(board, rng)
 	var totals: Dictionary = {}
 	var score_gain := 0
 	var combo := 0
-	while true:
-		var groups := find_matches(current)
-		if groups.is_empty():
-			break
-		combo += 1
-		var cleared := clear_matches(current, groups)
-		var gain: int = int(cleared["cell_count"]) * 10 * combo
-		score_gain += gain
-		for item in cleared["cleared"]:
+	var current := clone_board(board)
+	if waves.size() > 0:
+		current = waves[waves.size() - 1]["board_after"]
+	for wave in waves:
+		combo = int(wave["combo"])
+		score_gain += int(wave["score_gain"])
+		for item in wave["cleared"]:
 			var k: String = str(item["kind"])
 			totals[k] = int(totals.get(k, 0)) + int(item["count"])
-		current = cleared["board"]
-		current = apply_gravity(current)
-		current = refill_board(current, rng)
 	var total_cleared: Array = []
 	for k in totals.keys():
 		total_cleared.append({"kind": k, "count": totals[k]})
@@ -193,4 +188,53 @@ static func resolve_board(board: Array, rng: Callable) -> Dictionary:
 		"total_cleared": total_cleared,
 		"score_gain": score_gain,
 		"combo": combo,
+		"waves": waves,
 	}
+
+
+## Returns each match wave for animation: groups, cleared, boards before/after gravity+refill.
+static func resolve_waves(board: Array, rng: Callable) -> Array:
+	var current := clone_board(board)
+	var waves: Array = []
+	var combo := 0
+	while true:
+		var groups := find_matches(current)
+		if groups.is_empty():
+			break
+		combo += 1
+		var board_before_clear := clone_board(current)
+		var cleared := clear_matches(current, groups)
+		var gain: int = int(cleared["cell_count"]) * 10 * combo
+		var after_clear: Array = cleared["board"]
+		var after_gravity: Array = apply_gravity(after_clear)
+		var after_refill: Array = refill_board(after_gravity, rng)
+		waves.append({
+			"combo": combo,
+			"groups": groups,
+			"cleared": cleared["cleared"],
+			"cell_count": cleared["cell_count"],
+			"score_gain": gain,
+			"board_before": board_before_clear,
+			"matched_cells": _matched_cell_list(groups),
+			"board_after_clear": after_clear,
+			"board_after": after_refill,
+		})
+		current = after_refill
+	return waves
+
+
+static func _matched_cell_list(groups: Array) -> Array:
+	var seen: Dictionary = {}
+	var cells: Array = []
+	for g in groups:
+		for cell in g["cells"]:
+			var key := "%d,%d" % [int(cell["r"]), int(cell["c"])]
+			if seen.has(key):
+				continue
+			seen[key] = true
+			cells.append({
+				"r": int(cell["r"]),
+				"c": int(cell["c"]),
+				"kind": str(g["kind"]),
+			})
+	return cells
