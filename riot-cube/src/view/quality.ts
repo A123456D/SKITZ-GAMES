@@ -26,7 +26,8 @@ export function detectQuality(): RenderQuality {
     ? {
         dprCap: 1.5,
         stickerShadows: false,
-        hoverAnim: false,
+        // Keep bob/wobble on touch devices — cheap vs shadows/DPR.
+        hoverAnim: true,
       }
     : {
         dprCap: 2,
