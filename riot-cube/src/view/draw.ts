@@ -422,7 +422,7 @@ export function drawHint(ctx: CanvasRenderingContext2D, text: string): void {
   ctx.fillText(text, 64, 1186);
 }
 
-/** Bottom play dock — D-pad + row/col selector (selected lane floats). */
+/** Bottom play controls — D-pad far left, row/col selector far right. */
 export type PlayDock = {
   up: UiRect;
   down: UiRect;
@@ -455,22 +455,39 @@ export function drawPlayDock(
   opts: { mode: "row" | "col"; index: number; size: number },
 ): PlayDock {
   const y = 1125;
-  const h = 140;
-  const dockX = 160;
-  const dockW = 400;
+  const edge = 24;
+
+  // Left cluster — orbit D-pad
+  const padW = 200;
+  const padH = 140;
   ctx.fillStyle = "#1b1b1b";
-  roundRect(ctx, dockX, y, dockW, h, 8);
+  roundRect(ctx, edge, y, padW, padH, 8);
   ctx.fill();
   ctx.fillStyle = "#c8ff3d";
-  ctx.fillRect(dockX + 30, y - 8, 52, 12);
+  ctx.fillRect(edge + 18, y - 8, 44, 12);
 
-  // D-pad on the left; selector on the right.
-  const padCx = dockX + 118;
+  const padCx = edge + padW / 2;
   const up: UiRect = { x: padCx - 32, y: y + 12, w: 64, h: 36 };
-  const left: UiRect = { x: padCx - 100, y: y + 52, w: 64, h: 36 };
-  const right: UiRect = { x: padCx + 36, y: y + 52, w: 64, h: 36 };
+  const left: UiRect = { x: padCx - 96, y: y + 52, w: 64, h: 36 };
+  const right: UiRect = { x: padCx + 32, y: y + 52, w: 64, h: 36 };
   const down: UiRect = { x: padCx - 32, y: y + 94, w: 64, h: 36 };
-  const select: UiRect = { x: dockX + 250, y: y + 40, w: 120, h: 60 };
+
+  // Right cluster — row/col selector
+  const selW = 132;
+  const selH = 140;
+  const selPanelX = W - edge - selW;
+  ctx.fillStyle = "#1b1b1b";
+  roundRect(ctx, selPanelX, y, selW, selH, 8);
+  ctx.fill();
+  ctx.fillStyle = "#c8ff3d";
+  ctx.fillRect(selPanelX + selW - 62, y - 8, 44, 12);
+
+  const select: UiRect = {
+    x: selPanelX + 16,
+    y: y + 40,
+    w: selW - 32,
+    h: 60,
+  };
 
   dockBtn(ctx, up, "˄");
   dockBtn(ctx, left, "‹");
