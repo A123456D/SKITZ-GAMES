@@ -929,7 +929,7 @@ async function boot(): Promise<void> {
   resize();
   await Promise.all([loadLogo(), loadStickers()]);
   ensureThemeArt("classroom");
-  ensureThemeArt("grime");
+  ensureThemeArt("edgy");
   ensureAnimeArtBoth();
   syncActiveFace();
   requestAnimationFrame(tick);

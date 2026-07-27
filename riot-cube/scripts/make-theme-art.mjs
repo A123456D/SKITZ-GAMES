@@ -15,7 +15,7 @@ const jobs = [
     btn: "riot-classic-btn.png",
   },
   {
-    theme: "grime",
+    theme: "edgy",
     bg: "riot-grime-bg.png",
     btn: "riot-grime-btn.png",
   },

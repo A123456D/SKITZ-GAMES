@@ -1,4 +1,4 @@
-export const THEME_IDS = ["classroom", "grime", "anime"] as const;
+export const THEME_IDS = ["classroom", "edgy", "anime"] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
 export type ThemePalette = {
@@ -83,8 +83,8 @@ const CLASSROOM_PALETTE: ThemePalette = {
   browser: "#c9b896",
 };
 
-/** Matches GRIME sticker sheet: black field, purple/pink graffiti. */
-const GRIME_PALETTE: ThemePalette = {
+/** Edgy sticker pack: black field, purple/pink graffiti accents. */
+const EDGY_PALETTE: ThemePalette = {
   desk0: "#0c0a10",
   desk1: "#030203",
   accent: "#c084fc",
@@ -196,7 +196,7 @@ export type ThemeAssetDir = ThemeId | "anime-dark";
 
 export const THEMES: ThemeDef[] = [
   { id: "classroom", label: "CLASS ROOM", palette: CLASSROOM_PALETTE },
-  { id: "grime", label: "GRIME", palette: GRIME_PALETTE },
+  { id: "edgy", label: "EDGY", palette: EDGY_PALETTE },
   { id: "anime", label: "ANIME", palette: ANIME_PALETTE },
 ];
 
@@ -209,19 +209,20 @@ let animeMode: AnimeMode = loadAnimeMode();
 function loadStored(): ThemeId {
   try {
     let v = localStorage.getItem(THEME_KEY);
-    if (v === "classic") {
-      v = "classroom";
+    if (v === "classic") v = "classroom";
+    if (v === "grime") v = "edgy";
+    if (v === "classroom" || v === "edgy" || v === "anime") {
       try {
         localStorage.setItem(THEME_KEY, v);
       } catch {
         /* ignore */
       }
+      return v;
     }
-    if (v && (THEME_IDS as readonly string[]).includes(v)) return v as ThemeId;
   } catch {
     /* ignore */
   }
-  return "grime";
+  return "edgy";
 }
 
 function loadAnimeMode(): AnimeMode {
@@ -287,7 +288,7 @@ export function setTheme(id: ThemeId): void {
   applyThemeChrome();
 }
 
-/** Cycle classroom → grime → anime → … */
+/** Cycle classroom → edgy → anime → … */
 export function cycleTheme(): ThemeId {
   const i = THEME_IDS.indexOf(current);
   const next = THEME_IDS[(i + 1) % THEME_IDS.length]!;
