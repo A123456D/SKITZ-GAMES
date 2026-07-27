@@ -1,4 +1,4 @@
-/** Sticker symbols (plain 8-ball excluded). */
+/** All sticker assets (kept for loading / rare cosmetics). */
 export const TILE_KINDS = [
   "skull",
   "heart",
@@ -14,6 +14,18 @@ export const TILE_KINDS = [
 ] as const;
 
 export type TileKind = (typeof TILE_KINDS)[number];
+
+/** Match-3 play pool — denser boards, real matches. */
+export const PLAY_KINDS = [
+  "skull",
+  "heart",
+  "bolt",
+  "star",
+  "flame",
+  "diamond",
+] as const satisfies readonly TileKind[];
+
+export type PlayKind = (typeof PLAY_KINDS)[number];
 
 /** Empty cell during cascade / clear. */
 export type Cell = TileKind | null;
@@ -47,6 +59,13 @@ export type LevelDef = {
   board?: TileKind[][];
   /** Optional fixed back face. */
   boardBack?: TileKind[][];
+  /** Optional fixed right / left / top / bottom (faces 2–5). */
+  boardRight?: TileKind[][];
+  boardLeft?: TileKind[][];
+  boardTop?: TileKind[][];
+  boardBottom?: TileKind[][];
+  /** Sticker pool for generated faces / refill (default PLAY_KINDS). */
+  kinds?: readonly TileKind[];
   seed?: number;
   starScores: [number, number, number];
 };

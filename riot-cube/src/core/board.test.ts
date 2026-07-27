@@ -7,7 +7,7 @@ import {
   mulberry32,
   type Board,
 } from "./board";
-import { applyTwist, setActiveFace, startSession, starsForScore } from "./session";
+import { applyTwist, setActiveFace, spendOrbit, startSession, starsForScore } from "./session";
 import { facingFace } from "../view/cube3d";
 
 describe("twistBoard", () => {
@@ -157,11 +157,13 @@ describe("session + cube", () => {
     const result = applyTwist(session, { axis: "row", index: 2, dir: 1 });
     expect(result.didTwist).toBe(true);
     expect(result.scoreGain).toBe(0);
+    expect(result.spentMove).toBe(false);
+    expect(result.session.movesLeft).toBe(5);
     expect(result.session.goals[0]!.have).toBe(0);
     expect(result.session.faces[1]![0]).toEqual(["heart", "heart", "heart"]);
   });
 
-  it("wins on goal clear", () => {
+  it("spends a move only when a clear scores", () => {
     const session = startSession({
       id: "g",
       title: "G",
@@ -171,15 +173,78 @@ describe("session + cube", () => {
       starScores: [10, 20, 30],
       board: [
         ["heart", "heart", "bolt"],
-        ["star", "flame", "heart"],
-        ["skull", "diamond", "star"],
+        ["star", "flame", "skull"],
+        ["diamond", "skull", "star"],
+      ],
+      boardLeft: [
+        ["bolt", "star", "heart"],
+        ["diamond", "skull", "bolt"],
+        ["star", "flame", "diamond"],
+      ],
+      boardRight: [
+        ["flame", "bolt", "star"],
+        ["skull", "diamond", "flame"],
+        ["bolt", "star", "skull"],
+      ],
+      boardBack: [
+        ["diamond", "flame", "bolt"],
+        ["star", "skull", "diamond"],
+        ["flame", "bolt", "star"],
+      ],
+      boardTop: [
+        ["skull", "bolt", "flame"],
+        ["diamond", "star", "skull"],
+        ["bolt", "flame", "diamond"],
+      ],
+      boardBottom: [
+        ["star", "diamond", "skull"],
+        ["flame", "bolt", "star"],
+        ["diamond", "skull", "flame"],
       ],
     });
-    const win = applyTwist(session, { axis: "col", index: 2, dir: -1 });
+    const dry = applyTwist(session, { axis: "row", index: 1, dir: 1 });
+    expect(dry.spentMove).toBe(false);
+    expect(dry.session.movesLeft).toBe(5);
+
+    const win = applyTwist(session, { axis: "row", index: 0, dir: 1 });
+    expect(win.scoreGain).toBeGreaterThan(0);
+    expect(win.spentMove).toBe(true);
     expect(win.session.status).toBe("won");
+    expect(win.session.movesLeft).toBe(4);
+  });
+
+  it("orbit spend burns a move", () => {
+    const session = startSession({
+      id: "o",
+      title: "O",
+      size: 3,
+      moves: 2,
+      goals: [{ kind: "heart", need: 99 }],
+      starScores: [1, 2, 3],
+    });
+    const a = spendOrbit(session);
+    expect(a.didSpend).toBe(true);
+    expect(a.session.movesLeft).toBe(1);
   });
 
   it("maps stars", () => {
     expect(starsForScore(250, [100, 200, 300])).toBe(2);
+  });
+});
+
+describe("level openers", () => {
+  it("level 1 front has multiple scoring opening twists", async () => {
+    const { LEVEL_1 } = await import("./levels");
+    const s = startSession(LEVEL_1);
+    expect(findMatches(s.board)).toHaveLength(0);
+    let hits = 0;
+    for (const axis of ["row", "col"] as const) {
+      for (let index = 0; index < 6; index++) {
+        for (const dir of [1, -1] as const) {
+          if (applyTwist(s, { axis, index, dir }).scoreGain > 0) hits++;
+        }
+      }
+    }
+    expect(hits).toBeGreaterThanOrEqual(2);
   });
 });

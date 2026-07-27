@@ -1,8 +1,10 @@
-import { LEVEL_1 } from "./core/levels";
+import { LEVELS } from "./core/levels";
 import {
   applyTwist,
+  nextLevelIndex,
   setActiveFace,
   restartSession,
+  spendOrbit,
   startSession,
   starsForScore,
   type FaceId,
@@ -72,12 +74,12 @@ type Screen = "home" | "play" | "menu" | "settings";
 let screen: Screen = "home";
 let settingsFrom: Screen = "home";
 
-let session: Session = startSession(LEVEL_1);
+let session: Session = startSession(LEVELS[0]!);
+let levelIndex = 0;
 let floatText: { text: string; life: number } | null = null;
-/** Selected row/col for bottom dock — selected lane floats. */
-let controlMode: "row" | "col" = "row";
-let controlIndex = 0;
 let playDock: PlayDock | null = null;
+/** Face when an orbit drag started — charge one move if it changes on release. */
+let orbitDragFace: FaceId | null = null;
 
 type DragState = {
   u0: number;
@@ -182,15 +184,6 @@ function activeMotion(): {
       hovering: Math.abs(springUv) > 0.01,
     };
   }
-  // Idle selection from the dock — keep that lane floating.
-  if (screen === "play" && session.status === "playing") {
-    return {
-      axis: controlMode,
-      index: controlIndex,
-      offset: 0,
-      hovering: true,
-    };
-  }
   return { axis: null, index: -1, offset: 0, hovering: false };
 }
 
@@ -216,20 +209,32 @@ function resetPlayVisuals(): void {
 function goHome(): void {
   screen = "home";
   resetPlayVisuals();
-  controlMode = "row";
-  controlIndex = 0;
-  session = startSession(LEVEL_1);
+  levelIndex = 0;
+  session = startSession(LEVELS[0]!);
   syncActiveFace();
   paint();
 }
 
-function startPlay(): void {
+function startPlay(index = 0): void {
   resetPlayVisuals();
-  controlMode = "row";
-  controlIndex = 0;
-  session = startSession(LEVEL_1);
+  levelIndex = Math.max(0, Math.min(index, LEVELS.length - 1));
+  session = startSession(LEVELS[levelIndex]!);
   syncActiveFace();
   screen = "play";
+  paint();
+}
+
+function advanceOrRetry(): void {
+  if (session.status === "won") {
+    const next = nextLevelIndex(LEVELS, session.level.id);
+    if (next >= 0) {
+      startPlay(next);
+      return;
+    }
+  }
+  session = restartSession(session);
+  resetPlayVisuals();
+  syncActiveFace();
   paint();
 }
 
@@ -295,9 +300,7 @@ function paint(): void {
   ctx.textAlign = "center";
   ctx.fillText(`FACE · ${faceName}`, W / 2, 1008);
 
-  const n = session.level.size;
-  controlIndex = ((controlIndex % n) + n) % n;
-  playDock = drawPlayDock(ctx, { mode: controlMode, index: controlIndex, size: n });
+  playDock = drawPlayDock(ctx);
 
   if (floatText && floatText.life > 0) {
     ctx.save();
@@ -313,6 +316,7 @@ function paint(): void {
       won: session.status === "won",
       score: session.score,
       stars: starsForScore(session.score, session.level.starScores),
+      hasNext: session.status === "won" && nextLevelIndex(LEVELS, session.level.id) >= 0,
     });
   }
 
@@ -436,59 +440,22 @@ function orbitSens(): number {
 
 function hitPlayDock(x: number, y: number): boolean {
   if (!playDock || session.status !== "playing" || busy) return false;
-  const n = session.level.size;
   const d = playDock;
-
-  if (hitUiRect(d.select, x, y)) {
-    controlMode = controlMode === "row" ? "col" : "row";
-    controlIndex = Math.min(controlIndex, n - 1);
-    sfxPaperRustle();
-    paint();
+  if (hitUiRect(d.up, x, y)) {
+    startOrbitStep("up");
     return true;
   }
-
-  if (controlMode === "row") {
-    if (hitUiRect(d.left, x, y)) {
-      doTwist({ axis: "row", index: controlIndex, dir: -1, amount: 1 });
-      return true;
-    }
-    if (hitUiRect(d.right, x, y)) {
-      doTwist({ axis: "row", index: controlIndex, dir: 1, amount: 1 });
-      return true;
-    }
-    if (hitUiRect(d.up, x, y)) {
-      controlIndex = (controlIndex - 1 + n) % n;
-      sfxPaperRustle();
-      paint();
-      return true;
-    }
-    if (hitUiRect(d.down, x, y)) {
-      controlIndex = (controlIndex + 1) % n;
-      sfxPaperRustle();
-      paint();
-      return true;
-    }
-  } else {
-    if (hitUiRect(d.up, x, y)) {
-      doTwist({ axis: "col", index: controlIndex, dir: -1, amount: 1 });
-      return true;
-    }
-    if (hitUiRect(d.down, x, y)) {
-      doTwist({ axis: "col", index: controlIndex, dir: 1, amount: 1 });
-      return true;
-    }
-    if (hitUiRect(d.left, x, y)) {
-      controlIndex = (controlIndex - 1 + n) % n;
-      sfxPaperRustle();
-      paint();
-      return true;
-    }
-    if (hitUiRect(d.right, x, y)) {
-      controlIndex = (controlIndex + 1) % n;
-      sfxPaperRustle();
-      paint();
-      return true;
-    }
+  if (hitUiRect(d.down, x, y)) {
+    startOrbitStep("down");
+    return true;
+  }
+  if (hitUiRect(d.left, x, y)) {
+    startOrbitStep("left");
+    return true;
+  }
+  if (hitUiRect(d.right, x, y)) {
+    startOrbitStep("right");
+    return true;
   }
   return false;
 }
@@ -518,7 +485,16 @@ function nearestAngle(from: number, to: number): number {
 
 function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
   if (busy || drag || session.status !== "playing") return;
+  if (session.movesLeft <= 0) {
+    floatText = { text: "NO MOVES", life: 0.85 };
+    paint();
+    return;
+  }
+  const spent = spendOrbit(session);
+  if (!spent.didSpend) return;
+  session = spent.session;
   orbitDrag = null;
+  orbitDragFace = null;
   // Finish any in-flight tip before stacking another step.
   if (rotating) {
     rotX = targetRotX;
@@ -546,7 +522,13 @@ function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
 }
 
 function beginOrbitDrag(x: number, y: number): void {
+  if (session.movesLeft <= 0) {
+    floatText = { text: "NO MOVES", life: 0.85 };
+    paint();
+    return;
+  }
   rotating = false;
+  orbitDragFace = session.face;
   orbitDrag = { x0: x, y0: y, rotX0: rotX, rotY0: rotY };
 }
 
@@ -557,6 +539,12 @@ function endOrbitDrag(): void {
   targetRotX = nearestAngle(rotX, snapped.x);
   targetRotY = nearestAngle(rotY, snapped.y);
   rotating = true;
+  const nextFace = facingFace(targetRotX, targetRotY) as FaceId;
+  if (orbitDragFace !== null && nextFace !== orbitDragFace) {
+    const spent = spendOrbit(session);
+    if (spent.didSpend) session = spent.session;
+  }
+  orbitDragFace = null;
 }
 
 canvas.addEventListener(
@@ -631,10 +619,7 @@ canvas.addEventListener(
       return;
     }
     if (hitRetry(p.x, p.y)) {
-      session = restartSession(session);
-      resetPlayVisuals();
-      syncActiveFace();
-      paint();
+      advanceOrRetry();
     }
     return;
   }
@@ -674,7 +659,6 @@ canvas.addEventListener(
     const n = session.level.size;
     const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
     const r = Math.min(n - 1, Math.max(0, Math.floor(hit.v * n)));
-    controlIndex = controlMode === "row" ? r : c;
     drag = {
       u0: hit.u,
       v0: hit.v,

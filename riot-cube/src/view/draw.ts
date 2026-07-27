@@ -423,13 +423,12 @@ export function drawHint(ctx: CanvasRenderingContext2D, text: string): void {
   ctx.fillText(text, 64, 1186);
 }
 
-/** Bottom play controls — D-pad far left, row/col selector far right. */
+/** Bottom play controls — D-pad orbits; swipe the face to twist. */
 export type PlayDock = {
   up: UiRect;
   down: UiRect;
   left: UiRect;
   right: UiRect;
-  select: UiRect;
 };
 
 function drawDockImage(
@@ -464,10 +463,7 @@ function dockBtnFallback(
   ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
 }
 
-export function drawPlayDock(
-  ctx: CanvasRenderingContext2D,
-  opts: { mode: "row" | "col"; index: number; size: number },
-): PlayDock {
+export function drawPlayDock(ctx: CanvasRenderingContext2D): PlayDock {
   const edge = 20;
   const btn = 78;
   const gap = 8;
@@ -475,7 +471,6 @@ export function drawPlayDock(
   const padH = btn * 3 + gap * 2 + 20;
   const y = H - edge - padH;
 
-  // Left cluster — orbit D-pad
   ctx.fillStyle = "#1b1b1b";
   roundRect(ctx, edge, y, padW, padH, 10);
   ctx.fill();
@@ -494,24 +489,6 @@ export function drawPlayDock(
     h: btn,
   };
 
-  // Right cluster — row/col selector
-  const sel = 112;
-  const selW = sel + 28;
-  const selH = padH;
-  const selPanelX = W - edge - selW;
-  ctx.fillStyle = "#1b1b1b";
-  roundRect(ctx, selPanelX, y, selW, selH, 10);
-  ctx.fill();
-  ctx.fillStyle = "#c8ff3d";
-  ctx.fillRect(selPanelX + selW - 64, y - 8, 48, 12);
-
-  const select: UiRect = {
-    x: selPanelX + (selW - sel) / 2,
-    y: y + (selH - sel) / 2,
-    w: sel,
-    h: sel,
-  };
-
   drawDockImage(ctx, up, uiButtonImage("orbit-up"), () =>
     dockBtnFallback(ctx, up, "˄"),
   );
@@ -525,25 +502,32 @@ export function drawPlayDock(
     dockBtnFallback(ctx, down, "˅"),
   );
 
-  const selLabel = opts.mode === "row" ? `R${opts.index + 1}` : `C${opts.index + 1}`;
-  const selImg = uiButtonImage("select");
-  drawDockImage(ctx, select, selImg, () =>
-    dockBtnFallback(ctx, select, selLabel, { fill: "#c8ff3d", ink: "#111" }),
-  );
-  if (selImg) {
-    ctx.fillStyle = "#111";
-    ctx.font = "800 36px 'Chakra Petch', sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(selLabel, select.x + select.w / 2, select.y + select.h / 2 + 2);
-  }
+  const tipW = 200;
+  const tipH = padH;
+  const tipX = W - edge - tipW;
+  ctx.fillStyle = "#1b1b1b";
+  roundRect(ctx, tipX, y, tipW, tipH, 10);
+  ctx.fill();
+  ctx.fillStyle = "#ff2d6a";
+  ctx.fillRect(tipX + tipW - 64, y - 8, 48, 12);
+  ctx.fillStyle = "#c8ff3d";
+  ctx.font = "800 16px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("SWIPE", tipX + tipW / 2, y + tipH / 2 - 18);
+  ctx.fillStyle = "#f3efe6";
+  ctx.font = "700 15px 'Chakra Petch', sans-serif";
+  ctx.fillText("face to twist", tipX + tipW / 2, y + tipH / 2 + 6);
+  ctx.fillStyle = "#888";
+  ctx.font = "600 12px 'Chakra Petch', sans-serif";
+  ctx.fillText("D-pad flips · 1 move", tipX + tipW / 2, y + tipH / 2 + 28);
 
-  return { up, down, left, right, select };
+  return { up, down, left, right };
 }
 
 export function drawEndOverlay(
   ctx: CanvasRenderingContext2D,
-  opts: { won: boolean; score: number; stars: number },
+  opts: { won: boolean; score: number; stars: number; hasNext?: boolean },
 ): void {
   ctx.fillStyle = "rgba(0,0,0,0.62)";
   ctx.fillRect(0, 0, W, H);
@@ -568,7 +552,8 @@ export function drawEndOverlay(
   ctx.fill();
   ctx.fillStyle = "#fff";
   ctx.font = "800 22px 'Chakra Petch', sans-serif";
-  ctx.fillText(opts.won ? "AGAIN" : "RETRY", 310, 676);
+  const label = opts.won ? (opts.hasNext ? "NEXT" : "AGAIN") : "RETRY";
+  ctx.fillText(label, 310, 676);
 }
 
 export type UiRect = { x: number; y: number; w: number; h: number };
@@ -661,7 +646,7 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = "#c8ff3d";
   ctx.font = "600 20px 'Patrick Hand', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("Twist faces. Rip matches. Cascade hard.", W / 2, 680);
+  ctx.fillText("Swipe to twist. Flip costs a move.", W / 2, 680);
 
   // Accent how-to strip
   ctx.fillStyle = "#1b1b1b";
@@ -670,11 +655,11 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = "#c8ff3d";
   ctx.fillRect(160, 700, 70, 14);
   ctx.fillStyle = "#f3efe6";
-  ctx.font = "600 18px 'Patrick Hand', sans-serif";
+  ctx.font = "600 17px 'Patrick Hand', sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("• Slide a row or column to twist", 160, 750);
-  ctx.fillText("• Match 3+ — lines, squares, L/T shapes", 160, 780);
-  ctx.fillText("• Only the face you look at scores", 160, 810);
+  ctx.fillText("• Swipe a row/col — dry twists are free", 150, 748);
+  ctx.fillText("• Match 3+ spends a move · flip costs one", 150, 778);
+  ctx.fillText("• Only the face you look at scores", 150, 808);
 
   drawPaperButton(ctx, HOME_PLAY, "PLAY", {
     fill: "#ff2d6a",

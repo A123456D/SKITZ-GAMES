@@ -1,5 +1,5 @@
 import {
-  TILE_KINDS,
+  PLAY_KINDS,
   type Cell,
   type Coord,
   type MatchGroup,
@@ -32,15 +32,22 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-export function randomKind(rng: () => number, exclude?: TileKind[]): TileKind {
-  const pool = exclude?.length
-    ? TILE_KINDS.filter((k) => !exclude.includes(k))
-    : [...TILE_KINDS];
-  return pool[Math.floor(rng() * pool.length)]!;
+export function randomKind(
+  rng: () => number,
+  exclude?: TileKind[],
+  kinds: readonly TileKind[] = PLAY_KINDS,
+): TileKind {
+  const pool = exclude?.length ? kinds.filter((k) => !exclude.includes(k)) : [...kinds];
+  const use = pool.length ? pool : [...kinds];
+  return use[Math.floor(rng() * use.length)]!;
 }
 
 /** Fill board with no pre-existing matches (3+ lines or 2×2 squares). */
-export function generateBoard(size: number, seed: number): Board {
+export function generateBoard(
+  size: number,
+  seed: number,
+  kinds: readonly TileKind[] = PLAY_KINDS,
+): Board {
   const rng = mulberry32(seed);
   const board = createEmpty(size);
   for (let r = 0; r < size; r++) {
@@ -62,7 +69,7 @@ export function generateBoard(size: number, seed: number): Board {
       ) {
         banned.push(board[r - 1]![c - 1]!);
       }
-      board[r]![c] = randomKind(rng, banned);
+      board[r]![c] = randomKind(rng, banned, kinds);
     }
   }
   return board;
@@ -267,12 +274,16 @@ export function applyGravity(board: Board): Board {
   return next;
 }
 
-export function refillBoard(board: Board, rng: () => number): Board {
+export function refillBoard(
+  board: Board,
+  rng: () => number,
+  kinds: readonly TileKind[] = PLAY_KINDS,
+): Board {
   const n = boardSize(board);
   const next = cloneBoard(board);
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
-      if (!next[r]![c]) next[r]![c] = randomKind(rng);
+      if (!next[r]![c]) next[r]![c] = randomKind(rng, undefined, kinds);
     }
   }
   return next;
@@ -301,7 +312,11 @@ function mergeCleared(
 }
 
 /** After a twist: match → clear → gravity → refill, repeat until stable. */
-export function resolveBoard(board: Board, rng: () => number): ResolveResult {
+export function resolveBoard(
+  board: Board,
+  rng: () => number,
+  kinds: readonly TileKind[] = PLAY_KINDS,
+): ResolveResult {
   let current = cloneBoard(board);
   const steps: ResolveStep[] = [];
   const totals = new Map<TileKind, number>();
@@ -327,7 +342,7 @@ export function resolveBoard(board: Board, rng: () => number): ResolveResult {
     steps.push({ type: "gravity" });
     current = applyGravity(current);
     steps.push({ type: "refill" });
-    current = refillBoard(current, rng);
+    current = refillBoard(current, rng, kinds);
   }
 
   return {

@@ -1,7 +1,7 @@
 ---
 title: RIOT CUBE
 tagline: Twist. Rip. Match.
-summary: Twist rows and columns like cube slices to rip sticker matches. Mobile-first puzzle — free in the browser, install on Android from Chrome. 3D cube mode is the end goal.
+summary: Swipe rows and columns to twist cube slices, rip sticker matches, and clear level goals. Dry twists are free — matching and flipping cost moves. Mobile-first puzzle — free in the browser, install on Android from Chrome.
 cover: /images/logo-riot-cube-v3.png
 screenshots: []
 featured: true
@@ -18,6 +18,4 @@ webPlayPath: web/index.html
 downloads: {}
 ---
 
-**RIOT CUBE** is a SKITZ match puzzle: **swipe** to twist a row or column, **rip** matches of 3+, and clear level goals before moves run out. Score earns stars.
-
-Phase 1 ships a flat slice-twist board (web + Godot). A full **3D cube** is the planned end state on Godot first — same rules, more faces.
+**RIOT CUBE** is a SKITZ match puzzle: **swipe** to twist a row or column, **rip** matches of 3+, and clear level goals. Matching twists and cube flips spend moves; dry twists are free. Score earns stars across multiple levels.

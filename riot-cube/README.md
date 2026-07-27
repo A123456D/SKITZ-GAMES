@@ -23,6 +23,14 @@ Then open `/games/riot-cube/play/` on the site.
 
 Dev: `npm run dev` (port 5175).
 
+## Rules (web)
+
+- **6 sticker kinds** on a 6×6 face (dense enough to match)
+- **Swipe** a row/column to twist · **D-pad / chevrons** flip the cube
+- **Dry twists are free** · **matching clears** and **flips** each cost a move
+- Only the face you look at scores
+- Three levels with rising pressure
+
 ## Godot / Android
 
 Open `riot-cube/godot/` in **Godot 4.7**. See `godot/README.md` for export steps.
@@ -30,4 +38,4 @@ Open `riot-cube/godot/` in **Godot 4.7**. See `godot/README.md` for export steps
 ## Roadmap
 
 1. **Now:** 3D cube (6 faces) + row/column twists on the facing face, goals + score stars (web)
-2. **Later:** Port the 3D cube to Godot for Android; true Rubik-style slice turns across faces
+2. **Later:** Port economy + levels to Godot for Android; true Rubik-style slice turns across faces
