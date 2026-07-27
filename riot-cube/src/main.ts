@@ -53,7 +53,12 @@ import {
   type CubeLayout,
   type CubeMotion,
 } from "./view/cube3d";
-import { applyOrbitDrag, orbitStepDelta, ORBIT_DRAG_SENS, SNAP_Q } from "./view/orbit";
+import {
+  applyOrbitDrag,
+  orbitStepTarget,
+  ORBIT_DRAG_SENS,
+  snapOrbitToFace,
+} from "./view/orbit";
 import {
   cycleSfxVolume,
   getSfxVolume,
@@ -220,17 +225,15 @@ function orbitSens(): number {
 }
 
 function snapAngles(rx: number, ry: number): { x: number; y: number } {
-  const qx = Math.round(rx / SNAP_Q);
-  const qy = Math.round(ry / SNAP_Q);
-  let x = qx * SNAP_Q;
-  let y = qy * SNAP_Q;
-  const pitchCycle = ((qx % 4) + 4) % 4;
-  const yawCycle = ((qy % 4) + 4) % 4;
-  if (pitchCycle === 0 && yawCycle === 0) {
-    x = DEFAULT_ROT_X;
-    y = DEFAULT_ROT_Y;
+  const snapped = snapOrbitToFace(rx, ry);
+  // Home tip only on front — keeps a little depth without reintroducing gimbal snaps.
+  if (
+    Math.abs(nearestAngle(snapped.x, 0) - snapped.x) < 0.001 &&
+    Math.abs(nearestAngle(snapped.y, 0) - snapped.y) < 0.001
+  ) {
+    return { x: DEFAULT_ROT_X, y: DEFAULT_ROT_Y };
   }
-  return { x, y };
+  return snapped;
 }
 
 function nearestAngle(from: number, to: number): number {
@@ -255,12 +258,13 @@ function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
     tx = 0;
     ty = 0;
   } else {
-    tx = Math.round(tx / SNAP_Q) * SNAP_Q;
-    ty = Math.round(ty / SNAP_Q) * SNAP_Q;
+    const snapped = snapOrbitToFace(tx, ty);
+    tx = snapped.x;
+    ty = snapped.y;
   }
-  const { dRotX, dRotY } = orbitStepDelta(dir);
-  targetRotX = tx + dRotX;
-  targetRotY = ty + dRotY;
+  const next = orbitStepTarget(tx, ty, dir);
+  targetRotX = next.rotX;
+  targetRotY = next.rotY;
   rotating = true;
   sfxPaperFlutter();
   syncActiveFace();

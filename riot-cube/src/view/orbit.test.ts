@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import { facingFace } from "./cube3d";
 import {
   applyOrbitDrag,
+  faceAfterOrbitDir,
   faceAfterOrbitStep,
+  orbitStepTarget,
   ORBIT_DRAG_SENS,
   SNAP_Q,
+  snapOrbitToFace,
 } from "./orbit";
 
 describe("orbit mapping (do not flip casually)", () => {
@@ -47,5 +50,33 @@ describe("orbit mapping (do not flip casually)", () => {
     expect(facingFace(SNAP_Q * 2, 0)).toBe(1); // BACK
     expect(facingFace(SNAP_Q * 3, 0)).toBe(4); // TOP
     expect(facingFace(SNAP_Q * 4, 0)).toBe(0); // FRONT
+  });
+
+  it("from BOTTOM, ˄ continues vertically to BACK (not LEFT/RIGHT)", () => {
+    expect(faceAfterOrbitDir(SNAP_Q, 0, "up")).toBe(1); // BACK
+    expect(faceAfterOrbitDir(SNAP_Q, 0, "down")).toBe(0); // FRONT
+    const up = orbitStepTarget(SNAP_Q, 0, "up");
+    expect(facingFace(up.rotX, up.rotY)).toBe(1);
+    expect(Math.abs(up.rotY)).toBeLessThan(0.01);
+  });
+
+  it("from LEFT, ˄˅ flip vertically to BOTTOM/TOP", () => {
+    expect(faceAfterOrbitDir(0, SNAP_Q, "up")).toBe(5); // BOTTOM
+    expect(faceAfterOrbitDir(0, SNAP_Q, "down")).toBe(4); // TOP
+    const up = orbitStepTarget(0, SNAP_Q, "up");
+    expect(facingFace(up.rotX, up.rotY)).toBe(5);
+  });
+
+  it("snap never parks on gimbal LEFT while pitching through BOTTOM", () => {
+    // Near BOTTOM with a little yaw — old independent qx/qy snap became LEFT.
+    const snapped = snapOrbitToFace(SNAP_Q, 0.2);
+    expect(facingFace(snapped.x, snapped.y)).toBe(5);
+    expect(Math.abs(snapped.y)).toBeLessThan(0.01);
+  });
+
+  it("vertical drag axis-locks away stray yaw", () => {
+    const drag = applyOrbitDrag(0, 0, 40, -SNAP_Q / ORBIT_DRAG_SENS);
+    expect(Math.abs(drag.rotY)).toBeLessThan(0.001);
+    expect(facingFace(drag.rotX, drag.rotY)).toBe(5);
   });
 });
