@@ -62,6 +62,7 @@ import {
   unlockAudio,
 } from "./audio/paper";
 import { loadStickers } from "./view/stickers";
+import { loadUiButtons } from "./view/uiButtons";
 import { detectQuality, getQuality } from "./view/quality";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
@@ -419,7 +420,7 @@ function doTwist(twist: Twist): void {
 
 function inCubeOrbitZone(_layout: CubeLayout, x: number, y: number): boolean {
   // Keep clear of the bottom dock. Stickers still claim the face first.
-  return y > 195 && y < 1110 && x > 24 && x < W - 24;
+  return y > 195 && y < 1000 && x > 24 && x < W - 24;
 }
 
 function orbitSens(): number {
@@ -807,7 +808,7 @@ window.addEventListener("resize", () => {
 });
 
 loadStickers().then(async () => {
-  await loadLogo();
+  await Promise.all([loadLogo(), loadUiButtons()]);
   syncActiveFace();
   resize();
   paint();

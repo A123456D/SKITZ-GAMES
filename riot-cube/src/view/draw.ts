@@ -1,5 +1,6 @@
 import type { Goal, TileKind } from "../core/types";
 import { stickerImage } from "./stickers";
+import { uiButtonImage } from "./uiButtons";
 
 export const W = 720;
 export const H = 1280;
@@ -431,20 +432,33 @@ export type PlayDock = {
   select: UiRect;
 };
 
-function dockBtn(
+function drawDockImage(
+  ctx: CanvasRenderingContext2D,
+  r: UiRect,
+  img: HTMLImageElement | null,
+  fallback: () => void,
+): void {
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.drawImage(img, r.x, r.y, r.w, r.h);
+    return;
+  }
+  fallback();
+}
+
+function dockBtnFallback(
   ctx: CanvasRenderingContext2D,
   r: UiRect,
   label: string,
   opts?: { fill?: string; ink?: string },
 ): void {
   ctx.fillStyle = opts?.fill ?? "#111";
-  roundRect(ctx, r.x, r.y, r.w, r.h, 8);
+  roundRect(ctx, r.x, r.y, r.w, r.h, 10);
   ctx.fill();
   ctx.strokeStyle = "#c8ff3d";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 3;
   ctx.stroke();
   ctx.fillStyle = opts?.ink ?? "#c8ff3d";
-  ctx.font = "800 22px 'Chakra Petch', sans-serif";
+  ctx.font = "800 28px 'Chakra Petch', sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
@@ -454,47 +468,75 @@ export function drawPlayDock(
   ctx: CanvasRenderingContext2D,
   opts: { mode: "row" | "col"; index: number; size: number },
 ): PlayDock {
-  const y = 1125;
-  const edge = 24;
+  const edge = 20;
+  const btn = 78;
+  const gap = 8;
+  const padW = btn * 3 + gap * 2 + 20;
+  const padH = btn * 3 + gap * 2 + 20;
+  const y = H - edge - padH;
 
   // Left cluster — orbit D-pad
-  const padW = 200;
-  const padH = 140;
   ctx.fillStyle = "#1b1b1b";
-  roundRect(ctx, edge, y, padW, padH, 8);
+  roundRect(ctx, edge, y, padW, padH, 10);
   ctx.fill();
   ctx.fillStyle = "#c8ff3d";
-  ctx.fillRect(edge + 18, y - 8, 44, 12);
+  ctx.fillRect(edge + 16, y - 8, 48, 12);
 
   const padCx = edge + padW / 2;
-  const up: UiRect = { x: padCx - 32, y: y + 12, w: 64, h: 36 };
-  const left: UiRect = { x: padCx - 96, y: y + 52, w: 64, h: 36 };
-  const right: UiRect = { x: padCx + 32, y: y + 52, w: 64, h: 36 };
-  const down: UiRect = { x: padCx - 32, y: y + 94, w: 64, h: 36 };
-
-  // Right cluster — row/col selector
-  const selW = 132;
-  const selH = 140;
-  const selPanelX = W - edge - selW;
-  ctx.fillStyle = "#1b1b1b";
-  roundRect(ctx, selPanelX, y, selW, selH, 8);
-  ctx.fill();
-  ctx.fillStyle = "#c8ff3d";
-  ctx.fillRect(selPanelX + selW - 62, y - 8, 44, 12);
-
-  const select: UiRect = {
-    x: selPanelX + 16,
-    y: y + 40,
-    w: selW - 32,
-    h: 60,
+  const midY = y + 10 + btn + gap;
+  const up: UiRect = { x: padCx - btn / 2, y: y + 10, w: btn, h: btn };
+  const left: UiRect = { x: padCx - btn * 1.5 - gap, y: midY, w: btn, h: btn };
+  const right: UiRect = { x: padCx + btn / 2 + gap, y: midY, w: btn, h: btn };
+  const down: UiRect = {
+    x: padCx - btn / 2,
+    y: midY + btn + gap,
+    w: btn,
+    h: btn,
   };
 
-  dockBtn(ctx, up, "˄");
-  dockBtn(ctx, left, "‹");
-  dockBtn(ctx, right, "›");
-  dockBtn(ctx, down, "˅");
+  // Right cluster — row/col selector
+  const sel = 112;
+  const selW = sel + 28;
+  const selH = padH;
+  const selPanelX = W - edge - selW;
+  ctx.fillStyle = "#1b1b1b";
+  roundRect(ctx, selPanelX, y, selW, selH, 10);
+  ctx.fill();
+  ctx.fillStyle = "#c8ff3d";
+  ctx.fillRect(selPanelX + selW - 64, y - 8, 48, 12);
+
+  const select: UiRect = {
+    x: selPanelX + (selW - sel) / 2,
+    y: y + (selH - sel) / 2,
+    w: sel,
+    h: sel,
+  };
+
+  drawDockImage(ctx, up, uiButtonImage("orbit-up"), () =>
+    dockBtnFallback(ctx, up, "˄"),
+  );
+  drawDockImage(ctx, left, uiButtonImage("orbit-left"), () =>
+    dockBtnFallback(ctx, left, "‹"),
+  );
+  drawDockImage(ctx, right, uiButtonImage("orbit-right"), () =>
+    dockBtnFallback(ctx, right, "›"),
+  );
+  drawDockImage(ctx, down, uiButtonImage("orbit-down"), () =>
+    dockBtnFallback(ctx, down, "˅"),
+  );
+
   const selLabel = opts.mode === "row" ? `R${opts.index + 1}` : `C${opts.index + 1}`;
-  dockBtn(ctx, select, selLabel, { fill: "#c8ff3d", ink: "#111" });
+  const selImg = uiButtonImage("select");
+  drawDockImage(ctx, select, selImg, () =>
+    dockBtnFallback(ctx, select, selLabel, { fill: "#c8ff3d", ink: "#111" }),
+  );
+  if (selImg) {
+    ctx.fillStyle = "#111";
+    ctx.font = "800 36px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(selLabel, select.x + select.w / 2, select.y + select.h / 2 + 2);
+  }
 
   return { up, down, left, right, select };
 }
