@@ -73,20 +73,23 @@ function profile(diff: number) {
   const extraEdges = slot <= 2 ? 0 : slot <= 4 ? 1 : 2;
   const pulseLimit = phase === 1 ? 3 : phase === 2 ? (slot >= 5 ? 2 : 3) : slot >= 4 ? 2 : 3;
   const undoLimit = 0;
+  // Distant gear pairs scale up with board size / phase — later desks move more.
   const gearPairs =
     phase === 1
       ? 0
       : phase === 2
-        ? slot <= 2
+        ? slot <= 1
           ? 1
-          : slot <= 4
+          : slot <= 3
             ? 2
-            : 2
-        : slot <= 3
-          ? 1
-          : 2;
-  // Phase 3 row wraps must keep geared partners together → horizontal links only.
-  const gearMode: "any" | "row" = phase >= 3 ? "row" : "any";
+            : slot <= 5
+              ? 3
+              : 4
+        : slot <= 2
+          ? 2
+          : slot <= 4
+            ? 3
+            : 4;
   const rowShifts = phase === 3 ? Math.min(1 + Math.floor((slot - 1) / 2), 2) : 0;
   const minMoves = Math.min(size * size - 1, 3 + slot + (phase - 1));
   return {
@@ -98,7 +101,6 @@ function profile(diff: number) {
     pulseLimit,
     undoLimit,
     gearPairs,
-    gearMode,
     rowShifts,
     minMoves,
     hasGears: phase >= 2,
@@ -201,35 +203,32 @@ function tablesFromPorts(w: number, h: number, ports: number[][]): TableDef[] {
 }
 
 /**
- * Pair discs that share a real pipe edge — never random grid neighbors.
+ * Pair discs across the board — never adjacent neighbors.
  * Opposite gears (sign -1): turn one, the partner reverses.
- * Phase 3 uses same-row pairs only so row shifts keep partners adjacent.
+ * Prefers far spans and matching module shapes so links read as intentional.
  */
-function linkGears(
-  tables: TableDef[],
-  edges: Edge[],
-  w: number,
-  pairs: number,
-  rng: Rng,
-  mode: "any" | "row",
-): void {
+function linkGears(tables: TableDef[], pairs: number, rng: Rng): void {
   if (pairs <= 0) return;
-  const byId = new Map(tables.map((t) => [t.id, t]));
   type Cand = { a: TableDef; b: TableDef; score: number };
   const candidates: Cand[] = [];
-  for (const e of edges) {
-    const a = byId.get(e.a);
-    const b = byId.get(e.b);
-    if (!a || !b) continue;
-    const pa = cellPos(e.a, w);
-    const pb = cellPos(e.b, w);
-    const horizontal = pa.y === pb.y;
-    if (mode === "row" && !horizontal) continue;
-    const rank = (m: number) =>
-      m === M.STRAIGHT ? 4 : m === M.ELBOW ? 3 : m === M.ENDCAP ? 2 : 1;
-    // Prefer clear “shaft” pairs over busy tees/crosses.
-    const score = rank(a.module) + rank(b.module) + (horizontal ? 0.25 : 0);
-    candidates.push({ a, b, score });
+  const rank = (m: number) =>
+    m === M.STRAIGHT ? 4 : m === M.ELBOW ? 3 : m === M.ENDCAP ? 2 : 1;
+  for (let i = 0; i < tables.length; i++) {
+    const a = tables[i]!;
+    for (let j = i + 1; j < tables.length; j++) {
+      const b = tables[j]!;
+      const dx = Math.abs(a.hub.x - b.hub.x);
+      const dy = Math.abs(a.hub.y - b.hub.y);
+      const manhattan = dx + dy;
+      // Skip neighbors — links must sit elsewhere on the desk.
+      if (manhattan < 2) continue;
+      let score = manhattan * 3 + rank(a.module) + rank(b.module);
+      if (a.module === b.module) score += 2;
+      // Diagonal / opposite-corner spans read clearest.
+      if (dx >= 1 && dy >= 1) score += 2;
+      if (manhattan >= 4) score += 2;
+      candidates.push({ a, b, score });
+    }
   }
   const ordered = shuffle(rng, candidates).sort((x, y) => y.score - x.score);
   let linked = 0;
@@ -382,7 +381,7 @@ function scrambleAndVerify(
   // Keep solution order = reverse of scramble (do not shuffle geared undos).
   rotateSteps.reverse();
 
-  // Phase 3: wrap whole rows. Horizontal gear pairs stay adjacent.
+  // Phase 3: wrap whole rows after rotations are scrambled.
   const shiftSteps: MoveStep[] = [];
   const shiftedRows = new Set<number>();
   for (let i = 0; i < opts.rowShifts; i++) {
@@ -401,9 +400,16 @@ function scrambleAndVerify(
   const solution = [...shiftSteps, ...rotateSteps];
   if (rotateSteps.length < Math.min(opts.minMoves, Math.max(3, opts.size))) return null;
 
-  // Must still have the requested gear pairs when the phase asks for them.
+  // Distant gear pairs must actually be present at the requested count.
   const gearCount = g.tables.filter((t) => t.link).length / 2;
-  if (opts.gearPairs > 0 && gearCount < 1) return null;
+  if (opts.gearPairs > 0 && gearCount < opts.gearPairs) return null;
+  for (const t of g.tables) {
+    if (!t.link || t.id > t.link.partner) continue;
+    const p = g.tables.find((x) => x.id === t.link!.partner);
+    if (!p) return null;
+    const man = Math.abs(t.hub.x - p.hub.x) + Math.abs(t.hub.y - p.hub.y);
+    if (man < 2) return null;
+  }
 
   const level: LevelData = {
     id: `diff_${difficulty}`,
@@ -459,7 +465,7 @@ function scrambleAndVerify(
  * runs against a wall-clock budget: once spent, quality filters relax rather
  * than letting a slow device keep searching.
  */
-const BUDGET_MS = 220;
+const BUDGET_MS = 320;
 
 export function generateLevel(difficulty: number, seed: number): LevelData {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, difficulty));
@@ -475,7 +481,7 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
     const edges = buildTopology(w, h, extras, rng);
     const ports = portsFromEdges(w, h, edges);
     const tables = tablesFromPorts(w, h, ports);
-    linkGears(tables, edges, w, opts.gearPairs, rng, opts.gearMode);
+    linkGears(tables, opts.gearPairs, rng);
     // Never strip phase rules on timeout — only skip the slow anti-cheap filter.
     const overBudget = now() - started > BUDGET_MS;
     const level = scrambleAndVerify(tables, w, h, rng, opts, d, overBudget);
@@ -487,7 +493,7 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
   const edges = buildTopology(w, w, Math.max(0, opts.extraEdges - 1), rng);
   const ports = portsFromEdges(w, w, edges);
   const tables = tablesFromPorts(w, w, ports);
-  linkGears(tables, edges, w, opts.gearPairs, rng, opts.gearMode);
+  linkGears(tables, opts.gearPairs, rng);
   const soft = { ...opts, minMoves: 2 };
   const level = scrambleAndVerify(tables, w, w, rng, soft, d, true);
   if (level) return level;

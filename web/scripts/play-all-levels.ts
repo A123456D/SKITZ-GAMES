@@ -6,12 +6,32 @@ import {
   DIFFICULTY_COUNT,
   generateLevel,
   phaseOf,
+  phaseSlot,
   levelTitle,
 } from "../src/core/levelGen";
 import { loadLevel, applySolutionStep, pulse } from "../src/core/puzzleSession";
 import { solve } from "../src/core/networkSolver";
 
-function gearPairsOk(level: ReturnType<typeof generateLevel>): string | null {
+/** Expected gear-pair count from the generator profile. */
+function expectedGears(diff: number): number {
+  const phase = phaseOf(diff);
+  const slot = phaseSlot(diff);
+  if (phase === 1) return 0;
+  if (phase === 2) {
+    if (slot <= 1) return 1;
+    if (slot <= 3) return 2;
+    if (slot <= 5) return 3;
+    return 4;
+  }
+  if (slot <= 2) return 2;
+  if (slot <= 4) return 3;
+  return 4;
+}
+
+function gearLinksOk(
+  level: ReturnType<typeof generateLevel>,
+  opts: { requireDistant: boolean; expectPairs?: number },
+): string | null {
   const byId = new Map(level.tables.map((t) => [t.id, t]));
   const seen = new Set<number>();
   let pairs = 0;
@@ -20,20 +40,16 @@ function gearPairsOk(level: ReturnType<typeof generateLevel>): string | null {
     const p = byId.get(t.link.partner);
     if (!p?.link || p.link.partner !== t.id) return `broken link on ${t.id}`;
     if (t.link.sign !== -1 || p.link.sign !== -1) return `gear sign not opposite on ${t.id}`;
-    const dxRaw = Math.abs(t.hub.x - p.hub.x);
-    const dyRaw = Math.abs(t.hub.y - p.hub.y);
-    // Row shifts wrap the board — same-row gears stay neighbors on a cylinder.
-    const dx = Math.min(dxRaw, level.width - dxRaw);
-    const dy = Math.min(dyRaw, level.height - dyRaw);
-    if (dx + dy !== 1) {
-      return `gear pair not adjacent: ${t.id}-${p.id} (${t.hub.x},${t.hub.y})-(${p.hub.x},${p.hub.y})`;
-    }
-    if (level.allowRowShift && t.hub.y !== p.hub.y) {
-      return `phase3 gear not same row: ${t.id}-${p.id}`;
+    const man = Math.abs(t.hub.x - p.hub.x) + Math.abs(t.hub.y - p.hub.y);
+    if (opts.requireDistant && man < 2) {
+      return `gear pair too close: ${t.id}-${p.id} (${t.hub.x},${t.hub.y})-(${p.hub.x},${p.hub.y}) man=${man}`;
     }
     seen.add(t.id);
     seen.add(p.id);
     pairs++;
+  }
+  if (opts.expectPairs !== undefined && pairs !== opts.expectPairs) {
+    return `gear count ${pairs} != expected ${opts.expectPairs}`;
   }
   if (phaseOf(Number(level.id.replace("diff_", ""))) >= 2 && pairs < 1) {
     return "phase 2+ missing gear pairs";
@@ -44,11 +60,12 @@ function gearPairsOk(level: ReturnType<typeof generateLevel>): string | null {
 let fails = 0;
 for (let d = 1; d <= DIFFICULTY_COUNT; d++) {
   const seeds = [42, 77, 404, 900 + d * 13];
+  const expect = expectedGears(d);
   for (const seed of seeds) {
     const label = `${levelTitle(d)} seed=${seed}`;
     try {
       const level = generateLevel(d, seed);
-      const gErr = gearPairsOk(level);
+      const gErr = gearLinksOk(level, { requireDistant: true, expectPairs: expect });
       if (gErr) {
         console.log("GEAR FAIL", label, gErr);
         fails++;
@@ -69,16 +86,20 @@ for (let d = 1; d <= DIFFICULTY_COUNT; d++) {
           bad = true;
           break;
         }
-        const mid = gearPairsOk({
-          ...level,
-          tables: session.state.tables.map((t) => ({
-            ...t,
-            hub: { ...t.hub },
-            link: t.link ? { ...t.link } : undefined,
-          })),
-          width: session.state.width,
-          height: session.state.height,
-        });
+        // After row shifts, hubs move — only require link integrity mid-solve.
+        const mid = gearLinksOk(
+          {
+            ...level,
+            tables: session.state.tables.map((t) => ({
+              ...t,
+              hub: { ...t.hub },
+              link: t.link ? { ...t.link } : undefined,
+            })),
+            width: session.state.width,
+            height: session.state.height,
+          },
+          { requireDistant: false },
+        );
         if (mid) {
           console.log("MID GEAR FAIL", label, "after", i, mid);
           bad = true;
@@ -96,7 +117,6 @@ for (let d = 1; d <= DIFFICULTY_COUNT; d++) {
         continue;
       }
 
-      // Play again from scratch: confirm latent closed before pulse too.
       const check = loadLevel(level);
       for (const step of level.solution) applySolutionStep(check, step);
       if (!solve(check.state).won) {

@@ -150,6 +150,32 @@ describe("dense procedural levels", () => {
     expect(p2).toEqual([3, 4, 5, 6, 7, 8]);
   });
 
+  it("phase 2+ gear pairs sit apart on the board", () => {
+    for (const d of [7, 10, 12, 15, 18]) {
+      const level = generateLevel(d, 808 + d);
+      const pairs: Array<[number, number]> = [];
+      const seen = new Set<number>();
+      for (const t of level.tables) {
+        if (!t.link || seen.has(t.id)) continue;
+        const p = level.tables.find((x) => x.id === t.link!.partner)!;
+        const man = Math.abs(t.hub.x - p.hub.x) + Math.abs(t.hub.y - p.hub.y);
+        expect(man).toBeGreaterThanOrEqual(2);
+        pairs.push([t.id, p.id]);
+        seen.add(t.id);
+        seen.add(p.id);
+      }
+      expect(pairs.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("later desks use more gear pairs", () => {
+    const early = generateLevel(7, 111);
+    const late = generateLevel(12, 111);
+    const count = (level: ReturnType<typeof generateLevel>) =>
+      level.tables.filter((t) => t.link).length / 2;
+    expect(count(late)).toBeGreaterThan(count(early));
+  });
+
   it("phase 2 boards use gear links", () => {
     const level = generateLevel(8, 909);
     expect(level.hasGears).toBe(true);
