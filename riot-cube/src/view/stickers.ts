@@ -1,4 +1,7 @@
-import { TILE_KINDS, type TileKind } from "../core/stickers";
+import {
+  stickerPoolForTheme,
+  type TileKind,
+} from "../core/stickers";
 import {
   getAnimeMode,
   getTheme,
@@ -8,7 +11,7 @@ import {
 } from "./theme";
 
 /** Bump when replacing theme sticker PNGs so SW / memory cache cannot stick. */
-const STICKER_ASSET_VERSION = 11;
+const STICKER_ASSET_VERSION = 12;
 
 const cache = new Map<TileKind, HTMLImageElement>();
 let loadedTheme: ThemeId | null = null;
@@ -17,12 +20,15 @@ let loadedVersion = -1;
 let loadPromise: Promise<void> | null = null;
 
 function cacheKeyMatches(theme: ThemeId, mode: AnimeMode): boolean {
-  return (
-    loadedTheme === theme &&
-    loadedAnimeMode === mode &&
-    loadedVersion === STICKER_ASSET_VERSION &&
-    cache.size === TILE_KINDS.length
-  );
+  if (
+    loadedTheme !== theme ||
+    loadedAnimeMode !== mode ||
+    loadedVersion !== STICKER_ASSET_VERSION
+  ) {
+    return false;
+  }
+  const pool = stickerPoolForTheme(theme);
+  return pool.every((k) => cache.has(k));
 }
 
 export function loadStickers(forceTheme?: ThemeId): Promise<void> {
@@ -45,8 +51,9 @@ export function loadStickers(forceTheme?: ThemeId): Promise<void> {
   loadedAnimeMode = mode;
   loadedVersion = STICKER_ASSET_VERSION;
   const versionAtStart = STICKER_ASSET_VERSION;
+  const pool = stickerPoolForTheme(theme);
   loadPromise = Promise.all(
-    TILE_KINDS.map(
+    pool.map(
       (kind) =>
         new Promise<void>((resolve) => {
           const img = new Image();

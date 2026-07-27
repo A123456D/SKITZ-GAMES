@@ -1,5 +1,6 @@
 /** Sticker art kinds used as Rubik face “colors”. */
 export const TILE_KINDS = [
+  // Shared / edgy base pack
   "glitch",
   "punk",
   "hood",
@@ -24,14 +25,67 @@ export const TILE_KINDS = [
   "hourglass",
   "soda",
   "grimoire",
+  // Anime add-on pack (kept when new sheets are added)
+  "controller",
+  "crt",
+  "skate",
+  "panda",
+  "raven",
+  "spray",
+  "hero",
+  "mage",
+  "blaze",
+  "patch",
+  "familiar",
+  "drake",
+  "owl",
+  "bot",
+  // Classroom add-on pack
+  "pizza",
+  "rocket",
+  "alien",
+  "planet",
+  "wave",
+  "kittyw",
+  "board",
+  "shroom",
+  "note",
+  "cactus",
+  "camera",
+  "peace",
 ] as const;
 
 export type TileKind = (typeof TILE_KINDS)[number];
 
-/**
- * Classroom: 12 unique sticker arts from the classroom sheet.
- * Anime has 14 unique crops from the day packs.
- */
+/** Edgy uses the original shared 24-kind pack only. */
+export const EDGY_STICKER_POOL = [
+  "glitch",
+  "punk",
+  "hood",
+  "ramen",
+  "mask",
+  "katana",
+  "eyepatch",
+  "tears",
+  "butterfly",
+  "bolt",
+  "pill",
+  "chain",
+  "ghost",
+  "bunny",
+  "tv",
+  "candle",
+  "crow",
+  "bear",
+  "poison",
+  "heart",
+  "eye",
+  "hourglass",
+  "soda",
+  "grimoire",
+] as const satisfies readonly TileKind[];
+
+/** Prior classroom pack + newly added sheet (additive). */
 export const CLASSROOM_STICKER_POOL = [
   "glitch",
   "punk",
@@ -43,10 +97,21 @@ export const CLASSROOM_STICKER_POOL = [
   "bolt",
   "candle",
   "pill",
-  "chain",
-  "butterfly",
+  "pizza",
+  "rocket",
+  "alien",
+  "planet",
+  "wave",
+  "kittyw",
+  "board",
+  "shroom",
+  "note",
+  "cactus",
+  "camera",
+  "peace",
 ] as const satisfies readonly TileKind[];
 
+/** Prior anime day pack + newly added sheets (additive). */
 export const ANIME_STICKER_POOL = [
   "bear",
   "bolt",
@@ -62,13 +127,27 @@ export const ANIME_STICKER_POOL = [
   "katana",
   "tears",
   "tv",
+  "controller",
+  "crt",
+  "skate",
+  "panda",
+  "raven",
+  "spray",
+  "hero",
+  "mage",
+  "blaze",
+  "patch",
+  "familiar",
+  "drake",
+  "owl",
+  "bot",
 ] as const satisfies readonly TileKind[];
 
 /** Unique sticker kinds available for a theme’s chooser / random pick. */
 export function stickerPoolForTheme(theme: string): readonly TileKind[] {
   if (theme === "classroom") return CLASSROOM_STICKER_POOL;
   if (theme === "anime") return ANIME_STICKER_POOL;
-  return TILE_KINDS;
+  return EDGY_STICKER_POOL;
 }
 
 export type FaceStickers = readonly [
@@ -96,9 +175,9 @@ export const FACE_STICKERS: FaceStickers = [
 /** Shuffle a kind pool and take 6 distinct kinds for the six faces. */
 export function pickFaceStickers(
   rng: () => number,
-  pool: readonly TileKind[] = TILE_KINDS,
+  pool: readonly TileKind[] = EDGY_STICKER_POOL,
 ): FaceStickers {
-  const src = pool.length >= 6 ? pool : TILE_KINDS;
+  const src = pool.length >= 6 ? pool : EDGY_STICKER_POOL;
   const shuffled = src.slice();
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
