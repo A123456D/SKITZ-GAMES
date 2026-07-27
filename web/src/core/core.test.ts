@@ -144,11 +144,16 @@ describe("dense procedural levels", () => {
   });
 
   it("board size grows one step per desk until the cap", () => {
-    const sizes = [1, 2, 3, 4, 5, 6, 7, 10, 20].map((d) => generateLevel(d, 50 + d).width);
+    const sizes = [1, 2, 3, 4, 5, 6, 7, 10, 12].map((d) => generateLevel(d, 50 + d).width);
     expect(sizes).toEqual([3, 4, 5, 6, 7, 8, 8, 8, 8]);
   });
 
-  for (const d of [1, 3, 5, 8, 12]) {
+  it("late desks lock some hubs", () => {
+    const level = generateLevel(10, 909);
+    expect(level.tables.some((t) => t.locked)).toBe(true);
+  });
+
+  for (const d of [1, 3, 5, 8, 11]) {
     it(`diff ${d} generates a closed solvable net`, () => {
       const level = generateLevel(d, 1000 + d * 17);
       expect(level.tables.length).toBe(level.width * level.height);
@@ -165,7 +170,7 @@ describe("dense procedural levels", () => {
   }
 
   it("difficulty count is stable", () => {
-    expect(DIFFICULTY_COUNT).toBe(20);
+    expect(DIFFICULTY_COUNT).toBe(12);
   });
 });
 

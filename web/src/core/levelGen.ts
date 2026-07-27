@@ -10,7 +10,7 @@ import { setTableRotation } from "./rotateOps";
 import { applySolutionStep, loadLevel, pulse } from "./puzzleSession";
 import { analyzeNetwork, buildFastNet, fastWon, solve } from "./networkSolver";
 
-export const DIFFICULTY_COUNT = 20;
+export const DIFFICULTY_COUNT = 12;
 
 type Rng = () => number;
 
@@ -44,19 +44,17 @@ export function levelTitle(diff: number): string {
 
 function profile(diff: number) {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, diff));
-  // One more row/column each desk until the mobile-friendly cap — no long
-  // plateaus where several desks share the same board size.
-  // Desk 1 → 3×3, 2 → 4×4, …, 6+ → 8×8.
+  // Desks 1–6 grow one step; 7–12 stay at the mobile-friendly 8×8 cap and
+  // harden via chords, fewer pulses, and locked hubs.
   const size = Math.min(8, 2 + d);
   const extraEdges =
-    d <= 2 ? 0 : d <= 6 ? 1 : d <= 12 ? 2 + Math.floor((d - 7) / 3) : 4;
-  // Difficulty comes from board size and ambiguity, not from starving checks:
-  // one check earns 3 stars, so the pressure is in the scoring, not the cap.
-  const pulseLimit = d >= 13 ? 2 : 3;
+    d <= 2 ? 0 : d <= 6 ? 1 : d <= 8 ? 2 : d <= 10 ? 3 : 4;
+  const pulseLimit = d >= 11 ? 1 : d >= 9 ? 2 : 3;
   const undoLimit = 0; // unused — undo is free
-
-  const minMoves = Math.min(size * size - 1, 3 + Math.floor(d * 1.2));
-  return { diff: d, size, extraEdges, pulseLimit, undoLimit, minMoves };
+  // Lock high-degree hubs late so fewer discs can be spun freely.
+  const lockedHubs = d <= 8 ? 0 : d === 9 ? 2 : d === 10 ? 4 : d === 11 ? 6 : 8;
+  const minMoves = Math.min(size * size - 1, 3 + Math.floor(d * 1.35));
+  return { diff: d, size, extraEdges, pulseLimit, undoLimit, lockedHubs, minMoves };
 }
 
 type Edge = { a: number; b: number }; // cell indices
@@ -252,7 +250,22 @@ function scrambleAndVerify(
   const g = buildState(solved);
   const solution: MoveStep[] = [];
 
+  // Lock high-degree hubs at their solved rotation so late desks force
+  // routing around fixed junctions instead of spinning everything.
+  if (opts.lockedHubs > 0) {
+    const hubs = g.tables
+      .filter((t) => t.module === M.CROSS || t.module === M.TEE)
+      .sort((a, b) => {
+        const rank = (m: number) => (m === M.CROSS ? 2 : 1);
+        return rank(b.module) - rank(a.module);
+      });
+    for (const t of shuffle(rng, hubs).slice(0, opts.lockedHubs)) {
+      t.locked = true;
+    }
+  }
+
   for (const t of g.tables) {
+    if (t.locked) continue;
     const amount = 1 + Math.floor(rng() * 3); // 1..3
     const sign = rng() < 0.5 ? 1 : -1;
     setTableRotation(g, t.id, t.rotationQ + sign * amount);
@@ -260,6 +273,7 @@ function scrambleAndVerify(
   }
   // Ensure nothing accidentally still solved
   for (const t of g.tables) {
+    if (t.locked) continue;
     const sol = solvedTables.find((x) => x.id === t.id)!;
     if (((t.rotationQ % 4) + 4) % 4 === ((sol.rotationQ % 4) + 4) % 4) {
       setTableRotation(g, t.id, t.rotationQ + 1);
@@ -328,7 +342,7 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, difficulty));
   const rng = mulberry32((seed >>> 0) ^ Math.imul(d, 0x9e3779b9));
   const opts = profile(d);
-  const attempts = d >= 15 ? 400 : d >= 8 ? 250 : 150;
+  const attempts = d >= 10 ? 400 : d >= 7 ? 250 : 150;
   const started = now();
 
   for (let attempt = 0; attempt < attempts; attempt++) {
