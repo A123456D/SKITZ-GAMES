@@ -218,7 +218,7 @@ function dockBtnFallback(ctx: CanvasRenderingContext2D, r: UiRect): void {
   ctx.stroke();
 }
 
-/** Two bottom buttons: rotate the currently facing face CCW / CW. */
+/** Two bottom buttons: rotate the currently facing face CW / CCW. */
 export function drawFaceTurnButtons(ctx: CanvasRenderingContext2D): FaceTurnButtons {
   const p = getPalette();
   const btnW = 148;
@@ -243,11 +243,11 @@ export function drawFaceTurnButtons(ctx: CanvasRenderingContext2D): FaceTurnButt
   ctx.fillStyle = p.accent;
   ctx.fillRect(x0 - panelPad + 16, y - panelPad - 8, 48, 12);
 
-  const ccw: UiRect = { x: x0, y, w: btnW, h: btnH };
-  const cw: UiRect = { x: x0 + btnW + gap, y, w: btnW, h: btnH };
+  const cw: UiRect = { x: x0, y, w: btnW, h: btnH };
+  const ccw: UiRect = { x: x0 + btnW + gap, y, w: btnW, h: btnH };
 
-  drawDockImage(ctx, ccw, () => dockBtnFallback(ctx, ccw));
   drawDockImage(ctx, cw, () => dockBtnFallback(ctx, cw));
+  drawDockImage(ctx, ccw, () => dockBtnFallback(ctx, ccw));
 
   ctx.font = "800 42px 'Chakra Petch', sans-serif";
   ctx.textAlign = "center";
@@ -266,12 +266,12 @@ export function drawFaceTurnButtons(ctx: CanvasRenderingContext2D): FaceTurnButt
     ctx.fillStyle = fill;
     ctx.fillText(text, x, y);
   };
-  strokeLabel("\u21BA", ccw.x + ccw.w / 2, ccw.y + ccw.h / 2 - 4, p.ink);
   strokeLabel("\u21BB", cw.x + cw.w / 2, cw.y + cw.h / 2 - 4, p.ink);
+  strokeLabel("\u21BA", ccw.x + ccw.w / 2, ccw.y + ccw.h / 2 - 4, p.ink);
 
   ctx.font = "700 14px 'Chakra Petch', sans-serif";
-  strokeLabel("CCW", ccw.x + ccw.w / 2, ccw.y + ccw.h - 16, p.ink, 2.5);
   strokeLabel("CW", cw.x + cw.w / 2, cw.y + cw.h - 16, p.ink, 2.5);
+  strokeLabel("CCW", ccw.x + ccw.w / 2, ccw.y + ccw.h - 16, p.ink, 2.5);
 
   return { ccw, cw };
 }
