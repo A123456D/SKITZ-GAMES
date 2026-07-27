@@ -389,12 +389,16 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   ctx.textAlign = "center";
   ctx.fillText("A sticker Rubik\u2019s Cube. No timer. Just twist.", W / 2, 680);
 
-  ctx.fillStyle = p.panel;
+  // Light card + dark ink so tips stay readable on every theme (anime panel is white).
+  ctx.fillStyle = p.paper;
   roundRect(ctx, 120, 710, 480, 120, 8);
   ctx.fill();
+  ctx.strokeStyle = p.ink;
+  ctx.lineWidth = 2;
+  ctx.stroke();
   ctx.fillStyle = p.accent;
   ctx.fillRect(160, 700, 70, 14);
-  ctx.fillStyle = p.paper;
+  ctx.fillStyle = p.ink;
   ctx.font = "600 17px 'Patrick Hand', sans-serif";
   ctx.textAlign = "left";
   ctx.fillText("\u2022 Face-turn buttons spin the facing face", 150, 748);
