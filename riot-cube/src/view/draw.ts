@@ -48,7 +48,7 @@ export function drawDesk(ctx: CanvasRenderingContext2D): void {
     drawCover(ctx, art.bg, 0, 0, W, H);
     // Soft readability wash — keep anime daytime bright (heavy black looked like night).
     const g = ctx.createLinearGradient(0, 0, 0, H);
-    if (theme === "anime" || theme === "classic") {
+    if (theme === "anime" || theme === "classroom") {
       g.addColorStop(0, "rgba(255,255,255,0.08)");
       g.addColorStop(0.5, "rgba(0,0,0,0.04)");
       g.addColorStop(1, "rgba(0,0,0,0.18)");
@@ -216,17 +216,29 @@ export function drawFaceTurnButtons(ctx: CanvasRenderingContext2D): FaceTurnButt
   drawDockImage(ctx, ccw, () => dockBtnFallback(ctx, ccw));
   drawDockImage(ctx, cw, () => dockBtnFallback(ctx, cw));
 
-  ctx.fillStyle = p.ink;
   ctx.font = "800 42px 'Chakra Petch', sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("\u21BA", ccw.x + ccw.w / 2, ccw.y + ccw.h / 2 - 4);
-  ctx.fillText("\u21BB", cw.x + cw.w / 2, cw.y + cw.h / 2 - 4);
+  const strokeLabel = (
+    text: string,
+    x: number,
+    y: number,
+    fill: string,
+    strokeW = 3,
+  ) => {
+    ctx.lineWidth = strokeW;
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+    ctx.lineJoin = "round";
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = fill;
+    ctx.fillText(text, x, y);
+  };
+  strokeLabel("\u21BA", ccw.x + ccw.w / 2, ccw.y + ccw.h / 2 - 4, p.ink);
+  strokeLabel("\u21BB", cw.x + cw.w / 2, cw.y + cw.h / 2 - 4, p.ink);
 
   ctx.font = "700 14px 'Chakra Petch', sans-serif";
-  ctx.fillStyle = p.accent;
-  ctx.fillText("CCW", ccw.x + ccw.w / 2, ccw.y + ccw.h - 16);
-  ctx.fillText("CW", cw.x + cw.w / 2, cw.y + cw.h - 16);
+  strokeLabel("CCW", ccw.x + ccw.w / 2, ccw.y + ccw.h - 16, p.ink, 2.5);
+  strokeLabel("CW", cw.x + cw.w / 2, cw.y + cw.h - 16, p.ink, 2.5);
 
   return { ccw, cw };
 }
@@ -304,13 +316,9 @@ function drawPaperButton(
     roundRect(ctx, r.x, r.y, r.w, r.h, 8);
     ctx.clip();
     drawCover(ctx, btn!, r.x, r.y, r.w, r.h);
-    if (fill === p.panel) {
-      ctx.fillStyle = "rgba(0,0,0,0.4)";
-      ctx.fillRect(r.x, r.y, r.w, r.h);
-    } else if (fill === p.accent) {
-      ctx.fillStyle = "rgba(200,255,61,0.25)";
-      ctx.fillRect(r.x, r.y, r.w, r.h);
-    }
+    // Light wash so ink labels stay readable on any button texture.
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillRect(r.x, r.y, r.w, r.h);
     ctx.restore();
   } else {
     ctx.fillStyle = fill;
@@ -325,7 +333,7 @@ function drawPaperButton(
     ctx.fillStyle = opts.tape;
     ctx.fillRect(r.x + 18, r.y - 8, 56, 14);
   }
-  ctx.fillStyle = opts?.text ?? p.ink;
+  ctx.fillStyle = useTex ? p.ink : (opts?.text ?? p.ink);
   ctx.font = "800 26px 'Chakra Petch', sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";

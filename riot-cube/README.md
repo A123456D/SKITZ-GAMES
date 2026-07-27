@@ -26,7 +26,7 @@ Dev: `npm run dev` (port 5175).
 ## Rules (web)
 
 - **6 live sticker kinds** at a time, rotating through all sticker art each generation
-- Themes: **GRIME** (default) and **CLASSIC** — cycle in Settings
+- Themes: **GRIME** (default), **CLASS ROOM**, and **ANIME** — cycle in Settings
 - **Swipe** or use the **bottom dock** to twist · **side chevrons** flip the cube
 - **Dry twists are free** · **matching clears** and **flips** each cost a move
 - Only the face you look at scores

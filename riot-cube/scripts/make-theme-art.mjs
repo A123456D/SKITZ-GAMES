@@ -10,7 +10,7 @@ const root = join(__dirname, "..");
 
 const jobs = [
   {
-    theme: "classic",
+    theme: "classroom",
     bg: "riot-classic-bg.png",
     btn: "riot-classic-btn.png",
   },

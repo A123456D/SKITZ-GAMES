@@ -1,4 +1,4 @@
-export const THEME_IDS = ["classic", "grime", "anime"] as const;
+export const THEME_IDS = ["classroom", "grime", "anime"] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
 export type ThemePalette = {
@@ -48,7 +48,8 @@ export type ThemeDef = {
   palette: ThemePalette;
 };
 
-const CLASSIC_PALETTE: ThemePalette = {
+/** Warm daytime desk — classroom wood tones, lime/pink accents. */
+const CLASSROOM_PALETTE: ThemePalette = {
   desk0: "#d4c4a8",
   desk1: "#b8a888",
   accent: "#c8ff3d",
@@ -153,7 +154,7 @@ const ANIME_PALETTE: ThemePalette = {
 };
 
 export const THEMES: ThemeDef[] = [
-  { id: "classic", label: "CLASSIC", palette: CLASSIC_PALETTE },
+  { id: "classroom", label: "CLASS ROOM", palette: CLASSROOM_PALETTE },
   { id: "grime", label: "GRIME", palette: GRIME_PALETTE },
   { id: "anime", label: "ANIME", palette: ANIME_PALETTE },
 ];
@@ -164,7 +165,15 @@ let current: ThemeId = loadStored();
 
 function loadStored(): ThemeId {
   try {
-    const v = localStorage.getItem(THEME_KEY);
+    let v = localStorage.getItem(THEME_KEY);
+    if (v === "classic") {
+      v = "classroom";
+      try {
+        localStorage.setItem(THEME_KEY, v);
+      } catch {
+        /* ignore */
+      }
+    }
     if (v && (THEME_IDS as readonly string[]).includes(v)) return v as ThemeId;
   } catch {
     /* ignore */
@@ -198,7 +207,7 @@ export function setTheme(id: ThemeId): void {
   applyThemeChrome();
 }
 
-/** Cycle classic → grime → anime → … */
+/** Cycle classroom → grime → anime → … */
 export function cycleTheme(): ThemeId {
   const i = THEME_IDS.indexOf(current);
   const next = THEME_IDS[(i + 1) % THEME_IDS.length]!;

@@ -141,7 +141,7 @@ for ($i = 0; $i -lt 12; $i++) {
   $tw = [math]::Min($w - $tx, ($maxX + $pad) - $tx + 1)
   $th = [math]::Min($h - $ty, ($maxY + $pad) - $ty + 1)
   $side = [math]::Max($tw, $th)
-  # Normalize to ~206 like classic stickers
+  # Normalize to ~206 like classroom stickers
   $target = 206
 
   $cropped = New-Object System.Drawing.Bitmap $side, $side, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)

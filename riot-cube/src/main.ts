@@ -700,7 +700,7 @@ async function boot(): Promise<void> {
   });
   resize();
   await Promise.all([loadLogo(), loadStickers()]);
-  ensureThemeArt("classic");
+  ensureThemeArt("classroom");
   ensureThemeArt("grime");
   ensureThemeArt("anime");
   syncActiveFace();
