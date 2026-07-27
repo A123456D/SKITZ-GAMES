@@ -26,7 +26,7 @@ Dev: `npm run dev` (port 5175).
 ## Rules (web)
 
 - **6 sticker kinds** on a 6×6 face (dense enough to match)
-- **Swipe** a row/column to twist · **D-pad / chevrons** flip the cube
+- **Swipe** or use the **bottom dock** to twist · **side chevrons** flip the cube
 - **Dry twists are free** · **matching clears** and **flips** each cost a move
 - Only the face you look at scores
 - Three levels with rising pressure

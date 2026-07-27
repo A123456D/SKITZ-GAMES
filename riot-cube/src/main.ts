@@ -77,6 +77,9 @@ let settingsFrom: Screen = "home";
 let session: Session = startSession(LEVELS[0]!);
 let levelIndex = 0;
 let floatText: { text: string; life: number } | null = null;
+/** Selected row/col for bottom dock — selected lane floats. */
+let controlMode: "row" | "col" = "row";
+let controlIndex = 0;
 let playDock: PlayDock | null = null;
 /** Face when an orbit drag started — charge one move if it changes on release. */
 let orbitDragFace: FaceId | null = null;
@@ -184,6 +187,15 @@ function activeMotion(): {
       hovering: Math.abs(springUv) > 0.01,
     };
   }
+  // Idle selection from the dock — keep that lane floating.
+  if (screen === "play" && session.status === "playing") {
+    return {
+      axis: controlMode,
+      index: controlIndex,
+      offset: 0,
+      hovering: true,
+    };
+  }
   return { axis: null, index: -1, offset: 0, hovering: false };
 }
 
@@ -209,6 +221,8 @@ function resetPlayVisuals(): void {
 function goHome(): void {
   screen = "home";
   resetPlayVisuals();
+  controlMode = "row";
+  controlIndex = 0;
   levelIndex = 0;
   session = startSession(LEVELS[0]!);
   syncActiveFace();
@@ -217,6 +231,8 @@ function goHome(): void {
 
 function startPlay(index = 0): void {
   resetPlayVisuals();
+  controlMode = "row";
+  controlIndex = 0;
   levelIndex = Math.max(0, Math.min(index, LEVELS.length - 1));
   session = startSession(LEVELS[levelIndex]!);
   syncActiveFace();
@@ -300,7 +316,9 @@ function paint(): void {
   ctx.textAlign = "center";
   ctx.fillText(`FACE · ${faceName}`, W / 2, 1008);
 
-  playDock = drawPlayDock(ctx);
+  const n = session.level.size;
+  controlIndex = ((controlIndex % n) + n) % n;
+  playDock = drawPlayDock(ctx, { mode: controlMode, index: controlIndex, size: n });
 
   if (floatText && floatText.life > 0) {
     ctx.save();
@@ -440,22 +458,59 @@ function orbitSens(): number {
 
 function hitPlayDock(x: number, y: number): boolean {
   if (!playDock || session.status !== "playing" || busy) return false;
+  const n = session.level.size;
   const d = playDock;
-  if (hitUiRect(d.up, x, y)) {
-    startOrbitStep("up");
+
+  if (hitUiRect(d.select, x, y)) {
+    controlMode = controlMode === "row" ? "col" : "row";
+    controlIndex = Math.min(controlIndex, n - 1);
+    sfxPaperRustle();
+    paint();
     return true;
   }
-  if (hitUiRect(d.down, x, y)) {
-    startOrbitStep("down");
-    return true;
-  }
-  if (hitUiRect(d.left, x, y)) {
-    startOrbitStep("left");
-    return true;
-  }
-  if (hitUiRect(d.right, x, y)) {
-    startOrbitStep("right");
-    return true;
+
+  if (controlMode === "row") {
+    if (hitUiRect(d.left, x, y)) {
+      doTwist({ axis: "row", index: controlIndex, dir: -1, amount: 1 });
+      return true;
+    }
+    if (hitUiRect(d.right, x, y)) {
+      doTwist({ axis: "row", index: controlIndex, dir: 1, amount: 1 });
+      return true;
+    }
+    if (hitUiRect(d.up, x, y)) {
+      controlIndex = (controlIndex - 1 + n) % n;
+      sfxPaperRustle();
+      paint();
+      return true;
+    }
+    if (hitUiRect(d.down, x, y)) {
+      controlIndex = (controlIndex + 1) % n;
+      sfxPaperRustle();
+      paint();
+      return true;
+    }
+  } else {
+    if (hitUiRect(d.up, x, y)) {
+      doTwist({ axis: "col", index: controlIndex, dir: -1, amount: 1 });
+      return true;
+    }
+    if (hitUiRect(d.down, x, y)) {
+      doTwist({ axis: "col", index: controlIndex, dir: 1, amount: 1 });
+      return true;
+    }
+    if (hitUiRect(d.left, x, y)) {
+      controlIndex = (controlIndex - 1 + n) % n;
+      sfxPaperRustle();
+      paint();
+      return true;
+    }
+    if (hitUiRect(d.right, x, y)) {
+      controlIndex = (controlIndex + 1) % n;
+      sfxPaperRustle();
+      paint();
+      return true;
+    }
   }
   return false;
 }
@@ -659,6 +714,7 @@ canvas.addEventListener(
     const n = session.level.size;
     const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
     const r = Math.min(n - 1, Math.max(0, Math.floor(hit.v * n)));
+    controlIndex = controlMode === "row" ? r : c;
     drag = {
       u0: hit.u,
       v0: hit.v,

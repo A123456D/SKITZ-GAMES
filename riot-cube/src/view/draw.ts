@@ -423,12 +423,13 @@ export function drawHint(ctx: CanvasRenderingContext2D, text: string): void {
   ctx.fillText(text, 64, 1186);
 }
 
-/** Bottom play controls — D-pad orbits; swipe the face to twist. */
+/** Bottom play controls — D-pad twists selected lane; selector toggles row/col. */
 export type PlayDock = {
   up: UiRect;
   down: UiRect;
   left: UiRect;
   right: UiRect;
+  select: UiRect;
 };
 
 function drawDockImage(
@@ -463,7 +464,10 @@ function dockBtnFallback(
   ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
 }
 
-export function drawPlayDock(ctx: CanvasRenderingContext2D): PlayDock {
+export function drawPlayDock(
+  ctx: CanvasRenderingContext2D,
+  opts: { mode: "row" | "col"; index: number; size: number },
+): PlayDock {
   const edge = 20;
   const btn = 78;
   const gap = 8;
@@ -471,6 +475,7 @@ export function drawPlayDock(ctx: CanvasRenderingContext2D): PlayDock {
   const padH = btn * 3 + gap * 2 + 20;
   const y = H - edge - padH;
 
+  // Left cluster — twist D-pad (big targets for mobile)
   ctx.fillStyle = "#1b1b1b";
   roundRect(ctx, edge, y, padW, padH, 10);
   ctx.fill();
@@ -489,6 +494,24 @@ export function drawPlayDock(ctx: CanvasRenderingContext2D): PlayDock {
     h: btn,
   };
 
+  // Right cluster — row/col selector
+  const sel = 112;
+  const selW = sel + 28;
+  const selH = padH;
+  const selPanelX = W - edge - selW;
+  ctx.fillStyle = "#1b1b1b";
+  roundRect(ctx, selPanelX, y, selW, selH, 10);
+  ctx.fill();
+  ctx.fillStyle = "#c8ff3d";
+  ctx.fillRect(selPanelX + selW - 64, y - 8, 48, 12);
+
+  const select: UiRect = {
+    x: selPanelX + (selW - sel) / 2,
+    y: y + (selH - sel) / 2,
+    w: sel,
+    h: sel,
+  };
+
   drawDockImage(ctx, up, uiButtonImage("orbit-up"), () =>
     dockBtnFallback(ctx, up, "˄"),
   );
@@ -502,27 +525,20 @@ export function drawPlayDock(ctx: CanvasRenderingContext2D): PlayDock {
     dockBtnFallback(ctx, down, "˅"),
   );
 
-  const tipW = 200;
-  const tipH = padH;
-  const tipX = W - edge - tipW;
-  ctx.fillStyle = "#1b1b1b";
-  roundRect(ctx, tipX, y, tipW, tipH, 10);
-  ctx.fill();
-  ctx.fillStyle = "#ff2d6a";
-  ctx.fillRect(tipX + tipW - 64, y - 8, 48, 12);
-  ctx.fillStyle = "#c8ff3d";
-  ctx.font = "800 16px 'Chakra Petch', sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("SWIPE", tipX + tipW / 2, y + tipH / 2 - 18);
-  ctx.fillStyle = "#f3efe6";
-  ctx.font = "700 15px 'Chakra Petch', sans-serif";
-  ctx.fillText("face to twist", tipX + tipW / 2, y + tipH / 2 + 6);
-  ctx.fillStyle = "#888";
-  ctx.font = "600 12px 'Chakra Petch', sans-serif";
-  ctx.fillText("D-pad flips · 1 move", tipX + tipW / 2, y + tipH / 2 + 28);
+  const selLabel = opts.mode === "row" ? `R${opts.index + 1}` : `C${opts.index + 1}`;
+  const selImg = uiButtonImage("select");
+  drawDockImage(ctx, select, selImg, () =>
+    dockBtnFallback(ctx, select, selLabel, { fill: "#c8ff3d", ink: "#111" }),
+  );
+  if (selImg) {
+    ctx.fillStyle = "#111";
+    ctx.font = "800 36px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(selLabel, select.x + select.w / 2, select.y + select.h / 2 + 2);
+  }
 
-  return { up, down, left, right };
+  return { up, down, left, right, select };
 }
 
 export function drawEndOverlay(
@@ -646,7 +662,7 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = "#c8ff3d";
   ctx.font = "600 20px 'Patrick Hand', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("Swipe to twist. Flip costs a move.", W / 2, 680);
+  ctx.fillText("Twist with the dock. Flip costs a move.", W / 2, 680);
 
   // Accent how-to strip
   ctx.fillStyle = "#1b1b1b";
@@ -657,7 +673,7 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = "#f3efe6";
   ctx.font = "600 17px 'Patrick Hand', sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("• Swipe a row/col — dry twists are free", 150, 748);
+  ctx.fillText("• Dock / swipe twists — dry twists are free", 150, 748);
   ctx.fillText("• Match 3+ spends a move · flip costs one", 150, 778);
   ctx.fillText("• Only the face you look at scores", 150, 808);
 
