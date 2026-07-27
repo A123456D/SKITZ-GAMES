@@ -2,7 +2,7 @@ import { TILE_KINDS, type TileKind } from "../core/stickers";
 import { getTheme, stickerPath, type ThemeId } from "./theme";
 
 /** Bump when replacing theme sticker PNGs so SW / memory cache cannot stick. */
-const STICKER_ASSET_VERSION = 3;
+const STICKER_ASSET_VERSION = 4;
 
 const cache = new Map<TileKind, HTMLImageElement>();
 let loadedTheme: ThemeId | null = null;
