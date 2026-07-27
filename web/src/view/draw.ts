@@ -1027,22 +1027,23 @@ export function drawWheel(
   // Soft ground shadow under the floating knob. Retro uses its triangular
   // thickness and halo instead; a circular shadow made the pieces read as stars.
   if (theme !== "retro") {
-    const shadowW = r * 2.2 + 6;
-    const shadowH = r * 0.68 + 6;
+    const shadowW = r * (theme === "paper" ? 2.6 : 2.2) + 8;
+    const shadowH = r * (theme === "paper" ? 0.85 : 0.68) + 8;
     stamp(
       ctx,
-      `sh|${theme}|${pal}|${rKey}|ink2`,
+      `sh|${theme}|${pal}|${rKey}|inkLift1`,
       shadowW,
       shadowH,
       (c) => {
         c.save();
-        c.scale(1.12, theme === "paper" ? 0.48 : 0.34);
-        const shadow = c.createRadialGradient(0, 0, r * 0.12, 0, 0, r);
+        c.scale(1.18, theme === "paper" ? 0.42 : 0.34);
+        const shadow = c.createRadialGradient(0, 0, r * 0.1, 0, 0, r);
         if (theme === "paper") {
-          // Stronger graphite drop so cutouts feel lifted off the page.
-          shadow.addColorStop(0, "rgba(40, 36, 28, 0.38)");
-          shadow.addColorStop(0.45, "rgba(40, 36, 28, 0.16)");
-          shadow.addColorStop(1, "rgba(40, 36, 28, 0)");
+          // Deeper offset shade — cutouts lift off the page without a drawn rim.
+          shadow.addColorStop(0, "rgba(35, 32, 26, 0.42)");
+          shadow.addColorStop(0.4, "rgba(35, 32, 26, 0.18)");
+          shadow.addColorStop(0.75, "rgba(35, 32, 26, 0.06)");
+          shadow.addColorStop(1, "rgba(35, 32, 26, 0)");
         } else if (dark) {
           shadow.addColorStop(0, "rgba(0,0,0,0.5)");
           shadow.addColorStop(0.55, "rgba(0,0,0,0.2)");
@@ -1058,8 +1059,8 @@ export function drawWheel(
         c.fill();
         c.restore();
       },
-      hub.x,
-      hub.y + r * (theme === "paper" ? 0.2 : 0.1),
+      hub.x + (theme === "paper" ? r * 0.06 : 0),
+      hub.y + r * (theme === "paper" ? 0.32 : 0.1),
     );
   }
 
@@ -1093,10 +1094,11 @@ export function drawWheel(
   // Thickness under the face (does not spin).
   // Circular knobs can use a stationary ring. A stationary triangle behind a
   // rotating triangle creates a false six-point star, so retro stays flat.
+  // INK: soft card stock only — no hard rim stroke; lift comes from the drop shadow.
   if (theme !== "retro") {
     ctx.save();
-    ctx.translate(hub.x, hub.y - floatY + edge);
-    ctx.fillStyle = stock;
+    ctx.translate(hub.x, hub.y - floatY + (theme === "paper" ? edge * 1.15 : edge));
+    ctx.fillStyle = theme === "paper" ? "#EDE8DE" : stock;
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.fill();
@@ -1110,7 +1112,7 @@ export function drawWheel(
   const sx = squash > 1 ? 1 / Math.sqrt(squash) : squash;
   stamp(
     ctx,
-    `face|${theme}|${pal}|${table.module}|${table.locked ? 1 : 0}|${table.link ? 1 : 0}|${rKey}|gearTicks1`,
+    `face|${theme}|${pal}|${table.module}|${table.locked ? 1 : 0}|${table.link ? 1 : 0}|${rKey}|inkNoRim1`,
     faceSize,
     faceSize,
     (c) => paintWheelFace(c, table, r, theme, lightFace, dark, face),
@@ -1290,13 +1292,13 @@ export function knobFloatY(
   selected: boolean,
   time: number,
 ): number {
-  const bob = theme === "paper" ? 0.22 : isLightTheme(theme) ? 0.35 : selected ? 1.35 : 0.75;
+  const bob = theme === "paper" ? 0.35 : isLightTheme(theme) ? 0.35 : selected ? 1.35 : 0.75;
   const hover = Math.sin(time * 1.5 + tableId * 0.9) * bob;
   const base =
     theme === "paper"
       ? selected
-        ? 4.2
-        : 3.4
+        ? 6.2
+        : 5.2
       : isLightTheme(theme)
         ? selected
           ? 3.5
@@ -1514,14 +1516,18 @@ function paintWheelFace(
 
   // Crisp outer rim — dark on light faces, soft ink on paper triangles.
   // Punk paints its own hard lime rim + studs above.
-  // INK knobs: single bold outer ring (no inner concentric hairline).
+  // INK knobs: no outline — lifted card cutouts defined by fill + drop shadow.
   // Cyber (mono) paints its own red/white enamel badge above.
   if (theme === "paper") {
-    ctx.strokeStyle = P.INK;
-    ctx.lineWidth = Math.max(1.9, r * 0.048);
+    // Soft underside contact only — keeps the edge readable without a drawn ring.
+    ctx.save();
+    ctx.globalAlpha = 0.14;
+    ctx.strokeStyle = "rgba(40, 36, 28, 0.9)";
+    ctx.lineWidth = Math.max(1.2, r * 0.03);
     ctx.beginPath();
-    ctx.arc(0, 0, r - 0.5, 0, Math.PI * 2);
+    ctx.arc(0.6, 0.8, r - 0.8, 0.15 * Math.PI, 0.85 * Math.PI);
     ctx.stroke();
+    ctx.restore();
   } else if (theme === "retro") {
     // Hot pink neon rim — matches the synthwave reference triangles.
     ctx.save();
