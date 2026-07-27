@@ -68,8 +68,14 @@ import { detectQuality, getQuality } from "./view/quality";
 import {
   applyThemeChrome,
   cycleTheme,
+  getTheme,
   getThemeLabel,
 } from "./view/theme";
+import {
+  ensureThemeArt,
+  onThemeArtReady,
+  reloadThemeArt,
+} from "./view/themeAssets";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
@@ -467,12 +473,13 @@ canvas.addEventListener(
         cycleSfxVolume();
         return;
       }
-      if (hitUiRect(SETTINGS_THEME, p.x, p.y)) {
-        cycleTheme();
-        void loadStickers();
-        sfxPaperRustle();
-        return;
-      }
+    if (hitUiRect(SETTINGS_THEME, p.x, p.y)) {
+      cycleTheme();
+      reloadThemeArt(getTheme());
+      void loadStickers();
+      sfxPaperRustle();
+      return;
+    }
       if (hitUiRect(SETTINGS_SIZE, p.x, p.y)) {
         const next = cycleCubeSize(session.size);
         if (settingsFrom === "menu") session = startSession(next);
@@ -680,8 +687,14 @@ window.addEventListener("orientationchange", resize);
 
 async function boot(): Promise<void> {
   applyThemeChrome();
+  ensureThemeArt(getTheme());
+  onThemeArtReady(() => {
+    /* next paint picks up art */
+  });
   resize();
   await Promise.all([loadLogo(), loadUiButtons(), loadStickers()]);
+  ensureThemeArt("classic");
+  ensureThemeArt("grime");
   syncActiveFace();
   requestAnimationFrame(tick);
 }

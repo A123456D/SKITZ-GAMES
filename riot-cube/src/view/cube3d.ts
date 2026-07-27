@@ -3,7 +3,8 @@ import { stickerForColor, type TileKind } from "../core/stickers";
 import { lanePreview } from "../core/lane";
 import { getQuality } from "./quality";
 import { stickerImage } from "./stickers";
-import { getPalette } from "./theme";
+import { getPalette, getTheme } from "./theme";
+import { drawCover, getThemeArt } from "./themeAssets";
 
 export type Vec3 = { x: number; y: number; z: number };
 export type Vec2 = { x: number; y: number };
@@ -612,7 +613,8 @@ export function drawCubeOrbitButtons(
     h: endH,
   };
   const draw = (r: typeof left, label: string) => {
-    ctx.fillStyle = pal.panel;
+    const art = getThemeArt(getTheme());
+    const btn = art.btn;
     ctx.beginPath();
     const rr = 7;
     ctx.moveTo(r.x + rr, r.y);
@@ -621,9 +623,24 @@ export function drawCubeOrbitButtons(
     ctx.arcTo(r.x, r.y + r.h, r.x, r.y, rr);
     ctx.arcTo(r.x, r.y, r.x + r.w, r.y, rr);
     ctx.closePath();
-    ctx.fill();
+    if (btn && btn.complete && btn.naturalWidth > 0) {
+      ctx.save();
+      ctx.clip();
+      drawCover(ctx, btn, r.x, r.y, r.w, r.h);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = pal.panel;
+      ctx.fill();
+    }
     ctx.strokeStyle = pal.accent;
     ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(r.x + rr, r.y);
+    ctx.arcTo(r.x + r.w, r.y, r.x + r.w, r.y + r.h, rr);
+    ctx.arcTo(r.x + r.w, r.y + r.h, r.x, r.y + r.h, rr);
+    ctx.arcTo(r.x, r.y + r.h, r.x, r.y, rr);
+    ctx.arcTo(r.x, r.y, r.x + r.w, r.y, rr);
+    ctx.closePath();
     ctx.stroke();
     ctx.fillStyle = pal.accent;
     ctx.font = "800 18px 'Chakra Petch', sans-serif";

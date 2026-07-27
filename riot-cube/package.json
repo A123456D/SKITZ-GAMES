@@ -11,6 +11,7 @@
     "ship": "npm run build && node scripts/copy-to-site.mjs"
   },
   "devDependencies": {
+    "sharp": "^0.35.3",
     "typescript": "^5.8.2",
     "vite": "^6.2.0",
     "vitest": "^3.0.8"

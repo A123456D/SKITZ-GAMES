@@ -96,18 +96,18 @@ const GRIME_PALETTE: ThemePalette = {
   panelEdge: "#c084fc",
   hudBg: "#18161c",
   hudInk: "#f4f4f5",
-  faceActive: "#1c1a22",
-  faceSide: "#121018",
-  faceStroke: "#f4f4f5",
-  faceRule: "rgba(192,132,252,0.22)",
-  faceRuleDim: "rgba(192,132,252,0.12)",
+  faceActive: "#f4eee0",
+  faceSide: "#e5dcc8",
+  faceStroke: "#1a120c",
+  faceRule: "rgba(192,132,252,0.2)",
+  faceRuleDim: "rgba(192,132,252,0.14)",
   faceColors: [
     "#c084fc", // F purple
     "#38bdf8", // B sky
     "#fb7185", // R pink
     "#fbbf24", // L amber
-    "#e4e4e7", // U zinc
-    "#09090b", // D near-black
+    "#f3efe6", // U cream
+    "#1b1b1b", // D black
   ],
   rule: "rgba(192,132,252,0.28)",
   margin: "rgba(251,113,133,0.45)",

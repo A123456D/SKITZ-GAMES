@@ -1,5 +1,6 @@
 import { uiButtonImage } from "./uiButtons";
-import { getPalette } from "./theme";
+import { getPalette, getTheme } from "./theme";
+import { drawCover, getThemeArt } from "./themeAssets";
 
 export const W = 720;
 export const H = 1280;
@@ -42,6 +43,18 @@ function roundRect(
 
 export function drawDesk(ctx: CanvasRenderingContext2D): void {
   const p = getPalette();
+  const art = getThemeArt(getTheme());
+  if (art.bg && art.bg.complete && art.bg.naturalWidth > 0) {
+    drawCover(ctx, art.bg, 0, 0, W, H);
+    // Soft readability wash so HUD / cube stay clear.
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "rgba(0,0,0,0.28)");
+    g.addColorStop(0.45, "rgba(0,0,0,0.12)");
+    g.addColorStop(1, "rgba(0,0,0,0.45)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, p.desk0);
   g.addColorStop(1, p.desk1);
@@ -182,6 +195,28 @@ function drawDockImage(
   img: HTMLImageElement | null,
   fallback: () => void,
 ): void {
+  const art = getThemeArt(getTheme());
+  const btn = art.btn;
+  if (btn && btn.complete && btn.naturalWidth > 0) {
+    ctx.save();
+    roundRect(ctx, r.x, r.y, r.w, r.h, 10);
+    ctx.clip();
+    drawCover(ctx, btn, r.x, r.y, r.w, r.h);
+    ctx.restore();
+    // Keep arrow glyph / select label readable on top.
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.92;
+      ctx.drawImage(img, r.x, r.y, r.w, r.h);
+      ctx.restore();
+    }
+    const p = getPalette();
+    ctx.strokeStyle = p.accent;
+    ctx.lineWidth = 3;
+    roundRect(ctx, r.x, r.y, r.w, r.h, 10);
+    ctx.stroke();
+    return;
+  }
   if (img && img.complete && img.naturalWidth > 0) {
     ctx.drawImage(img, r.x, r.y, r.w, r.h);
     return;
@@ -345,11 +380,36 @@ function drawPaperButton(
   opts?: { fill?: string; text?: string; tape?: string },
 ): void {
   const p = getPalette();
-  ctx.fillStyle = opts?.fill ?? p.paper;
-  roundRect(ctx, r.x, r.y, r.w, r.h, 8);
-  ctx.fill();
+  const art = getThemeArt(getTheme());
+  const btn = art.btn;
+  const fill = opts?.fill ?? p.paper;
+  const useTex =
+    btn &&
+    btn.complete &&
+    btn.naturalWidth > 0 &&
+    fill !== p.hot;
+
+  if (useTex) {
+    ctx.save();
+    roundRect(ctx, r.x, r.y, r.w, r.h, 8);
+    ctx.clip();
+    drawCover(ctx, btn!, r.x, r.y, r.w, r.h);
+    if (fill === p.panel) {
+      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+    } else if (fill === p.accent) {
+      ctx.fillStyle = "rgba(200,255,61,0.25)";
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+    }
+    ctx.restore();
+  } else {
+    ctx.fillStyle = fill;
+    roundRect(ctx, r.x, r.y, r.w, r.h, 8);
+    ctx.fill();
+  }
   ctx.strokeStyle = p.ink;
   ctx.lineWidth = 3;
+  roundRect(ctx, r.x, r.y, r.w, r.h, 8);
   ctx.stroke();
   if (opts?.tape) {
     ctx.fillStyle = opts.tape;
