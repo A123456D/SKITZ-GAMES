@@ -1,4 +1,3 @@
-import { uiButtonImage } from "./uiButtons";
 import { getPalette, getTheme } from "./theme";
 import { drawCover, getThemeArt } from "./themeAssets";
 
@@ -64,12 +63,7 @@ export function drawDesk(ctx: CanvasRenderingContext2D): void {
 
 export function drawHud(
   ctx: CanvasRenderingContext2D,
-  opts: {
-    sizeLabel: string;
-    moves: number;
-    faceName: string;
-    sfxVol?: number;
-  },
+  opts: { sfxVol?: number },
 ): void {
   const p = getPalette();
   ctx.fillStyle = p.hudBg;
@@ -86,42 +80,7 @@ export function drawHud(
   ctx.textBaseline = "alphabetic";
   ctx.fillText("RIOT CUBE", 50, 58);
 
-  ctx.fillStyle = p.panel;
-  roundRect(ctx, 260, 30, 96, 42, 5);
-  ctx.fill();
-  ctx.fillStyle = p.accent;
-  ctx.font = "700 12px 'Chakra Petch', sans-serif";
-  ctx.fillText("MOVES", 274, 46);
-  ctx.fillStyle = p.white;
-  ctx.font = "800 20px 'Chakra Petch', sans-serif";
-  ctx.fillText(String(opts.moves), 274, 64);
-
-  ctx.fillStyle = p.hudBg;
-  roundRect(ctx, 370, 28, 100, 46, 5);
-  ctx.fill();
-  ctx.strokeStyle = p.ink;
-  ctx.stroke();
-  ctx.fillStyle = p.hudInk;
-  ctx.font = "700 12px 'Chakra Petch', sans-serif";
-  ctx.fillText("SIZE", 384, 46);
-  ctx.font = "800 18px 'Chakra Petch', sans-serif";
-  ctx.fillText(opts.sizeLabel, 384, 66);
-
   drawVolumeButton(ctx, opts.sfxVol ?? 0.4);
-
-  ctx.fillStyle = p.panel;
-  roundRect(ctx, 36, 88, 648, 56, 5);
-  ctx.fill();
-  ctx.fillStyle = p.accent;
-  ctx.fillRect(56, 80, 44, 12);
-  ctx.fillStyle = p.paper;
-  ctx.font = "600 16px 'Patrick Hand', sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText(
-    `Orbit freely. Dock / swipe twists lanes (${opts.faceName}).`,
-    56,
-    124,
-  );
 }
 
 export const VOL_BTN = { x: 656, y: 28, w: 42, h: 46 };
@@ -181,18 +140,14 @@ function drawVolumeButton(ctx: CanvasRenderingContext2D, vol: number): void {
   }
 }
 
-export type PlayDock = {
-  up: UiRect;
-  down: UiRect;
-  left: UiRect;
-  right: UiRect;
-  select: UiRect;
+export type FaceTurnButtons = {
+  ccw: UiRect;
+  cw: UiRect;
 };
 
 function drawDockImage(
   ctx: CanvasRenderingContext2D,
   r: UiRect,
-  img: HTMLImageElement | null,
   fallback: () => void,
 ): void {
   const art = getThemeArt(getTheme());
@@ -203,13 +158,6 @@ function drawDockImage(
     ctx.clip();
     drawCover(ctx, btn, r.x, r.y, r.w, r.h);
     ctx.restore();
-    // Keep arrow glyph / select label readable on top.
-    if (img && img.complete && img.naturalWidth > 0) {
-      ctx.save();
-      ctx.globalAlpha = 0.92;
-      ctx.drawImage(img, r.x, r.y, r.w, r.h);
-      ctx.restore();
-    }
     const p = getPalette();
     ctx.strokeStyle = p.accent;
     ctx.lineWidth = 3;
@@ -217,108 +165,63 @@ function drawDockImage(
     ctx.stroke();
     return;
   }
-  if (img && img.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, r.x, r.y, r.w, r.h);
-    return;
-  }
   fallback();
 }
 
-function dockBtnFallback(
-  ctx: CanvasRenderingContext2D,
-  r: UiRect,
-  label: string,
-  opts?: { fill?: string; ink?: string },
-): void {
+function dockBtnFallback(ctx: CanvasRenderingContext2D, r: UiRect): void {
   const p = getPalette();
-  ctx.fillStyle = opts?.fill ?? p.ink;
+  ctx.fillStyle = p.ink;
   roundRect(ctx, r.x, r.y, r.w, r.h, 10);
   ctx.fill();
   ctx.strokeStyle = p.accent;
   ctx.lineWidth = 3;
   ctx.stroke();
-  ctx.fillStyle = opts?.ink ?? p.accent;
-  ctx.font = "800 28px 'Chakra Petch', sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
 }
 
-/** D-pad twists selected lane; selector toggles row/col. */
-export function drawPlayDock(
-  ctx: CanvasRenderingContext2D,
-  opts: { mode: "row" | "col"; index: number; size: number },
-): PlayDock {
+/** Two bottom buttons: rotate the currently facing face CCW / CW. */
+export function drawFaceTurnButtons(ctx: CanvasRenderingContext2D): FaceTurnButtons {
   const p = getPalette();
-  const edge = 20;
-  const btn = 78;
-  const gap = 8;
-  const padW = btn * 3 + gap * 2 + 20;
-  const padH = btn * 3 + gap * 2 + 20;
-  const y = H - edge - padH;
+  const btnW = 148;
+  const btnH = 96;
+  const gap = 28;
+  const edge = 28;
+  const y = H - edge - btnH;
+  const totalW = btnW * 2 + gap;
+  const x0 = (W - totalW) / 2;
 
+  const panelPad = 16;
   ctx.fillStyle = p.panel;
-  roundRect(ctx, edge, y, padW, padH, 10);
+  roundRect(
+    ctx,
+    x0 - panelPad,
+    y - panelPad,
+    totalW + panelPad * 2,
+    btnH + panelPad * 2,
+    10,
+  );
   ctx.fill();
   ctx.fillStyle = p.accent;
-  ctx.fillRect(edge + 16, y - 8, 48, 12);
+  ctx.fillRect(x0 - panelPad + 16, y - panelPad - 8, 48, 12);
 
-  const padCx = edge + padW / 2;
-  const midY = y + 10 + btn + gap;
-  const up: UiRect = { x: padCx - btn / 2, y: y + 10, w: btn, h: btn };
-  const left: UiRect = { x: padCx - btn * 1.5 - gap, y: midY, w: btn, h: btn };
-  const right: UiRect = { x: padCx + btn / 2 + gap, y: midY, w: btn, h: btn };
-  const down: UiRect = {
-    x: padCx - btn / 2,
-    y: midY + btn + gap,
-    w: btn,
-    h: btn,
-  };
+  const ccw: UiRect = { x: x0, y, w: btnW, h: btnH };
+  const cw: UiRect = { x: x0 + btnW + gap, y, w: btnW, h: btnH };
 
-  const sel = 112;
-  const selW = sel + 28;
-  const selH = padH;
-  const selPanelX = W - edge - selW;
-  ctx.fillStyle = p.panel;
-  roundRect(ctx, selPanelX, y, selW, selH, 10);
-  ctx.fill();
+  drawDockImage(ctx, ccw, () => dockBtnFallback(ctx, ccw));
+  drawDockImage(ctx, cw, () => dockBtnFallback(ctx, cw));
+
+  ctx.fillStyle = p.ink;
+  ctx.font = "800 42px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("\u21BA", ccw.x + ccw.w / 2, ccw.y + ccw.h / 2 - 4);
+  ctx.fillText("\u21BB", cw.x + cw.w / 2, cw.y + cw.h / 2 - 4);
+
+  ctx.font = "700 14px 'Chakra Petch', sans-serif";
   ctx.fillStyle = p.accent;
-  ctx.fillRect(selPanelX + selW - 64, y - 8, 48, 12);
+  ctx.fillText("CCW", ccw.x + ccw.w / 2, ccw.y + ccw.h - 16);
+  ctx.fillText("CW", cw.x + cw.w / 2, cw.y + cw.h - 16);
 
-  const select: UiRect = {
-    x: selPanelX + (selW - sel) / 2,
-    y: y + (selH - sel) / 2,
-    w: sel,
-    h: sel,
-  };
-
-  drawDockImage(ctx, up, uiButtonImage("orbit-up"), () =>
-    dockBtnFallback(ctx, up, "\u02C4"),
-  );
-  drawDockImage(ctx, left, uiButtonImage("orbit-left"), () =>
-    dockBtnFallback(ctx, left, "\u2039"),
-  );
-  drawDockImage(ctx, right, uiButtonImage("orbit-right"), () =>
-    dockBtnFallback(ctx, right, "\u203A"),
-  );
-  drawDockImage(ctx, down, uiButtonImage("orbit-down"), () =>
-    dockBtnFallback(ctx, down, "\u02C5"),
-  );
-
-  const selLabel = opts.mode === "row" ? `R${opts.index + 1}` : `C${opts.index + 1}`;
-  const selImg = uiButtonImage("select");
-  drawDockImage(ctx, select, selImg, () =>
-    dockBtnFallback(ctx, select, selLabel, { fill: p.accent, ink: p.ink }),
-  );
-  if (selImg) {
-    ctx.fillStyle = p.ink;
-    ctx.font = "800 36px 'Chakra Petch', sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(selLabel, select.x + select.w / 2, select.y + select.h / 2 + 2);
-  }
-
-  return { up, down, left, right, select };
+  return { ccw, cw };
 }
 
 export function drawEndOverlay(
@@ -355,7 +258,7 @@ export function drawEndOverlay(
   ctx.fillText("HOME", 318, 746);
 }
 
-export const MENU_BTN: UiRect = { x: 490, y: 28, w: 72, h: 46 };
+export const MENU_BTN: UiRect = { x: 572, y: 28, w: 72, h: 46 };
 
 export function drawMenuButton(ctx: CanvasRenderingContext2D): void {
   const p = getPalette();
@@ -479,8 +382,8 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = p.paper;
   ctx.font = "600 17px 'Patrick Hand', sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("\u2022 Dock / swipe twists lanes like a Rubik\u2019s Cube", 150, 748);
-  ctx.fillText("\u2022 Select R/C \u00B7 D-pad twists or changes lane", 150, 778);
+  ctx.fillText("\u2022 Face-turn buttons spin the facing face", 150, 748);
+  ctx.fillText("\u2022 Swipe a lane on the cube \u00B7 orbit to peek", 150, 778);
   ctx.fillText("\u2022 Try 2\u00D72 in settings if 3\u00D73 is rough", 150, 808);
 
   drawPaperButton(ctx, HOME_PLAY, "PLAY", {

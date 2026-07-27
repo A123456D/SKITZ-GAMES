@@ -11,6 +11,10 @@ import {
   scramble,
 } from "./rubik";
 import { applyLaneTwist, type LaneTwist } from "./lane";
+import {
+  pickFaceStickers,
+  type FaceStickers,
+} from "./stickers";
 
 export type { FaceId, CubeSize, LaneTwist };
 export { CUBE_SIZES, FACE_COUNT } from "./rubik";
@@ -25,6 +29,7 @@ export type Session = {
   moveCount: number;
   status: GameStatus;
   rng: () => number;
+  faceStickers: FaceStickers;
 };
 
 export function loadCubeSize(): CubeSize {
@@ -63,6 +68,7 @@ function seedFrom(): number {
 export function startSession(size: CubeSize = loadCubeSize()): Session {
   const seed = seedFrom();
   const rng = mulberry32(seed);
+  const faceStickers = pickFaceStickers(rng);
   const cube = scramble(size, defaultScrambleMoves(size), rng);
   return {
     size,
@@ -71,18 +77,24 @@ export function startSession(size: CubeSize = loadCubeSize()): Session {
     moveCount: 0,
     status: "playing",
     rng,
+    faceStickers,
   };
 }
 
 export function doScramble(session: Session): Session {
+  const seed = seedFrom();
+  const rng = mulberry32(seed);
+  const faceStickers = pickFaceStickers(rng);
   const cube = scramble(
     session.size,
     defaultScrambleMoves(session.size),
-    session.rng,
+    rng,
   );
   return {
     ...session,
     cube,
+    faceStickers,
+    rng,
     moveCount: 0,
     status: "playing",
   };

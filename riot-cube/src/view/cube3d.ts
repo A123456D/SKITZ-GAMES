@@ -308,6 +308,8 @@ export function drawCube3D(
     motion?: CubeMotion;
     /** Unshifted cube for lane peeks (defaults to `cube`). */
     sourceCube?: CubeState;
+    /** Per-face sticker kinds; defaults to FACE_STICKERS. */
+    faceStickers?: readonly TileKind[];
   },
 ): void {
   type FaceDraw = { i: FaceId; depth: number };
@@ -343,6 +345,7 @@ export function drawCube3D(
       opts.sourceCube ?? cube,
       motion,
       f.i === opts.activeFace,
+      opts.faceStickers,
     );
   }
 }
@@ -355,6 +358,7 @@ function drawFace(
   source: CubeState,
   motion: CubeMotion,
   isActive: boolean,
+  faceStickers?: readonly TileKind[],
 ): void {
   const p = getPalette();
   const geom = FACES[faceIndex]!;
@@ -420,7 +424,7 @@ function drawFace(
     hovering: boolean,
   ) => {
     if (u1 <= 0 || u0 >= 1 || v1 <= 0 || v0 >= 1) return;
-    const kind = stickerForColor(colorId);
+    const kind = stickerForColor(colorId, faceStickers);
     const s0 = facePointLifted(geom, u0, v0, hovering ? liftPulse : 0, layout);
     const s1 = facePointLifted(geom, u1, v0, hovering ? liftPulse : 0, layout);
     const s2 = facePointLifted(geom, u1, v1, hovering ? liftPulse : 0, layout);

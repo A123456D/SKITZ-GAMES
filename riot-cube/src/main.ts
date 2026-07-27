@@ -1,4 +1,5 @@
 import {
+  applyFaceTurn,
   applyTwist,
   cycleCubeSize,
   doScramble,
@@ -17,11 +18,11 @@ import {
   H,
   drawDesk,
   drawEndOverlay,
+  drawFaceTurnButtons,
   drawHomeScreen,
   drawHud,
   drawMenuButton,
   drawPauseMenu,
-  drawPlayDock,
   drawSettingsScreen,
   hitRetry,
   hitSolvedHome,
@@ -39,14 +40,13 @@ import {
   SETTINGS_SIZE,
   SETTINGS_THEME,
   SETTINGS_VOL,
-  type PlayDock,
+  type FaceTurnButtons,
 } from "./view/draw";
 import {
   drawCube3D,
   drawCubeOrbitButtons,
   facingFaceDot,
   facingFaceQuat,
-  FACE_NAMES,
   hitFrontUV,
   hitOrbitButton,
   screenDeltaToFaceUV,
@@ -75,7 +75,6 @@ import {
   sfxPaperSlide,
   unlockAudio,
 } from "./audio/paper";
-import { loadUiButtons } from "./view/uiButtons";
 import { loadStickers } from "./view/stickers";
 import { detectQuality, getQuality } from "./view/quality";
 import {
@@ -98,9 +97,7 @@ let screen: Screen = "home";
 let settingsFrom: Screen = "home";
 
 let session: Session = startSession(loadCubeSize());
-let controlMode: "row" | "col" = "row";
-let controlIndex = 0;
-let playDock: PlayDock | null = null;
+let faceTurnBtns: FaceTurnButtons | null = null;
 
 type DragState = {
   u0: number;
@@ -188,14 +185,6 @@ function activeMotion(): CubeMotion {
       hovering: Math.abs(springUv) > 0.01,
     };
   }
-  if (screen === "play" && session.status === "playing") {
-    return {
-      axis: controlMode,
-      index: controlIndex,
-      offset: 0,
-      hovering: true,
-    };
-  }
   return { axis: null, index: -1, offset: 0, hovering: false };
 }
 
@@ -213,6 +202,12 @@ function resetPlayVisuals(): void {
 function doTwist(twist: LaneTwist): void {
   if (session.status === "solved") return;
   session = applyTwist(session, twist);
+  sfxPaperSlide();
+}
+
+function doFaceTurn(dir: 1 | -1): void {
+  if (session.status === "solved") return;
+  session = applyFaceTurn(session, session.face, dir);
   sfxPaperSlide();
 }
 
@@ -271,56 +266,15 @@ function endOrbitDrag(): void {
   rotating = true;
 }
 
-function hitPlayDock(x: number, y: number): boolean {
-  if (!playDock || session.status !== "playing") return false;
-  const n = session.size;
-  const d = playDock;
-
-  if (hitUiRect(d.select, x, y)) {
-    controlMode = controlMode === "row" ? "col" : "row";
-    controlIndex = Math.min(controlIndex, n - 1);
-    sfxPaperRustle();
+function hitFaceTurnButtons(x: number, y: number): boolean {
+  if (!faceTurnBtns || session.status !== "playing") return false;
+  if (hitUiRect(faceTurnBtns.ccw, x, y)) {
+    doFaceTurn(-1);
     return true;
   }
-
-  if (controlMode === "row") {
-    if (hitUiRect(d.left, x, y)) {
-      doTwist({ axis: "row", index: controlIndex, dir: -1, amount: 1 });
-      return true;
-    }
-    if (hitUiRect(d.right, x, y)) {
-      doTwist({ axis: "row", index: controlIndex, dir: 1, amount: 1 });
-      return true;
-    }
-    if (hitUiRect(d.up, x, y)) {
-      controlIndex = (controlIndex - 1 + n) % n;
-      sfxPaperRustle();
-      return true;
-    }
-    if (hitUiRect(d.down, x, y)) {
-      controlIndex = (controlIndex + 1) % n;
-      sfxPaperRustle();
-      return true;
-    }
-  } else {
-    if (hitUiRect(d.up, x, y)) {
-      doTwist({ axis: "col", index: controlIndex, dir: -1, amount: 1 });
-      return true;
-    }
-    if (hitUiRect(d.down, x, y)) {
-      doTwist({ axis: "col", index: controlIndex, dir: 1, amount: 1 });
-      return true;
-    }
-    if (hitUiRect(d.left, x, y)) {
-      controlIndex = (controlIndex - 1 + n) % n;
-      sfxPaperRustle();
-      return true;
-    }
-    if (hitUiRect(d.right, x, y)) {
-      controlIndex = (controlIndex + 1) % n;
-      sfxPaperRustle();
-      return true;
-    }
+  if (hitUiRect(faceTurnBtns.cw, x, y)) {
+    doFaceTurn(1);
+    return true;
   }
   return false;
 }
@@ -357,9 +311,6 @@ function paint(): void {
   }
 
   drawHud(ctx, {
-    sizeLabel: sizeLabel(session.size),
-    moves: session.moveCount,
-    faceName: FACE_NAMES[session.face]!,
     sfxVol: getSfxVolume(),
   });
   drawMenuButton(ctx);
@@ -368,16 +319,11 @@ function paint(): void {
     activeFace: session.face,
     motion,
     sourceCube: source,
+    faceStickers: session.faceStickers,
   });
   orbitBtns = drawCubeOrbitButtons(ctx, layout.cx, layout.cy, layout.scale, W, H);
 
-  const n = session.size;
-  controlIndex = ((controlIndex % n) + n) % n;
-  playDock = drawPlayDock(ctx, {
-    mode: controlMode,
-    index: controlIndex,
-    size: n,
-  });
+  faceTurnBtns = drawFaceTurnButtons(ctx);
 
   if (session.status === "solved") {
     drawEndOverlay(ctx, { moves: session.moveCount });
@@ -415,14 +361,10 @@ function tick(): void {
 function goHome(): void {
   screen = "home";
   resetPlayVisuals();
-  controlMode = "row";
-  controlIndex = 0;
 }
 
 function startPlay(): void {
   resetPlayVisuals();
-  controlMode = "row";
-  controlIndex = 0;
   session = startSession(session.size);
   saveCubeSize(session.size);
   syncActiveFace();
@@ -457,18 +399,17 @@ canvas.addEventListener(
         cycleSfxVolume();
         return;
       }
-    if (hitUiRect(SETTINGS_THEME, p.x, p.y)) {
-      cycleTheme();
-      reloadThemeArt(getTheme());
-      void loadStickers();
-      sfxPaperRustle();
-      return;
-    }
+      if (hitUiRect(SETTINGS_THEME, p.x, p.y)) {
+        cycleTheme();
+        reloadThemeArt(getTheme());
+        void loadStickers();
+        sfxPaperRustle();
+        return;
+      }
       if (hitUiRect(SETTINGS_SIZE, p.x, p.y)) {
         const next = cycleCubeSize(session.size);
         if (settingsFrom === "menu") session = startSession(next);
         else session = { ...session, size: next };
-        controlIndex = 0;
         return;
       }
       if (hitUiRect(SETTINGS_BACK, p.x, p.y)) {
@@ -538,7 +479,7 @@ canvas.addEventListener(
       cycleSfxVolume();
       return;
     }
-    if (hitPlayDock(p.x, p.y)) return;
+    if (hitFaceTurnButtons(p.x, p.y)) return;
 
     if (orbitBtns) {
       const orb = hitOrbitButton(orbitBtns, p.x, p.y);
@@ -555,7 +496,6 @@ canvas.addEventListener(
       const n = session.size;
       const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
       const r = Math.min(n - 1, Math.max(0, Math.floor(hit.v * n)));
-      controlIndex = controlMode === "row" ? r : c;
       drag = {
         u0: hit.u,
         v0: hit.v,
@@ -608,8 +548,6 @@ canvas.addEventListener(
         drag.axis = "col";
         drag.index = drag.c;
       }
-      controlMode = drag.axis;
-      controlIndex = drag.index;
       sfxPaperRustle();
     }
     drag.offsetUv = drag.axis === "row" ? du : dv;
@@ -667,7 +605,7 @@ async function boot(): Promise<void> {
     /* next paint picks up art */
   });
   resize();
-  await Promise.all([loadLogo(), loadUiButtons(), loadStickers()]);
+  await Promise.all([loadLogo(), loadStickers()]);
   ensureThemeArt("classic");
   ensureThemeArt("grime");
   syncActiveFace();
