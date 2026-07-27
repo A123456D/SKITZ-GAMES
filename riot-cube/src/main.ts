@@ -99,6 +99,7 @@ import { detectQuality, getQuality } from "./view/quality";
 import {
   applyThemeChrome,
   cycleTheme,
+  getAnimeMode,
   getTheme,
   getThemeLabel,
   toggleAnimeMode,
@@ -111,9 +112,34 @@ import {
 } from "./view/themeAssets";
 import { getHintsEnabled, toggleHintsEnabled } from "./view/prefs";
 
+function activeStickerPool() {
+  const theme = getTheme();
+  return stickerPoolForTheme(
+    theme,
+    theme === "anime" ? getAnimeMode() : "day",
+  );
+}
+
 function applyAnimeModeToggle(): void {
   toggleAnimeMode();
   reloadThemeArt(getTheme());
+  const pool = activeStickerPool();
+  const ok = session.faceStickers.every((k) =>
+    (pool as readonly string[]).includes(k),
+  );
+  if (!ok) {
+    session = setFaceStickers(
+      session,
+      pickFaceStickers(() => Math.random(), pool),
+    );
+  }
+  if (screen === "stickers") {
+    stickerDraft = stickerDraft.map((k) =>
+      k && (pool as readonly string[]).includes(k) ? k : null,
+    );
+    const empty = stickerDraft.findIndex((k) => !k);
+    stickerSlot = empty >= 0 ? empty : 0;
+  }
   void loadStickers();
   sfxPaperRustle();
 }
@@ -125,10 +151,7 @@ type Screen = "home" | "play" | "menu" | "settings" | "stickers";
 let screen: Screen = "home";
 let settingsFrom: Screen = "home";
 
-let session: Session = startSession(
-  loadCubeSize(),
-  stickerPoolForTheme(getTheme()),
-);
+let session: Session = startSession(loadCubeSize(), activeStickerPool());
 let faceTurnBtns: FaceTurnButtons | null = null;
 
 let hintMove: HintMove | null = null;
@@ -559,7 +582,7 @@ function goHome(): void {
 
 function startPlay(): void {
   resetPlayVisuals();
-  session = startSession(session.size, stickerPoolForTheme(getTheme()));
+  session = startSession(session.size, activeStickerPool());
   saveCubeSize(session.size);
   syncActiveFace();
   screen = "play";
@@ -603,7 +626,7 @@ canvas.addEventListener(
       if (hitUiRect(SETTINGS_SIZE, p.x, p.y)) {
         const next = cycleCubeSize(session.size);
         if (settingsFrom === "menu")
-          session = startSession(next, stickerPoolForTheme(getTheme()));
+          session = startSession(next, activeStickerPool());
         else session = { ...session, size: next };
         clearHint();
         return;
@@ -628,10 +651,7 @@ canvas.addEventListener(
         return;
       }
       if (hitUiRect(STICKERS_RANDOM, p.x, p.y)) {
-        const map = pickFaceStickers(
-          () => Math.random(),
-          stickerPoolForTheme(getTheme()),
-        );
+        const map = pickFaceStickers(() => Math.random(), activeStickerPool());
         stickerDraft = [...map];
         stickerSlot = 0;
         sfxPaperFlutter();

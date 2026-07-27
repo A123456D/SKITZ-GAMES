@@ -11,13 +11,17 @@ import {
 } from "./theme";
 
 /** Bump when replacing theme sticker PNGs so SW / memory cache cannot stick. */
-const STICKER_ASSET_VERSION = 12;
+const STICKER_ASSET_VERSION = 13;
 
 const cache = new Map<TileKind, HTMLImageElement>();
 let loadedTheme: ThemeId | null = null;
 let loadedAnimeMode: AnimeMode | null = null;
 let loadedVersion = -1;
 let loadPromise: Promise<void> | null = null;
+
+function activePool(theme: ThemeId, mode: AnimeMode): readonly TileKind[] {
+  return stickerPoolForTheme(theme, theme === "anime" ? mode : "day");
+}
 
 function cacheKeyMatches(theme: ThemeId, mode: AnimeMode): boolean {
   if (
@@ -27,7 +31,7 @@ function cacheKeyMatches(theme: ThemeId, mode: AnimeMode): boolean {
   ) {
     return false;
   }
-  const pool = stickerPoolForTheme(theme);
+  const pool = activePool(theme, mode);
   return pool.every((k) => cache.has(k));
 }
 
@@ -51,7 +55,7 @@ export function loadStickers(forceTheme?: ThemeId): Promise<void> {
   loadedAnimeMode = mode;
   loadedVersion = STICKER_ASSET_VERSION;
   const versionAtStart = STICKER_ASSET_VERSION;
-  const pool = stickerPoolForTheme(theme);
+  const pool = activePool(theme, mode);
   loadPromise = Promise.all(
     pool.map(
       (kind) =>
@@ -69,26 +73,8 @@ export function loadStickers(forceTheme?: ThemeId): Promise<void> {
             resolve();
           };
           img.onload = commit;
-          img.onerror = () => {
-            // Anime-dark stickers optional until uploaded — fall back to day pack.
-            if (theme === "anime" && mode === "dark") {
-              const fallback = new Image();
-              fallback.onload = () => {
-                if (
-                  loadedTheme === theme &&
-                  loadedAnimeMode === mode &&
-                  loadedVersion === versionAtStart
-                ) {
-                  cache.set(kind, fallback);
-                }
-                resolve();
-              };
-              fallback.onerror = () => resolve();
-              fallback.src = `./themes/anime/${kind}.png?v=${STICKER_ASSET_VERSION}`;
-              return;
-            }
-            resolve();
-          };
+          // No day fallback in dark mode — missing files stay missing.
+          img.onerror = () => resolve();
           img.src = primary;
         }),
     ),

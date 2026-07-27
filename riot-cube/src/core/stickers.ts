@@ -143,10 +143,43 @@ export const ANIME_STICKER_POOL = [
   "bot",
 ] as const satisfies readonly TileKind[];
 
+/** Horror anime-dark sheet — 24 unique; do not mix with day add-ons. */
+export const ANIME_DARK_STICKER_POOL = [
+  "glitch",
+  "punk",
+  "hood",
+  "ramen",
+  "mask",
+  "katana",
+  "eyepatch",
+  "tears",
+  "butterfly",
+  "bolt",
+  "pill",
+  "chain",
+  "ghost",
+  "bunny",
+  "tv",
+  "candle",
+  "crow",
+  "bear",
+  "poison",
+  "heart",
+  "eye",
+  "hourglass",
+  "soda",
+  "grimoire",
+] as const satisfies readonly TileKind[];
+
 /** Unique sticker kinds available for a theme’s chooser / random pick. */
-export function stickerPoolForTheme(theme: string): readonly TileKind[] {
+export function stickerPoolForTheme(
+  theme: string,
+  animeMode: "day" | "dark" = "day",
+): readonly TileKind[] {
   if (theme === "classroom") return CLASSROOM_STICKER_POOL;
-  if (theme === "anime") return ANIME_STICKER_POOL;
+  if (theme === "anime") {
+    return animeMode === "dark" ? ANIME_DARK_STICKER_POOL : ANIME_STICKER_POOL;
+  }
   return EDGY_STICKER_POOL;
 }
 

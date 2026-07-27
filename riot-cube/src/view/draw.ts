@@ -661,7 +661,11 @@ export function availableStickerKinds(
     const k = draft[i];
     if (k && i !== slot) taken.add(k);
   }
-  const pool = stickerPoolForTheme(getTheme());
+  const theme = getTheme();
+  const pool = stickerPoolForTheme(
+    theme,
+    theme === "anime" ? getAnimeMode() : "day",
+  );
   return pool.filter((k) => !taken.has(k));
 }
 
