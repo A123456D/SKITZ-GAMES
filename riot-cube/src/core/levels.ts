@@ -20,34 +20,34 @@ function quietFace(seedRow: number): Face {
 
 /**
  * Level 1 — teach swipe matches on FRONT.
- * Crafted so row-0 twist +1 pulls a heart from LEFT → three hearts.
- * Also col-2 twist -1 pulls a flame from TOP → three flames.
+ * Crafted so row-0 twist +1 pulls headphones from LEFT → three headphones.
+ * Col-4 twist +1 pulls a flame from TOP → three flames.
  */
 const L1_FRONT: Face = [
-  ["heart", "heart", "bolt", "star", "flame", "diamond"],
-  ["bolt", "star", "flame", "diamond", "flame", "heart"],
-  ["star", "flame", "diamond", "skull", "skull", "bolt"],
-  ["flame", "diamond", "skull", "heart", "bolt", "star"],
-  ["diamond", "skull", "heart", "bolt", "star", "flame"],
-  ["skull", "heart", "bolt", "star", "diamond", "skull"],
+  ["headphones", "headphones", "spray", "smiley", "flame", "sneaker"],
+  ["spray", "smiley", "flame", "sneaker", "flame", "headphones"],
+  ["smiley", "flame", "sneaker", "skull", "skull", "spray"],
+  ["flame", "sneaker", "skull", "headphones", "spray", "smiley"],
+  ["sneaker", "skull", "headphones", "spray", "smiley", "flame"],
+  ["skull", "headphones", "spray", "smiley", "sneaker", "skull"],
 ];
 
 const L1_LEFT: Face = [
-  ["bolt", "star", "flame", "diamond", "skull", "heart"], // [5]=heart → FRONT row0 +1
-  ["star", "flame", "diamond", "skull", "heart", "bolt"],
-  ["flame", "diamond", "skull", "heart", "bolt", "star"],
-  ["diamond", "skull", "heart", "bolt", "star", "flame"],
-  ["skull", "heart", "bolt", "star", "flame", "diamond"],
-  ["heart", "bolt", "star", "flame", "diamond", "skull"],
+  ["spray", "smiley", "flame", "sneaker", "skull", "headphones"], // [5] → FRONT row0 +1
+  ["smiley", "flame", "sneaker", "skull", "headphones", "spray"],
+  ["flame", "sneaker", "skull", "headphones", "spray", "smiley"],
+  ["sneaker", "skull", "headphones", "spray", "smiley", "flame"],
+  ["skull", "headphones", "spray", "smiley", "flame", "sneaker"],
+  ["headphones", "spray", "smiley", "flame", "sneaker", "skull"],
 ];
 
 const L1_TOP: Face = [
-  ["star", "flame", "diamond", "skull", "heart", "bolt"],
-  ["flame", "diamond", "skull", "heart", "bolt", "star"],
-  ["diamond", "skull", "heart", "bolt", "star", "flame"],
-  ["skull", "heart", "bolt", "star", "flame", "diamond"],
-  ["heart", "bolt", "star", "flame", "diamond", "skull"],
-  ["bolt", "star", "diamond", "skull", "flame", "heart"], // [4]=flame → FRONT col4 +1
+  ["smiley", "flame", "sneaker", "skull", "headphones", "spray"],
+  ["flame", "sneaker", "skull", "headphones", "spray", "smiley"],
+  ["sneaker", "skull", "headphones", "spray", "smiley", "flame"],
+  ["skull", "headphones", "spray", "smiley", "flame", "sneaker"],
+  ["headphones", "spray", "smiley", "flame", "sneaker", "skull"],
+  ["spray", "smiley", "sneaker", "skull", "flame", "headphones"], // [4]=flame → FRONT col4 +1
 ];
 
 const L1_RIGHT = quietFace(1);
@@ -60,7 +60,7 @@ export const LEVEL_1: LevelDef = {
   size: 6,
   moves: 18,
   goals: [
-    { kind: "heart", need: 8 },
+    { kind: "headphones", need: 8 },
     { kind: "flame", need: 6 },
   ],
   board: L1_FRONT,
@@ -75,12 +75,12 @@ export const LEVEL_1: LevelDef = {
 
 /** Level 2 — denser goals, fewer moves. */
 const L2_FRONT: Face = [
-  ["skull", "skull", "bolt", "star", "flame", "diamond"],
-  ["heart", "bolt", "star", "flame", "diamond", "heart"],
-  ["bolt", "star", "flame", "diamond", "heart", "bolt"],
-  ["star", "flame", "diamond", "heart", "bolt", "star"],
-  ["flame", "diamond", "heart", "bolt", "star", "flame"],
-  ["diamond", "heart", "bolt", "star", "flame", "diamond"],
+  ["skull", "skull", "spray", "smiley", "flame", "sneaker"],
+  ["headphones", "spray", "smiley", "flame", "sneaker", "headphones"],
+  ["spray", "smiley", "flame", "sneaker", "headphones", "spray"],
+  ["smiley", "flame", "sneaker", "headphones", "spray", "smiley"],
+  ["flame", "sneaker", "headphones", "spray", "smiley", "flame"],
+  ["sneaker", "headphones", "spray", "smiley", "flame", "sneaker"],
 ];
 
 export const LEVEL_2: LevelDef = {
@@ -90,17 +90,17 @@ export const LEVEL_2: LevelDef = {
   moves: 16,
   goals: [
     { kind: "skull", need: 10 },
-    { kind: "bolt", need: 8 },
-    { kind: "star", need: 8 },
+    { kind: "spray", need: 8 },
+    { kind: "smiley", need: 8 },
   ],
   board: L2_FRONT,
   boardLeft: [
-    ["diamond", "flame", "star", "bolt", "heart", "skull"], // feeds FRONT row0 +1 → 3 skulls
-    ["flame", "star", "bolt", "heart", "skull", "diamond"],
-    ["star", "bolt", "heart", "skull", "diamond", "flame"],
-    ["bolt", "heart", "skull", "diamond", "flame", "star"],
-    ["heart", "skull", "diamond", "flame", "star", "bolt"],
-    ["skull", "diamond", "flame", "star", "bolt", "heart"],
+    ["sneaker", "flame", "smiley", "spray", "headphones", "skull"], // feeds FRONT row0 +1 → 3 skulls
+    ["flame", "smiley", "spray", "headphones", "skull", "sneaker"],
+    ["smiley", "spray", "headphones", "skull", "sneaker", "flame"],
+    ["spray", "headphones", "skull", "sneaker", "flame", "smiley"],
+    ["headphones", "skull", "sneaker", "flame", "smiley", "spray"],
+    ["skull", "sneaker", "flame", "smiley", "spray", "headphones"],
   ],
   kinds: PLAY_KINDS,
   seed: 2202,
@@ -114,8 +114,8 @@ export const LEVEL_3: LevelDef = {
   size: 6,
   moves: 14,
   goals: [
-    { kind: "diamond", need: 12 },
-    { kind: "heart", need: 10 },
+    { kind: "sneaker", need: 12 },
+    { kind: "headphones", need: 10 },
     { kind: "flame", need: 10 },
   ],
   kinds: PLAY_KINDS,

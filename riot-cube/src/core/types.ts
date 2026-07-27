@@ -18,11 +18,11 @@ export type TileKind = (typeof TILE_KINDS)[number];
 /** Match-3 play pool — denser boards, real matches. */
 export const PLAY_KINDS = [
   "skull",
-  "heart",
-  "bolt",
-  "star",
+  "headphones",
+  "spray",
+  "smiley",
   "flame",
-  "diamond",
+  "sneaker",
 ] as const satisfies readonly TileKind[];
 
 export type PlayKind = (typeof PLAY_KINDS)[number];
