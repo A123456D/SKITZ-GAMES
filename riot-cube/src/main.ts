@@ -40,6 +40,7 @@ import {
   PAUSE_RESUME,
   PAUSE_SETTINGS,
   SETTINGS_BACK,
+  SETTINGS_THEME,
   SETTINGS_VOL,
   type PlayDock,
 } from "./view/draw";
@@ -66,6 +67,7 @@ import {
 import { loadStickers } from "./view/stickers";
 import { loadUiButtons } from "./view/uiButtons";
 import { detectQuality, getQuality } from "./view/quality";
+import { cycleTheme, getThemeLabel } from "./view/theme";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
@@ -266,7 +268,7 @@ function paint(): void {
     return;
   }
   if (screen === "settings") {
-    drawSettingsScreen(ctx, { sfxVol: getSfxVolume() });
+    drawSettingsScreen(ctx, { sfxVol: getSfxVolume(), themeLabel: getThemeLabel() });
     return;
   }
 
@@ -627,6 +629,13 @@ canvas.addEventListener(
   if (screen === "settings") {
     if (hitUiRect(SETTINGS_VOL, p.x, p.y)) {
       cycleSfxVolume();
+      paint();
+      return;
+    }
+    if (hitUiRect(SETTINGS_THEME, p.x, p.y)) {
+      cycleTheme();
+      void loadStickers().then(() => paint());
+      sfxPaperRustle();
       paint();
       return;
     }

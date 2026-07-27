@@ -1,4 +1,4 @@
-const CACHE = "riot-cube-v13";
+const CACHE = "riot-cube-v14";
 
 self.addEventListener("install", (event) => {
   // Activate immediately so clients pick up the new caching strategy.

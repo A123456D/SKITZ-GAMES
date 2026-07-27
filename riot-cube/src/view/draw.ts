@@ -725,38 +725,43 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   });
 }
 
-export const SETTINGS_VOL: UiRect = { x: 140, y: 480, w: 440, h: 80 };
-export const SETTINGS_BACK: UiRect = { x: 140, y: 600, w: 440, h: 70 };
+export const SETTINGS_VOL: UiRect = { x: 140, y: 430, w: 440, h: 80 };
+export const SETTINGS_THEME: UiRect = { x: 140, y: 530, w: 440, h: 80 };
+export const SETTINGS_BACK: UiRect = { x: 140, y: 640, w: 440, h: 70 };
 
 export function drawSettingsScreen(
   ctx: CanvasRenderingContext2D,
-  opts: { sfxVol: number },
+  opts: { sfxVol: number; themeLabel: string },
 ): void {
   drawDesk(ctx);
 
   ctx.fillStyle = "#f3efe6";
-  roundRect(ctx, 80, 260, 560, 500, 10);
+  roundRect(ctx, 80, 220, 560, 560, 10);
   ctx.fill();
   ctx.strokeStyle = "#111";
   ctx.lineWidth = 4;
   ctx.stroke();
   ctx.fillStyle = "#c8ff3d";
-  ctx.fillRect(120, 248, 100, 18);
+  ctx.fillRect(120, 208, 100, 18);
 
   ctx.fillStyle = "#111";
   ctx.font = "800 42px 'Permanent Marker', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("SETTINGS", W / 2, 340);
+  ctx.fillText("SETTINGS", W / 2, 300);
 
-  ctx.font = "600 20px 'Patrick Hand', sans-serif";
+  ctx.font = "600 18px 'Patrick Hand', sans-serif";
   ctx.fillStyle = "#333";
-  ctx.fillText("Tap sound to cycle volume", W / 2, 390);
+  ctx.fillText("Tap to cycle sound & sticker theme", W / 2, 350);
 
   const volLabel =
     opts.sfxVol <= 0.001 ? "MUTED" : opts.sfxVol < 0.55 ? "SOFT" : "NORMAL";
   drawPaperButton(ctx, SETTINGS_VOL, `SOUND  ·  ${volLabel}`, {
     fill: "#111",
     text: "#c8ff3d",
+  });
+  drawPaperButton(ctx, SETTINGS_THEME, `THEME  ·  ${opts.themeLabel}`, {
+    fill: "#111",
+    text: "#ff2d6a",
   });
   drawPaperButton(ctx, SETTINGS_BACK, "BACK", {
     fill: "#ff2d6a",

@@ -1,13 +1,20 @@
 import type { TileKind } from "../core/types";
 import { TILE_KINDS } from "../core/types";
+import { getTheme, stickerPath, type ThemeId } from "./theme";
 
 const cache = new Map<TileKind, HTMLImageElement>();
-let loaded = false;
+let loadedTheme: ThemeId | null = null;
 let loadPromise: Promise<void> | null = null;
 
-export function loadStickers(): Promise<void> {
-  if (loaded) return Promise.resolve();
-  if (loadPromise) return loadPromise;
+export function loadStickers(forceTheme?: ThemeId): Promise<void> {
+  const theme = forceTheme ?? getTheme();
+  if (loadedTheme === theme && cache.size === TILE_KINDS.length) {
+    return Promise.resolve();
+  }
+  if (loadPromise && loadedTheme === theme) return loadPromise;
+
+  cache.clear();
+  loadedTheme = theme;
   loadPromise = Promise.all(
     TILE_KINDS.map(
       (kind) =>
@@ -18,11 +25,11 @@ export function loadStickers(): Promise<void> {
             resolve();
           };
           img.onerror = () => resolve();
-          img.src = `./stickers/${kind}.png`;
+          img.src = `${stickerPath(kind, theme)}?v=1`;
         }),
     ),
   ).then(() => {
-    loaded = true;
+    loadPromise = null;
   });
   return loadPromise;
 }
