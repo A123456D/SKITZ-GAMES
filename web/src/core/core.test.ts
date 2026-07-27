@@ -150,6 +150,15 @@ describe("dense procedural levels", () => {
     expect(p2).toEqual([4, 5, 6, 7, 8, 8]);
   });
 
+  it("pulse budget is 1 / 2 / 3 by phase", () => {
+    expect(generateLevel(1, 9).pulseLimit).toBe(1);
+    expect(generateLevel(6, 9).pulseLimit).toBe(1);
+    expect(generateLevel(7, 9).pulseLimit).toBe(2);
+    expect(generateLevel(12, 9).pulseLimit).toBe(2);
+    expect(generateLevel(13, 9).pulseLimit).toBe(3);
+    expect(generateLevel(18, 9).pulseLimit).toBe(3);
+  });
+
   it("phase 2+ gear trains sit off the rim", () => {
     for (const d of [7, 10, 12, 15, 18]) {
       const level = generateLevel(d, 808 + d);

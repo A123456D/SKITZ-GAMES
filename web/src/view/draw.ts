@@ -2344,7 +2344,7 @@ export function drawGearPairChip(
   ctx.restore();
 }
 
-/** Small ink letter on a geared disc — shared label for the whole train. */
+/** Letter chip outside the disc rim so it never looks like pipe artwork. */
 export function drawGearDiscBadge(
   ctx: CanvasRenderingContext2D,
   layout: Layout,
@@ -2353,14 +2353,11 @@ export function drawGearDiscBadge(
 ): void {
   const c = cellCenter(layout, hub);
   const r = Math.min(layout.cell * 0.48, (layout.cell + layout.gap) * 0.46);
-  drawGearPairChip(
-    ctx,
-    c.x + r * 0.58,
-    c.y - r * 0.58,
-    gearPairLabel(pairIndex),
-    P.INK,
-    Math.max(9, r * 0.22),
-  );
+  const chipR = Math.max(8, r * 0.2);
+  // Park the mark in the cell-gap NE of the rim — clear of ports and wiring.
+  const bx = c.x + r + chipR + Math.max(2, layout.gap * 0.35);
+  const by = c.y - r - chipR - Math.max(2, layout.gap * 0.35);
+  drawGearPairChip(ctx, bx, by, gearPairLabel(pairIndex), P.INK, chipR);
 }
 
 /** Pulse every other disc in the selected gear train. */

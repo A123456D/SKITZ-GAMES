@@ -1935,9 +1935,13 @@ function drawPlay(): void {
     );
   }
 
-  // Pair markers only — no cables across the board (those cover other discs).
+  // Pair markers only on real trains (2+ discs), letter sits outside the rim.
   for (const t of session.state.tables) {
     if (!t.link) continue;
+    const peers = session.state.tables.filter(
+      (x) => x.link && x.link.group === t.link!.group,
+    ).length;
+    if (peers < 2) continue;
     const idx = gearPairIndex(session.state.tables, t.id);
     if (idx >= 0) drawGearDiscBadge(ctx, layout, t.hub, idx);
   }

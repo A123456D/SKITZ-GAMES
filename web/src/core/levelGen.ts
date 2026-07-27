@@ -71,7 +71,8 @@ function profile(diff: number) {
   // Phase 1: 3×3→8×8. Phase 2+: 4×4→8×8 so gears have a real interior.
   const size = phase === 1 ? Math.min(8, 2 + slot) : Math.min(8, 3 + slot);
   const extraEdges = slot <= 2 ? 0 : slot <= 4 ? 1 : 2;
-  const pulseLimit = phase === 1 ? 3 : phase === 2 ? (slot >= 5 ? 2 : 3) : slot >= 4 ? 2 : 3;
+  // One check budget per phase — spend carefully.
+  const pulseLimit = phase === 1 ? 1 : phase === 2 ? 2 : 3;
   const undoLimit = 0;
   // Gear trains: early = pairs; later = a 3–4 train plus a separate pair.
   // Sizes are disc counts per train; capped by interior cell count.
@@ -259,8 +260,13 @@ function scoreGearEdge(
   else score += 4;
   if (a.module === b.module) score += 6;
   score += (degree[a.id]! + degree[b.id]!) * 1.5;
-  if (a.module === M.TEE || a.module === M.CROSS) score += 2;
-  if (b.module === M.TEE || b.module === M.CROSS) score += 2;
+  // Prefer readable shafts over busy crosses — crosses look “why is this linked?”.
+  if (a.module === M.STRAIGHT || b.module === M.STRAIGHT) score += 3;
+  if (a.module === M.ELBOW || b.module === M.ELBOW) score += 2;
+  if (a.module === M.CROSS) score -= 6;
+  if (b.module === M.CROSS) score -= 6;
+  if (a.module === M.TEE) score -= 2;
+  if (b.module === M.TEE) score -= 2;
   if (a.module === M.ENDCAP && b.module === M.ENDCAP) score -= 5;
   return score;
 }
@@ -286,7 +292,9 @@ function linkGearGroups(
 
   for (const size of groupSizes) {
     if (size < 2) continue;
-    const pool = tables.filter((t) => !isEdgeCell(t.hub, w, h) && !used.has(t.id));
+    const pool = tables.filter(
+      (t) => !isEdgeCell(t.hub, w, h) && !used.has(t.id) && t.module !== M.CROSS,
+    );
     if (pool.length < size) continue;
 
     // Seed: best pipe-related pair, then grow by best attachment to the train.
@@ -332,7 +340,7 @@ function linkGearGroups(
       used.add(pick.t.id);
     }
 
-    if (members.length < 2) {
+    if (members.length < size) {
       for (const m of members) used.delete(m.id);
       continue;
     }

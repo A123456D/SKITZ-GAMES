@@ -88,6 +88,12 @@ for (let d = 1; d <= DIFFICULTY_COUNT; d++) {
     const label = `${levelTitle(d)} seed=${seed}`;
     try {
       const level = generateLevel(d, seed);
+      const wantPulse = phaseOf(d) === 1 ? 1 : phaseOf(d) === 2 ? 2 : 3;
+      if (level.pulseLimit !== wantPulse) {
+        console.log("PULSE FAIL", label, `got ${level.pulseLimit} want ${wantPulse}`);
+        fails++;
+        continue;
+      }
       const gErr = gearLinksOk(level, { requireInterior: true, expectGroups: expect });
       if (gErr) {
         console.log("GEAR FAIL", label, gErr);
