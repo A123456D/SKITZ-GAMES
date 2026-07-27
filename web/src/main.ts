@@ -1896,22 +1896,25 @@ function drawPlay(): void {
   if (session.level.allowBoardTurn && !victory && !pendingWin) {
     const s = layout.cell + layout.gap;
     const boardW = session.state.width * s - layout.gap;
+    const btnR = 16;
+    const gapFromBoard = 28; // keep clear of the top-row discs
+    const cy = layout.origin.y - gapFromBoard - btnR;
     const tl: ButtonRect = {
-      x: layout.origin.x - 8,
-      y: layout.origin.y - 36,
-      w: 36,
-      h: 36,
+      x: layout.origin.x - 10,
+      y: cy - btnR,
+      w: btnR * 2,
+      h: btnR * 2,
       id: "board_ccw",
     };
     const tr: ButtonRect = {
-      x: layout.origin.x + boardW - 28,
-      y: layout.origin.y - 36,
-      w: 36,
-      h: 36,
+      x: layout.origin.x + boardW - btnR * 2 + 10,
+      y: cy - btnR,
+      w: btnR * 2,
+      h: btnR * 2,
       id: "board_cw",
     };
-    drawRoundButton(ctx, tl.x + 18, tl.y + 18, 16, "↺", false, time);
-    drawRoundButton(ctx, tr.x + 18, tr.y + 18, 16, "↻", false, time);
+    drawRoundButton(ctx, tl.x + btnR, cy, btnR, "↺", false, time);
+    drawRoundButton(ctx, tr.x + btnR, cy, btnR, "↻", false, time);
     buttons.push(tl, tr);
   }
 
