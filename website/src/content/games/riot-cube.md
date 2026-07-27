@@ -2,7 +2,7 @@
 title: RIOT CUBE
 tagline: Twist. Rip. Match.
 summary: Twist rows and columns like cube slices to rip sticker matches. Mobile-first puzzle — free in the browser, install on Android from Chrome. 3D cube mode is the end goal.
-cover: /images/logo-riot-cube.png
+cover: /images/logo-riot-cube-v3.png
 screenshots: []
 featured: true
 released: true
