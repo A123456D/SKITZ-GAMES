@@ -511,7 +511,7 @@ export function loadLogo(): Promise<void> {
       resolve();
     };
     img.onerror = () => resolve();
-    img.src = "./riot-cube-logo.png";
+    img.src = "./logo-riot-cube.png?v=2";
   });
 }
 

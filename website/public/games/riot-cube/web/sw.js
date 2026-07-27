@@ -1,4 +1,4 @@
-const CACHE = "riot-cube-v3";
+const CACHE = "riot-cube-v4";
 
 self.addEventListener("install", (event) => {
   // Activate immediately so clients pick up the new caching strategy.
@@ -22,6 +22,8 @@ function shouldNetworkFirst(req, url) {
   if (path.endsWith(".html") || path.endsWith("/")) return true;
   if (path.includes("/assets/")) return true;
   if (/\.(js|css|webmanifest)$/i.test(path)) return true;
+  // Brand logo must refresh when we replace the art.
+  if (/logo-riot-cube\.png$/i.test(path) || /riot-cube-logo\.png$/i.test(path)) return true;
   return false;
 }
 

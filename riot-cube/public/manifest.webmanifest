@@ -9,7 +9,7 @@
   "theme_color": "#0c0c0c",
   "icons": [
     {
-      "src": "./riot-cube-logo.png",
+      "src": "./logo-riot-cube.png",
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any"
