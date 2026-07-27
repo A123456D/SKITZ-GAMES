@@ -1,4 +1,4 @@
-const CACHE = "riot-cube-v14";
+const CACHE = "riot-cube-v15";
 
 self.addEventListener("install", (event) => {
   // Activate immediately so clients pick up the new caching strategy.
@@ -25,6 +25,9 @@ function shouldNetworkFirst(req, url) {
   // Brand logo must refresh when we replace the art.
   if (/logo-riot-cube\.png$/i.test(path) || /riot-cube-logo\.png$/i.test(path)) return true;
   if (path.includes("/ui/")) return true;
+  // Theme backgrounds change often — never stick on a stale night/day plate.
+  if (/\/themes\/[^/]+\/bg\.jpg$/i.test(path)) return true;
+  if (/\/themes\/[^/]+\/btn\.jpg$/i.test(path)) return true;
   return false;
 }
 

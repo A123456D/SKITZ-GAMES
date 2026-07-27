@@ -42,14 +42,21 @@ function roundRect(
 
 export function drawDesk(ctx: CanvasRenderingContext2D): void {
   const p = getPalette();
-  const art = getThemeArt(getTheme());
+  const theme = getTheme();
+  const art = getThemeArt(theme);
   if (art.bg && art.bg.complete && art.bg.naturalWidth > 0) {
     drawCover(ctx, art.bg, 0, 0, W, H);
-    // Soft readability wash so HUD / cube stay clear.
+    // Soft readability wash — keep anime daytime bright (heavy black looked like night).
     const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, "rgba(0,0,0,0.28)");
-    g.addColorStop(0.45, "rgba(0,0,0,0.12)");
-    g.addColorStop(1, "rgba(0,0,0,0.45)");
+    if (theme === "anime") {
+      g.addColorStop(0, "rgba(255,255,255,0.08)");
+      g.addColorStop(0.5, "rgba(0,0,0,0.04)");
+      g.addColorStop(1, "rgba(0,0,0,0.18)");
+    } else {
+      g.addColorStop(0, "rgba(0,0,0,0.28)");
+      g.addColorStop(0.45, "rgba(0,0,0,0.12)");
+      g.addColorStop(1, "rgba(0,0,0,0.45)");
+    }
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
     return;

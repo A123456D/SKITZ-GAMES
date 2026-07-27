@@ -117,39 +117,39 @@ const GRIME_PALETTE: ThemePalette = {
   browser: "#030203",
 };
 
-/** Night indigo desk, sakura hot, sky accent — anime sticker sheet. */
+/** Daytime neighborhood street — sky desk fallback, sakura hot, soft sky accent. */
 const ANIME_PALETTE: ThemePalette = {
-  desk0: "#0a0e1a",
-  desk1: "#05070f",
-  accent: "#7dd3fc",
-  hot: "#f472b6",
+  desk0: "#87b8e8",
+  desk1: "#c5dcf0",
+  accent: "#0284c7",
+  hot: "#ec4899",
   paper: "#f3efe6",
   paperDeep: "#e8e2d6",
   ink: "#0a0a0a",
-  muted: "#94a3b8",
-  panel: "#0f121c",
-  panelEdge: "#7dd3fc",
-  hudBg: "#12161f",
-  hudInk: "#f1f5f9",
+  muted: "#64748b",
+  panel: "#ffffff",
+  panelEdge: "#0284c7",
+  hudBg: "#ffffff",
+  hudInk: "#0f172a",
   faceActive: "#f4eee0",
   faceSide: "#e5dcc8",
   faceStroke: "#1a120c",
-  faceRule: "rgba(125,211,252,0.2)",
-  faceRuleDim: "rgba(125,211,252,0.14)",
+  faceRule: "rgba(2,132,199,0.2)",
+  faceRuleDim: "rgba(2,132,199,0.14)",
   faceColors: [
-    "#7dd3fc", // F sky
+    "#38bdf8", // F sky
     "#a78bfa", // B soft purple
     "#f472b6", // R sakura
     "#fbbf24", // L amber
     "#f3efe6", // U cream
-    "#0a0e1a", // D night
+    "#64748b", // D slate
   ],
-  rule: "rgba(125,211,252,0.28)",
-  margin: "rgba(244,114,182,0.45)",
-  tape: "#7dd3fc",
-  losePanel: "#120a14",
-  white: "#fafafa",
-  browser: "#05070f",
+  rule: "rgba(2,132,199,0.28)",
+  margin: "rgba(236,72,153,0.45)",
+  tape: "#38bdf8",
+  losePanel: "#e2e8f0",
+  white: "#ffffff",
+  browser: "#c5dcf0",
 };
 
 export const THEMES: ThemeDef[] = [
