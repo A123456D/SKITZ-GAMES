@@ -11,8 +11,12 @@ export const Module = {
   ENDCAP: 5,
 } as const;
 
-/** Geared coupling: turning this table also turns `partner` by `delta * sign`. */
-export type TableLink = { partner: number; sign: 1 | -1 };
+/** Geared coupling: all discs sharing `group` turn together by polarity. */
+export type TableLink = {
+  group: number;
+  /** Mesh polarity within the group (±1). Relative turn = polarity_a * polarity_b. */
+  polarity: 1 | -1;
+};
 
 export type TableDef = {
   id: number;
@@ -23,7 +27,7 @@ export type TableDef = {
   module: number;
   locked: boolean;
   tint: number;
-  /** Optional gear link to another table (symmetric partner turns too). */
+  /** Optional gear train (shared group turns together). */
   link?: TableLink;
 };
 

@@ -770,11 +770,13 @@ function doPulse(): void {
 function visualRot(tableId: number): number {
   const t = session!.state.tables.find((x) => x.id === tableId)!;
   if (drag && drag.tableId === tableId) return drag.liveAngle;
-  // A geared partner spins live while the other disc is dragged.
-  if (drag && t.link && t.link.partner === drag.tableId) {
-    const dragged = session!.state.tables.find((x) => x.id === drag!.tableId)!;
-    const delta = drag.liveAngle - dragged.rotationQ * (Math.PI / 2);
-    return t.rotationQ * (Math.PI / 2) + delta * t.link.sign;
+  // A geared cohort spins live while one disc is dragged.
+  if (drag && t.link) {
+    const src = session!.state.tables.find((x) => x.id === drag!.tableId);
+    if (src?.link && src.link.group === t.link.group && t.id !== drag.tableId) {
+      const delta = drag.liveAngle - src.rotationQ * (Math.PI / 2);
+      return t.rotationQ * (Math.PI / 2) + delta * t.link.polarity * src.link.polarity;
+    }
   }
   if (rotTween && rotTween.id === tableId) {
     const u = Math.min(1, (time - rotTween.start) / rotTween.dur);
@@ -1943,9 +1945,11 @@ function drawPlay(): void {
     const selectedId = session.selectedTable;
     const sel = session.state.tables.find((t) => t.id === selectedId);
     if (sel?.link) {
-      const partner = session.state.tables.find((t) => t.id === sel.link!.partner);
       const idx = gearPairIndex(session.state.tables, sel.id);
-      if (partner && idx >= 0) drawGearPartnerHint(ctx, layout, partner.hub, idx, time);
+      for (const other of session.state.tables) {
+        if (!other.link || other.id === sel.id || other.link.group !== sel.link.group) continue;
+        if (idx >= 0) drawGearPartnerHint(ctx, layout, other.hub, idx, time);
+      }
     }
   }
 

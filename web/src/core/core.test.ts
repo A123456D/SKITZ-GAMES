@@ -150,36 +150,40 @@ describe("dense procedural levels", () => {
     expect(p2).toEqual([4, 5, 6, 7, 8, 8]);
   });
 
-  it("phase 2+ gear pairs sit apart and off the rim", () => {
+  it("phase 2+ gear trains sit off the rim", () => {
     for (const d of [7, 10, 12, 15, 18]) {
       const level = generateLevel(d, 808 + d);
-      const pairs: Array<[number, number]> = [];
-      const seen = new Set<number>();
+      const byGroup = new Map<number, typeof level.tables>();
       for (const t of level.tables) {
-        if (!t.link || seen.has(t.id)) continue;
-        const p = level.tables.find((x) => x.id === t.link!.partner)!;
-        const man = Math.abs(t.hub.x - p.hub.x) + Math.abs(t.hub.y - p.hub.y);
-        expect(man).toBeGreaterThanOrEqual(2);
-        for (const hub of [t.hub, p.hub]) {
-          expect(hub.x).toBeGreaterThan(0);
-          expect(hub.y).toBeGreaterThan(0);
-          expect(hub.x).toBeLessThan(level.width - 1);
-          expect(hub.y).toBeLessThan(level.height - 1);
-        }
-        pairs.push([t.id, p.id]);
-        seen.add(t.id);
-        seen.add(p.id);
+        if (!t.link) continue;
+        expect(t.hub.x).toBeGreaterThan(0);
+        expect(t.hub.y).toBeGreaterThan(0);
+        expect(t.hub.x).toBeLessThan(level.width - 1);
+        expect(t.hub.y).toBeLessThan(level.height - 1);
+        const list = byGroup.get(t.link.group) ?? [];
+        list.push(t);
+        byGroup.set(t.link.group, list);
       }
-      expect(pairs.length).toBeGreaterThanOrEqual(1);
+      expect(byGroup.size).toBeGreaterThanOrEqual(1);
+      for (const members of byGroup.values()) {
+        expect(members.length).toBeGreaterThanOrEqual(2);
+      }
     }
   });
 
-  it("later desks use more gear pairs", () => {
+  it("later desks use larger gear trains", () => {
     const early = generateLevel(7, 111);
     const late = generateLevel(12, 222);
-    const count = (level: ReturnType<typeof generateLevel>) =>
-      level.tables.filter((t) => t.link).length / 2;
-    expect(count(late)).toBeGreaterThan(count(early));
+    const maxTrain = (level: ReturnType<typeof generateLevel>) => {
+      const m = new Map<number, number>();
+      for (const t of level.tables) {
+        if (!t.link) continue;
+        m.set(t.link.group, (m.get(t.link.group) ?? 0) + 1);
+      }
+      return Math.max(0, ...m.values());
+    };
+    expect(maxTrain(late)).toBeGreaterThanOrEqual(maxTrain(early));
+    expect(maxTrain(late)).toBeGreaterThanOrEqual(3);
   });
 
   it("phase 2 boards use gear links", () => {

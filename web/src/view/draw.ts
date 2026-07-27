@@ -1110,7 +1110,7 @@ export function drawWheel(
   const sx = squash > 1 ? 1 / Math.sqrt(squash) : squash;
   stamp(
     ctx,
-    `face|${theme}|${pal}|${table.module}|${table.locked ? 1 : 0}|${table.link ? 1 : 0}|${rKey}|gearTeeth2`,
+    `face|${theme}|${pal}|${table.module}|${table.locked ? 1 : 0}|${table.link ? 1 : 0}|${rKey}|gearTicks1`,
     faceSize,
     faceSize,
     (c) => paintWheelFace(c, table, r, theme, lightFace, dark, face),
@@ -1734,28 +1734,19 @@ function paintWheelFace(
   }
 
   if (table.link) {
-    // Bold cog teeth — linked discs must read at a glance.
+    // Subtle cog ticks — linked without loud colour rings.
     ctx.fillStyle = ink;
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = Math.max(1.6, r * 0.045);
-    ctx.beginPath();
-    const teeth = tri ? 9 : 14;
+    ctx.globalAlpha = paperInk ? 0.55 : 0.7;
+    const teeth = tri ? 6 : 8;
     for (let i = 0; i < teeth; i++) {
-      const a0 = -Math.PI / 2 + (i * Math.PI * 2) / teeth;
-      const a1 = -Math.PI / 2 + ((i + 0.45) * Math.PI * 2) / teeth;
-      const outer = r * 1.08;
-      const inner = r * 0.92;
-      ctx.moveTo(Math.cos(a0) * inner, Math.sin(a0) * inner);
-      ctx.lineTo(Math.cos(a0) * outer, Math.sin(a0) * outer);
-      ctx.lineTo(Math.cos(a1) * outer, Math.sin(a1) * outer);
-      ctx.lineTo(Math.cos(a1) * inner, Math.sin(a1) * inner);
+      const a = -Math.PI / 2 + (i * Math.PI * 2) / teeth;
+      const x = Math.cos(a) * r * 0.98;
+      const y = Math.sin(a) * r * 0.98;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(1.1, r * 0.045), 0, Math.PI * 2);
+      ctx.fill();
     }
-    ctx.closePath();
-    ctx.fill();
-    // Inner ring so the coupling still reads when teeth sit under wiring.
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 0.78, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 
   if (table.module === Module.GATE) {
@@ -2308,65 +2299,52 @@ function drawTokenDoor(ctx: CanvasRenderingContext2D, c: Vec2, size: number): vo
   ctx.restore();
 }
 
-/** Stable pair index for each geared disc (partners share one index). */
+/** Stable group index for geared discs (same train → same index). */
 export function gearPairIndex(tables: TableDef[], id: number): number {
-  const roots: number[] = [];
+  const groups: number[] = [];
   for (const t of tables) {
-    if (!t.link || t.id > t.link.partner) continue;
-    roots.push(t.id);
+    if (!t.link || groups.includes(t.link.group)) continue;
+    groups.push(t.link.group);
   }
-  roots.sort((a, b) => a - b);
+  groups.sort((a, b) => a - b);
   const t = tables.find((x) => x.id === id);
   if (!t?.link) return -1;
-  const root = Math.min(t.id, t.link.partner);
-  return roots.indexOf(root);
+  return groups.indexOf(t.link.group);
 }
 
 export function gearPairLabel(index: number): string {
   return String.fromCharCode(65 + (((index % 26) + 26) % 26));
 }
 
-/** High-contrast pair tints that still sit on paper / dark themes. */
-export function gearPairColor(index: number): string {
-  const tones = ["#C45C26", "#1F6F8B", "#3D7A4A", "#8B3A62", "#6B5B2E", "#2F5D8C"];
-  return tones[((index % tones.length) + tones.length) % tones.length]!;
-}
-
 /**
- * Bold cable between geared partners removed — cables covered other discs.
- * Pair identity is carried by disc badges + optional partner hint on select.
+ * Quiet monochrome mark — no loud coloured rings (those fought the theme ink).
  */
 export function drawGearPairChip(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   label: string,
-  color: string,
-  r = 12,
+  _color: string,
+  r = 10,
 ): void {
   ctx.save();
   ctx.globalAlpha = 1;
   ctx.fillStyle = P.PAPER;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2.6;
+  ctx.strokeStyle = P.INK;
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  ctx.strokeStyle = P.INK;
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.stroke();
   ctx.fillStyle = P.INK;
-  ctx.font = font(800, Math.round(r * 1.15));
+  ctx.font = font(700, Math.round(r * 1.05));
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(label, x, y + 0.5);
   ctx.restore();
 }
 
-/** Letter chip on a geared disc (upright, not spun with the face). */
+/** Small ink letter on a geared disc — shared label for the whole train. */
 export function drawGearDiscBadge(
   ctx: CanvasRenderingContext2D,
   layout: Layout,
@@ -2375,42 +2353,33 @@ export function drawGearDiscBadge(
 ): void {
   const c = cellCenter(layout, hub);
   const r = Math.min(layout.cell * 0.48, (layout.cell + layout.gap) * 0.46);
-  // Soft pair-colored rim that does not cross neighboring discs.
-  ctx.save();
-  ctx.strokeStyle = gearPairColor(pairIndex);
-  ctx.globalAlpha = 0.9;
-  ctx.lineWidth = Math.max(2.4, r * 0.08);
-  ctx.beginPath();
-  ctx.arc(c.x, c.y, r + 3, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
   drawGearPairChip(
     ctx,
-    c.x + r * 0.62,
-    c.y - r * 0.62,
+    c.x + r * 0.58,
+    c.y - r * 0.58,
     gearPairLabel(pairIndex),
-    gearPairColor(pairIndex),
-    Math.max(11, r * 0.28),
+    P.INK,
+    Math.max(9, r * 0.22),
   );
 }
 
-/** Pulse the partner disc when a geared disc is selected — no board-spanning line. */
+/** Pulse every other disc in the selected gear train. */
 export function drawGearPartnerHint(
   ctx: CanvasRenderingContext2D,
   layout: Layout,
   hub: Vec2,
-  pairIndex: number,
+  _pairIndex: number,
   time: number,
 ): void {
   const c = cellCenter(layout, hub);
   const r = Math.min(layout.cell * 0.48, (layout.cell + layout.gap) * 0.46);
   const pulse = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(time * 4));
   ctx.save();
-  ctx.strokeStyle = gearPairColor(pairIndex);
-  ctx.globalAlpha = 0.35 + 0.55 * pulse;
-  ctx.lineWidth = 3.2;
+  ctx.strokeStyle = P.INK;
+  ctx.globalAlpha = 0.25 + 0.4 * pulse;
+  ctx.lineWidth = 2.2;
   ctx.beginPath();
-  ctx.arc(c.x, c.y, r + 6 + pulse * 2, 0, Math.PI * 2);
+  ctx.arc(c.x, c.y, r + 5 + pulse * 2, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }

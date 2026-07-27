@@ -12,37 +12,38 @@ import {
 import { loadLevel, applySolutionStep, pulse } from "../src/core/puzzleSession";
 import { solve } from "../src/core/networkSolver";
 
-/** Expected gear-pair count from the generator profile. */
-function expectedGears(diff: number): number {
+/** Expected gear-train sizes from the generator profile. */
+function expectedGroups(diff: number): number[] {
   const phase = phaseOf(diff);
   const slot = phaseSlot(diff);
-  if (phase === 1) return 0;
+  if (phase === 1) return [];
   const size = Math.min(8, 3 + slot);
   const interior = Math.max(0, size - 2) * Math.max(0, size - 2);
-  const maxPairs = Math.floor(interior / 2);
-  const wanted =
+  const wanted: number[] =
     phase === 2
-      ? slot <= 1
-        ? 1
-        : slot === 2
-          ? 2
-          : slot === 3
-            ? 3
-            : slot === 4
-              ? 4
-              : slot === 5
-                ? 4
-                : 5
+      ? slot <= 2
+        ? [2]
+        : slot === 3
+          ? [3]
+          : slot === 4
+            ? [3, 2]
+            : [4, 2]
       : slot <= 1
-        ? 2
+        ? [2]
         : slot === 2
-          ? 3
+          ? [3]
           : slot === 3
-            ? 4
-            : slot === 4
-              ? 5
-              : 6;
-  return Math.min(wanted, maxPairs);
+            ? [3, 2]
+            : [4, 2];
+  const out: number[] = [];
+  let left = interior;
+  for (const n of wanted) {
+    if (n >= 2 && n <= left) {
+      out.push(n);
+      left -= n;
+    }
+  }
+  return out;
 }
 
 function isRim(hub: { x: number; y: number }, w: number, h: number): boolean {
@@ -51,34 +52,30 @@ function isRim(hub: { x: number; y: number }, w: number, h: number): boolean {
 
 function gearLinksOk(
   level: ReturnType<typeof generateLevel>,
-  opts: { requireDistant: boolean; requireInterior: boolean; expectPairs?: number },
+  opts: { requireInterior: boolean; expectGroups?: number[] },
 ): string | null {
-  const byId = new Map(level.tables.map((t) => [t.id, t]));
-  const seen = new Set<number>();
-  let pairs = 0;
+  const byGroup = new Map<number, typeof level.tables>();
   for (const t of level.tables) {
-    if (!t.link || seen.has(t.id)) continue;
-    const p = byId.get(t.link.partner);
-    if (!p?.link || p.link.partner !== t.id) return `broken link on ${t.id}`;
-    if (t.link.sign !== -1 || p.link.sign !== -1) return `gear sign not opposite on ${t.id}`;
-    if (opts.requireInterior) {
-      if (isRim(t.hub, level.width, level.height) || isRim(p.hub, level.width, level.height)) {
-        return `gear on rim: ${t.id}@(${t.hub.x},${t.hub.y}) ${p.id}@(${p.hub.x},${p.hub.y})`;
-      }
+    if (!t.link) continue;
+    if (opts.requireInterior && isRim(t.hub, level.width, level.height)) {
+      return `gear on rim: ${t.id}@(${t.hub.x},${t.hub.y})`;
     }
-    const man = Math.abs(t.hub.x - p.hub.x) + Math.abs(t.hub.y - p.hub.y);
-    if (opts.requireDistant && man < 2) {
-      return `gear pair too close: ${t.id}-${p.id} (${t.hub.x},${t.hub.y})-(${p.hub.x},${p.hub.y}) man=${man}`;
+    const list = byGroup.get(t.link.group) ?? [];
+    list.push(t);
+    byGroup.set(t.link.group, list);
+  }
+  const got = [...byGroup.values()].map((m) => m.length).sort((a, b) => b - a);
+  if (opts.expectGroups) {
+    const want = [...opts.expectGroups].sort((a, b) => b - a);
+    if (got.length !== want.length || got.some((n, i) => n !== want[i])) {
+      return `gear groups ${got.join("+")} != expected ${want.join("+")}`;
     }
-    seen.add(t.id);
-    seen.add(p.id);
-    pairs++;
   }
-  if (opts.expectPairs !== undefined && pairs !== opts.expectPairs) {
-    return `gear count ${pairs} != expected ${opts.expectPairs}`;
+  if (phaseOf(Number(level.id.replace("diff_", ""))) >= 2 && got.length < 1) {
+    return "phase 2+ missing gear trains";
   }
-  if (phaseOf(Number(level.id.replace("diff_", ""))) >= 2 && pairs < 1) {
-    return "phase 2+ missing gear pairs";
+  for (const members of byGroup.values()) {
+    if (members.length < 2) return "singleton gear group";
   }
   return null;
 }
@@ -86,16 +83,12 @@ function gearLinksOk(
 let fails = 0;
 for (let d = 1; d <= DIFFICULTY_COUNT; d++) {
   const seeds = [42, 77, 404, 900 + d * 13];
-  const expect = expectedGears(d);
+  const expect = expectedGroups(d);
   for (const seed of seeds) {
     const label = `${levelTitle(d)} seed=${seed}`;
     try {
       const level = generateLevel(d, seed);
-      const gErr = gearLinksOk(level, {
-        requireDistant: true,
-        requireInterior: true,
-        expectPairs: expect,
-      });
+      const gErr = gearLinksOk(level, { requireInterior: true, expectGroups: expect });
       if (gErr) {
         console.log("GEAR FAIL", label, gErr);
         fails++;
@@ -116,7 +109,6 @@ for (let d = 1; d <= DIFFICULTY_COUNT; d++) {
           bad = true;
           break;
         }
-        // After row shifts, hubs move — only require link integrity mid-solve.
         const mid = gearLinksOk(
           {
             ...level,
@@ -128,7 +120,7 @@ for (let d = 1; d <= DIFFICULTY_COUNT; d++) {
             width: session.state.width,
             height: session.state.height,
           },
-          { requireDistant: false, requireInterior: false },
+          { requireInterior: false },
         );
         if (mid) {
           console.log("MID GEAR FAIL", label, "after", i, mid);
@@ -155,11 +147,14 @@ for (let d = 1; d <= DIFFICULTY_COUNT; d++) {
         continue;
       }
 
+      const geared = level.tables.filter((t) => t.link).length;
+      const groups = new Set(level.tables.filter((t) => t.link).map((t) => t.link!.group)).size;
       console.log(
         "PLAYED OK",
         label,
         `size=${level.width}`,
-        `gears=${level.tables.filter((t) => t.link).length / 2}`,
+        `gears=${geared}`,
+        `trains=${groups}`,
         `rowSteps=${level.solution.filter((s) => s.tableId === -2).length}`,
         `par=${level.par}`,
       );

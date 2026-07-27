@@ -73,34 +73,36 @@ function profile(diff: number) {
   const extraEdges = slot <= 2 ? 0 : slot <= 4 ? 1 : 2;
   const pulseLimit = phase === 1 ? 3 : phase === 2 ? (slot >= 5 ? 2 : 3) : slot >= 4 ? 2 : 3;
   const undoLimit = 0;
-  // Interior-only gear pairs — later desks couple more discs at once.
+  // Gear trains: early = pairs; later = a 3–4 train plus a separate pair.
+  // Sizes are disc counts per train; capped by interior cell count.
   const interior = Math.max(0, size - 2) * Math.max(0, size - 2);
-  const maxInteriorPairs = Math.floor(interior / 2);
-  const gearPairsWanted =
+  const gearGroupsWanted: number[] =
     phase === 1
-      ? 0
+      ? []
       : phase === 2
-        ? slot <= 1
-          ? 1
-          : slot === 2
-            ? 2
-            : slot === 3
-              ? 3
-              : slot === 4
-                ? 4
-                : slot === 5
-                  ? 4
-                  : 5
+        ? slot <= 2
+          ? [2]
+          : slot === 3
+            ? [3]
+            : slot === 4
+              ? [3, 2]
+              : [4, 2]
         : slot <= 1
-          ? 2
+          ? [2]
           : slot === 2
-            ? 3
+            ? [3]
             : slot === 3
-              ? 4
-              : slot === 4
-                ? 5
-                : 6;
-  const gearPairs = Math.min(gearPairsWanted, maxInteriorPairs);
+              ? [3, 2]
+              : [4, 2];
+  const gearGroups: number[] = [];
+  let interiorLeft = interior;
+  for (const n of gearGroupsWanted) {
+    if (n >= 2 && n <= interiorLeft) {
+      gearGroups.push(n);
+      interiorLeft -= n;
+    }
+  }
+  const gearDiscCount = gearGroups.reduce((a, b) => a + b, 0);
   const rowShifts = phase === 3 ? Math.min(1 + Math.floor((slot - 1) / 2), 2) : 0;
   const minMoves = Math.min(size * size - 1, 3 + slot + (phase - 1));
   return {
@@ -111,7 +113,8 @@ function profile(diff: number) {
     extraEdges,
     pulseLimit,
     undoLimit,
-    gearPairs,
+    gearGroups,
+    gearDiscCount,
     rowShifts,
     minMoves,
     hasGears: phase >= 2,
@@ -214,10 +217,8 @@ function tablesFromPorts(w: number, h: number, ports: number[][]): TableDef[] {
 }
 
 /**
- * Pair interior discs that share a short pipe path — never rim, never neighbors.
- * Opposite gears (sign -1): turn one, the partner reverses.
- * Links only form when the topology gives a reason (graph distance 2–4 on the
- * pipe net) and busy matching junctions are preferred so coupling bites.
+ * Form interior gear trains that share short pipe paths — never rim, never
+ * neighbors. Each train gets alternating polarity so turning one flips the mesh.
  */
 function isEdgeCell(hub: { x: number; y: number }, w: number, h: number): boolean {
   return hub.x <= 0 || hub.y <= 0 || hub.x >= w - 1 || hub.y >= h - 1;
@@ -246,15 +247,33 @@ function pipeDistances(edges: Edge[], n: number): number[][] {
   return dist;
 }
 
-function linkGears(
+function scoreGearEdge(
+  a: TableDef,
+  b: TableDef,
+  gDist: number,
+  degree: number[],
+): number {
+  let score = 0;
+  if (gDist === 2) score += 10;
+  else if (gDist === 3) score += 8;
+  else score += 4;
+  if (a.module === b.module) score += 6;
+  score += (degree[a.id]! + degree[b.id]!) * 1.5;
+  if (a.module === M.TEE || a.module === M.CROSS) score += 2;
+  if (b.module === M.TEE || b.module === M.CROSS) score += 2;
+  if (a.module === M.ENDCAP && b.module === M.ENDCAP) score -= 5;
+  return score;
+}
+
+function linkGearGroups(
   tables: TableDef[],
   edges: Edge[],
   w: number,
   h: number,
-  pairs: number,
+  groupSizes: number[],
   rng: Rng,
 ): void {
-  if (pairs <= 0) return;
+  if (!groupSizes.length) return;
   const n = w * h;
   const dist = pipeDistances(edges, n);
   const degree = new Array<number>(n).fill(0);
@@ -262,44 +281,67 @@ function linkGears(
     degree[e.a]!++;
     degree[e.b]!++;
   }
-  const interior = tables.filter((t) => !isEdgeCell(t.hub, w, h));
-  type Cand = { a: TableDef; b: TableDef; score: number };
-  const candidates: Cand[] = [];
-  for (let i = 0; i < interior.length; i++) {
-    const a = interior[i]!;
-    for (let j = i + 1; j < interior.length; j++) {
-      const b = interior[j]!;
-      const gDist = dist[a.id]![b.id]!;
-      // Must share a short pipe path — unrelated far cells are not "linked for a reason".
-      if (gDist < 2 || gDist > 4) continue;
-      const man = Math.abs(a.hub.x - b.hub.x) + Math.abs(a.hub.y - b.hub.y);
-      if (man < 2) continue;
-      let score = 0;
-      // Sweet spot: two hops on the same run (local coupling that fights itself).
-      if (gDist === 2) score += 10;
-      else if (gDist === 3) score += 8;
-      else score += 4;
-      if (a.module === b.module) score += 6;
-      // Busy junctions hurt more when forced to co-rotate.
-      score += (degree[a.id]! + degree[b.id]!) * 1.5;
-      if (a.module === M.TEE || a.module === M.CROSS) score += 2;
-      if (b.module === M.TEE || b.module === M.CROSS) score += 2;
-      // Endcaps alone rarely create hard coupling.
-      if (a.module === M.ENDCAP && b.module === M.ENDCAP) score -= 5;
-      candidates.push({ a, b, score });
-    }
-  }
-  const ordered = shuffle(rng, candidates).sort((x, y) => y.score - x.score);
-  let linked = 0;
   const used = new Set<number>();
-  for (const { a, b } of ordered) {
-    if (linked >= pairs) break;
-    if (used.has(a.id) || used.has(b.id)) continue;
-    a.link = { partner: b.id, sign: -1 };
-    b.link = { partner: a.id, sign: -1 };
-    used.add(a.id);
-    used.add(b.id);
-    linked++;
+  let groupId = 0;
+
+  for (const size of groupSizes) {
+    if (size < 2) continue;
+    const pool = tables.filter((t) => !isEdgeCell(t.hub, w, h) && !used.has(t.id));
+    if (pool.length < size) continue;
+
+    // Seed: best pipe-related pair, then grow by best attachment to the train.
+    type Pair = { a: TableDef; b: TableDef; score: number };
+    const seeds: Pair[] = [];
+    for (let i = 0; i < pool.length; i++) {
+      const a = pool[i]!;
+      for (let j = i + 1; j < pool.length; j++) {
+        const b = pool[j]!;
+        const gDist = dist[a.id]![b.id]!;
+        if (gDist < 2 || gDist > 4) continue;
+        const man = Math.abs(a.hub.x - b.hub.x) + Math.abs(a.hub.y - b.hub.y);
+        if (man < 2) continue;
+        seeds.push({ a, b, score: scoreGearEdge(a, b, gDist, degree) });
+      }
+    }
+    if (!seeds.length) continue;
+    const seed = shuffle(rng, seeds).sort((x, y) => y.score - x.score)[0]!;
+    const members: TableDef[] = [seed.a, seed.b];
+    used.add(seed.a.id);
+    used.add(seed.b.id);
+
+    while (members.length < size) {
+      type Grow = { t: TableDef; score: number };
+      const grows: Grow[] = [];
+      for (const cand of pool) {
+        if (used.has(cand.id)) continue;
+        let best = -1;
+        let ok = false;
+        for (const m of members) {
+          const gDist = dist[cand.id]![m.id]!;
+          if (gDist < 2 || gDist > 4) continue;
+          const man = Math.abs(cand.hub.x - m.hub.x) + Math.abs(cand.hub.y - m.hub.y);
+          if (man < 2) continue;
+          ok = true;
+          best = Math.max(best, scoreGearEdge(cand, m, gDist, degree));
+        }
+        if (ok) grows.push({ t: cand, score: best });
+      }
+      if (!grows.length) break;
+      const pick = shuffle(rng, grows).sort((x, y) => y.score - x.score)[0]!;
+      members.push(pick.t);
+      used.add(pick.t.id);
+    }
+
+    if (members.length < 2) {
+      for (const m of members) used.delete(m.id);
+      continue;
+    }
+    // Alternating polarity along the train order.
+    for (let i = 0; i < members.length; i++) {
+      const t = members[i]!;
+      t.link = { group: groupId, polarity: i % 2 === 0 ? 1 : -1 };
+    }
+    groupId++;
   }
 }
 
@@ -429,30 +471,34 @@ function scrambleAndVerify(
   const rotateSteps: MoveStep[] = [];
   const visited = new Set<number>();
 
-  // Scramble with rotateTable so geared partners stay in sync. Only emit
-  // solution steps for the disc the player turns (one per gear pair).
+  // Scramble with rotateTable so gear trains stay in sync. Only emit
+  // solution steps for one disc per train (lowest id).
+  const groupRoot = (group: number) =>
+    Math.min(...g.tables.filter((x) => x.link?.group === group).map((x) => x.id));
+  const markGroup = (group: number) => {
+    for (const x of g.tables) if (x.link?.group === group) visited.add(x.id);
+  };
   for (const t of shuffle(rng, [...g.tables])) {
     if (visited.has(t.id) || t.locked) continue;
-    // Prefer turning the lower id in a gear pair so the solution is stable.
-    if (t.link && t.id > t.link.partner) continue;
+    if (t.link && t.id !== groupRoot(t.link.group)) continue;
     const amount = 1 + Math.floor(rng() * 3);
     const dir: 1 | -1 = rng() < 0.5 ? 1 : -1;
     if (!rotateTable(g, t.id, dir * amount)) continue;
     for (let k = 0; k < amount; k++) rotateSteps.push(move(t.id, (-dir) as -1 | 1));
-    visited.add(t.id);
-    if (t.link) visited.add(t.link.partner);
+    if (t.link) markGroup(t.link.group);
+    else visited.add(t.id);
   }
 
   // Nudge any ungeared disc that is still at the solved angle.
   for (const t of g.tables) {
     if (visited.has(t.id) || t.locked) continue;
-    if (t.link && t.id > t.link.partner) continue;
+    if (t.link && t.id !== groupRoot(t.link.group)) continue;
     const sol = solvedTables.find((x) => x.id === t.id)!;
     if (((t.rotationQ % 4) + 4) % 4 !== ((sol.rotationQ % 4) + 4) % 4) continue;
     rotateTable(g, t.id, 1);
     rotateSteps.push(move(t.id, -1));
-    visited.add(t.id);
-    if (t.link) visited.add(t.link.partner);
+    if (t.link) markGroup(t.link.group);
+    else visited.add(t.id);
   }
 
   // Keep solution order = reverse of scramble (do not shuffle geared undos).
@@ -488,17 +534,35 @@ function scrambleAndVerify(
   const solution = [...shiftSteps, ...rotateSteps];
   if (rotateSteps.length < Math.min(opts.minMoves, Math.max(3, opts.size))) return null;
 
-  // Distant interior gear pairs must match the requested count and stay off the rim.
-  const gearCount = g.tables.filter((t) => t.link).length / 2;
-  if (opts.gearPairs > 0 && gearCount < opts.gearPairs) return null;
-  for (const t of g.tables) {
-    if (!t.link) continue;
+  // Gear trains must match requested disc count and stay off the rim.
+  const geared = g.tables.filter((t) => t.link);
+  if (opts.gearDiscCount > 0 && geared.length < opts.gearDiscCount) return null;
+  const byGroup = new Map<number, typeof geared>();
+  for (const t of geared) {
     if (isEdgeCell(t.hub, w, h)) return null;
-    if (t.id > t.link.partner) continue;
-    const p = g.tables.find((x) => x.id === t.link!.partner);
-    if (!p) return null;
-    const man = Math.abs(t.hub.x - p.hub.x) + Math.abs(t.hub.y - p.hub.y);
-    if (man < 2) return null;
+    const list = byGroup.get(t.link!.group) ?? [];
+    list.push(t);
+    byGroup.set(t.link!.group, list);
+  }
+  const gotSizes = [...byGroup.values()].map((m) => m.length).sort((a, b) => b - a);
+  const wantSizes = [...opts.gearGroups].sort((a, b) => b - a);
+  if (gotSizes.length < wantSizes.length) return null;
+  for (let i = 0; i < wantSizes.length; i++) {
+    if ((gotSizes[i] ?? 0) < wantSizes[i]!) return null;
+  }
+  for (const members of byGroup.values()) {
+    if (members.length < 2) return null;
+    // Pair trains must sit apart; larger trains must not collapse to a single adjacent duo.
+    let far = 0;
+    for (let i = 0; i < members.length; i++) {
+      for (let j = i + 1; j < members.length; j++) {
+        const man =
+          Math.abs(members[i]!.hub.x - members[j]!.hub.x) +
+          Math.abs(members[i]!.hub.y - members[j]!.hub.y);
+        if (man >= 2) far++;
+      }
+    }
+    if (far < 1) return null;
   }
 
   const level: LevelData = {
@@ -575,7 +639,7 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
     const edges = buildTopology(w, h, extras, rng);
     const ports = portsFromEdges(w, h, edges);
     const tables = tablesFromPorts(w, h, ports);
-    linkGears(tables, edges, w, h, opts.gearPairs, rng);
+    linkGearGroups(tables, edges, w, h, opts.gearGroups, rng);
     // Never strip phase rules on timeout — only skip the slow anti-cheap filter.
     const overBudget = now() - started > BUDGET_MS;
     const level = scrambleAndVerify(tables, w, h, rng, opts, d, overBudget);
@@ -587,7 +651,7 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
   const edges = buildTopology(w, w, Math.max(0, opts.extraEdges - 1), rng);
   const ports = portsFromEdges(w, w, edges);
   const tables = tablesFromPorts(w, w, ports);
-  linkGears(tables, edges, w, w, opts.gearPairs, rng);
+  linkGearGroups(tables, edges, w, w, opts.gearGroups, rng);
   const soft = { ...opts, minMoves: 2 };
   const level = scrambleAndVerify(tables, w, w, rng, soft, d, true);
   if (level) return level;

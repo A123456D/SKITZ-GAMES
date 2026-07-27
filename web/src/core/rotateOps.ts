@@ -1,5 +1,6 @@
 import { rotateDir } from "./cellKind";
 import { getTable, type GridState } from "./gridState";
+import type { TableDef } from "./tableDef";
 
 function spin(state: GridState, tableId: number, deltaQ: number): boolean {
   const table = getTable(state, tableId);
@@ -8,10 +9,17 @@ function spin(state: GridState, tableId: number, deltaQ: number): boolean {
   return true;
 }
 
+/** Other discs in the same gear train (excludes `tableId`). */
+export function gearCohort(state: GridState, tableId: number): TableDef[] {
+  const table = getTable(state, tableId);
+  if (!table?.link) return [];
+  const g = table.link.group;
+  return state.tables.filter((t) => t.id !== tableId && t.link?.group === g);
+}
+
 /**
- * Quarter-turn a table in place (a single player action). If the table is geared
- * to a partner, the partner turns too by `delta * sign` — the coupling that makes
- * discs impossible to solve independently. Does not move cells.
+ * Quarter-turn a table in place (a single player action). If geared, every other
+ * disc in the train turns by `delta * polarity_self * polarity_other`.
  */
 export function rotateTable(state: GridState, tableId: number, deltaQ: number): boolean {
   if (deltaQ === 0) return true;
@@ -19,8 +27,11 @@ export function rotateTable(state: GridState, tableId: number, deltaQ: number): 
   if (!table || table.locked) return false;
   spin(state, tableId, deltaQ);
   if (table.link) {
-    const partner = getTable(state, table.link.partner);
-    if (partner && !partner.locked) spin(state, partner.id, deltaQ * table.link.sign);
+    const selfPol = table.link.polarity;
+    for (const other of gearCohort(state, tableId)) {
+      if (other.locked || !other.link) continue;
+      spin(state, other.id, deltaQ * selfPol * other.link.polarity);
+    }
   }
   return true;
 }
@@ -35,14 +46,15 @@ export function setTableRotation(state: GridState, tableId: number, rotationQ: n
 
 /**
  * Absolute set as a player action: turns the table to `rotationQ` and applies the
- * same delta to a geared partner. Used by drag-commit so gears stay in sync.
+ * matching delta across the gear train.
  */
 export function applyPlayerRotation(state: GridState, tableId: number, rotationQ: number): boolean {
   const table = getTable(state, tableId);
   if (!table || table.locked) return false;
   const next = ((rotationQ % 4) + 4) % 4;
-  let dq = (next - table.rotationQ) % 4;
+  let dq = ((next - table.rotationQ) % 4 + 4) % 4;
   if (dq === 0) return false;
+  if (dq === 3) dq = -1;
   return rotateTable(state, tableId, dq);
 }
 
