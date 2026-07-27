@@ -1,6 +1,6 @@
 import { getAnimeMode, getPalette, getTheme } from "./theme";
 import { drawCover, getThemeArt } from "./themeAssets";
-import { TILE_KINDS, type TileKind } from "../core/stickers";
+import { stickerPoolForTheme, type TileKind } from "../core/stickers";
 import { stickerImage } from "./stickers";
 
 export const W = 720;
@@ -661,7 +661,8 @@ export function availableStickerKinds(
     const k = draft[i];
     if (k && i !== slot) taken.add(k);
   }
-  return TILE_KINDS.filter((k) => !taken.has(k));
+  const pool = stickerPoolForTheme(getTheme());
+  return pool.filter((k) => !taken.has(k));
 }
 
 export function drawStickersScreen(

@@ -28,6 +28,47 @@ export const TILE_KINDS = [
 
 export type TileKind = (typeof TILE_KINDS)[number];
 
+/**
+ * Classroom only has ~10 unique vintage sticker arts — hide filler dups in UI.
+ * Anime has 14 unique crops from the sheet.
+ */
+export const CLASSROOM_STICKER_POOL = [
+  "glitch",
+  "punk",
+  "hood",
+  "ramen",
+  "mask",
+  "katana",
+  "tears",
+  "bolt",
+  "candle",
+  "pill",
+] as const satisfies readonly TileKind[];
+
+export const ANIME_STICKER_POOL = [
+  "bear",
+  "bolt",
+  "butterfly",
+  "candle",
+  "chain",
+  "eye",
+  "eyepatch",
+  "grimoire",
+  "heart",
+  "hood",
+  "hourglass",
+  "katana",
+  "tears",
+  "tv",
+] as const satisfies readonly TileKind[];
+
+/** Unique sticker kinds available for a theme’s chooser / random pick. */
+export function stickerPoolForTheme(theme: string): readonly TileKind[] {
+  if (theme === "classroom") return CLASSROOM_STICKER_POOL;
+  if (theme === "anime") return ANIME_STICKER_POOL;
+  return TILE_KINDS;
+}
+
 export type FaceStickers = readonly [
   TileKind,
   TileKind,
@@ -50,16 +91,27 @@ export const FACE_STICKERS: FaceStickers = [
   "katana",
 ];
 
-/** Shuffle TILE_KINDS and take 6 distinct kinds for the six faces. */
-export function pickFaceStickers(rng: () => number): FaceStickers {
-  const pool = TILE_KINDS.slice();
-  for (let i = pool.length - 1; i > 0; i--) {
+/** Shuffle a kind pool and take 6 distinct kinds for the six faces. */
+export function pickFaceStickers(
+  rng: () => number,
+  pool: readonly TileKind[] = TILE_KINDS,
+): FaceStickers {
+  const src = pool.length >= 6 ? pool : TILE_KINDS;
+  const shuffled = src.slice();
+  for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    const tmp = pool[i]!;
-    pool[i] = pool[j]!;
-    pool[j] = tmp;
+    const tmp = shuffled[i]!;
+    shuffled[i] = shuffled[j]!;
+    shuffled[j] = tmp;
   }
-  return [pool[0]!, pool[1]!, pool[2]!, pool[3]!, pool[4]!, pool[5]!];
+  return [
+    shuffled[0]!,
+    shuffled[1]!,
+    shuffled[2]!,
+    shuffled[3]!,
+    shuffled[4]!,
+    shuffled[5]!,
+  ];
 }
 
 export function stickerForColor(

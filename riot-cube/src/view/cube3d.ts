@@ -281,6 +281,23 @@ function spinUV(u: number, v: number, a: number): { u: number; v: number } {
   return { u: 0.5 + cu * c - cv * s, v: 0.5 + cu * s + cv * c };
 }
 
+function rotateCellCW(r: number, c: number, n: number): { r: number; c: number } {
+  return { r: c, c: n - 1 - r };
+}
+
+/** One sticker step on the face grid (CW or CCW). */
+function rotateCell(
+  r: number,
+  c: number,
+  n: number,
+  dir: 1 | -1,
+): { r: number; c: number } {
+  if (dir === 1) return rotateCellCW(r, c, n);
+  let p = { r, c };
+  for (let i = 0; i < 3; i++) p = rotateCellCW(p.r, p.c, n);
+  return p;
+}
+
 function facePointScreen(
   geom: FaceGeom,
   u: number,
@@ -324,9 +341,9 @@ function drawHintMoveLine(
   const nView = applyRot(geom.normal, layout.q);
   if (nView.z <= 0.05) return;
 
-  const lift = 0.08;
+  const lift = 0.1;
   const ease = t < 1 ? t : 1;
-  const alpha = 0.55 + 0.4 * Math.sin(ease * Math.PI);
+  const alpha = 0.6 + 0.35 * Math.sin(ease * Math.PI);
 
   ctx.save();
   ctx.lineCap = "round";
@@ -339,14 +356,13 @@ function drawHintMoveLine(
   ctx.shadowBlur = 10;
 
   if (move.kind === "face") {
-    const inset = 0.18;
-    const steps = 48;
+    // Quarter-turn only (one sticker step on the face ring) — not a full 360°.
+    const inset = 0.22;
+    const steps = 24;
+    const sweep = (Math.PI / 2) * move.dir;
     const pts: Vec2[] = [];
     for (let i = 0; i <= steps; i++) {
-      const a =
-        move.dir === 1
-          ? -Math.PI / 2 + (i / steps) * Math.PI * 2
-          : -Math.PI / 2 - (i / steps) * Math.PI * 2;
+      const a = -Math.PI / 2 + (i / steps) * sweep;
       const u = 0.5 + Math.cos(a) * (0.5 - inset);
       const v = 0.5 + Math.sin(a) * (0.5 - inset);
       pts.push(facePointLifted(geom, u, v, lift, layout));
@@ -357,20 +373,46 @@ function drawHintMoveLine(
     for (let i = 1; i < drawTo; i++) ctx.lineTo(pts[i]!.x, pts[i]!.y);
     ctx.stroke();
     const tip = pts[Math.min(pts.length - 1, drawTo - 1)]!;
-    const prev = pts[Math.max(0, drawTo - 4)]!;
+    const prev = pts[Math.max(0, drawTo - 3)]!;
     drawArrowHead(ctx, prev, tip, 14);
+
+    // Label: one sticker / quarter turn
+    const mid = pts[Math.min(pts.length - 1, Math.floor(drawTo * 0.55))]!;
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = Math.min(1, alpha + 0.2);
+    ctx.font = "800 18px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = p.ink;
+    ctx.lineWidth = 3;
+    ctx.strokeText("1", mid.x, mid.y - 16);
+    ctx.fillText("1", mid.x, mid.y - 16);
   } else {
+    // One-sticker slide: from a cell center to the neighboring cell on that lane.
+    const amount = Math.max(1, move.amount ?? 1);
     const mid = (move.index + 0.5) / size;
-    const a0 = 0.1;
-    const a1 = 0.9;
-    const from = move.dir === 1 ? a0 : a1;
-    const to = move.dir === 1 ? a1 : a0;
-    const u0 = move.axis === "row" ? from : mid;
-    const v0 = move.axis === "row" ? mid : from;
-    const u1 = move.axis === "row" ? to : mid;
-    const v1 = move.axis === "row" ? mid : to;
-    const start = facePointLifted(geom, u0, v0, lift, layout);
-    const end = facePointLifted(geom, u1, v1, lift, layout);
+    const cell = 1 / size;
+    // Start at first sticker center along the lane; end `amount` cells later.
+    const fromCenter = 0.5 * cell;
+    const toCenter = fromCenter + amount * cell * move.dir;
+    const u0 = move.axis === "row" ? fromCenter : mid;
+    const v0 = move.axis === "row" ? mid : fromCenter;
+    const u1 = move.axis === "row" ? toCenter : mid;
+    const v1 = move.axis === "row" ? mid : toCenter;
+    // If dir is -1, start near the far end so the arrow still travels with the swipe.
+    const startU = move.dir === 1 ? u0 : u0 + (size - 1) * cell * (move.axis === "row" ? 1 : 0);
+    const startV = move.dir === 1 ? v0 : v0 + (size - 1) * cell * (move.axis === "col" ? 1 : 0);
+    const endU =
+      move.dir === 1
+        ? u1
+        : startU - amount * cell * (move.axis === "row" ? 1 : 0);
+    const endV =
+      move.dir === 1
+        ? v1
+        : startV - amount * cell * (move.axis === "col" ? 1 : 0);
+
+    const start = facePointLifted(geom, startU, startV, lift, layout);
+    const end = facePointLifted(geom, endU, endV, lift, layout);
     const head = {
       x: start.x + (end.x - start.x) * Math.min(1, ease),
       y: start.y + (end.y - start.y) * Math.min(1, ease),
@@ -380,10 +422,41 @@ function drawHintMoveLine(
     ctx.lineTo(head.x, head.y);
     ctx.stroke();
     const along = {
-      x: start.x + (end.x - start.x) * Math.max(0, Math.min(1, ease) - 0.08),
-      y: start.y + (end.y - start.y) * Math.max(0, Math.min(1, ease) - 0.08),
+      x: start.x + (end.x - start.x) * Math.max(0, Math.min(1, ease) - 0.12),
+      y: start.y + (end.y - start.y) * Math.max(0, Math.min(1, ease) - 0.12),
     };
     drawArrowHead(ctx, along, head, 14);
+
+    // Highlight source sticker cell
+    const half = cell * 0.38;
+    const c0 = facePointLifted(geom, startU - half, startV - half, lift * 0.5, layout);
+    const c1 = facePointLifted(geom, startU + half, startV - half, lift * 0.5, layout);
+    const c2 = facePointLifted(geom, startU + half, startV + half, lift * 0.5, layout);
+    const c3 = facePointLifted(geom, startU - half, startV + half, lift * 0.5, layout);
+    ctx.globalAlpha = 0.35 * alpha;
+    ctx.beginPath();
+    ctx.moveTo(c0.x, c0.y);
+    ctx.lineTo(c1.x, c1.y);
+    ctx.lineTo(c2.x, c2.y);
+    ctx.lineTo(c3.x, c3.y);
+    ctx.closePath();
+    ctx.fill();
+
+    const label = {
+      x: (start.x + head.x) / 2,
+      y: (start.y + head.y) / 2,
+    };
+    ctx.globalAlpha = Math.min(1, alpha + 0.2);
+    ctx.shadowBlur = 0;
+    ctx.font = "800 18px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = p.ink;
+    ctx.lineWidth = 3;
+    const txt = String(amount);
+    ctx.strokeText(txt, label.x, label.y - 14);
+    ctx.fillStyle = p.hot;
+    ctx.fillText(txt, label.x, label.y - 14);
   }
 
   ctx.restore();
@@ -524,6 +597,8 @@ function drawFace(
   const pad = (stride - cell) / 2;
   const faceSpin = isActive && motion.faceSpin ? motion.faceSpin : 0;
   const spinning = Math.abs(faceSpin) > 1e-5;
+  const spinProgress = spinning ? Math.min(1, Math.abs(faceSpin) / (Math.PI / 2)) : 0;
+  const spinDir: 1 | -1 = faceSpin >= 0 ? 1 : -1;
   const movingRow =
     !spinning && isActive && motion.hovering && motion.axis === "row"
       ? motion.index
@@ -549,22 +624,24 @@ function drawFace(
     u1: number,
     v1: number,
     hovering: boolean,
+    artSpin = 0,
   ) => {
     if (u1 <= 0 || u0 >= 1 || v1 <= 0 || v0 >= 1) return;
     const kind = stickerForColor(colorId, faceStickers);
-    const corners = spinning
-      ? [
-          spinUV(u0, v0, faceSpin),
-          spinUV(u1, v0, faceSpin),
-          spinUV(u1, v1, faceSpin),
-          spinUV(u0, v1, faceSpin),
-        ]
-      : [
-          { u: u0, v: v0 },
-          { u: u1, v: v0 },
-          { u: u1, v: v1 },
-          { u: u0, v: v1 },
-        ];
+    const corners =
+      Math.abs(artSpin) > 1e-5
+        ? [
+            spinUV(u0, v0, artSpin),
+            spinUV(u1, v0, artSpin),
+            spinUV(u1, v1, artSpin),
+            spinUV(u0, v1, artSpin),
+          ]
+        : [
+            { u: u0, v: v0 },
+            { u: u1, v: v0 },
+            { u: u1, v: v1 },
+            { u: u0, v: v1 },
+          ];
     const lift = hovering || spinning ? liftPulse : 0;
     const s0 = facePointLifted(geom, corners[0]!.u, corners[0]!.v, lift, layout);
     const s1 = facePointLifted(geom, corners[1]!.u, corners[1]!.v, lift, layout);
@@ -584,40 +661,67 @@ function drawFace(
     );
   };
 
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      if (r === movingRow || c === movingCol) continue;
-      const colorId = board[r]![c] as ColorId;
-      paintSticker(
-        colorId,
-        c * stride + pad,
-        r * stride + pad,
-        c * stride + pad + cell,
-        r * stride + pad + cell,
-        false,
-      );
+  if (spinning) {
+    // Per-sticker slide to the next cell (one step), not a rigid full-face texture spin.
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const colorId = board[r]![c] as ColorId;
+        const dest = rotateCell(r, c, n, spinDir);
+        const uA = c * stride + pad;
+        const vA = r * stride + pad;
+        const uB = dest.c * stride + pad;
+        const vB = dest.r * stride + pad;
+        const u0 = uA + (uB - uA) * spinProgress;
+        const v0 = vA + (vB - vA) * spinProgress;
+        // Center cubie still needs art rotation; edge stickers keep upright while sliding.
+        const isCenter = n % 2 === 1 && r === (n - 1) / 2 && c === (n - 1) / 2;
+        paintSticker(
+          colorId,
+          u0,
+          v0,
+          u0 + cell,
+          v0 + cell,
+          true,
+          isCenter ? faceSpin : 0,
+        );
+      }
     }
-  }
+  } else {
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (r === movingRow || c === movingCol) continue;
+        const colorId = board[r]![c] as ColorId;
+        paintSticker(
+          colorId,
+          c * stride + pad,
+          r * stride + pad,
+          c * stride + pad + cell,
+          r * stride + pad + cell,
+          false,
+        );
+      }
+    }
 
-  if (movingRow >= 0) {
-    const r = movingRow;
-    const items = lanePreview(source, faceIndex, "row", r, motion.offset);
-    for (const { pos, color } of items) {
-      const u0 = (pos - 0.5) * stride + pad;
-      const u1 = u0 + cell;
-      const v0 = r * stride + pad;
-      const v1 = v0 + cell;
-      paintSticker(color, u0, v0, u1, v1, true);
-    }
-  } else if (movingCol >= 0) {
-    const c = movingCol;
-    const items = lanePreview(source, faceIndex, "col", c, motion.offset);
-    for (const { pos, color } of items) {
-      const u0 = c * stride + pad;
-      const u1 = u0 + cell;
-      const v0 = (pos - 0.5) * stride + pad;
-      const v1 = v0 + cell;
-      paintSticker(color, u0, v0, u1, v1, true);
+    if (movingRow >= 0) {
+      const r = movingRow;
+      const items = lanePreview(source, faceIndex, "row", r, motion.offset);
+      for (const { pos, color } of items) {
+        const u0 = (pos - 0.5) * stride + pad;
+        const u1 = u0 + cell;
+        const v0 = r * stride + pad;
+        const v1 = v0 + cell;
+        paintSticker(color, u0, v0, u1, v1, true);
+      }
+    } else if (movingCol >= 0) {
+      const c = movingCol;
+      const items = lanePreview(source, faceIndex, "col", c, motion.offset);
+      for (const { pos, color } of items) {
+        const u0 = c * stride + pad;
+        const u1 = u0 + cell;
+        const v0 = (pos - 0.5) * stride + pad;
+        const v1 = v0 + cell;
+        paintSticker(color, u0, v0, u1, v1, true);
+      }
     }
   }
 

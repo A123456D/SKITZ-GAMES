@@ -14,7 +14,7 @@ import {
   type Session,
 } from "./core/session";
 import { suggestHintMove, type HintMove } from "./core/hint";
-import { pickFaceStickers, type TileKind } from "./core/stickers";
+import { pickFaceStickers, stickerPoolForTheme, type TileKind } from "./core/stickers";
 import { previewCube } from "./core/lane";
 import {
   W,
@@ -125,7 +125,10 @@ type Screen = "home" | "play" | "menu" | "settings" | "stickers";
 let screen: Screen = "home";
 let settingsFrom: Screen = "home";
 
-let session: Session = startSession(loadCubeSize());
+let session: Session = startSession(
+  loadCubeSize(),
+  stickerPoolForTheme(getTheme()),
+);
 let faceTurnBtns: FaceTurnButtons | null = null;
 
 let hintMove: HintMove | null = null;
@@ -556,7 +559,7 @@ function goHome(): void {
 
 function startPlay(): void {
   resetPlayVisuals();
-  session = startSession(session.size);
+  session = startSession(session.size, stickerPoolForTheme(getTheme()));
   saveCubeSize(session.size);
   syncActiveFace();
   screen = "play";
@@ -599,7 +602,8 @@ canvas.addEventListener(
       }
       if (hitUiRect(SETTINGS_SIZE, p.x, p.y)) {
         const next = cycleCubeSize(session.size);
-        if (settingsFrom === "menu") session = startSession(next);
+        if (settingsFrom === "menu")
+          session = startSession(next, stickerPoolForTheme(getTheme()));
         else session = { ...session, size: next };
         clearHint();
         return;
@@ -624,7 +628,10 @@ canvas.addEventListener(
         return;
       }
       if (hitUiRect(STICKERS_RANDOM, p.x, p.y)) {
-        const map = pickFaceStickers(() => Math.random());
+        const map = pickFaceStickers(
+          () => Math.random(),
+          stickerPoolForTheme(getTheme()),
+        );
         stickerDraft = [...map];
         stickerSlot = 0;
         sfxPaperFlutter();
@@ -894,7 +901,8 @@ function endDrag(): void {
     return;
   }
   const dir: 1 | -1 = steps > 0 ? 1 : -1;
-  const amount = Math.min(n - 1, Math.abs(steps));
+  // One sticker per swipe — never a multi-cell jump / “full” lane rotation.
+  const amount = 1;
   springAxis = null;
   springIndex = -1;
   springUv = 0;

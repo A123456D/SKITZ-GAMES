@@ -67,10 +67,13 @@ function seedFrom(): number {
   return (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
 }
 
-export function startSession(size: CubeSize = loadCubeSize()): Session {
+export function startSession(
+  size: CubeSize = loadCubeSize(),
+  stickerPool: readonly TileKind[] = TILE_KINDS,
+): Session {
   const seed = seedFrom();
   const rng = mulberry32(seed);
-  const faceStickers = pickFaceStickers(rng);
+  const faceStickers = pickFaceStickers(rng, stickerPool);
   const cube = scramble(size, defaultScrambleMoves(size), rng);
   return {
     size,

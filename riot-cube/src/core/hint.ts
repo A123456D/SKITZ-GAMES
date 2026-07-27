@@ -16,6 +16,8 @@ export type HintMove =
       axis: LaneAxis;
       index: number;
       dir: TurnDir;
+      /** Sticker cells to slide (always 1 from hints). */
+      amount?: number;
     };
 
 function correctCount(cube: CubeState): number {
@@ -66,7 +68,7 @@ export function suggestHintMove(
       for (const dir of [1, -1] as TurnDir[]) {
         const twist: LaneTwist = { axis, index, dir, amount: 1 };
         tryMove(
-          { kind: "lane", face: viewFace, axis, index, dir },
+          { kind: "lane", face: viewFace, axis, index, dir, amount: 1 },
           applyLaneTwist(cloneCube(cube), viewFace, twist),
         );
       }
