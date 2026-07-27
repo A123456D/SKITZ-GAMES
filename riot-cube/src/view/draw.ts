@@ -494,43 +494,68 @@ function drawPaperButton(
   ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
 }
 
-export const HOME_PLAY: UiRect = { x: 150, y: 720, w: 420, h: 78 };
-export const HOME_SETTINGS: UiRect = { x: 150, y: 820, w: 420, h: 70 };
+export const HOME_PLAY: UiRect = { x: 150, y: 860, w: 420, h: 78 };
+export const HOME_SETTINGS: UiRect = { x: 150, y: 960, w: 420, h: 70 };
+
+let logoImg: HTMLImageElement | null = null;
+let logoReady = false;
+
+/** Preload home / brand logo (transparent PNG). */
+export function loadLogo(): Promise<void> {
+  if (logoReady) return Promise.resolve();
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      logoImg = img;
+      logoReady = true;
+      resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = "./riot-cube-logo.png";
+  });
+}
 
 export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   drawDesk(ctx);
 
-  // Title scrap
-  ctx.fillStyle = "#f3efe6";
-  roundRect(ctx, 70, 220, 580, 160, 8);
-  ctx.fill();
-  ctx.strokeStyle = "#111";
-  ctx.lineWidth = 4;
-  ctx.stroke();
-  ctx.fillStyle = "#ff2d6a";
-  ctx.fillRect(110, 205, 120, 22);
-  ctx.fillStyle = "#111";
-  ctx.font = "800 64px 'Permanent Marker', sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText("RIOT CUBE", W / 2, 310);
-  ctx.font = "600 22px 'Patrick Hand', sans-serif";
-  ctx.fillStyle = "#333";
-  ctx.fillText("Twist faces. Rip matches. Cascade hard.", W / 2, 350);
+  // Brand logo (paper cube + RIOT CUBE wordmark)
+  if (logoImg && logoReady) {
+    const maxW = 520;
+    const maxH = 520;
+    const scale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
+    const lw = logoImg.width * scale;
+    const lh = logoImg.height * scale;
+    ctx.drawImage(logoImg, (W - lw) / 2, 120, lw, lh);
+  } else {
+    ctx.fillStyle = "#f3efe6";
+    roundRect(ctx, 70, 220, 580, 160, 8);
+    ctx.fill();
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.fillStyle = "#111";
+    ctx.font = "800 64px 'Permanent Marker', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("RIOT CUBE", W / 2, 310);
+  }
 
-  // Accent sticker strip
+  ctx.fillStyle = "#c8ff3d";
+  ctx.font = "600 20px 'Patrick Hand', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Twist faces. Rip matches. Cascade hard.", W / 2, 680);
+
+  // Accent how-to strip
   ctx.fillStyle = "#1b1b1b";
-  roundRect(ctx, 120, 430, 480, 200, 8);
+  roundRect(ctx, 120, 710, 480, 120, 8);
   ctx.fill();
   ctx.fillStyle = "#c8ff3d";
-  ctx.fillRect(160, 418, 70, 16);
+  ctx.fillRect(160, 700, 70, 14);
   ctx.fillStyle = "#f3efe6";
-  ctx.font = "600 20px 'Patrick Hand', sans-serif";
+  ctx.font = "600 18px 'Patrick Hand', sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("• Slide a row or column to twist", 160, 490);
-  ctx.fillText("• Match 3+ (lines, squares, L/T)", 160, 530);
-  ctx.fillText("• Spin the cube — only the face", 160, 570);
-  ctx.fillText("  you look at scores", 160, 600);
+  ctx.fillText("• Slide a row or column to twist", 160, 750);
+  ctx.fillText("• Match 3+ — lines, squares, L/T shapes", 160, 780);
+  ctx.fillText("• Only the face you look at scores", 160, 810);
 
   drawPaperButton(ctx, HOME_PLAY, "PLAY", {
     fill: "#ff2d6a",

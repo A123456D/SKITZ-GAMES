@@ -30,6 +30,7 @@ import {
   hitRetry,
   hitUiRect,
   hitVolumeButton,
+  loadLogo,
   HOME_PLAY,
   HOME_SETTINGS,
   MENU_BTN,
@@ -674,7 +675,8 @@ window.addEventListener("resize", () => {
   paint();
 });
 
-loadStickers().then(() => {
+loadStickers().then(async () => {
+  await loadLogo();
   syncActiveFace();
   resize();
   paint();
