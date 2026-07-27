@@ -12,7 +12,12 @@ import {
   type LaneTwist,
   type Session,
 } from "./core/session";
-import { previewCube } from "./core/lane";
+import { applyLaneTwist, previewCube } from "./core/lane";
+import {
+  isSolved,
+  type ColorId,
+  type CubeState,
+} from "./core/rubik";
 import {
   W,
   H,
@@ -136,6 +141,22 @@ type TurnAnim =
       twist: LaneTwist;
       t: number;
       ms: number;
+    }
+  | {
+      kind: "laneOuter";
+      face: FaceId;
+      axis: "row" | "col";
+      index: number;
+      dir: 1 | -1;
+      /** Colors on the active face line before the move */
+      startLine: ColorId[];
+      /** Colors on that line after applyLaneTwist */
+      endLine: ColorId[];
+      /** Full cube after the twist — applied on complete */
+      resultCube: CubeState;
+      twist: LaneTwist;
+      t: number;
+      ms: number;
     };
 let turnAnim: TurnAnim | null = null;
 let lastFrameTs = 0;
@@ -197,6 +218,22 @@ function syncActiveFace(): void {
   }
 }
 
+function readFaceLine(
+  cube: CubeState,
+  face: FaceId,
+  axis: "row" | "col",
+  index: number,
+): ColorId[] {
+  const n = cube.size;
+  const line: ColorId[] = [];
+  if (axis === "row") {
+    for (let c = 0; c < n; c++) line.push(cube.faces[face]![index]![c] as ColorId);
+  } else {
+    for (let r = 0; r < n; r++) line.push(cube.faces[face]![r]![index] as ColorId);
+  }
+  return line;
+}
+
 function activeMotion(): CubeMotion {
   if (turnAnim?.kind === "face") {
     const e = easeOutCubic(turnAnim.t);
@@ -206,6 +243,21 @@ function activeMotion(): CubeMotion {
       offset: 0,
       hovering: false,
       faceSpin: e * turnAnim.dir * (Math.PI / 2),
+    };
+  }
+  if (turnAnim?.kind === "laneOuter") {
+    return {
+      axis: turnAnim.axis,
+      index: turnAnim.index,
+      offset: 0,
+      hovering: true,
+      outerSlide: {
+        dir: turnAnim.dir,
+        progress: easeOutCubic(turnAnim.t),
+        startLine: turnAnim.startLine,
+        endLine: turnAnim.endLine,
+        faces: turnAnim.twist.amount ?? 1,
+      },
     };
   }
   if (turnAnim?.kind === "lane") {
@@ -258,13 +310,31 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
   const amount = Math.max(1, twist.amount ?? 1);
   const n = session.size;
   const outer = isOuterLane(twist.index, n);
-  // Outer = face turn: one quarter-turn replaces the whole edge (1.0 UV), not one
-  // sticker (1/n). Animating only 1/n then applying faceTurn caused the snap.
-  const toUv = outer ? twist.dir * amount : (twist.dir * amount) / n;
-  const dist = Math.abs(toUv - fromUv);
-  const ms = outer
-    ? TURN_MS * Math.min(2.1, Math.max(1.35, dist * 1.15))
-    : TURN_MS;
+  if (outer) {
+    const face = session.face;
+    const twistFull = { ...twist, amount };
+    const resultCube = applyLaneTwist(session.cube, face, twistFull);
+    const startLine = readFaceLine(session.cube, face, twist.axis, twist.index);
+    const endLine = readFaceLine(resultCube, face, twist.axis, twist.index);
+    const slideFaces = amount;
+    turnAnim = {
+      kind: "laneOuter",
+      face,
+      axis: twist.axis,
+      index: twist.index,
+      dir: twist.dir,
+      startLine,
+      endLine,
+      resultCube,
+      twist: twistFull,
+      t: 0,
+      ms: TURN_MS * Math.min(2.1, Math.max(1.35, slideFaces * 1.15)),
+    };
+    sfxPaperSlide();
+    return;
+  }
+  // Middle lanes: belt preview (sticker-by-sticker).
+  const toUv = (twist.dir * amount) / n;
   turnAnim = {
     kind: "lane",
     face: session.face,
@@ -274,7 +344,7 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
     toUv,
     twist: { ...twist, amount },
     t: 0,
-    ms,
+    ms: TURN_MS,
   };
   sfxPaperSlide();
 }
@@ -377,6 +447,7 @@ function paint(): void {
   // Integer side-peek only while dragging; lane turn anim stays continuous via lanePreview.
   if (
     turnAnim?.kind !== "lane" &&
+    turnAnim?.kind !== "laneOuter" &&
     motion.axis &&
     motion.hovering &&
     Math.abs(motion.offset) > 0.001
@@ -424,6 +495,14 @@ function tick(ts: number): void {
         turnAnim.t = 1;
         if (turnAnim.kind === "face") {
           session = applyFaceTurn(session, turnAnim.face, turnAnim.dir);
+        } else if (turnAnim.kind === "laneOuter") {
+          session = {
+            ...session,
+            cube: turnAnim.resultCube,
+            face: session.face,
+            moveCount: session.moveCount + 1,
+            status: isSolved(turnAnim.resultCube) ? "solved" : "playing",
+          };
         } else {
           const face = session.face;
           session = { ...session, face: turnAnim.face };
