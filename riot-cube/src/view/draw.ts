@@ -651,6 +651,19 @@ export const STICKERS_APPLY: UiRect = { x: 480, y: 1168, w: 200, h: 56 };
 
 export const STICKERS_GRID: UiRect = { x: 40, y: 360, w: 640, h: 780 };
 
+/** Kinds still free to pick (hides ones already in other slots). */
+export function availableStickerKinds(
+  draft: readonly (TileKind | null)[],
+  slot: number,
+): TileKind[] {
+  const taken = new Set<TileKind>();
+  for (let i = 0; i < draft.length; i++) {
+    const k = draft[i];
+    if (k && i !== slot) taken.add(k);
+  }
+  return TILE_KINDS.filter((k) => !taken.has(k));
+}
+
 export function drawStickersScreen(
   ctx: CanvasRenderingContext2D,
   opts: {
@@ -708,8 +721,9 @@ export function drawStickersScreen(
     ctx.fillText(SLOT_LABELS[i]!, sx + slotW / 2, sy + slotW + 14);
   }
 
-  // Grid clip
+  // Grid clip — only unused stickers (plus current slot’s kind so you can keep it).
   const g = STICKERS_GRID;
+  const pool = availableStickerKinds(opts.draft, opts.slot);
   ctx.save();
   ctx.beginPath();
   roundRect(ctx, g.x, g.y, g.w, g.h, 8);
@@ -721,29 +735,27 @@ export function drawStickersScreen(
   const cell = 140;
   const gap = 16;
   const pad = 20;
-  for (let i = 0; i < TILE_KINDS.length; i++) {
-    const kind = TILE_KINDS[i]!;
+  for (let i = 0; i < pool.length; i++) {
+    const kind = pool[i]!;
     const col = i % cols;
     const row = Math.floor(i / cols);
     const cx = g.x + pad + col * (cell + gap);
     const cy = g.y + pad + row * (cell + gap) - opts.scroll;
     if (cy + cell < g.y || cy > g.y + g.h) continue;
 
-    const used = opts.draft.includes(kind);
-    ctx.fillStyle = used ? p.panel : p.paperDeep;
+    const current = opts.draft[opts.slot] === kind;
+    ctx.fillStyle = current ? p.accent : p.paperDeep;
     roundRect(ctx, cx, cy, cell, cell, 8);
     ctx.fill();
-    ctx.strokeStyle = used ? p.muted : p.ink;
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = current ? p.ink : p.ink;
+    ctx.lineWidth = current ? 3 : 2;
     ctx.stroke();
 
     const img = stickerImage(kind);
     if (img && img.complete && img.naturalWidth > 0) {
-      ctx.globalAlpha = used ? 0.35 : 1;
       ctx.drawImage(img, cx + 18, cy + 10, cell - 36, cell - 36);
-      ctx.globalAlpha = 1;
     }
-    ctx.fillStyle = used ? p.muted : p.ink;
+    ctx.fillStyle = p.ink;
     ctx.font = "700 12px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(kind.toUpperCase(), cx + cell / 2, cy + cell - 12);
@@ -766,12 +778,16 @@ export function drawStickersScreen(
   });
 }
 
-export function stickersGridContentHeight(): number {
+export function stickersGridContentHeight(
+  draft: readonly (TileKind | null)[],
+  slot: number,
+): number {
   const cols = 4;
   const cell = 140;
   const gap = 16;
   const pad = 20;
-  const rows = Math.ceil(TILE_KINDS.length / cols);
+  const count = availableStickerKinds(draft, slot).length;
+  const rows = Math.max(1, Math.ceil(count / cols));
   return pad * 2 + rows * cell + (rows - 1) * gap;
 }
 
@@ -792,9 +808,12 @@ export function hitStickersGridKind(
   x: number,
   y: number,
   scroll: number,
+  draft: readonly (TileKind | null)[],
+  slot: number,
 ): TileKind | null {
   const g = STICKERS_GRID;
   if (!hitRect(g, x, y)) return null;
+  const pool = availableStickerKinds(draft, slot);
   const cols = 4;
   const cell = 140;
   const gap = 16;
@@ -809,7 +828,7 @@ export function hitStickersGridKind(
   const inCellY = ly - row * (cell + gap);
   if (inCellX > cell || inCellY > cell) return null;
   const i = row * cols + col;
-  if (i < 0 || i >= TILE_KINDS.length) return null;
-  return TILE_KINDS[i]!;
+  if (i < 0 || i >= pool.length) return null;
+  return pool[i]!;
 }
 

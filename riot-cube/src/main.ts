@@ -801,7 +801,7 @@ canvas.addEventListener(
       stickersScrollDrag.lastY = p.y;
       const maxScroll = Math.max(
         0,
-        stickersGridContentHeight() - STICKERS_GRID.h,
+        stickersGridContentHeight(stickerDraft, stickerSlot) - STICKERS_GRID.h,
       );
       stickersScroll = Math.min(
         maxScroll,
@@ -852,8 +852,10 @@ function endDrag(): void {
           stickersScrollDrag.lastX,
           stickersScrollDrag.lastY,
           stickersScroll,
+          stickerDraft,
+          stickerSlot,
         );
-        if (kind && !stickerDraft.includes(kind)) {
+        if (kind) {
           stickerDraft[stickerSlot] = kind;
           const next = stickerDraft.findIndex((k, i) => i > stickerSlot && !k);
           const wrap = stickerDraft.findIndex((k) => !k);
