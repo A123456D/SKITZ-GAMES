@@ -2318,52 +2318,146 @@ export function gearPairIndex(tables: TableDef[], id: number): number {
   return groups.indexOf(t.link.group);
 }
 
-export function gearPairLabel(index: number): string {
-  return String.fromCharCode(65 + (((index % 26) + 26) % 26));
+let gearMarkerImg: HTMLImageElement | null = null;
+let gearMarkerReady = false;
+
+/** Warm the coloured gear-link marker (INK draws a monochrome silhouette instead). */
+export function loadGearMarker(): void {
+  if (gearMarkerImg) return;
+  gearMarkerImg = new Image();
+  gearMarkerImg.onload = () => {
+    gearMarkerReady = true;
+  };
+  gearMarkerImg.onerror = () => {
+    gearMarkerImg = null;
+    gearMarkerReady = false;
+  };
+  gearMarkerImg.src = "./gear-link-marker.png?v=1";
+}
+
+function ensureGearMarker(): HTMLImageElement | null {
+  if (!gearMarkerImg) loadGearMarker();
+  return gearMarkerReady && gearMarkerImg?.naturalWidth ? gearMarkerImg : null;
 }
 
 /**
- * Quiet monochrome mark — no loud coloured rings (those fought the theme ink).
+ * Concave four-point link mark (matches the provided marker art).
+ * Coloured on every theme; INK draws the same silhouette in fineliner only.
  */
-export function drawGearPairChip(
+function drawGearLinkMarkerShape(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
-  label: string,
-  _color: string,
-  r = 10,
+  size: number,
+  inkOnly: boolean,
 ): void {
+  const s = size * 0.5;
   ctx.save();
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = P.PAPER;
-  ctx.strokeStyle = P.INK;
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = P.INK;
-  ctx.font = font(700, Math.round(r * 1.05));
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(label, x, y + 0.5);
+  ctx.translate(x, y);
+
+  // Four concave sides: arcs bowing inward from N/E/S/W tips.
+  const tip = s * 0.92;
+  const mid = s * 0.38;
+  const path = () => {
+    ctx.beginPath();
+    ctx.moveTo(0, -tip);
+    ctx.quadraticCurveTo(mid, -mid, tip, 0);
+    ctx.quadraticCurveTo(mid, mid, 0, tip);
+    ctx.quadraticCurveTo(-mid, mid, -tip, 0);
+    ctx.quadraticCurveTo(-mid, -mid, 0, -tip);
+    ctx.closePath();
+  };
+
+  if (inkOnly) {
+    path();
+    ctx.fillStyle = P.PAPER;
+    ctx.fill();
+    ctx.strokeStyle = P.INK;
+    ctx.lineWidth = Math.max(1.4, size * 0.07);
+    ctx.stroke();
+    // Inner ring + core.
+    ctx.lineWidth = Math.max(1.1, size * 0.05);
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.22, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = P.INK;
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Dark fill so the neon rim reads.
+    path();
+    ctx.fillStyle = "#050505";
+    ctx.fill();
+
+    // Outer magenta lip.
+    path();
+    ctx.strokeStyle = "#5A1020";
+    ctx.lineWidth = Math.max(2.4, size * 0.12);
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    // Lime / yellow hot edge.
+    path();
+    ctx.strokeStyle = "#C8FF00";
+    ctx.lineWidth = Math.max(1.6, size * 0.075);
+    ctx.stroke();
+    path();
+    ctx.strokeStyle = "#F2E84A";
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = Math.max(1.0, size * 0.045);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Center reticule.
+    ctx.strokeStyle = "#F4F4F6";
+    ctx.lineWidth = Math.max(1.2, size * 0.05);
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.22, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#F4F4F6";
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    // Tiny triad dots inside the core.
+    ctx.fillStyle = "#1A0A0C";
+    for (let i = 0; i < 3; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI * 2) / 3;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * s * 0.045, Math.sin(a) * s * 0.045, Math.max(0.6, size * 0.02), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   ctx.restore();
 }
 
-/** Letter chip outside the disc rim so it never looks like pipe artwork. */
+/** Link marker on a geared disc — coloured art except on INK. */
 export function drawGearDiscBadge(
   ctx: CanvasRenderingContext2D,
   layout: Layout,
   hub: Vec2,
-  pairIndex: number,
+  _pairIndex: number,
 ): void {
+  const theme = getThemeId();
   const c = cellCenter(layout, hub);
   const r = Math.min(layout.cell * 0.48, (layout.cell + layout.gap) * 0.46);
-  const chipR = Math.max(8, r * 0.2);
-  // Park the mark in the cell-gap NE of the rim — clear of ports and wiring.
-  const bx = c.x + r + chipR + Math.max(2, layout.gap * 0.35);
-  const by = c.y - r - chipR - Math.max(2, layout.gap * 0.35);
-  drawGearPairChip(ctx, bx, by, gearPairLabel(pairIndex), P.INK, chipR);
+  const size = Math.max(15, Math.min(26, r * 0.48));
+  // Sit on the disc near the NE rim so pipes stay readable.
+  const bx = c.x + r * 0.52;
+  const by = c.y - r * 0.52;
+  const inkOnly = theme === "paper";
+
+  if (!inkOnly) {
+    const img = ensureGearMarker();
+    if (img) {
+      ctx.save();
+      ctx.drawImage(img, bx - size / 2, by - size / 2, size, size);
+      ctx.restore();
+      return;
+    }
+  }
+  drawGearLinkMarkerShape(ctx, bx, by, size, inkOnly);
 }
 
 /** Pulse every other disc in the selected gear train. */
@@ -2374,11 +2468,12 @@ export function drawGearPartnerHint(
   _pairIndex: number,
   time: number,
 ): void {
+  const theme = getThemeId();
   const c = cellCenter(layout, hub);
   const r = Math.min(layout.cell * 0.48, (layout.cell + layout.gap) * 0.46);
   const pulse = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(time * 4));
   ctx.save();
-  ctx.strokeStyle = P.INK;
+  ctx.strokeStyle = theme === "paper" ? P.INK : "#C8FF00";
   ctx.globalAlpha = 0.25 + 0.4 * pulse;
   ctx.lineWidth = 2.2;
   ctx.beginPath();

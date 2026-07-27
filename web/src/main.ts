@@ -79,6 +79,7 @@ import {
   hitCircle,
   hitRect,
   loadLogo,
+  loadGearMarker,
   sliderValueAt,
   type ButtonRect,
   type Layout,
@@ -136,6 +137,7 @@ window.visualViewport?.addEventListener("resize", fitGameToViewport);
 window.visualViewport?.addEventListener("scroll", fitGameToViewport);
 
 loadLogo();
+loadGearMarker();
 
 // Per-theme selector logos, shown on the theme chips in place of palette swatches.
 const themeLogoImgs: Partial<Record<ThemeId, HTMLImageElement>> = {};
