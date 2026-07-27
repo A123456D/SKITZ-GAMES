@@ -267,7 +267,18 @@ export type CubeMotion = {
   index: number;
   offset: number;
   hovering: boolean;
+  /** Radians; rotates active-face stickers around face center in UV. */
+  faceSpin?: number;
 };
+
+/** Rotate UV around face center. +angle = screen CW with V-down (matches faceTurn CW). */
+function spinUV(u: number, v: number, a: number): { u: number; v: number } {
+  const cu = u - 0.5;
+  const cv = v - 0.5;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return { u: 0.5 + cu * c - cv * s, v: 0.5 + cu * s + cv * c };
+}
 
 function facePointScreen(
   geom: FaceGeom,
@@ -403,17 +414,25 @@ function drawFace(
   const stride = 1 / n;
   const cell = (1 - gap * (n - 1)) / n;
   const pad = (stride - cell) / 2;
+  const faceSpin = isActive && motion.faceSpin ? motion.faceSpin : 0;
+  const spinning = Math.abs(faceSpin) > 1e-5;
   const movingRow =
-    isActive && motion.hovering && motion.axis === "row" ? motion.index : -1;
+    !spinning && isActive && motion.hovering && motion.axis === "row"
+      ? motion.index
+      : -1;
   const movingCol =
-    isActive && motion.hovering && motion.axis === "col" ? motion.index : -1;
+    !spinning && isActive && motion.hovering && motion.axis === "col"
+      ? motion.index
+      : -1;
   const hoverT = performance.now() / 1000;
   const liftPulse =
     quality.hoverAnim && (movingRow >= 0 || movingCol >= 0)
       ? 0.038 + 0.01 * Math.sin(hoverT * 3.4)
       : movingRow >= 0 || movingCol >= 0
         ? 0.04
-        : 0;
+        : spinning
+          ? 0.032
+          : 0;
 
   const paintSticker = (
     colorId: ColorId,
@@ -425,10 +444,24 @@ function drawFace(
   ) => {
     if (u1 <= 0 || u0 >= 1 || v1 <= 0 || v0 >= 1) return;
     const kind = stickerForColor(colorId, faceStickers);
-    const s0 = facePointLifted(geom, u0, v0, hovering ? liftPulse : 0, layout);
-    const s1 = facePointLifted(geom, u1, v0, hovering ? liftPulse : 0, layout);
-    const s2 = facePointLifted(geom, u1, v1, hovering ? liftPulse : 0, layout);
-    const s3 = facePointLifted(geom, u0, v1, hovering ? liftPulse : 0, layout);
+    const corners = spinning
+      ? [
+          spinUV(u0, v0, faceSpin),
+          spinUV(u1, v0, faceSpin),
+          spinUV(u1, v1, faceSpin),
+          spinUV(u0, v1, faceSpin),
+        ]
+      : [
+          { u: u0, v: v0 },
+          { u: u1, v: v0 },
+          { u: u1, v: v1 },
+          { u: u0, v: v1 },
+        ];
+    const lift = hovering || spinning ? liftPulse : 0;
+    const s0 = facePointLifted(geom, corners[0]!.u, corners[0]!.v, lift, layout);
+    const s1 = facePointLifted(geom, corners[1]!.u, corners[1]!.v, lift, layout);
+    const s2 = facePointLifted(geom, corners[2]!.u, corners[2]!.v, lift, layout);
+    const s3 = facePointLifted(geom, corners[3]!.u, corners[3]!.v, lift, layout);
     drawStickerOnQuad(
       ctx,
       kind,
@@ -437,7 +470,7 @@ function drawFace(
       s2,
       s3,
       q,
-      hovering,
+      hovering || spinning,
       hoverT,
       quality.stickerShadows,
     );

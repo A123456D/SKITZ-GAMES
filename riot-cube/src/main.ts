@@ -116,6 +116,35 @@ let springUv = 0;
 let springAxis: "row" | "col" | null = null;
 let springIndex = -1;
 
+const TURN_MS = 340;
+
+type TurnAnim =
+  | {
+      kind: "face";
+      face: FaceId;
+      dir: 1 | -1;
+      t: number;
+      ms: number;
+    }
+  | {
+      kind: "lane";
+      face: FaceId;
+      axis: "row" | "col";
+      index: number;
+      fromUv: number;
+      toUv: number;
+      twist: LaneTwist;
+      t: number;
+      ms: number;
+    };
+let turnAnim: TurnAnim | null = null;
+let lastFrameTs = 0;
+
+function easeOutCubic(t: number): number {
+  const x = Math.min(1, Math.max(0, t));
+  return 1 - (1 - x) ** 3;
+}
+
 const DEFAULT_ORIENT = quatFromEulerYX(0.04, -0.05);
 let orient: Quat = quatCopy(DEFAULT_ORIENT);
 let targetOrient: Quat = quatCopy(DEFAULT_ORIENT);
@@ -169,6 +198,25 @@ function syncActiveFace(): void {
 }
 
 function activeMotion(): CubeMotion {
+  if (turnAnim?.kind === "face") {
+    const e = easeOutCubic(turnAnim.t);
+    return {
+      axis: null,
+      index: -1,
+      offset: 0,
+      hovering: false,
+      faceSpin: e * turnAnim.dir * (Math.PI / 2),
+    };
+  }
+  if (turnAnim?.kind === "lane") {
+    const e = easeOutCubic(turnAnim.t);
+    return {
+      axis: turnAnim.axis,
+      index: turnAnim.index,
+      offset: turnAnim.fromUv + (turnAnim.toUv - turnAnim.fromUv) * e,
+      hovering: true,
+    };
+  }
   if (drag?.axis) {
     return {
       axis: drag.axis,
@@ -192,6 +240,7 @@ function resetPlayVisuals(): void {
   drag = null;
   orbitDrag = null;
   rotating = false;
+  turnAnim = null;
   springUv = 0;
   springAxis = null;
   springIndex = -1;
@@ -199,15 +248,27 @@ function resetPlayVisuals(): void {
   targetOrient = quatCopy(orient);
 }
 
-function doTwist(twist: LaneTwist): void {
-  if (session.status === "solved") return;
-  session = applyTwist(session, twist);
+function doTwist(twist: LaneTwist, fromUv = 0): void {
+  if (session.status === "solved" || turnAnim) return;
+  const amount = Math.max(1, twist.amount ?? 1);
+  const toUv = (twist.dir * amount) / session.size;
+  turnAnim = {
+    kind: "lane",
+    face: session.face,
+    axis: twist.axis,
+    index: twist.index,
+    fromUv,
+    toUv,
+    twist: { ...twist, amount },
+    t: 0,
+    ms: TURN_MS,
+  };
   sfxPaperSlide();
 }
 
 function doFaceTurn(dir: 1 | -1): void {
-  if (session.status === "solved") return;
-  session = applyFaceTurn(session, session.face, dir);
+  if (session.status === "solved" || turnAnim) return;
+  turnAnim = { kind: "face", face: session.face, dir, t: 0, ms: TURN_MS };
   sfxPaperSlide();
 }
 
@@ -300,7 +361,13 @@ function paint(): void {
   const motion = activeMotion();
   const source = session.cube;
   let display = source;
-  if (motion.axis && motion.hovering && Math.abs(motion.offset) > 0.001) {
+  // Integer side-peek only while dragging; lane turn anim stays continuous via lanePreview.
+  if (
+    turnAnim?.kind !== "lane" &&
+    motion.axis &&
+    motion.hovering &&
+    Math.abs(motion.offset) > 0.001
+  ) {
     display = previewCube(
       source,
       session.face,
@@ -333,10 +400,28 @@ function paint(): void {
   }
 }
 
-function tick(): void {
+function tick(ts: number): void {
+  const dt = lastFrameTs ? Math.min(48, ts - lastFrameTs) : 16.67;
+  lastFrameTs = ts;
+
   if (screen === "play" || screen === "menu") {
+    if (turnAnim) {
+      turnAnim.t += dt / turnAnim.ms;
+      if (turnAnim.t >= 1) {
+        turnAnim.t = 1;
+        if (turnAnim.kind === "face") {
+          session = applyFaceTurn(session, turnAnim.face, turnAnim.dir);
+        } else {
+          const face = session.face;
+          session = { ...session, face: turnAnim.face };
+          session = applyTwist(session, turnAnim.twist);
+          session = { ...session, face };
+        }
+        turnAnim = null;
+      }
+    }
     if (springAxis) {
-      springUv *= 0.78;
+      springUv += (0 - springUv) * 0.16;
       if (Math.abs(springUv) < 0.008) {
         springUv = 0;
         springAxis = null;
@@ -491,7 +576,8 @@ canvas.addEventListener(
 
     const layout = cubeLayout();
     const headOn = facingFaceDot(orient) >= 0.75;
-    const hit = headOn && !rotating ? hitFrontUV(layout, p.x, p.y) : null;
+    const hit =
+      headOn && !rotating && !turnAnim ? hitFrontUV(layout, p.x, p.y) : null;
     if (hit && hit.face === session.face) {
       const n = session.size;
       const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
@@ -575,12 +661,18 @@ function endDrag(): void {
     sfxPaperRustle();
     return;
   }
+  if (turnAnim) {
+    springAxis = axis;
+    springIndex = index;
+    springUv = offsetUv;
+    return;
+  }
   const dir: 1 | -1 = steps > 0 ? 1 : -1;
   const amount = Math.min(session.size - 1, Math.abs(steps));
   springAxis = null;
   springIndex = -1;
   springUv = 0;
-  doTwist({ axis, index, dir, amount });
+  doTwist({ axis, index, dir, amount }, offsetUv);
 }
 
 canvas.addEventListener("pointerup", endDrag);
