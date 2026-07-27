@@ -6,6 +6,9 @@ import { setSfxVolume } from "../audio/sfx";
 const KEY = "shiftr_web_save_v12";
 const LEGACY_KEYS = ["shiftr_web_save_v11", "shiftr_web_save_v10", "shiftr_web_save_v9"];
 
+/** Temporary playtest flag — opens every desk. Set false before release. */
+export const UNLOCK_ALL_LEVELS = true;
+
 export type SaveData = {
   unlocked: number;
   bestStars: Record<string, number>;
@@ -47,6 +50,7 @@ function clampUnlocked(n: number): number {
  * Older builds forced every level open — if we see that, re-derive from clears.
  */
 function unlockedFromProgress(d: Partial<SaveData>): number {
+  if (UNLOCK_ALL_LEVELS) return DIFFICULTY_COUNT;
   let maxClearedIndex = -1;
   for (const id of Object.keys(d.bestStars ?? {})) {
     const m = /^diff_(\d+)$/.exec(id);
@@ -69,7 +73,7 @@ function migrateTheme(raw: unknown): ThemeId {
 
 function freshSave(firstRun: boolean): SaveData {
   return {
-    unlocked: 1,
+    unlocked: UNLOCK_ALL_LEVELS ? DIFFICULTY_COUNT : 1,
     bestStars: {},
     bestMoves: {},
     lastLevelIndex: 0,
