@@ -422,6 +422,108 @@ export function drawHint(ctx: CanvasRenderingContext2D, text: string): void {
   ctx.fillText(text, 64, 1186);
 }
 
+/** Bottom play dock — cube tip + row/col slide controls (replaces hint). */
+export type PlayDock = {
+  tipUp: UiRect;
+  tipDown: UiRect;
+  rowLeft: UiRect;
+  rowRight: UiRect;
+  rowPrev: UiRect;
+  rowNext: UiRect;
+  colUp: UiRect;
+  colDown: UiRect;
+  colPrev: UiRect;
+  colNext: UiRect;
+};
+
+function dockBtn(
+  ctx: CanvasRenderingContext2D,
+  r: UiRect,
+  label: string,
+  opts?: { fill?: string; ink?: string },
+): void {
+  ctx.fillStyle = opts?.fill ?? "#111";
+  roundRect(ctx, r.x, r.y, r.w, r.h, 6);
+  ctx.fill();
+  ctx.strokeStyle = "#c8ff3d";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = opts?.ink ?? "#c8ff3d";
+  ctx.font = "800 16px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
+}
+
+export function drawPlayDock(
+  ctx: CanvasRenderingContext2D,
+  opts: { row: number; col: number; size: number },
+): PlayDock {
+  const y = 1140;
+  const h = 88;
+  ctx.fillStyle = "#1b1b1b";
+  roundRect(ctx, 36, y, 648, h, 6);
+  ctx.fill();
+  ctx.fillStyle = "#c8ff3d";
+  ctx.fillRect(56, y - 8, 48, 12);
+
+  const tipUp: UiRect = { x: 52, y: y + 14, w: 52, h: 28 };
+  const tipDown: UiRect = { x: 52, y: y + 48, w: 52, h: 28 };
+  dockBtn(ctx, tipUp, "˄");
+  dockBtn(ctx, tipDown, "˅");
+  ctx.fillStyle = "#888";
+  ctx.font = "700 9px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("TIP", 78, y + 12);
+
+  const rowPrev: UiRect = { x: 120, y: y + 18, w: 40, h: 52 };
+  const rowLeft: UiRect = { x: 168, y: y + 18, w: 56, h: 52 };
+  const rowRight: UiRect = { x: 292, y: y + 18, w: 56, h: 52 };
+  const rowNext: UiRect = { x: 356, y: y + 18, w: 40, h: 52 };
+  dockBtn(ctx, rowPrev, "−");
+  dockBtn(ctx, rowLeft, "‹");
+  ctx.fillStyle = "#f3efe6";
+  ctx.font = "800 13px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(`ROW ${opts.row + 1}`, 258, y + 36);
+  ctx.fillStyle = "#888";
+  ctx.font = "700 10px 'Chakra Petch', sans-serif";
+  ctx.fillText(`${opts.size}`, 258, y + 54);
+  dockBtn(ctx, rowRight, "›");
+  dockBtn(ctx, rowNext, "+");
+
+  const colPrev: UiRect = { x: 416, y: y + 18, w: 36, h: 52 };
+  const colUp: UiRect = { x: 458, y: y + 18, w: 50, h: 52 };
+  const colDown: UiRect = { x: 568, y: y + 18, w: 50, h: 52 };
+  const colNext: UiRect = { x: 624, y: y + 18, w: 36, h: 52 };
+  dockBtn(ctx, colPrev, "−");
+  dockBtn(ctx, colUp, "˄");
+  ctx.fillStyle = "#f3efe6";
+  ctx.font = "800 13px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(`COL ${opts.col + 1}`, 534, y + 36);
+  ctx.fillStyle = "#888";
+  ctx.font = "700 10px 'Chakra Petch', sans-serif";
+  ctx.fillText(`${opts.size}`, 534, y + 54);
+  dockBtn(ctx, colDown, "˅");
+  dockBtn(ctx, colNext, "+");
+
+  return {
+    tipUp,
+    tipDown,
+    rowLeft,
+    rowRight,
+    rowPrev,
+    rowNext,
+    colUp,
+    colDown,
+    colPrev,
+    colNext,
+  };
+}
+
 export function drawEndOverlay(
   ctx: CanvasRenderingContext2D,
   opts: { won: boolean; score: number; stars: number },

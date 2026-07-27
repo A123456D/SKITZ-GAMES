@@ -25,7 +25,7 @@ export function detectQuality(): RenderQuality {
   quality = lowEnd
     ? {
         dprCap: 1.5,
-        stickerShadows: true,
+        stickerShadows: false,
         hoverAnim: true,
       }
     : {

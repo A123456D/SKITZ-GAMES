@@ -21,11 +21,11 @@ import {
   H,
   drawDesk,
   drawEndOverlay,
-  drawHint,
   drawHomeScreen,
   drawHud,
   drawMenuButton,
   drawPauseMenu,
+  drawPlayDock,
   drawSettingsScreen,
   hitRetry,
   hitUiRect,
@@ -39,6 +39,7 @@ import {
   PAUSE_SETTINGS,
   SETTINGS_BACK,
   SETTINGS_VOL,
+  type PlayDock,
 } from "./view/draw";
 import {
   drawCube3D,
@@ -50,7 +51,7 @@ import {
   screenDeltaToFaceUV,
   type CubeLayout,
 } from "./view/cube3d";
-import { applyOrbitDrag, orbitStepDelta, SNAP_Q } from "./view/orbit";
+import { applyOrbitDrag, orbitStepDelta, ORBIT_DRAG_SENS, SNAP_Q } from "./view/orbit";
 import {
   cycleSfxVolume,
   getSfxVolume,
@@ -72,6 +73,10 @@ let settingsFrom: Screen = "home";
 
 let session: Session = startSession(LEVEL_1);
 let floatText: { text: string; life: number } | null = null;
+/** Selected row/col for bottom dock slide buttons. */
+let controlRow = 0;
+let controlCol = 0;
+let playDock: PlayDock | null = null;
 
 type DragState = {
   u0: number;
@@ -201,6 +206,8 @@ function resetPlayVisuals(): void {
 function goHome(): void {
   screen = "home";
   resetPlayVisuals();
+  controlRow = 0;
+  controlCol = 0;
   session = startSession(LEVEL_1);
   syncActiveFace();
   paint();
@@ -208,6 +215,8 @@ function goHome(): void {
 
 function startPlay(): void {
   resetPlayVisuals();
+  controlRow = 0;
+  controlCol = 0;
   session = startSession(LEVEL_1);
   syncActiveFace();
   screen = "play";
@@ -276,14 +285,10 @@ function paint(): void {
   ctx.textAlign = "center";
   ctx.fillText(`FACE · ${faceName}`, W / 2, 1008);
 
-  drawHint(
-    ctx,
-    session.status === "playing"
-      ? "Drag a row/col to slide stickers. Drag around the cube to spin."
-      : session.status === "won"
-        ? "Rip. Match. Repeat."
-        : "Try another twist path.",
-  );
+  const n = session.level.size;
+  controlRow = ((controlRow % n) + n) % n;
+  controlCol = ((controlCol % n) + n) % n;
+  playDock = drawPlayDock(ctx, { row: controlRow, col: controlCol, size: n });
 
   if (floatText && floatText.life > 0) {
     ctx.save();
@@ -399,9 +404,71 @@ function doTwist(twist: Twist): void {
 }
 
 function inCubeOrbitZone(_layout: CubeLayout, x: number, y: number): boolean {
-  // Include the band above/below the cube so vertical flips work. HUD goals
-  // end ~184; hint bar starts ~1148. Stickers still claim the face first.
-  return y > 195 && y < 1120 && x > 24 && x < W - 24;
+  // Keep clear of the bottom dock (~1140+). Stickers still claim the face first.
+  return y > 195 && y < 1125 && x > 24 && x < W - 24;
+}
+
+function orbitSens(): number {
+  const coarse =
+    typeof window !== "undefined" &&
+    window.matchMedia("(pointer: coarse)").matches;
+  // Installed / touch PWAs need a bit more pitch gain to feel vertical flips.
+  return coarse ? ORBIT_DRAG_SENS * 1.55 : ORBIT_DRAG_SENS;
+}
+
+function hitPlayDock(x: number, y: number): boolean {
+  if (!playDock || session.status !== "playing" || busy) return false;
+  const n = session.level.size;
+  const d = playDock;
+  if (hitUiRect(d.tipUp, x, y)) {
+    startOrbitStep("up");
+    return true;
+  }
+  if (hitUiRect(d.tipDown, x, y)) {
+    startOrbitStep("down");
+    return true;
+  }
+  if (hitUiRect(d.rowPrev, x, y)) {
+    controlRow = (controlRow - 1 + n) % n;
+    sfxPaperRustle();
+    paint();
+    return true;
+  }
+  if (hitUiRect(d.rowNext, x, y)) {
+    controlRow = (controlRow + 1) % n;
+    sfxPaperRustle();
+    paint();
+    return true;
+  }
+  if (hitUiRect(d.rowLeft, x, y)) {
+    doTwist({ axis: "row", index: controlRow, dir: -1, amount: 1 });
+    return true;
+  }
+  if (hitUiRect(d.rowRight, x, y)) {
+    doTwist({ axis: "row", index: controlRow, dir: 1, amount: 1 });
+    return true;
+  }
+  if (hitUiRect(d.colPrev, x, y)) {
+    controlCol = (controlCol - 1 + n) % n;
+    sfxPaperRustle();
+    paint();
+    return true;
+  }
+  if (hitUiRect(d.colNext, x, y)) {
+    controlCol = (controlCol + 1) % n;
+    sfxPaperRustle();
+    paint();
+    return true;
+  }
+  if (hitUiRect(d.colUp, x, y)) {
+    doTwist({ axis: "col", index: controlCol, dir: -1, amount: 1 });
+    return true;
+  }
+  if (hitUiRect(d.colDown, x, y)) {
+    doTwist({ axis: "col", index: controlCol, dir: 1, amount: 1 });
+    return true;
+  }
+  return false;
 }
 
 function snapAngles(rx: number, ry: number): { x: number; y: number } {
@@ -452,7 +519,10 @@ function endOrbitDrag(): void {
   rotating = true;
 }
 
-canvas.addEventListener("pointerdown", (e) => {
+canvas.addEventListener(
+  "pointerdown",
+  (e) => {
+  e.preventDefault();
   unlockAudio();
   canvas.setPointerCapture(e.pointerId);
   const p = canvasPoint(e);
@@ -546,6 +616,8 @@ canvas.addEventListener("pointerdown", (e) => {
     return;
   }
 
+  if (hitPlayDock(p.x, p.y)) return;
+
   if (orbitBtns) {
     const orb = hitOrbitButton(orbitBtns, p.x, p.y);
     if (orb) {
@@ -559,9 +631,16 @@ canvas.addEventListener("pointerdown", (e) => {
   const headOn = facingFaceDot(rotX, rotY) >= 0.75;
   const hit = headOn && !rotating ? hitFrontUV(layout, p.x, p.y) : null;
   if (hit && hit.face === session.face) {
+    // Top/bottom fringe of the face → tip the cube (fixes mobile vertical orbit).
+    if (hit.v < 0.14 || hit.v > 0.86) {
+      beginOrbitDrag(p.x, p.y);
+      return;
+    }
     const n = session.level.size;
     const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
     const r = Math.min(n - 1, Math.max(0, Math.floor(hit.v * n)));
+    controlRow = r;
+    controlCol = c;
     drag = {
       u0: hit.u,
       v0: hit.v,
@@ -579,16 +658,21 @@ canvas.addEventListener("pointerdown", (e) => {
   if (inCubeOrbitZone(layout, p.x, p.y)) {
     beginOrbitDrag(p.x, p.y);
   }
-});
+  },
+  { passive: false },
+);
 
-canvas.addEventListener("pointermove", (e) => {
+canvas.addEventListener(
+  "pointermove",
+  (e) => {
+  e.preventDefault();
   if (screen !== "play" || session.status !== "playing" || busy) return;
   const p = canvasPoint(e);
 
   if (orbitDrag) {
     const dx = p.x - orbitDrag.x0;
     const dy = p.y - orbitDrag.y0;
-    const next = applyOrbitDrag(orbitDrag.rotX0, orbitDrag.rotY0, dx, dy);
+    const next = applyOrbitDrag(orbitDrag.rotX0, orbitDrag.rotY0, dx, dy, orbitSens());
     rotX = next.rotX;
     rotY = next.rotY;
     targetRotX = rotX;
@@ -608,6 +692,21 @@ canvas.addEventListener("pointermove", (e) => {
 
   if (!drag.axis) {
     if (Math.abs(du) < 0.03 && Math.abs(dv) < 0.03) return;
+    // Strong vertical screen drag on face → orbit tip instead of column twist.
+    const sdx = p.x - drag.x0;
+    const sdy = p.y - drag.y0;
+    if (Math.abs(sdy) > Math.abs(sdx) * 1.35 && Math.abs(sdy) > 28) {
+      beginOrbitDrag(drag.x0, drag.y0);
+      drag = null;
+      const next = applyOrbitDrag(orbitDrag!.rotX0, orbitDrag!.rotY0, sdx, sdy, orbitSens());
+      rotX = next.rotX;
+      rotY = next.rotY;
+      targetRotX = rotX;
+      targetRotY = rotY;
+      syncActiveFace();
+      paint();
+      return;
+    }
     if (Math.abs(du) >= Math.abs(dv)) {
       drag.axis = "row";
       drag.index = drag.r;
@@ -620,7 +719,9 @@ canvas.addEventListener("pointermove", (e) => {
   // Column: finger down (+V) pulls content down so TOP slides in from the top edge.
   drag.offsetUv = drag.axis === "row" ? du : dv;
   paint();
-});
+  },
+  { passive: false },
+);
 
 function endDrag(): void {
   if (screen !== "play") return;

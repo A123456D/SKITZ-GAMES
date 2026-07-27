@@ -553,12 +553,12 @@ export function drawCubeOrbitButtons(
   const gap = 12;
   const sideW = 34;
   const sideH = 54;
-  const endW = 54;
-  const endH = 34;
+  const endW = 64;
+  const endH = 44;
   const edge = 14;
-  // Larger tap pads than the drawn chrome — top/bottom were easy to miss.
-  const hitPadX = 10;
-  const hitPadY = 12;
+  // Larger tap pads than the drawn chrome — top/bottom were easy to miss on PWA.
+  const hitPadX = 14;
+  const hitPadY = 18;
 
   const left = {
     x: Math.max(edge, cx - half - gap - sideW),
