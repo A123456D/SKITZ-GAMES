@@ -248,10 +248,23 @@ function resetPlayVisuals(): void {
   targetOrient = quatCopy(orient);
 }
 
+/** Outer lanes map to real face turns; middle lanes are belt slices. */
+function isOuterLane(index: number, size: number): boolean {
+  return index === 0 || index === size - 1;
+}
+
 function doTwist(twist: LaneTwist, fromUv = 0): void {
   if (session.status === "solved" || turnAnim) return;
   const amount = Math.max(1, twist.amount ?? 1);
-  const toUv = (twist.dir * amount) / session.size;
+  const n = session.size;
+  const outer = isOuterLane(twist.index, n);
+  // Outer = face turn: one quarter-turn replaces the whole edge (1.0 UV), not one
+  // sticker (1/n). Animating only 1/n then applying faceTurn caused the snap.
+  const toUv = outer ? twist.dir * amount : (twist.dir * amount) / n;
+  const dist = Math.abs(toUv - fromUv);
+  const ms = outer
+    ? TURN_MS * Math.min(2.1, Math.max(1.35, dist * 1.15))
+    : TURN_MS;
   turnAnim = {
     kind: "lane",
     face: session.face,
@@ -261,7 +274,7 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
     toUv,
     twist: { ...twist, amount },
     t: 0,
-    ms: TURN_MS,
+    ms,
   };
   sfxPaperSlide();
 }
@@ -653,8 +666,10 @@ function endDrag(): void {
   const offsetUv = drag.offsetUv;
   drag = null;
   if (!axis || index < 0) return;
-  const steps = Math.round(offsetUv * session.size);
-  if (steps === 0) {
+  const n = session.size;
+  const outer = isOuterLane(index, n);
+  const stickerSteps = Math.round(offsetUv * n);
+  if (stickerSteps === 0) {
     springAxis = axis;
     springIndex = index;
     springUv = offsetUv;
@@ -667,8 +682,18 @@ function endDrag(): void {
     springUv = offsetUv;
     return;
   }
-  const dir: 1 | -1 = steps > 0 ? 1 : -1;
-  const amount = Math.min(session.size - 1, Math.abs(steps));
+  let dir: 1 | -1;
+  let amount: number;
+  if (outer) {
+    // Face-turn units (full edge). Any clear sticker drag still commits one turn.
+    let turns = Math.round(offsetUv);
+    if (turns === 0) turns = stickerSteps > 0 ? 1 : -1;
+    dir = turns > 0 ? 1 : -1;
+    amount = Math.min(2, Math.abs(turns));
+  } else {
+    dir = stickerSteps > 0 ? 1 : -1;
+    amount = Math.min(n - 1, Math.abs(stickerSteps));
+  }
   springAxis = null;
   springIndex = -1;
   springUv = 0;
