@@ -31,4 +31,14 @@ describe("orbit mapping (do not flip casually)", () => {
     const left = applyOrbitDrag(0, 0, -SNAP_Q / ORBIT_DRAG_SENS, 0);
     expect(facingFace(left.rotX, left.rotY)).toBe(2);
   });
+
+  it("pitch clamps at ±90° so a second tip does not tumble", () => {
+    const pastBottom = applyOrbitDrag(SNAP_Q, 0, 0, -SNAP_Q / ORBIT_DRAG_SENS);
+    expect(pastBottom.rotX).toBe(SNAP_Q);
+    expect(facingFace(pastBottom.rotX, pastBottom.rotY)).toBe(5);
+
+    const pastTop = applyOrbitDrag(-SNAP_Q, 0, 0, SNAP_Q / ORBIT_DRAG_SENS);
+    expect(pastTop.rotX).toBe(-SNAP_Q);
+    expect(facingFace(pastTop.rotX, pastTop.rotY)).toBe(4);
+  });
 });

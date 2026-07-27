@@ -493,7 +493,12 @@ function snapAngles(rx: number, ry: number): { x: number; y: number } {
   // Snap to axis-aligned face views. Keep a tiny tip only on the home pose
   // so the front view stays slightly 3D without leaving other faces crooked.
   let x = Math.round(rx / SNAP_Q) * SNAP_Q;
-  let y = Math.round(ry / SNAP_Q) * SNAP_Q;
+  // Pitch only reaches top/bottom — never tumble past ±90°.
+  x = Math.max(-SNAP_Q, Math.min(SNAP_Q, x));
+  let qy = Math.round(ry / SNAP_Q);
+  qy = ((qy % 4) + 4) % 4;
+  if (qy > 2) qy -= 4;
+  let y = qy * SNAP_Q;
   if (Math.abs(x) < 0.001 && Math.abs(y) < 0.001) {
     x = DEFAULT_ROT_X;
     y = DEFAULT_ROT_Y;
@@ -501,9 +506,24 @@ function snapAngles(rx: number, ry: number): { x: number; y: number } {
   return { x, y };
 }
 
+/** Closest yaw to `from` that matches `to` (avoids 270° spins on wrap). */
+function nearestYaw(from: number, to: number): number {
+  let d = to - from;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return from + d;
+}
+
 function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
   if (busy || drag || session.status !== "playing") return;
   orbitDrag = null;
+  // Finish any in-flight tip before stacking another step (stops runaway spin).
+  if (rotating) {
+    rotX = targetRotX;
+    rotY = targetRotY;
+    rotating = false;
+    syncActiveFace();
+  }
   const snapped = snapAngles(rotX, rotY);
   let tx = snapped.x;
   let ty = snapped.y;
@@ -515,12 +535,25 @@ function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
   const { dRotX, dRotY } = orbitStepDelta(dir);
   tx += dRotX;
   ty += dRotY;
-  // Re-apply home tip if we landed on front
+  // Re-apply home tip if we landed on front; clamp so we never oversell pitch.
   const landed = snapAngles(tx, ty);
+  const nextY = nearestYaw(rotY, landed.y);
+  // Already at pitch/yaw limit for this step — ignore so it doesn't twitch/spin.
+  if (Math.abs(landed.x - rotX) < 0.02 && Math.abs(nextY - rotY) < 0.02) {
+    rotX = landed.x;
+    rotY = nextY;
+    targetRotX = rotX;
+    targetRotY = rotY;
+    syncActiveFace();
+    paint();
+    return;
+  }
   targetRotX = landed.x;
-  targetRotY = landed.y;
+  targetRotY = nextY;
   rotating = true;
   sfxPaperFlutter();
+  syncActiveFace();
+  paint();
 }
 
 function beginOrbitDrag(x: number, y: number): void {
@@ -533,7 +566,7 @@ function endOrbitDrag(): void {
   orbitDrag = null;
   const snapped = snapAngles(rotX, rotY);
   targetRotX = snapped.x;
-  targetRotY = snapped.y;
+  targetRotY = nearestYaw(rotY, snapped.y);
   rotating = true;
 }
 
@@ -649,11 +682,6 @@ canvas.addEventListener(
   const headOn = facingFaceDot(rotX, rotY) >= 0.75;
   const hit = headOn && !rotating ? hitFrontUV(layout, p.x, p.y) : null;
   if (hit && hit.face === session.face) {
-    // Top/bottom fringe of the face → tip the cube (fixes mobile vertical orbit).
-    if (hit.v < 0.14 || hit.v > 0.86) {
-      beginOrbitDrag(p.x, p.y);
-      return;
-    }
     const n = session.level.size;
     const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
     const r = Math.min(n - 1, Math.max(0, Math.floor(hit.v * n)));
@@ -709,21 +737,6 @@ canvas.addEventListener(
 
   if (!drag.axis) {
     if (Math.abs(du) < 0.03 && Math.abs(dv) < 0.03) return;
-    // Strong vertical screen drag on face → orbit tip instead of column twist.
-    const sdx = p.x - drag.x0;
-    const sdy = p.y - drag.y0;
-    if (Math.abs(sdy) > Math.abs(sdx) * 1.35 && Math.abs(sdy) > 28) {
-      beginOrbitDrag(drag.x0, drag.y0);
-      drag = null;
-      const next = applyOrbitDrag(orbitDrag!.rotX0, orbitDrag!.rotY0, sdx, sdy, orbitSens());
-      rotX = next.rotX;
-      rotY = next.rotY;
-      targetRotX = rotX;
-      targetRotY = rotY;
-      syncActiveFace();
-      paint();
-      return;
-    }
     if (Math.abs(du) >= Math.abs(dv)) {
       drag.axis = "row";
       drag.index = drag.r;
