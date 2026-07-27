@@ -73,7 +73,7 @@ function profile(diff: number) {
   const extraEdges = slot <= 2 ? 0 : slot <= 4 ? 1 : 2;
   const pulseLimit = phase === 1 ? 3 : phase === 2 ? (slot >= 5 ? 2 : 3) : slot >= 4 ? 2 : 3;
   const undoLimit = 0;
-  // Interior-only gear pairs — later desks couple more discs.
+  // Interior-only gear pairs — later desks couple more discs at once.
   const interior = Math.max(0, size - 2) * Math.max(0, size - 2);
   const maxInteriorPairs = Math.floor(interior / 2);
   const gearPairsWanted =
@@ -82,16 +82,24 @@ function profile(diff: number) {
       : phase === 2
         ? slot <= 1
           ? 1
-          : slot <= 3
+          : slot === 2
             ? 2
-            : slot <= 5
+            : slot === 3
               ? 3
-              : 4
-        : slot <= 2
+              : slot === 4
+                ? 4
+                : slot === 5
+                  ? 4
+                  : 5
+        : slot <= 1
           ? 2
-          : slot <= 4
+          : slot === 2
             ? 3
-            : 4;
+            : slot === 3
+              ? 4
+              : slot === 4
+                ? 5
+                : 6;
   const gearPairs = Math.min(gearPairsWanted, maxInteriorPairs);
   const rowShifts = phase === 3 ? Math.min(1 + Math.floor((slot - 1) / 2), 2) : 0;
   const minMoves = Math.min(size * size - 1, 3 + slot + (phase - 1));
@@ -206,33 +214,78 @@ function tablesFromPorts(w: number, h: number, ports: number[][]): TableDef[] {
 }
 
 /**
- * Pair interior discs across the board — never rim cells, never neighbors.
+ * Pair interior discs that share a short pipe path — never rim, never neighbors.
  * Opposite gears (sign -1): turn one, the partner reverses.
+ * Links only form when the topology gives a reason (graph distance 2–4 on the
+ * pipe net) and busy matching junctions are preferred so coupling bites.
  */
 function isEdgeCell(hub: { x: number; y: number }, w: number, h: number): boolean {
   return hub.x <= 0 || hub.y <= 0 || hub.x >= w - 1 || hub.y >= h - 1;
 }
 
-function linkGears(tables: TableDef[], w: number, h: number, pairs: number, rng: Rng): void {
+function pipeDistances(edges: Edge[], n: number): number[][] {
+  const adj: number[][] = Array.from({ length: n }, () => []);
+  for (const e of edges) {
+    adj[e.a]!.push(e.b);
+    adj[e.b]!.push(e.a);
+  }
+  const dist = Array.from({ length: n }, () => Array.from({ length: n }, () => 99));
+  for (let s = 0; s < n; s++) {
+    const row = dist[s]!;
+    row[s] = 0;
+    const q = [s];
+    for (let qi = 0; qi < q.length; qi++) {
+      const u = q[qi]!;
+      for (const v of adj[u]!) {
+        if (row[v]! <= row[u]! + 1) continue;
+        row[v] = row[u]! + 1;
+        q.push(v);
+      }
+    }
+  }
+  return dist;
+}
+
+function linkGears(
+  tables: TableDef[],
+  edges: Edge[],
+  w: number,
+  h: number,
+  pairs: number,
+  rng: Rng,
+): void {
   if (pairs <= 0) return;
+  const n = w * h;
+  const dist = pipeDistances(edges, n);
+  const degree = new Array<number>(n).fill(0);
+  for (const e of edges) {
+    degree[e.a]!++;
+    degree[e.b]!++;
+  }
   const interior = tables.filter((t) => !isEdgeCell(t.hub, w, h));
   type Cand = { a: TableDef; b: TableDef; score: number };
   const candidates: Cand[] = [];
-  const rank = (m: number) =>
-    m === M.STRAIGHT ? 4 : m === M.ELBOW ? 3 : m === M.ENDCAP ? 2 : 1;
   for (let i = 0; i < interior.length; i++) {
     const a = interior[i]!;
     for (let j = i + 1; j < interior.length; j++) {
       const b = interior[j]!;
-      const dx = Math.abs(a.hub.x - b.hub.x);
-      const dy = Math.abs(a.hub.y - b.hub.y);
-      const manhattan = dx + dy;
-      // Skip neighbors — links must sit elsewhere on the desk.
-      if (manhattan < 2) continue;
-      let score = manhattan * 3 + rank(a.module) + rank(b.module);
-      if (a.module === b.module) score += 2;
-      if (dx >= 1 && dy >= 1) score += 2;
-      if (manhattan >= 4) score += 2;
+      const gDist = dist[a.id]![b.id]!;
+      // Must share a short pipe path — unrelated far cells are not "linked for a reason".
+      if (gDist < 2 || gDist > 4) continue;
+      const man = Math.abs(a.hub.x - b.hub.x) + Math.abs(a.hub.y - b.hub.y);
+      if (man < 2) continue;
+      let score = 0;
+      // Sweet spot: two hops on the same run (local coupling that fights itself).
+      if (gDist === 2) score += 10;
+      else if (gDist === 3) score += 8;
+      else score += 4;
+      if (a.module === b.module) score += 6;
+      // Busy junctions hurt more when forced to co-rotate.
+      score += (degree[a.id]! + degree[b.id]!) * 1.5;
+      if (a.module === M.TEE || a.module === M.CROSS) score += 2;
+      if (b.module === M.TEE || b.module === M.CROSS) score += 2;
+      // Endcaps alone rarely create hard coupling.
+      if (a.module === M.ENDCAP && b.module === M.ENDCAP) score -= 5;
       candidates.push({ a, b, score });
     }
   }
@@ -248,6 +301,24 @@ function linkGears(tables: TableDef[], w: number, h: number, pairs: number, rng:
     used.add(b.id);
     linked++;
   }
+}
+
+/**
+ * True when removing gear links makes the same scrambled board cheap to close.
+ * That means the coupling is load-bearing — not decoration.
+ */
+function gearCouplingMatters(level: LevelData): boolean {
+  if (!level.tables.some((t) => t.link)) return true;
+  const bare: LevelData = {
+    ...level,
+    hasGears: false,
+    tables: level.tables.map((t) => ({
+      ...t,
+      hub: { ...t.hub },
+      link: undefined,
+    })),
+  };
+  return hasCheapSolve(bare, 2, 4, 700);
 }
 
 function emptyGrid(w: number, h: number) {
@@ -462,12 +533,16 @@ function scrambleAndVerify(
 
   if (solve(buildState(level)).won) return null;
 
-  // Fast anti-cheap only works without gears; geared boards skip it.
-  if (!skipAntiCheap && !opts.hasGears) {
-    const exactDepth = difficulty >= 8 ? 2 : 3;
-    const probeLen = difficulty >= 10 ? 5 : 4;
-    const probes = difficulty >= 10 ? 1200 : 800;
-    if (hasCheapSolve(level, exactDepth, probeLen, probes)) return null;
+  if (!skipAntiCheap) {
+    if (!opts.hasGears) {
+      const exactDepth = difficulty >= 8 ? 2 : 3;
+      const probeLen = difficulty >= 10 ? 5 : 4;
+      const probes = difficulty >= 10 ? 1200 : 800;
+      if (hasCheapSolve(level, exactDepth, probeLen, probes)) return null;
+    } else if (!gearCouplingMatters(level)) {
+      // Reject decorative gears — coupling must be what blocks the easy fix.
+      return null;
+    }
   }
 
   const session = loadLevel(level);
@@ -484,13 +559,13 @@ function scrambleAndVerify(
  * runs against a wall-clock budget: once spent, quality filters relax rather
  * than letting a slow device keep searching.
  */
-const BUDGET_MS = 320;
+const BUDGET_MS = 450;
 
 export function generateLevel(difficulty: number, seed: number): LevelData {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, difficulty));
   const rng = mulberry32((seed >>> 0) ^ Math.imul(d, 0x9e3779b9));
   const opts = profile(d);
-  const attempts = opts.phase >= 3 ? 500 : opts.phase >= 2 ? 400 : 180;
+  const attempts = opts.phase >= 3 ? 700 : opts.phase >= 2 ? 550 : 180;
   const started = now();
 
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -500,7 +575,7 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
     const edges = buildTopology(w, h, extras, rng);
     const ports = portsFromEdges(w, h, edges);
     const tables = tablesFromPorts(w, h, ports);
-    linkGears(tables, w, h, opts.gearPairs, rng);
+    linkGears(tables, edges, w, h, opts.gearPairs, rng);
     // Never strip phase rules on timeout — only skip the slow anti-cheap filter.
     const overBudget = now() - started > BUDGET_MS;
     const level = scrambleAndVerify(tables, w, h, rng, opts, d, overBudget);
@@ -512,7 +587,7 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
   const edges = buildTopology(w, w, Math.max(0, opts.extraEdges - 1), rng);
   const ports = portsFromEdges(w, w, edges);
   const tables = tablesFromPorts(w, w, ports);
-  linkGears(tables, w, w, opts.gearPairs, rng);
+  linkGears(tables, edges, w, w, opts.gearPairs, rng);
   const soft = { ...opts, minMoves: 2 };
   const level = scrambleAndVerify(tables, w, w, rng, soft, d, true);
   if (level) return level;

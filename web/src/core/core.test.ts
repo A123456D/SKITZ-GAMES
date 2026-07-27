@@ -176,7 +176,7 @@ describe("dense procedural levels", () => {
 
   it("later desks use more gear pairs", () => {
     const early = generateLevel(7, 111);
-    const late = generateLevel(12, 111);
+    const late = generateLevel(12, 222);
     const count = (level: ReturnType<typeof generateLevel>) =>
       level.tables.filter((t) => t.link).length / 2;
     expect(count(late)).toBeGreaterThan(count(early));

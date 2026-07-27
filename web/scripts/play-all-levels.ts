@@ -24,16 +24,24 @@ function expectedGears(diff: number): number {
     phase === 2
       ? slot <= 1
         ? 1
-        : slot <= 3
+        : slot === 2
           ? 2
-          : slot <= 5
+          : slot === 3
             ? 3
-            : 4
-      : slot <= 2
+            : slot === 4
+              ? 4
+              : slot === 5
+                ? 4
+                : 5
+      : slot <= 1
         ? 2
-        : slot <= 4
+        : slot === 2
           ? 3
-          : 4;
+          : slot === 3
+            ? 4
+            : slot === 4
+              ? 5
+              : 6;
   return Math.min(wanted, maxPairs);
 }
 

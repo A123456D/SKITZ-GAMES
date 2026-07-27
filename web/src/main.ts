@@ -61,8 +61,7 @@ import {
   drawCoachHint,
   drawFingerPointer,
   drawGearDiscBadge,
-  drawGearLink,
-  gearPairIndex,
+  drawGearPartnerHint,
   drawGlassButton,
   drawHairlineGrid,
   drawHudStats,
@@ -72,8 +71,8 @@ import {
   drawPointCoach,
   drawRetroConnections,
   drawRoundButton,
-  drawRowShiftArrow,
   drawTitle,
+  gearPairIndex,
   drawVolumeSlider,
   drawMuteBox,
   drawWheel,
@@ -1864,15 +1863,15 @@ function drawPlay(): void {
   }
   drawHairlineGrid(ctx, session.state, layout);
 
-  // Phase 3: large row-shift arrows centered in the side gutters.
+  // Phase 3: original round ‹ › buttons — just keep them fully in the gutter.
   if (session.level.allowRowShift && !victory && !pendingWin) {
     const s = layout.cell + layout.gap;
     const boardW = session.state.width * s - layout.gap;
-    const arrowR = 20;
+    const arrowR = 16;
     const leftGutter = layout.origin.x;
     const rightGutter = W - (layout.origin.x + boardW);
-    const leftCx = Math.max(arrowR + 4, leftGutter * 0.5);
-    const rightCx = Math.min(W - arrowR - 4, layout.origin.x + boardW + rightGutter * 0.5);
+    const leftCx = Math.max(arrowR + 6, Math.min(leftGutter - 6, leftGutter * 0.55));
+    const rightCx = Math.min(W - arrowR - 6, Math.max(layout.origin.x + boardW + 6, layout.origin.x + boardW + rightGutter * 0.45));
     for (let y = 0; y < session.state.height; y++) {
       const cy = layout.origin.y + y * s + layout.cell / 2;
       const left: ButtonRect = {
@@ -1889,8 +1888,8 @@ function drawPlay(): void {
         h: arrowR * 2,
         id: `row_R_${y}`,
       };
-      drawRowShiftArrow(ctx, leftCx, cy, -1, arrowR);
-      drawRowShiftArrow(ctx, rightCx, cy, 1, arrowR);
+      drawRoundButton(ctx, leftCx, cy, arrowR, "‹", false, time);
+      drawRoundButton(ctx, rightCx, cy, arrowR, "›", false, time);
       buttons.push(left, right);
     }
   }
@@ -1931,18 +1930,19 @@ function drawPlay(): void {
     );
   }
 
-  // Gear cables + letter chips sit above discs so pairs are easy to match.
-  for (const t of session.state.tables) {
-    if (t.link && t.id < t.link.partner) {
-      const p = session.state.tables.find((x) => x.id === t.link!.partner);
-      const idx = gearPairIndex(session.state.tables, t.id);
-      if (p && idx >= 0) drawGearLink(ctx, layout, t.hub, p.hub, session.state.width, idx);
-    }
-  }
+  // Pair markers only — no cables across the board (those cover other discs).
   for (const t of session.state.tables) {
     if (!t.link) continue;
     const idx = gearPairIndex(session.state.tables, t.id);
     if (idx >= 0) drawGearDiscBadge(ctx, layout, t.hub, idx);
+  }
+  if (session.selectedTable != null) {
+    const sel = session.state.tables.find((t) => t.id === session.selectedTable);
+    if (sel?.link) {
+      const partner = session.state.tables.find((t) => t.id === sel.link!.partner);
+      const idx = gearPairIndex(session.state.tables, sel.id);
+      if (partner && idx >= 0) drawGearPartnerHint(ctx, layout, partner.hub, idx, time);
+    }
   }
 
   // Retro socket-to-socket tubes — drawn after knobs so they stay plugged into
