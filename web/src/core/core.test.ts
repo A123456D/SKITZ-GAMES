@@ -161,7 +161,7 @@ describe("dense procedural levels", () => {
 
   it("phase 2+ gear trains sit off the rim", () => {
     for (const d of [7, 10, 12, 15, 18]) {
-      const level = generateLevel(d, 808 + d);
+      const level = generateLevel(d, 900 + d * 3);
       const byGroup = new Map<number, typeof level.tables>();
       for (const t of level.tables) {
         if (!t.link) continue;

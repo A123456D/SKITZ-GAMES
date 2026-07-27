@@ -52,7 +52,7 @@ function isRim(hub: { x: number; y: number }, w: number, h: number): boolean {
 
 function gearLinksOk(
   level: ReturnType<typeof generateLevel>,
-  opts: { requireInterior: boolean; expectGroups?: number[] },
+  opts: { requireInterior: boolean; requireSpread?: boolean; expectGroups?: number[] },
 ): string | null {
   const byGroup = new Map<number, typeof level.tables>();
   for (const t of level.tables) {
@@ -77,6 +77,24 @@ function gearLinksOk(
   for (const members of byGroup.values()) {
     if (members.length < 2) return "singleton gear group";
   }
+  if (opts.requireSpread) {
+    const need = level.width <= 6 ? 2 : 3;
+    for (const members of byGroup.values()) {
+      for (const m of members) {
+        let nearest = 99;
+        for (const o of members) {
+          if (o.id === m.id) continue;
+          nearest = Math.min(
+            nearest,
+            Math.abs(m.hub.x - o.hub.x) + Math.abs(m.hub.y - o.hub.y),
+          );
+        }
+        if (nearest < need) {
+          return `gear train too tight: nearest=${nearest} need>=${need}`;
+        }
+      }
+    }
+  }
   return null;
 }
 
@@ -94,7 +112,11 @@ for (let d = 1; d <= DIFFICULTY_COUNT; d++) {
         fails++;
         continue;
       }
-      const gErr = gearLinksOk(level, { requireInterior: true, expectGroups: expect });
+      const gErr = gearLinksOk(level, {
+        requireInterior: true,
+        requireSpread: true,
+        expectGroups: expect,
+      });
       if (gErr) {
         console.log("GEAR FAIL", label, gErr);
         fails++;

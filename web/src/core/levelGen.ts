@@ -116,6 +116,7 @@ function profile(diff: number) {
     undoLimit,
     gearGroups,
     gearDiscCount,
+    gearSep: minGearSep(size),
     rowShifts,
     minMoves,
     hasGears: phase >= 2,
@@ -253,11 +254,24 @@ function scoreGearEdge(
   b: TableDef,
   gDist: number,
   degree: number[],
+  boardW: number,
 ): number {
+  const man = Math.abs(a.hub.x - b.hub.x) + Math.abs(a.hub.y - b.hub.y);
   let score = 0;
-  if (gDist === 2) score += 10;
-  else if (gDist === 3) score += 8;
-  else score += 4;
+  // On crowded boards, reward longer pipe hops and real board distance.
+  if (boardW >= 7) {
+    if (gDist === 2) score += 2;
+    else if (gDist === 3) score += 8;
+    else if (gDist === 4) score += 11;
+    else if (gDist === 5) score += 12;
+    else score += 9;
+    score += man * 3;
+  } else {
+    if (gDist === 2) score += 6;
+    else if (gDist === 3) score += 10;
+    else score += 8;
+    score += man * 2.5;
+  }
   if (a.module === b.module) score += 6;
   score += (degree[a.id]! + degree[b.id]!) * 1.5;
   // Prefer readable shafts over busy crosses — crosses look “why is this linked?”.
@@ -271,6 +285,18 @@ function scoreGearEdge(
   return score;
 }
 
+/** Minimum nearest-neighbor span between geared discs — grows with board size. */
+function minGearSep(w: number): number {
+  if (w <= 6) return 2;
+  return 3;
+}
+
+function pipeDistRange(w: number): { min: number; max: number } {
+  if (w <= 5) return { min: 2, max: 5 };
+  if (w <= 6) return { min: 2, max: 6 };
+  return { min: 2, max: 7 };
+}
+
 function linkGearGroups(
   tables: TableDef[],
   edges: Edge[],
@@ -278,6 +304,7 @@ function linkGearGroups(
   h: number,
   groupSizes: number[],
   rng: Rng,
+  sepOverride?: number,
 ): void {
   if (!groupSizes.length) return;
   const n = w * h;
@@ -287,8 +314,21 @@ function linkGearGroups(
     degree[e.a]!++;
     degree[e.b]!++;
   }
+  const sep = sepOverride ?? minGearSep(w);
+  const { min: minPipe, max: maxPipe } = pipeDistRange(w);
   const used = new Set<number>();
   let groupId = 0;
+
+  const farEnough = (a: TableDef, b: TableDef) =>
+    Math.abs(a.hub.x - b.hub.x) + Math.abs(a.hub.y - b.hub.y) >= sep;
+
+  const clearOfUsed = (t: TableDef) => {
+    for (const u of tables) {
+      if (!used.has(u.id) || u.id === t.id) continue;
+      if (!farEnough(t, u)) return false;
+    }
+    return true;
+  };
 
   for (const size of groupSizes) {
     if (size < 2) continue;
@@ -297,18 +337,19 @@ function linkGearGroups(
     );
     if (pool.length < size) continue;
 
-    // Seed: best pipe-related pair, then grow by best attachment to the train.
+    // Seed: spread pipe-related pair, then grow by distant attachments.
     type Pair = { a: TableDef; b: TableDef; score: number };
     const seeds: Pair[] = [];
     for (let i = 0; i < pool.length; i++) {
       const a = pool[i]!;
+      if (!clearOfUsed(a)) continue;
       for (let j = i + 1; j < pool.length; j++) {
         const b = pool[j]!;
+        if (!clearOfUsed(b)) continue;
         const gDist = dist[a.id]![b.id]!;
-        if (gDist < 2 || gDist > 4) continue;
-        const man = Math.abs(a.hub.x - b.hub.x) + Math.abs(a.hub.y - b.hub.y);
-        if (man < 2) continue;
-        seeds.push({ a, b, score: scoreGearEdge(a, b, gDist, degree) });
+        if (gDist < minPipe || gDist > maxPipe) continue;
+        if (!farEnough(a, b)) continue;
+        seeds.push({ a, b, score: scoreGearEdge(a, b, gDist, degree, w) });
       }
     }
     if (!seeds.length) continue;
@@ -322,17 +363,20 @@ function linkGearGroups(
       const grows: Grow[] = [];
       for (const cand of pool) {
         if (used.has(cand.id)) continue;
+        if (!members.every((m) => farEnough(cand, m))) continue;
+        if (!clearOfUsed(cand)) continue;
         let best = -1;
-        let ok = false;
+        let linked = false;
+        let nearest = 99;
         for (const m of members) {
           const gDist = dist[cand.id]![m.id]!;
-          if (gDist < 2 || gDist > 4) continue;
           const man = Math.abs(cand.hub.x - m.hub.x) + Math.abs(cand.hub.y - m.hub.y);
-          if (man < 2) continue;
-          ok = true;
-          best = Math.max(best, scoreGearEdge(cand, m, gDist, degree));
+          nearest = Math.min(nearest, man);
+          if (gDist < minPipe || gDist > maxPipe) continue;
+          linked = true;
+          best = Math.max(best, scoreGearEdge(cand, m, gDist, degree, w));
         }
-        if (ok) grows.push({ t: cand, score: best });
+        if (linked) grows.push({ t: cand, score: best + nearest * 2 });
       }
       if (!grows.length) break;
       const pick = shuffle(rng, grows).sort((x, y) => y.score - x.score)[0]!;
@@ -512,6 +556,44 @@ function scrambleAndVerify(
   // Keep solution order = reverse of scramble (do not shuffle geared undos).
   rotateSteps.reverse();
 
+  // Gear trains must match requested disc count, stay off the rim, and stay spread
+  // (checked before row shifts so wraps don't falsely collapse spacing).
+  const gearedPre = g.tables.filter((t) => t.link);
+  if (opts.gearDiscCount > 0 && gearedPre.length < opts.gearDiscCount) return null;
+  const byGroupPre = new Map<number, typeof gearedPre>();
+  for (const t of gearedPre) {
+    if (isEdgeCell(t.hub, w, h)) return null;
+    const list = byGroupPre.get(t.link!.group) ?? [];
+    list.push(t);
+    byGroupPre.set(t.link!.group, list);
+  }
+  const gotSizes = [...byGroupPre.values()].map((m) => m.length).sort((a, b) => b - a);
+  const wantSizes = [...opts.gearGroups].sort((a, b) => b - a);
+  if (gotSizes.length < wantSizes.length) return null;
+  for (let i = 0; i < wantSizes.length; i++) {
+    if ((gotSizes[i] ?? 0) < wantSizes[i]!) return null;
+  }
+  const sep = opts.gearSep;
+  const manOf = (a: TableDef, b: TableDef) =>
+    Math.abs(a.hub.x - b.hub.x) + Math.abs(a.hub.y - b.hub.y);
+  for (const members of byGroupPre.values()) {
+    if (members.length < 2) return null;
+    for (const m of members) {
+      let nearest = 99;
+      for (const o of members) {
+        if (o.id === m.id) continue;
+        nearest = Math.min(nearest, manOf(m, o));
+      }
+      if (nearest < sep) return null;
+    }
+  }
+  for (let i = 0; i < gearedPre.length; i++) {
+    for (let j = i + 1; j < gearedPre.length; j++) {
+      if (gearedPre[i]!.link!.group === gearedPre[j]!.link!.group) continue;
+      if (manOf(gearedPre[i]!, gearedPre[j]!) < sep) return null;
+    }
+  }
+
   // Phase 3: wrap whole rows after rotations are scrambled.
   // Skip shifts that would drag a geared disc onto the rim.
   const shiftSteps: MoveStep[] = [];
@@ -531,6 +613,31 @@ function scrambleAndVerify(
       });
       if (hitsRim) continue;
       if (!shiftRow(g, y, dir)) continue;
+      // Undo if the wrap pulls geared discs into a tight clump.
+      let collapsed = false;
+      const gearedNow = g.tables.filter((t) => t.link);
+      for (const m of gearedNow) {
+        if (isEdgeCell(m.hub, w, h)) {
+          collapsed = true;
+          break;
+        }
+        let nearest = 99;
+        for (const o of gearedNow) {
+          if (o.id === m.id) continue;
+          nearest = Math.min(
+            nearest,
+            Math.abs(m.hub.x - o.hub.x) + Math.abs(m.hub.y - o.hub.y),
+          );
+        }
+        if (nearest < sep) {
+          collapsed = true;
+          break;
+        }
+      }
+      if (collapsed) {
+        shiftRow(g, y, (-dir) as 1 | -1);
+        continue;
+      }
       shiftedRows.add(y);
       shiftSteps.push(rowShift(y, -dir));
       placed = true;
@@ -542,35 +649,9 @@ function scrambleAndVerify(
   const solution = [...shiftSteps, ...rotateSteps];
   if (rotateSteps.length < Math.min(opts.minMoves, Math.max(3, opts.size))) return null;
 
-  // Gear trains must match requested disc count and stay off the rim.
-  const geared = g.tables.filter((t) => t.link);
-  if (opts.gearDiscCount > 0 && geared.length < opts.gearDiscCount) return null;
-  const byGroup = new Map<number, typeof geared>();
-  for (const t of geared) {
-    if (isEdgeCell(t.hub, w, h)) return null;
-    const list = byGroup.get(t.link!.group) ?? [];
-    list.push(t);
-    byGroup.set(t.link!.group, list);
-  }
-  const gotSizes = [...byGroup.values()].map((m) => m.length).sort((a, b) => b - a);
-  const wantSizes = [...opts.gearGroups].sort((a, b) => b - a);
-  if (gotSizes.length < wantSizes.length) return null;
-  for (let i = 0; i < wantSizes.length; i++) {
-    if ((gotSizes[i] ?? 0) < wantSizes[i]!) return null;
-  }
-  for (const members of byGroup.values()) {
-    if (members.length < 2) return null;
-    // Pair trains must sit apart; larger trains must not collapse to a single adjacent duo.
-    let far = 0;
-    for (let i = 0; i < members.length; i++) {
-      for (let j = i + 1; j < members.length; j++) {
-        const man =
-          Math.abs(members[i]!.hub.x - members[j]!.hub.x) +
-          Math.abs(members[i]!.hub.y - members[j]!.hub.y);
-        if (man >= 2) far++;
-      }
-    }
-    if (far < 1) return null;
+  // After wraps, geared discs must still be interior.
+  for (const t of g.tables) {
+    if (t.link && isEdgeCell(t.hub, w, h)) return null;
   }
 
   const level: LevelData = {
@@ -631,13 +712,13 @@ function scrambleAndVerify(
  * runs against a wall-clock budget: once spent, quality filters relax rather
  * than letting a slow device keep searching.
  */
-const BUDGET_MS = 450;
+const BUDGET_MS = 650;
 
 export function generateLevel(difficulty: number, seed: number): LevelData {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, difficulty));
   const rng = mulberry32((seed >>> 0) ^ Math.imul(d, 0x9e3779b9));
   const opts = profile(d);
-  const attempts = opts.phase >= 3 ? 700 : opts.phase >= 2 ? 550 : 180;
+  const attempts = opts.phase >= 3 ? 900 : opts.phase >= 2 ? 650 : 180;
   const started = now();
 
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -654,15 +735,17 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
     if (level) return level;
   }
 
-  // Last resort: same phase rules, softer move floor — never a silent phase downgrade.
+  // Last resort: keep full gear spacing, only relax move floor + anti-cheap.
   const w = opts.size;
-  const edges = buildTopology(w, w, Math.max(0, opts.extraEdges - 1), rng);
-  const ports = portsFromEdges(w, w, edges);
-  const tables = tablesFromPorts(w, w, ports);
-  linkGearGroups(tables, edges, w, w, opts.gearGroups, rng);
   const soft = { ...opts, minMoves: 2 };
-  const level = scrambleAndVerify(tables, w, w, rng, soft, d, true);
-  if (level) return level;
+  for (let rescue = 0; rescue < 120; rescue++) {
+    const edges = buildTopology(w, w, Math.max(0, opts.extraEdges - 1 + (rescue % 3)), rng);
+    const ports = portsFromEdges(w, w, edges);
+    const tables = tablesFromPorts(w, w, ports);
+    linkGearGroups(tables, edges, w, w, opts.gearGroups, rng);
+    const level = scrambleAndVerify(tables, w, w, rng, soft, d, true);
+    if (level) return level;
+  }
 
   throw new Error(`levelGen failed for difficulty ${d} seed ${seed}`);
 }
