@@ -1937,7 +1937,8 @@ function drawPlay(): void {
     if (idx >= 0) drawGearDiscBadge(ctx, layout, t.hub, idx);
   }
   if (session.selectedTable != null) {
-    const sel = session.state.tables.find((t) => t.id === session.selectedTable);
+    const selectedId = session.selectedTable;
+    const sel = session.state.tables.find((t) => t.id === selectedId);
     if (sel?.link) {
       const partner = session.state.tables.find((t) => t.id === sel.link!.partner);
       const idx = gearPairIndex(session.state.tables, sel.id);
