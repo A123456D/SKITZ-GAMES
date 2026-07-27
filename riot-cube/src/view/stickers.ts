@@ -24,7 +24,7 @@ export function loadStickers(forceTheme?: ThemeId): Promise<void> {
             resolve();
           };
           img.onerror = () => resolve();
-          img.src = `${stickerPath(kind, theme)}?v=1`;
+          img.src = `${stickerPath(kind, theme)}?v=2`;
         }),
     ),
   ).then(() => {
