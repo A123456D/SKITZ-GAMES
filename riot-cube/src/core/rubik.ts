@@ -51,6 +51,20 @@ export function isSolved(cube: CubeState): boolean {
   return true;
 }
 
+/** First face that is not uniform in its solved color, or null if solved. */
+export function findUnsolvedFace(cube: CubeState): FaceId | null {
+  for (let fi = 0; fi < FACE_COUNT; fi++) {
+    const face = cube.faces[fi]!;
+    const want = fi as ColorId;
+    for (let r = 0; r < cube.size; r++) {
+      for (let c = 0; c < cube.size; c++) {
+        if (face[r]![c] !== want) return fi as FaceId;
+      }
+    }
+  }
+  return null;
+}
+
 function rotateFaceCW(face: FaceGrid): FaceGrid {
   const n = face.length;
   const out: ColorId[][] = Array.from({ length: n }, () =>

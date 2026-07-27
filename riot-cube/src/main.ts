@@ -6,16 +6,21 @@ import {
   loadCubeSize,
   saveCubeSize,
   setActiveFace,
+  setFaceStickers,
   sizeLabel,
   startSession,
   type FaceId,
   type LaneTwist,
   type Session,
 } from "./core/session";
+import { findUnsolvedFace } from "./core/rubik";
+import { pickFaceStickers, type TileKind } from "./core/stickers";
 import { previewCube } from "./core/lane";
 import {
   W,
   H,
+  analogPadCenter,
+  drawAnalogStick,
   drawDesk,
   drawEndOverlay,
   drawFaceTurnButtons,
@@ -23,13 +28,22 @@ import {
   drawHud,
   drawMenuButton,
   drawPauseMenu,
+  drawPlayActions,
   drawSettingsScreen,
+  drawStickersScreen,
+  hitAnalogPad,
+  hitPlayHint,
+  hitPlayScramble,
+  hitPlayStickers,
   hitRetry,
   hitSolvedHome,
+  hitStickersGridKind,
+  hitStickersSlot,
   hitUiRect,
   hitVolumeButton,
   hitAnimeModeButton,
   loadLogo,
+  stickersGridContentHeight,
   HOME_PLAY,
   HOME_SETTINGS,
   MENU_BTN,
@@ -38,9 +52,14 @@ import {
   PAUSE_SCRAMBLE,
   PAUSE_SETTINGS,
   SETTINGS_BACK,
+  SETTINGS_HINTS,
   SETTINGS_SIZE,
   SETTINGS_THEME,
   SETTINGS_VOL,
+  STICKERS_APPLY,
+  STICKERS_BACK,
+  STICKERS_GRID,
+  STICKERS_RANDOM,
   type FaceTurnButtons,
 } from "./view/draw";
 import {
@@ -56,6 +75,7 @@ import {
 } from "./view/cube3d";
 import {
   applyOrbitDragQuat,
+  applyScreenOrbit,
   orbitStepQuat,
   ORBIT_DRAG_SENS,
   snapOrbitQuat,
@@ -91,6 +111,7 @@ import {
   onThemeArtReady,
   reloadThemeArt,
 } from "./view/themeAssets";
+import { getHintsEnabled, toggleHintsEnabled } from "./view/prefs";
 
 function applyAnimeModeToggle(): void {
   toggleAnimeMode();
@@ -102,12 +123,30 @@ function applyAnimeModeToggle(): void {
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
 
-type Screen = "home" | "play" | "menu" | "settings";
+type Screen = "home" | "play" | "menu" | "settings" | "stickers";
 let screen: Screen = "home";
 let settingsFrom: Screen = "home";
 
 let session: Session = startSession(loadCubeSize());
 let faceTurnBtns: FaceTurnButtons | null = null;
+
+let hintFace: FaceId | null = null;
+let hintUntil = 0;
+
+let analogActive = false;
+let analogKnob = { x: 0, y: 0 };
+
+let stickerDraft: (TileKind | null)[] = [null, null, null, null, null, null];
+let stickerSlot = 0;
+let stickersScroll = 0;
+let stickersScrollDrag: {
+  y0: number;
+  x0: number;
+  scroll0: number;
+  moved: boolean;
+  lastX: number;
+  lastY: number;
+} | null = null;
 
 type DragState = {
   u0: number;
@@ -248,14 +287,18 @@ function activeMotion(): CubeMotion {
 
 function resetPlayVisuals(): void {
   drag = null;
-  orbitDrag = null;
-  rotating = false;
-  turnAnim = null;
   springUv = 0;
   springAxis = null;
   springIndex = -1;
+  turnAnim = null;
+  orbitDrag = null;
+  analogActive = false;
+  analogKnob = { x: 0, y: 0 };
+  hintFace = null;
+  hintUntil = 0;
+  rotating = false;
   orient = quatCopy(DEFAULT_ORIENT);
-  targetOrient = quatCopy(orient);
+  targetOrient = quatCopy(DEFAULT_ORIENT);
 }
 
 function doTwist(twist: LaneTwist, fromUv = 0): void {
@@ -351,6 +394,32 @@ function hitFaceTurnButtons(x: number, y: number): boolean {
   return false;
 }
 
+function clearHint(): void {
+  hintFace = null;
+  hintUntil = 0;
+}
+
+function triggerHint(): void {
+  if (!getHintsEnabled()) return;
+  const face = findUnsolvedFace(session.cube);
+  if (face == null) {
+    clearHint();
+    return;
+  }
+  hintFace = face;
+  hintUntil = performance.now() + 1400;
+  sfxPaperFlutter();
+}
+
+function openStickersPicker(): void {
+  stickerDraft = [...session.faceStickers];
+  stickerSlot = 0;
+  stickersScroll = 0;
+  stickersScrollDrag = null;
+  screen = "stickers";
+  sfxPaperRustle();
+}
+
 function paint(): void {
   drawDesk(ctx);
 
@@ -363,6 +432,15 @@ function paint(): void {
       sfxVol: getSfxVolume(),
       themeLabel: getThemeLabel(),
       sizeLabel: sizeLabel(session.size),
+      hintsOn: getHintsEnabled(),
+    });
+    return;
+  }
+  if (screen === "stickers") {
+    drawStickersScreen(ctx, {
+      draft: stickerDraft,
+      slot: stickerSlot,
+      scroll: stickersScroll,
     });
     return;
   }
@@ -372,7 +450,6 @@ function paint(): void {
   const motion = activeMotion();
   const source = session.cube;
   let display = source;
-  // Integer side-peek only while dragging; lane turn anim stays continuous via lanePreview.
   if (
     turnAnim?.kind !== "lane" &&
     motion.axis &&
@@ -388,6 +465,13 @@ function paint(): void {
     );
   }
 
+  const now = performance.now();
+  const hintPulse =
+    hintFace != null && now < hintUntil
+      ? 1 - (hintUntil - now) / 1400
+      : 0;
+  if (hintFace != null && now >= hintUntil) clearHint();
+
   drawHud(ctx, {
     sfxVol: getSfxVolume(),
   });
@@ -398,10 +482,18 @@ function paint(): void {
     motion,
     sourceCube: source,
     faceStickers: session.faceStickers,
+    hintFace: hintPulse > 0 ? hintFace : null,
+    hintPulse,
   });
   orbitBtns = drawCubeOrbitButtons(ctx, layout.cx, layout.cy, layout.scale, W, H);
 
-  faceTurnBtns = drawFaceTurnButtons(ctx);
+  if (session.status === "playing") {
+    drawPlayActions(ctx, { hintsOn: getHintsEnabled() });
+    drawAnalogStick(ctx, analogKnob.x, analogKnob.y);
+    faceTurnBtns = drawFaceTurnButtons(ctx);
+  } else {
+    faceTurnBtns = null;
+  }
 
   if (session.status === "solved") {
     drawEndOverlay(ctx, { moves: session.moveCount });
@@ -439,7 +531,7 @@ function tick(ts: number): void {
         springIndex = -1;
       }
     }
-    if (rotating && !orbitDrag) {
+    if (rotating && !orbitDrag && !analogActive) {
       const speed = 0.14;
       orient = quatSlerp(orient, targetOrient, speed);
       if (Math.abs(quatDot(orient, targetOrient)) > 0.9995) {
@@ -448,6 +540,16 @@ function tick(ts: number): void {
         rotating = false;
         syncActiveFace();
       }
+    }
+    if (analogActive) {
+      const rate = 0.0028 * dt;
+      orient = applyScreenOrbit(
+        orient,
+        -analogKnob.y * rate * 60,
+        analogKnob.x * rate * 60,
+      );
+      targetOrient = quatCopy(orient);
+      syncActiveFace();
     }
   }
   paint();
@@ -506,10 +608,61 @@ canvas.addEventListener(
         const next = cycleCubeSize(session.size);
         if (settingsFrom === "menu") session = startSession(next);
         else session = { ...session, size: next };
+        clearHint();
+        return;
+      }
+      if (hitUiRect(SETTINGS_HINTS, p.x, p.y)) {
+        toggleHintsEnabled();
+        if (!getHintsEnabled()) clearHint();
+        sfxPaperRustle();
         return;
       }
       if (hitUiRect(SETTINGS_BACK, p.x, p.y)) {
         screen = settingsFrom === "menu" ? "menu" : settingsFrom;
+        return;
+      }
+      return;
+    }
+
+    if (screen === "stickers") {
+      if (hitUiRect(STICKERS_BACK, p.x, p.y)) {
+        screen = "play";
+        sfxPaperRustle();
+        return;
+      }
+      if (hitUiRect(STICKERS_RANDOM, p.x, p.y)) {
+        const map = pickFaceStickers(() => Math.random());
+        stickerDraft = [...map];
+        stickerSlot = 0;
+        sfxPaperFlutter();
+        return;
+      }
+      if (hitUiRect(STICKERS_APPLY, p.x, p.y)) {
+        if (
+          stickerDraft.every((k) => k != null) &&
+          new Set(stickerDraft).size === 6
+        ) {
+          session = setFaceStickers(session, stickerDraft as TileKind[]);
+          clearHint();
+          screen = "play";
+          sfxPaperFlutter();
+        }
+        return;
+      }
+      const slot = hitStickersSlot(p.x, p.y);
+      if (slot != null) {
+        stickerSlot = slot;
+        return;
+      }
+      if (hitUiRect(STICKERS_GRID, p.x, p.y)) {
+        stickersScrollDrag = {
+          y0: p.y,
+          x0: p.x,
+          scroll0: stickersScroll,
+          moved: false,
+          lastX: p.x,
+          lastY: p.y,
+        };
         return;
       }
       return;
@@ -583,6 +736,40 @@ canvas.addEventListener(
       applyAnimeModeToggle();
       return;
     }
+
+    const hintsOn = getHintsEnabled();
+    if (hitPlayHint(p.x, p.y, hintsOn)) {
+      triggerHint();
+      return;
+    }
+    if (hitPlayScramble(p.x, p.y, hintsOn)) {
+      session = doScramble(session);
+      resetPlayVisuals();
+      syncActiveFace();
+      sfxPaperRustle();
+      return;
+    }
+    if (hitPlayStickers(p.x, p.y, hintsOn)) {
+      openStickersPicker();
+      return;
+    }
+    if (hitAnalogPad(p.x, p.y)) {
+      analogActive = true;
+      rotating = false;
+      orbitDrag = null;
+      drag = null;
+      const c = analogPadCenter();
+      const maxR = 48;
+      let nx = (p.x - c.x) / maxR;
+      let ny = (p.y - c.y) / maxR;
+      const len = Math.hypot(nx, ny) || 1;
+      if (len > 1) {
+        nx /= len;
+        ny /= len;
+      }
+      analogKnob = { x: nx, y: ny };
+      return;
+    }
     if (hitFaceTurnButtons(p.x, p.y)) return;
 
     if (orbitBtns) {
@@ -626,8 +813,41 @@ canvas.addEventListener(
   "pointermove",
   (e) => {
     e.preventDefault();
-    if (screen !== "play" || session.status !== "playing") return;
     const p = canvasPoint(e);
+
+    if (screen === "stickers" && stickersScrollDrag) {
+      const dy = p.y - stickersScrollDrag.y0;
+      if (Math.abs(dy) > 6 || Math.abs(p.x - stickersScrollDrag.x0) > 6) {
+        stickersScrollDrag.moved = true;
+      }
+      stickersScrollDrag.lastX = p.x;
+      stickersScrollDrag.lastY = p.y;
+      const maxScroll = Math.max(
+        0,
+        stickersGridContentHeight() - STICKERS_GRID.h,
+      );
+      stickersScroll = Math.min(
+        maxScroll,
+        Math.max(0, stickersScrollDrag.scroll0 - dy),
+      );
+      return;
+    }
+
+    if (screen !== "play" || session.status !== "playing") return;
+
+    if (analogActive) {
+      const c = analogPadCenter();
+      const maxR = 48;
+      let nx = (p.x - c.x) / maxR;
+      let ny = (p.y - c.y) / maxR;
+      const len = Math.hypot(nx, ny) || 1;
+      if (len > 1) {
+        nx /= len;
+        ny /= len;
+      }
+      analogKnob = { x: nx, y: ny };
+      return;
+    }
 
     if (orbitDrag) {
       const dx = p.x - orbitDrag.x0;
@@ -661,7 +881,34 @@ canvas.addEventListener(
 );
 
 function endDrag(): void {
+  if (screen === "stickers") {
+    if (stickersScrollDrag) {
+      if (!stickersScrollDrag.moved) {
+        const kind = hitStickersGridKind(
+          stickersScrollDrag.lastX,
+          stickersScrollDrag.lastY,
+          stickersScroll,
+        );
+        if (kind && !stickerDraft.includes(kind)) {
+          stickerDraft[stickerSlot] = kind;
+          const next = stickerDraft.findIndex((k, i) => i > stickerSlot && !k);
+          const wrap = stickerDraft.findIndex((k) => !k);
+          stickerSlot = next >= 0 ? next : wrap >= 0 ? wrap : (stickerSlot + 1) % 6;
+          sfxPaperFlutter();
+        }
+      }
+      stickersScrollDrag = null;
+    }
+    return;
+  }
   if (screen !== "play") return;
+  if (analogActive) {
+    analogActive = false;
+    analogKnob = { x: 0, y: 0 };
+    targetOrient = snapOrient(orient);
+    rotating = true;
+    return;
+  }
   if (orbitDrag) {
     endOrbitDrag();
     return;
@@ -697,7 +944,17 @@ function endDrag(): void {
 
 canvas.addEventListener("pointerup", endDrag);
 canvas.addEventListener("pointercancel", () => {
+  if (screen === "stickers") {
+    stickersScrollDrag = null;
+    return;
+  }
   if (screen !== "play") return;
+  if (analogActive) {
+    analogActive = false;
+    analogKnob = { x: 0, y: 0 };
+    targetOrient = snapOrient(orient);
+    rotating = true;
+  }
   if (orbitDrag) endOrbitDrag();
   if (drag?.axis) {
     springAxis = drag.axis;

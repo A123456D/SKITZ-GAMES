@@ -321,6 +321,10 @@ export function drawCube3D(
     sourceCube?: CubeState;
     /** Per-face sticker kinds; defaults to FACE_STICKERS. */
     faceStickers?: readonly TileKind[];
+    /** Face to pulse as a hint (0–5). */
+    hintFace?: FaceId | null;
+    /** 0..1 pulse phase for hint stroke. */
+    hintPulse?: number;
   },
 ): void {
   type FaceDraw = { i: FaceId; depth: number };
@@ -357,6 +361,7 @@ export function drawCube3D(
       motion,
       f.i === opts.activeFace,
       opts.faceStickers,
+      opts.hintFace === f.i ? (opts.hintPulse ?? 1) : 0,
     );
   }
 }
@@ -370,6 +375,7 @@ function drawFace(
   motion: CubeMotion,
   isActive: boolean,
   faceStickers?: readonly TileKind[],
+  hintPulse = 0,
 ): void {
   const p = getPalette();
   const geom = FACES[faceIndex]!;
@@ -392,6 +398,14 @@ function drawFace(
   ctx.closePath();
   ctx.fillStyle = isActive ? p.faceActive : p.faceSide;
   ctx.fill();
+  if (hintPulse > 0) {
+    const a = 0.35 + 0.45 * Math.abs(Math.sin(hintPulse * Math.PI));
+    ctx.strokeStyle = p.hot;
+    ctx.lineWidth = 6 + 4 * a;
+    ctx.globalAlpha = a;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
   ctx.strokeStyle = isActive ? p.accent : p.faceStroke;
   ctx.lineWidth = isActive ? 4 : 2.5;
   ctx.stroke();

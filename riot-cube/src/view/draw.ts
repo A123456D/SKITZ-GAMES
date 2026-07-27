@@ -1,5 +1,7 @@
 import { getAnimeMode, getPalette, getTheme } from "./theme";
 import { drawCover, getThemeArt } from "./themeAssets";
+import { TILE_KINDS, type TileKind } from "../core/stickers";
+import { stickerImage } from "./stickers";
 
 export const W = 720;
 export const H = 1280;
@@ -490,35 +492,41 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   });
 }
 
-export const SETTINGS_VOL: UiRect = { x: 140, y: 400, w: 440, h: 72 };
-export const SETTINGS_THEME: UiRect = { x: 140, y: 490, w: 440, h: 72 };
-export const SETTINGS_SIZE: UiRect = { x: 140, y: 580, w: 440, h: 72 };
-export const SETTINGS_BACK: UiRect = { x: 140, y: 690, w: 440, h: 70 };
+export const SETTINGS_VOL: UiRect = { x: 140, y: 370, w: 440, h: 64 };
+export const SETTINGS_THEME: UiRect = { x: 140, y: 448, w: 440, h: 64 };
+export const SETTINGS_SIZE: UiRect = { x: 140, y: 526, w: 440, h: 64 };
+export const SETTINGS_HINTS: UiRect = { x: 140, y: 604, w: 440, h: 64 };
+export const SETTINGS_BACK: UiRect = { x: 140, y: 700, w: 440, h: 64 };
 
 export function drawSettingsScreen(
   ctx: CanvasRenderingContext2D,
-  opts: { sfxVol: number; themeLabel: string; sizeLabel: string },
+  opts: {
+    sfxVol: number;
+    themeLabel: string;
+    sizeLabel: string;
+    hintsOn: boolean;
+  },
 ): void {
   const p = getPalette();
   drawDesk(ctx);
 
   ctx.fillStyle = p.paper;
-  roundRect(ctx, 80, 200, 560, 620, 10);
+  roundRect(ctx, 80, 170, 560, 660, 10);
   ctx.fill();
   ctx.strokeStyle = p.ink;
   ctx.lineWidth = 4;
   ctx.stroke();
   ctx.fillStyle = p.accent;
-  ctx.fillRect(120, 188, 100, 18);
+  ctx.fillRect(120, 158, 100, 18);
 
   ctx.fillStyle = p.ink;
   ctx.font = "800 42px 'Permanent Marker', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("SETTINGS", W / 2, 280);
+  ctx.fillText("SETTINGS", W / 2, 250);
 
   ctx.font = "600 18px 'Patrick Hand', sans-serif";
   ctx.fillStyle = p.muted;
-  ctx.fillText("Sound, look, and cube size", W / 2, 330);
+  ctx.fillText("Sound, look, cube, and hints", W / 2, 295);
 
   const volLabel =
     opts.sfxVol <= 0.001 ? "MUTED" : opts.sfxVol < 0.55 ? "SOFT" : "NORMAL";
@@ -534,8 +542,296 @@ export function drawSettingsScreen(
     fill: p.panel,
     text: p.accent,
   });
+  drawPaperButton(
+    ctx,
+    SETTINGS_HINTS,
+    `HINTS  \u00B7  ${opts.hintsOn ? "ON" : "OFF"}`,
+    {
+      fill: p.panel,
+      text: opts.hintsOn ? p.accent : p.muted,
+    },
+  );
   drawPaperButton(ctx, SETTINGS_BACK, "BACK", {
     fill: p.hot,
     text: p.white,
   });
 }
+
+/** Mid play row — HINT / SCRAMBLE / STICKERS above the face-turn dock. */
+export const PLAY_HINT: UiRect = { x: 36, y: 1038, w: 200, h: 50 };
+export const PLAY_SCRAMBLE: UiRect = { x: 260, y: 1038, w: 200, h: 50 };
+export const PLAY_STICKERS: UiRect = { x: 484, y: 1038, w: 200, h: 50 };
+
+export function drawPlayActions(
+  ctx: CanvasRenderingContext2D,
+  opts: { hintsOn: boolean },
+): void {
+  const p = getPalette();
+  if (opts.hintsOn) {
+    drawPaperButton(ctx, PLAY_HINT, "HINT", {
+      fill: p.paper,
+      text: p.ink,
+      tape: p.accent,
+    });
+    drawPaperButton(ctx, PLAY_SCRAMBLE, "SCRAMBLE", {
+      fill: p.panel,
+      text: p.accent,
+    });
+    drawPaperButton(ctx, PLAY_STICKERS, "STICKERS", {
+      fill: p.paper,
+      text: p.ink,
+      tape: p.hot,
+    });
+    return;
+  }
+  const scramble: UiRect = { x: 100, y: 1038, w: 240, h: 50 };
+  const stickers: UiRect = { x: 380, y: 1038, w: 240, h: 50 };
+  drawPaperButton(ctx, scramble, "SCRAMBLE", {
+    fill: p.panel,
+    text: p.accent,
+  });
+  drawPaperButton(ctx, stickers, "STICKERS", {
+    fill: p.paper,
+    text: p.ink,
+    tape: p.hot,
+  });
+}
+
+export function hitPlayScramble(x: number, y: number, hintsOn: boolean): boolean {
+  if (hintsOn) return hitRect(PLAY_SCRAMBLE, x, y);
+  return hitRect({ x: 100, y: 1038, w: 240, h: 50 }, x, y);
+}
+
+export function hitPlayStickers(x: number, y: number, hintsOn: boolean): boolean {
+  if (hintsOn) return hitRect(PLAY_STICKERS, x, y);
+  return hitRect({ x: 380, y: 1038, w: 240, h: 50 }, x, y);
+}
+
+export function hitPlayHint(x: number, y: number, hintsOn: boolean): boolean {
+  if (!hintsOn) return false;
+  return hitRect(PLAY_HINT, x, y);
+}
+
+/** Virtual analog orbit pad — left of CCW/CW dock. */
+export const ANALOG_PAD: UiRect = { x: 20, y: 1148, w: 150, h: 112 };
+
+export function hitAnalogPad(x: number, y: number): boolean {
+  return hitRect(ANALOG_PAD, x, y);
+}
+
+export function analogPadCenter(): { x: number; y: number } {
+  return {
+    x: ANALOG_PAD.x + ANALOG_PAD.w / 2,
+    y: ANALOG_PAD.y + ANALOG_PAD.h / 2,
+  };
+}
+
+export function drawAnalogStick(
+  ctx: CanvasRenderingContext2D,
+  knobNx: number,
+  knobNy: number,
+): void {
+  const p = getPalette();
+  const { x, y, w, h } = ANALOG_PAD;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const maxR = Math.min(w, h) * 0.32;
+
+  ctx.fillStyle = p.panel;
+  roundRect(ctx, x, y, w, h, 12);
+  ctx.fill();
+  ctx.strokeStyle = p.panelEdge;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = p.accent;
+  ctx.fillRect(x + 14, y - 6, 36, 10);
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, maxR + 10, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fill();
+  ctx.strokeStyle = p.ink;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  const kx = cx + knobNx * maxR;
+  const ky = cy + knobNy * maxR;
+  ctx.beginPath();
+  ctx.arc(kx, ky, 22, 0, Math.PI * 2);
+  ctx.fillStyle = p.paper;
+  ctx.fill();
+  ctx.strokeStyle = p.hot;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+}
+
+const SLOT_LABELS = ["F", "B", "R", "L", "U", "D"] as const;
+
+export const STICKERS_BACK: UiRect = { x: 40, y: 1168, w: 200, h: 56 };
+export const STICKERS_RANDOM: UiRect = { x: 260, y: 1168, w: 200, h: 56 };
+export const STICKERS_APPLY: UiRect = { x: 480, y: 1168, w: 200, h: 56 };
+
+export const STICKERS_GRID: UiRect = { x: 40, y: 360, w: 640, h: 780 };
+
+export function drawStickersScreen(
+  ctx: CanvasRenderingContext2D,
+  opts: {
+    draft: readonly (TileKind | null)[];
+    slot: number;
+    scroll: number;
+  },
+): void {
+  const p = getPalette();
+  drawDesk(ctx);
+
+  ctx.fillStyle = p.paper;
+  roundRect(ctx, 24, 40, 672, 1220, 10);
+  ctx.fill();
+  ctx.strokeStyle = p.ink;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.fillStyle = p.hot;
+  ctx.fillRect(48, 28, 90, 16);
+
+  ctx.fillStyle = p.ink;
+  ctx.font = "800 34px 'Permanent Marker', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("CHOOSE STICKERS", W / 2, 95);
+  ctx.font = "600 16px 'Patrick Hand', sans-serif";
+  ctx.fillStyle = p.muted;
+  ctx.fillText("Pick 6 different stickers for the faces", W / 2, 128);
+
+  const slotW = 88;
+  const slotGap = 12;
+  const slotsW = 6 * slotW + 5 * slotGap;
+  const sx0 = (W - slotsW) / 2;
+  for (let i = 0; i < 6; i++) {
+    const sx = sx0 + i * (slotW + slotGap);
+    const sy = 160;
+    const selected = opts.slot === i;
+    ctx.fillStyle = selected ? p.accent : p.panel;
+    roundRect(ctx, sx, sy, slotW, slotW + 22, 8);
+    ctx.fill();
+    ctx.strokeStyle = selected ? p.ink : p.panelEdge;
+    ctx.lineWidth = selected ? 3 : 2;
+    ctx.stroke();
+
+    const kind = opts.draft[i];
+    const img = kind ? stickerImage(kind) : null;
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, sx + 8, sy + 8, slotW - 16, slotW - 16);
+    } else {
+      ctx.fillStyle = selected ? p.ink : p.muted;
+      ctx.font = "700 14px 'Chakra Petch', sans-serif";
+      ctx.fillText(kind ? kind.slice(0, 4).toUpperCase() : "?", sx + slotW / 2, sy + slotW / 2 + 4);
+    }
+    ctx.fillStyle = selected ? p.ink : p.accent;
+    ctx.font = "800 14px 'Chakra Petch', sans-serif";
+    ctx.fillText(SLOT_LABELS[i]!, sx + slotW / 2, sy + slotW + 14);
+  }
+
+  // Grid clip
+  const g = STICKERS_GRID;
+  ctx.save();
+  ctx.beginPath();
+  roundRect(ctx, g.x, g.y, g.w, g.h, 8);
+  ctx.clip();
+  ctx.fillStyle = "rgba(0,0,0,0.08)";
+  ctx.fillRect(g.x, g.y, g.w, g.h);
+
+  const cols = 4;
+  const cell = 140;
+  const gap = 16;
+  const pad = 20;
+  for (let i = 0; i < TILE_KINDS.length; i++) {
+    const kind = TILE_KINDS[i]!;
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const cx = g.x + pad + col * (cell + gap);
+    const cy = g.y + pad + row * (cell + gap) - opts.scroll;
+    if (cy + cell < g.y || cy > g.y + g.h) continue;
+
+    const used = opts.draft.includes(kind);
+    ctx.fillStyle = used ? p.panel : p.paperDeep;
+    roundRect(ctx, cx, cy, cell, cell, 8);
+    ctx.fill();
+    ctx.strokeStyle = used ? p.muted : p.ink;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const img = stickerImage(kind);
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.globalAlpha = used ? 0.35 : 1;
+      ctx.drawImage(img, cx + 18, cy + 10, cell - 36, cell - 36);
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = used ? p.muted : p.ink;
+    ctx.font = "700 12px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(kind.toUpperCase(), cx + cell / 2, cy + cell - 12);
+  }
+  ctx.restore();
+
+  const filled = opts.draft.filter(Boolean).length;
+  const ready = filled === 6 && new Set(opts.draft).size === 6;
+  drawPaperButton(ctx, STICKERS_BACK, "BACK", {
+    fill: p.panel,
+    text: p.accent,
+  });
+  drawPaperButton(ctx, STICKERS_RANDOM, "RANDOM", {
+    fill: p.paper,
+    text: p.ink,
+  });
+  drawPaperButton(ctx, STICKERS_APPLY, ready ? "APPLY" : `${filled}/6`, {
+    fill: ready ? p.hot : p.panel,
+    text: ready ? p.white : p.muted,
+  });
+}
+
+export function stickersGridContentHeight(): number {
+  const cols = 4;
+  const cell = 140;
+  const gap = 16;
+  const pad = 20;
+  const rows = Math.ceil(TILE_KINDS.length / cols);
+  return pad * 2 + rows * cell + (rows - 1) * gap;
+}
+
+export function hitStickersSlot(x: number, y: number): number | null {
+  const slotW = 88;
+  const slotGap = 12;
+  const slotsW = 6 * slotW + 5 * slotGap;
+  const sx0 = (W - slotsW) / 2;
+  const sy = 160;
+  for (let i = 0; i < 6; i++) {
+    const sx = sx0 + i * (slotW + slotGap);
+    if (x >= sx && x <= sx + slotW && y >= sy && y <= sy + slotW + 22) return i;
+  }
+  return null;
+}
+
+export function hitStickersGridKind(
+  x: number,
+  y: number,
+  scroll: number,
+): TileKind | null {
+  const g = STICKERS_GRID;
+  if (!hitRect(g, x, y)) return null;
+  const cols = 4;
+  const cell = 140;
+  const gap = 16;
+  const pad = 20;
+  const lx = x - g.x - pad;
+  const ly = y - g.y - pad + scroll;
+  if (lx < 0 || ly < 0) return null;
+  const col = Math.floor(lx / (cell + gap));
+  const row = Math.floor(ly / (cell + gap));
+  if (col < 0 || col >= cols) return null;
+  const inCellX = lx - col * (cell + gap);
+  const inCellY = ly - row * (cell + gap);
+  if (inCellX > cell || inCellY > cell) return null;
+  const i = row * cols + col;
+  if (i < 0 || i >= TILE_KINDS.length) return null;
+  return TILE_KINDS[i]!;
+}
+

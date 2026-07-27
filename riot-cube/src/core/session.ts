@@ -14,6 +14,8 @@ import { applyLaneTwist, type LaneTwist } from "./lane";
 import {
   pickFaceStickers,
   type FaceStickers,
+  type TileKind,
+  TILE_KINDS,
 } from "./stickers";
 
 export type { FaceId, CubeSize, LaneTwist };
@@ -97,6 +99,22 @@ export function doScramble(session: Session): Session {
     rng,
     moveCount: 0,
     status: "playing",
+  };
+}
+
+export function setFaceStickers(
+  session: Session,
+  map: readonly TileKind[],
+): Session {
+  if (map.length !== 6) return session;
+  const set = new Set(map);
+  if (set.size !== 6) return session;
+  for (const k of map) {
+    if (!(TILE_KINDS as readonly string[]).includes(k)) return session;
+  }
+  return {
+    ...session,
+    faceStickers: map as FaceStickers,
   };
 }
 
