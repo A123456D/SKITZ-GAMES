@@ -28,6 +28,7 @@ import {
   hitSolvedHome,
   hitUiRect,
   hitVolumeButton,
+  hitAnimeModeButton,
   loadLogo,
   HOME_PLAY,
   HOME_SETTINGS,
@@ -82,12 +83,21 @@ import {
   cycleTheme,
   getTheme,
   getThemeLabel,
+  toggleAnimeMode,
 } from "./view/theme";
 import {
+  ensureAnimeArtBoth,
   ensureThemeArt,
   onThemeArtReady,
   reloadThemeArt,
 } from "./view/themeAssets";
+
+function applyAnimeModeToggle(): void {
+  toggleAnimeMode();
+  reloadThemeArt(getTheme());
+  void loadStickers();
+  sfxPaperRustle();
+}
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
@@ -535,6 +545,10 @@ canvas.addEventListener(
         cycleSfxVolume();
         return;
       }
+      if (hitAnimeModeButton(p.x, p.y)) {
+        applyAnimeModeToggle();
+        return;
+      }
       if (hitUiRect(MENU_BTN, p.x, p.y)) {
         screen = "menu";
         return;
@@ -563,6 +577,10 @@ canvas.addEventListener(
     }
     if (hitVolumeButton(p.x, p.y)) {
       cycleSfxVolume();
+      return;
+    }
+    if (hitAnimeModeButton(p.x, p.y)) {
+      applyAnimeModeToggle();
       return;
     }
     if (hitFaceTurnButtons(p.x, p.y)) return;
@@ -702,7 +720,7 @@ async function boot(): Promise<void> {
   await Promise.all([loadLogo(), loadStickers()]);
   ensureThemeArt("classroom");
   ensureThemeArt("grime");
-  ensureThemeArt("anime");
+  ensureAnimeArtBoth();
   syncActiveFace();
   requestAnimationFrame(tick);
 }

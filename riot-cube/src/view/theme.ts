@@ -153,6 +153,47 @@ const ANIME_PALETTE: ThemePalette = {
   browser: "#c5dcf0",
 };
 
+/** Horror night neighborhood — inky blacks, cool muted accents. */
+const ANIME_DARK_PALETTE: ThemePalette = {
+  desk0: "#0a0c12",
+  desk1: "#030406",
+  accent: "#7dd3fc",
+  hot: "#f43f5e",
+  paper: "#e8e4dc",
+  paperDeep: "#d4cfc4",
+  ink: "#0a0a0a",
+  muted: "#94a3b8",
+  panel: "#12141c",
+  panelEdge: "#7dd3fc",
+  hudBg: "#161820",
+  hudInk: "#e2e8f0",
+  faceActive: "#f4eee0",
+  faceSide: "#e5dcc8",
+  faceStroke: "#1a120c",
+  faceRule: "rgba(125,211,252,0.18)",
+  faceRuleDim: "rgba(125,211,252,0.12)",
+  faceColors: [
+    "#7dd3fc", // F ice
+    "#a78bfa", // B soft purple
+    "#f43f5e", // R blood
+    "#fbbf24", // L amber
+    "#e2e8f0", // U pale
+    "#0f172a", // D night
+  ],
+  rule: "rgba(125,211,252,0.24)",
+  margin: "rgba(244,63,94,0.45)",
+  tape: "#7dd3fc",
+  losePanel: "#0c0e14",
+  white: "#f8fafc",
+  browser: "#030406",
+};
+
+export const ANIME_MODES = ["day", "dark"] as const;
+export type AnimeMode = (typeof ANIME_MODES)[number];
+
+/** Asset folder under public/themes/ (anime resolves day/dark). */
+export type ThemeAssetDir = ThemeId | "anime-dark";
+
 export const THEMES: ThemeDef[] = [
   { id: "classroom", label: "CLASS ROOM", palette: CLASSROOM_PALETTE },
   { id: "grime", label: "GRIME", palette: GRIME_PALETTE },
@@ -160,8 +201,10 @@ export const THEMES: ThemeDef[] = [
 ];
 
 const THEME_KEY = "riotcube_theme";
+const ANIME_MODE_KEY = "riotcube_anime_mode";
 
 let current: ThemeId = loadStored();
+let animeMode: AnimeMode = loadAnimeMode();
 
 function loadStored(): ThemeId {
   try {
@@ -181,6 +224,16 @@ function loadStored(): ThemeId {
   return "grime";
 }
 
+function loadAnimeMode(): AnimeMode {
+  try {
+    const v = localStorage.getItem(ANIME_MODE_KEY);
+    if (v && (ANIME_MODES as readonly string[]).includes(v)) return v as AnimeMode;
+  } catch {
+    /* ignore */
+  }
+  return "day";
+}
+
 export function getTheme(): ThemeId {
   return current;
 }
@@ -193,7 +246,34 @@ export function getThemeLabel(): string {
   return getThemeDef().label;
 }
 
+export function getAnimeMode(): AnimeMode {
+  return animeMode;
+}
+
+export function setAnimeMode(mode: AnimeMode): void {
+  animeMode = mode;
+  try {
+    localStorage.setItem(ANIME_MODE_KEY, mode);
+  } catch {
+    /* ignore */
+  }
+  applyThemeChrome();
+}
+
+export function toggleAnimeMode(): AnimeMode {
+  const next: AnimeMode = animeMode === "day" ? "dark" : "day";
+  setAnimeMode(next);
+  return next;
+}
+
+/** Folder used for bg/btn/stickers for the active theme (+ anime mode). */
+export function getThemeAssetDir(theme: ThemeId = current): ThemeAssetDir {
+  if (theme === "anime" && animeMode === "dark") return "anime-dark";
+  return theme;
+}
+
 export function getPalette(): ThemePalette {
+  if (current === "anime" && animeMode === "dark") return ANIME_DARK_PALETTE;
   return getThemeDef().palette;
 }
 
@@ -216,7 +296,8 @@ export function cycleTheme(): ThemeId {
 }
 
 export function stickerPath(kind: string, theme: ThemeId = current): string {
-  return `./themes/${theme}/${kind}.png`;
+  const dir = theme === "anime" ? getThemeAssetDir("anime") : theme;
+  return `./themes/${dir}/${kind}.png`;
 }
 
 /** Sync page background / theme-color with active palette. */

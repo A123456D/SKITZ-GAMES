@@ -1,4 +1,4 @@
-import { getPalette, getTheme } from "./theme";
+import { getAnimeMode, getPalette, getTheme } from "./theme";
 import { drawCover, getThemeArt } from "./themeAssets";
 
 export const W = 720;
@@ -48,7 +48,9 @@ export function drawDesk(ctx: CanvasRenderingContext2D): void {
     drawCover(ctx, art.bg, 0, 0, W, H);
     // Soft readability wash — keep anime daytime bright (heavy black looked like night).
     const g = ctx.createLinearGradient(0, 0, 0, H);
-    if (theme === "anime" || theme === "classroom") {
+    const lightWash =
+      theme === "classroom" || (theme === "anime" && getAnimeMode() === "day");
+    if (lightWash) {
       g.addColorStop(0, "rgba(255,255,255,0.08)");
       g.addColorStop(0.5, "rgba(0,0,0,0.04)");
       g.addColorStop(1, "rgba(0,0,0,0.18)");
@@ -87,7 +89,36 @@ export function drawHud(
   ctx.textBaseline = "alphabetic";
   ctx.fillText("RIOT CUBE", 50, 58);
 
+  if (getTheme() === "anime") {
+    drawAnimeModeButton(ctx);
+  }
   drawVolumeButton(ctx, opts.sfxVol ?? 0.4);
+}
+
+export const ANIME_MODE_BTN: UiRect = { x: 270, y: 28, w: 120, h: 46 };
+
+export function hitAnimeModeButton(x: number, y: number): boolean {
+  if (getTheme() !== "anime") return false;
+  return hitRect(ANIME_MODE_BTN, x, y);
+}
+
+function drawAnimeModeButton(ctx: CanvasRenderingContext2D): void {
+  const p = getPalette();
+  const { x, y, w, h } = ANIME_MODE_BTN;
+  const dark = getAnimeMode() === "dark";
+  ctx.fillStyle = dark ? p.panel : p.hudBg;
+  roundRect(ctx, x, y, w, h, 5);
+  ctx.fill();
+  ctx.strokeStyle = dark ? p.accent : p.ink;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = dark ? p.hot : p.accent;
+  ctx.fillRect(x + 10, y - 6, 36, 10);
+  ctx.fillStyle = dark ? p.accent : p.hudInk;
+  ctx.font = "800 16px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(dark ? "DARK" : "DAY", x + w / 2, y + h / 2 + 1);
 }
 
 export const VOL_BTN = { x: 656, y: 28, w: 42, h: 46 };
