@@ -48,7 +48,7 @@ export function drawDesk(ctx: CanvasRenderingContext2D): void {
     drawCover(ctx, art.bg, 0, 0, W, H);
     // Soft readability wash — keep anime daytime bright (heavy black looked like night).
     const g = ctx.createLinearGradient(0, 0, 0, H);
-    if (theme === "anime") {
+    if (theme === "anime" || theme === "classic") {
       g.addColorStop(0, "rgba(255,255,255,0.08)");
       g.addColorStop(0.5, "rgba(0,0,0,0.04)");
       g.addColorStop(1, "rgba(0,0,0,0.18)");

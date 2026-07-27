@@ -49,8 +49,8 @@ export type ThemeDef = {
 };
 
 const CLASSIC_PALETTE: ThemePalette = {
-  desk0: "#1a1410",
-  desk1: "#0c0a08",
+  desk0: "#d4c4a8",
+  desk1: "#b8a888",
   accent: "#c8ff3d",
   hot: "#ff2d6a",
   paper: "#f3efe6",
@@ -79,7 +79,7 @@ const CLASSIC_PALETTE: ThemePalette = {
   tape: "#ffd60a",
   losePanel: "#2a1a1a",
   white: "#ffffff",
-  browser: "#0c0a08",
+  browser: "#c9b896",
 };
 
 /** Matches GRIME sticker sheet: black field, purple/pink graffiti. */
