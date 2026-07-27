@@ -29,8 +29,8 @@ export const TILE_KINDS = [
 export type TileKind = (typeof TILE_KINDS)[number];
 
 /**
- * Classroom only has ~10 unique vintage sticker arts — hide filler dups in UI.
- * Anime has 14 unique crops from the sheet.
+ * Classroom: 12 unique sticker arts from the classroom sheet.
+ * Anime has 14 unique crops from the day packs.
  */
 export const CLASSROOM_STICKER_POOL = [
   "glitch",
@@ -43,6 +43,8 @@ export const CLASSROOM_STICKER_POOL = [
   "bolt",
   "candle",
   "pill",
+  "chain",
+  "butterfly",
 ] as const satisfies readonly TileKind[];
 
 export const ANIME_STICKER_POOL = [
