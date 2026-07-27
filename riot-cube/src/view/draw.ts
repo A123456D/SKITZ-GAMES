@@ -456,18 +456,21 @@ export function drawPlayDock(
 ): PlayDock {
   const y = 1125;
   const h = 140;
+  const dockX = 160;
+  const dockW = 400;
   ctx.fillStyle = "#1b1b1b";
-  roundRect(ctx, 160, y, 400, h, 8);
+  roundRect(ctx, dockX, y, dockW, h, 8);
   ctx.fill();
   ctx.fillStyle = "#c8ff3d";
-  ctx.fillRect(190, y - 8, 52, 12);
+  ctx.fillRect(dockX + 30, y - 8, 52, 12);
 
-  const cx = W / 2;
-  const up: UiRect = { x: cx - 32, y: y + 12, w: 64, h: 36 };
-  const left: UiRect = { x: cx - 110, y: y + 52, w: 64, h: 36 };
-  const select: UiRect = { x: cx - 36, y: y + 50, w: 72, h: 40 };
-  const right: UiRect = { x: cx + 46, y: y + 52, w: 64, h: 36 };
-  const down: UiRect = { x: cx - 32, y: y + 94, w: 64, h: 36 };
+  // D-pad on the left; selector on the right.
+  const padCx = dockX + 118;
+  const up: UiRect = { x: padCx - 32, y: y + 12, w: 64, h: 36 };
+  const left: UiRect = { x: padCx - 100, y: y + 52, w: 64, h: 36 };
+  const right: UiRect = { x: padCx + 36, y: y + 52, w: 64, h: 36 };
+  const down: UiRect = { x: padCx - 32, y: y + 94, w: 64, h: 36 };
+  const select: UiRect = { x: dockX + 250, y: y + 40, w: 120, h: 60 };
 
   dockBtn(ctx, up, "˄");
   dockBtn(ctx, left, "‹");
