@@ -1,4 +1,4 @@
-/** All sticker assets (kept for loading / rare cosmetics). */
+/** All sticker assets available in the game. */
 export const TILE_KINDS = [
   "skull",
   "heart",
@@ -15,17 +15,35 @@ export const TILE_KINDS = [
 
 export type TileKind = (typeof TILE_KINDS)[number];
 
-/** Match-3 play pool — denser boards, real matches. */
-export const PLAY_KINDS = [
-  "skull",
-  "headphones",
-  "spray",
-  "smiley",
-  "flame",
-  "sneaker",
-] as const satisfies readonly TileKind[];
+/** How many sticker kinds are live in any one generation (keeps matches dense). */
+export const PLAY_POOL_SIZE = 6;
 
-export type PlayKind = (typeof PLAY_KINDS)[number];
+/**
+ * Rotate through every sticker asset across generations.
+ * `mustInclude` (level goals) always stay in the pool.
+ */
+export function rotatingPlayKinds(
+  generation: number,
+  mustInclude: readonly TileKind[] = [],
+  count = PLAY_POOL_SIZE,
+): TileKind[] {
+  const n = TILE_KINDS.length;
+  const offset = ((generation % n) + n) % n;
+  const out: TileKind[] = [];
+  for (const k of mustInclude) {
+    if (!out.includes(k)) out.push(k);
+  }
+  for (let i = 0; i < n && out.length < count; i++) {
+    const k = TILE_KINDS[(offset + i) % n]!;
+    if (!out.includes(k)) out.push(k);
+  }
+  return out;
+}
+
+/** Default opening window (generation 0) — tests / quiet boards. */
+export const PLAY_KINDS = rotatingPlayKinds(0);
+
+export type PlayKind = TileKind;
 
 /** Empty cell during cascade / clear. */
 export type Cell = TileKind | null;
@@ -64,7 +82,10 @@ export type LevelDef = {
   boardLeft?: TileKind[][];
   boardTop?: TileKind[][];
   boardBottom?: TileKind[][];
-  /** Sticker pool for generated faces / refill (default PLAY_KINDS). */
+  /**
+   * Lock the sticker pool (no rotation). When omitted, each generation
+   * rotates through TILE_KINDS while keeping goal stickers available.
+   */
   kinds?: readonly TileKind[];
   seed?: number;
   starScores: [number, number, number];

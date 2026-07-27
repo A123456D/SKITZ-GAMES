@@ -300,6 +300,8 @@ export type ResolveResult = {
   totalCleared: { kind: TileKind; count: number }[];
   scoreGain: number;
   combo: number;
+  /** How many refill waves ran (pool can rotate each wave). */
+  refillCount: number;
 };
 
 function mergeCleared(
@@ -311,17 +313,26 @@ function mergeCleared(
   }
 }
 
+export type KindsSource =
+  | readonly TileKind[]
+  | ((refillIndex: number) => readonly TileKind[]);
+
+function kindsAt(source: KindsSource, refillIndex: number): readonly TileKind[] {
+  return typeof source === "function" ? source(refillIndex) : source;
+}
+
 /** After a twist: match → clear → gravity → refill, repeat until stable. */
 export function resolveBoard(
   board: Board,
   rng: () => number,
-  kinds: readonly TileKind[] = PLAY_KINDS,
+  kinds: KindsSource = PLAY_KINDS,
 ): ResolveResult {
   let current = cloneBoard(board);
   const steps: ResolveStep[] = [];
   const totals = new Map<TileKind, number>();
   let scoreGain = 0;
   let combo = 0;
+  let refillCount = 0;
 
   for (;;) {
     const groups = findMatches(current);
@@ -342,7 +353,8 @@ export function resolveBoard(
     steps.push({ type: "gravity" });
     current = applyGravity(current);
     steps.push({ type: "refill" });
-    current = refillBoard(current, rng, kinds);
+    current = refillBoard(current, rng, kindsAt(kinds, refillCount));
+    refillCount += 1;
   }
 
   return {
@@ -351,5 +363,6 @@ export function resolveBoard(
     totalCleared: [...totals.entries()].map(([kind, count]) => ({ kind, count })),
     scoreGain,
     combo,
+    refillCount,
   };
 }

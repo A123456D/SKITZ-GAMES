@@ -232,6 +232,23 @@ describe("session + cube", () => {
   });
 });
 
+describe("rotating sticker pool", () => {
+  it("keeps goal kinds and cycles unused stickers across generations", async () => {
+    const { rotatingPlayKinds, TILE_KINDS } = await import("./types");
+    const g0 = rotatingPlayKinds(0, ["headphones", "flame"]);
+    const g1 = rotatingPlayKinds(1, ["headphones", "flame"]);
+    const g5 = rotatingPlayKinds(5, ["headphones", "flame"]);
+    expect(g0).toContain("headphones");
+    expect(g0).toContain("flame");
+    expect(g0).toHaveLength(6);
+    expect(g1).not.toEqual(g0);
+    // Over a few generations, former “unused” stickers appear.
+    const seen = new Set([...g0, ...g1, ...g5]);
+    expect(seen.size).toBeGreaterThan(6);
+    expect(TILE_KINDS.some((k) => seen.has(k))).toBe(true);
+  });
+});
+
 describe("level openers", () => {
   it("level 1 front has multiple scoring opening twists", async () => {
     const { LEVEL_1 } = await import("./levels");

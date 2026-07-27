@@ -1,16 +1,16 @@
 import type { LevelDef, TileKind } from "./types";
-import { PLAY_KINDS } from "./types";
+import { rotatingPlayKinds } from "./types";
 
 type Face = TileKind[][];
 
-/** Shared quiet filler face — no opening matches, 6-kind pool. */
+/** Shared quiet filler face — no opening matches, dense rotating window. */
 function quietFace(seedRow: number): Face {
-  const k = PLAY_KINDS;
+  const k = rotatingPlayKinds(seedRow);
   const rows: Face = [];
   for (let r = 0; r < 6; r++) {
     const row: TileKind[] = [];
     for (let c = 0; c < 6; c++) {
-      row.push(k[(r * 2 + c * 3 + seedRow) % k.length]!);
+      row.push(k[(r * 2 + c * 3) % k.length]!);
     }
     rows.push(row);
   }
@@ -63,7 +63,6 @@ export const LEVEL_1: LevelDef = {
   boardLeft: L1_LEFT,
   boardTop: L1_TOP,
   boardBottom: quietFace(3),
-  kinds: PLAY_KINDS,
   starScores: [300, 700, 1200],
 };
 
@@ -96,7 +95,6 @@ export const LEVEL_2: LevelDef = {
     ["headphones", "skull", "sneaker", "flame", "smiley", "spray"],
     ["skull", "sneaker", "flame", "smiley", "spray", "headphones"],
   ],
-  kinds: PLAY_KINDS,
   seed: 2202,
   starScores: [400, 900, 1500],
 };
@@ -130,7 +128,6 @@ export const LEVEL_3: LevelDef = {
     ["headphones", "sneaker", "flame", "skull", "smiley", "spray"],
     ["sneaker", "flame", "skull", "smiley", "spray", "headphones"],
   ],
-  kinds: PLAY_KINDS,
   seed: 3303,
   starScores: [500, 1100, 1800],
 };
@@ -165,7 +162,6 @@ export const LEVEL_4: LevelDef = {
     ["headphones", "skull", "flame", "sneaker", "smiley", "spray"],
     ["skull", "flame", "sneaker", "smiley", "spray", "headphones"],
   ],
-  kinds: PLAY_KINDS,
   seed: 4404,
   starScores: [550, 1200, 1900],
 };
@@ -199,7 +195,6 @@ export const LEVEL_5: LevelDef = {
     ["headphones", "smiley", "spray", "flame", "skull", "sneaker"],
     ["smiley", "spray", "flame", "skull", "sneaker", "headphones"],
   ],
-  kinds: PLAY_KINDS,
   seed: 5505,
   starScores: [600, 1300, 2000],
 };
@@ -230,7 +225,6 @@ export const LEVEL_6: LevelDef = {
   boardBack: quietFace(8),
   boardTop: quietFace(9),
   boardBottom: quietFace(10),
-  kinds: PLAY_KINDS,
   seed: 6606,
   starScores: [700, 1400, 2200],
 };

@@ -5,7 +5,13 @@ import {
   type Board,
 } from "./board";
 import { twistCubeFaces } from "./cubeTwist";
-import { PLAY_KINDS, type Goal, type LevelDef, type TileKind, type Twist } from "./types";
+import {
+  rotatingPlayKinds,
+  type Goal,
+  type LevelDef,
+  type TileKind,
+  type Twist,
+} from "./types";
 
 export type GameStatus = "playing" | "won" | "lost";
 /** F B R L U D */
@@ -26,7 +32,10 @@ export type Session = {
   comboPeak: number;
   rng: () => number;
   lastTwist: Twist | null;
+  /** Active sticker pool for the latest generation. */
   kinds: readonly TileKind[];
+  /** Advances each refill so unused stickers rotate into play. */
+  gen: number;
 };
 
 export function starsForScore(score: number, thresholds: [number, number, number]): 0 | 1 | 2 | 3 {
@@ -45,8 +54,14 @@ function hashId(id: string): number {
   return h >>> 0;
 }
 
-function levelKinds(level: LevelDef): readonly TileKind[] {
-  return level.kinds?.length ? level.kinds : PLAY_KINDS;
+function goalKinds(level: LevelDef): TileKind[] {
+  return level.goals.map((g) => g.kind);
+}
+
+/** Locked level pool, or a rotating window that always keeps goals available. */
+function poolFor(level: LevelDef, generation: number): readonly TileKind[] {
+  if (level.kinds?.length) return level.kinds;
+  return rotatingPlayKinds(generation, goalKinds(level));
 }
 
 function fixedFace(level: LevelDef, face: FaceId): TileKind[][] | undefined {
@@ -62,11 +77,16 @@ export function startSession(level: LevelDef): Session {
   const seed = level.seed ?? hashId(level.id);
   const rng = mulberry32(seed ^ 0x9e3779b9);
   const size = level.size;
-  const kinds = levelKinds(level);
+  const kinds = poolFor(level, 0);
   const faces = Array.from({ length: FACE_COUNT }, (_, i) => {
     const fixed = fixedFace(level, i as FaceId);
     if (fixed) return fixed.map((row) => row.slice());
-    return generateBoard(size, (seed ^ Math.imul(i + 1, 0x9e3779b9)) >>> 0, kinds);
+    // Each face starts on its own generation slice so stickers vary around the cube.
+    return generateBoard(
+      size,
+      (seed ^ Math.imul(i + 1, 0x9e3779b9)) >>> 0,
+      poolFor(level, i),
+    );
   }) as CubeFaces;
 
   return {
@@ -82,6 +102,7 @@ export function startSession(level: LevelDef): Session {
     rng,
     lastTwist: null,
     kinds,
+    gen: 0,
   };
 }
 
@@ -120,10 +141,11 @@ export function applyTwist(session: Session, twist: Twist): TwistResult {
   if (session.status !== "playing") {
     return { session, didTwist: false, scoreGain: 0, combo: 0, spentMove: false };
   }
-  // Out of match-moves: still allow dry setup twists so the board isn't frozen dead.
-  // Scoring requires movesLeft > 0.
   const facesTwisted = twistCubeFaces(session.faces, session.face, twist);
-  const resolved = resolveBoard(facesTwisted[session.face]!, session.rng, session.kinds);
+  const genBase = session.gen;
+  const resolved = resolveBoard(facesTwisted[session.face]!, session.rng, (refillIndex) =>
+    poolFor(session.level, genBase + 1 + refillIndex),
+  );
   const scored = resolved.scoreGain > 0;
 
   if (scored && session.movesLeft <= 0) {
@@ -134,6 +156,8 @@ export function applyTwist(session: Session, twist: Twist): TwistResult {
   const movesLeft = scored ? session.movesLeft - 1 : session.movesLeft;
   const score = session.score + resolved.scoreGain;
   const comboPeak = Math.max(session.comboPeak, resolved.combo);
+  const gen = genBase + resolved.refillCount;
+  const kinds = poolFor(session.level, gen);
 
   const faces = facesTwisted.map((f, i) =>
     i === session.face ? resolved.board : f,
@@ -150,6 +174,8 @@ export function applyTwist(session: Session, twist: Twist): TwistResult {
       status: finishStatus(goals, movesLeft),
       comboPeak,
       lastTwist: twist,
+      kinds,
+      gen,
     },
     didTwist: true,
     scoreGain: resolved.scoreGain,
