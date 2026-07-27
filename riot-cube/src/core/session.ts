@@ -86,7 +86,6 @@ export function startSession(size: CubeSize = loadCubeSize()): Session {
 export function doScramble(session: Session): Session {
   const seed = seedFrom();
   const rng = mulberry32(seed);
-  const faceStickers = pickFaceStickers(rng);
   const cube = scramble(
     session.size,
     defaultScrambleMoves(session.size),
@@ -95,7 +94,6 @@ export function doScramble(session: Session): Session {
   return {
     ...session,
     cube,
-    faceStickers,
     rng,
     moveCount: 0,
     status: "playing",

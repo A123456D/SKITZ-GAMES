@@ -1,6 +1,7 @@
 import type { ColorId, CubeState, FaceId } from "../core/rubik";
 import { stickerForColor, type TileKind } from "../core/stickers";
 import { lanePreview } from "../core/lane";
+import type { HintMove } from "../core/hint";
 import { getQuality } from "./quality";
 import { stickerImage } from "./stickers";
 import { getPalette, getTheme } from "./theme";
@@ -310,6 +311,105 @@ function facePointLifted(
   return { x: layout.cx + p.x, y: layout.cy + p.y };
 }
 
+/** Animated guide line for a suggested face turn or lane swipe. */
+function drawHintMoveLine(
+  ctx: CanvasRenderingContext2D,
+  layout: CubeLayout,
+  size: number,
+  move: HintMove,
+  t: number,
+): void {
+  const p = getPalette();
+  const geom = FACES[move.face]!;
+  const nView = applyRot(geom.normal, layout.q);
+  if (nView.z <= 0.05) return;
+
+  const lift = 0.08;
+  const ease = t < 1 ? t : 1;
+  const alpha = 0.55 + 0.4 * Math.sin(ease * Math.PI);
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = p.hot;
+  ctx.fillStyle = p.hot;
+  ctx.lineWidth = 5;
+  ctx.shadowColor = p.hot;
+  ctx.shadowBlur = 10;
+
+  if (move.kind === "face") {
+    const inset = 0.18;
+    const steps = 48;
+    const pts: Vec2[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const a =
+        move.dir === 1
+          ? -Math.PI / 2 + (i / steps) * Math.PI * 2
+          : -Math.PI / 2 - (i / steps) * Math.PI * 2;
+      const u = 0.5 + Math.cos(a) * (0.5 - inset);
+      const v = 0.5 + Math.sin(a) * (0.5 - inset);
+      pts.push(facePointLifted(geom, u, v, lift, layout));
+    }
+    const drawTo = Math.max(2, Math.floor(pts.length * Math.min(1, ease * 1.15)));
+    ctx.beginPath();
+    ctx.moveTo(pts[0]!.x, pts[0]!.y);
+    for (let i = 1; i < drawTo; i++) ctx.lineTo(pts[i]!.x, pts[i]!.y);
+    ctx.stroke();
+    const tip = pts[Math.min(pts.length - 1, drawTo - 1)]!;
+    const prev = pts[Math.max(0, drawTo - 4)]!;
+    drawArrowHead(ctx, prev, tip, 14);
+  } else {
+    const mid = (move.index + 0.5) / size;
+    const a0 = 0.1;
+    const a1 = 0.9;
+    const from = move.dir === 1 ? a0 : a1;
+    const to = move.dir === 1 ? a1 : a0;
+    const u0 = move.axis === "row" ? from : mid;
+    const v0 = move.axis === "row" ? mid : from;
+    const u1 = move.axis === "row" ? to : mid;
+    const v1 = move.axis === "row" ? mid : to;
+    const start = facePointLifted(geom, u0, v0, lift, layout);
+    const end = facePointLifted(geom, u1, v1, lift, layout);
+    const head = {
+      x: start.x + (end.x - start.x) * Math.min(1, ease),
+      y: start.y + (end.y - start.y) * Math.min(1, ease),
+    };
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(head.x, head.y);
+    ctx.stroke();
+    const along = {
+      x: start.x + (end.x - start.x) * Math.max(0, Math.min(1, ease) - 0.08),
+      y: start.y + (end.y - start.y) * Math.max(0, Math.min(1, ease) - 0.08),
+    };
+    drawArrowHead(ctx, along, head, 14);
+  }
+
+  ctx.restore();
+}
+
+function drawArrowHead(
+  ctx: CanvasRenderingContext2D,
+  from: Vec2,
+  to: Vec2,
+  size: number,
+): void {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const px = -uy;
+  const py = ux;
+  ctx.beginPath();
+  ctx.moveTo(to.x, to.y);
+  ctx.lineTo(to.x - ux * size + px * size * 0.45, to.y - uy * size + py * size * 0.45);
+  ctx.lineTo(to.x - ux * size - px * size * 0.45, to.y - uy * size - py * size * 0.45);
+  ctx.closePath();
+  ctx.fill();
+}
+
 export function drawCube3D(
   ctx: CanvasRenderingContext2D,
   layout: CubeLayout,
@@ -321,10 +421,10 @@ export function drawCube3D(
     sourceCube?: CubeState;
     /** Per-face sticker kinds; defaults to FACE_STICKERS. */
     faceStickers?: readonly TileKind[];
-    /** Face to pulse as a hint (0–5). */
-    hintFace?: FaceId | null;
-    /** 0..1 pulse phase for hint stroke. */
-    hintPulse?: number;
+    /** Animated move guide (line travels along the suggested turn). */
+    hintMove?: HintMove | null;
+    /** 0..1 animation phase for the hint line. */
+    hintT?: number;
   },
 ): void {
   type FaceDraw = { i: FaceId; depth: number };
@@ -361,8 +461,11 @@ export function drawCube3D(
       motion,
       f.i === opts.activeFace,
       opts.faceStickers,
-      opts.hintFace === f.i ? (opts.hintPulse ?? 1) : 0,
     );
+  }
+
+  if (opts.hintMove && (opts.hintT ?? 0) < 1) {
+    drawHintMoveLine(ctx, layout, cube.size, opts.hintMove, opts.hintT ?? 0);
   }
 }
 
@@ -375,7 +478,6 @@ function drawFace(
   motion: CubeMotion,
   isActive: boolean,
   faceStickers?: readonly TileKind[],
-  hintPulse = 0,
 ): void {
   const p = getPalette();
   const geom = FACES[faceIndex]!;
@@ -398,14 +500,6 @@ function drawFace(
   ctx.closePath();
   ctx.fillStyle = isActive ? p.faceActive : p.faceSide;
   ctx.fill();
-  if (hintPulse > 0) {
-    const a = 0.35 + 0.45 * Math.abs(Math.sin(hintPulse * Math.PI));
-    ctx.strokeStyle = p.hot;
-    ctx.lineWidth = 6 + 4 * a;
-    ctx.globalAlpha = a;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
   ctx.strokeStyle = isActive ? p.accent : p.faceStroke;
   ctx.lineWidth = isActive ? 4 : 2.5;
   ctx.stroke();

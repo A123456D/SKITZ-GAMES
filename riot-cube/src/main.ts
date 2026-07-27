@@ -13,7 +13,7 @@ import {
   type LaneTwist,
   type Session,
 } from "./core/session";
-import { findUnsolvedFace } from "./core/rubik";
+import { suggestHintMove, type HintMove } from "./core/hint";
 import { pickFaceStickers, type TileKind } from "./core/stickers";
 import { previewCube } from "./core/lane";
 import {
@@ -128,8 +128,9 @@ let settingsFrom: Screen = "home";
 let session: Session = startSession(loadCubeSize());
 let faceTurnBtns: FaceTurnButtons | null = null;
 
-let hintFace: FaceId | null = null;
+let hintMove: HintMove | null = null;
 let hintUntil = 0;
+let hintStarted = 0;
 
 /** Finger position while free-orbit dragging (transparent circle). */
 let orbitFinger: { x: number; y: number } | null = null;
@@ -291,8 +292,9 @@ function resetPlayVisuals(): void {
   turnAnim = null;
   orbitDrag = null;
   orbitFinger = null;
-  hintFace = null;
+  hintMove = null;
   hintUntil = 0;
+  hintStarted = 0;
   rotating = false;
   orient = quatCopy(DEFAULT_ORIENT);
   targetOrient = quatCopy(DEFAULT_ORIENT);
@@ -394,19 +396,21 @@ function hitFaceTurnButtons(x: number, y: number): boolean {
 }
 
 function clearHint(): void {
-  hintFace = null;
+  hintMove = null;
   hintUntil = 0;
+  hintStarted = 0;
 }
 
 function triggerHint(): void {
   if (!getHintsEnabled()) return;
-  const face = findUnsolvedFace(session.cube);
-  if (face == null) {
+  const move = suggestHintMove(session.cube, session.face);
+  if (!move) {
     clearHint();
     return;
   }
-  hintFace = face;
-  hintUntil = performance.now() + 1400;
+  hintMove = move;
+  hintStarted = performance.now();
+  hintUntil = hintStarted + 1600;
   sfxPaperFlutter();
 }
 
@@ -465,11 +469,11 @@ function paint(): void {
   }
 
   const now = performance.now();
-  const hintPulse =
-    hintFace != null && now < hintUntil
-      ? 1 - (hintUntil - now) / 1400
+  const hintT =
+    hintMove != null && now < hintUntil
+      ? (now - hintStarted) / (hintUntil - hintStarted)
       : 0;
-  if (hintFace != null && now >= hintUntil) clearHint();
+  if (hintMove != null && now >= hintUntil) clearHint();
 
   drawHud(ctx, {
     sfxVol: getSfxVolume(),
@@ -481,8 +485,8 @@ function paint(): void {
     motion,
     sourceCube: source,
     faceStickers: session.faceStickers,
-    hintFace: hintPulse > 0 ? hintFace : null,
-    hintPulse,
+    hintMove: hintT > 0 && hintT < 1 ? hintMove : null,
+    hintT,
   });
   orbitBtns = drawCubeOrbitButtons(ctx, layout.cx, layout.cy, layout.scale, W, H);
 
