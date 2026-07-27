@@ -1,5 +1,6 @@
 import type { ColorId, CubeState, FaceId } from "../core/rubik";
 import { stickerForColor, type TileKind } from "../core/stickers";
+import { lanePreview } from "../core/lane";
 import { getQuality } from "./quality";
 import { stickerImage } from "./stickers";
 import { getPalette } from "./theme";
@@ -196,6 +197,25 @@ export function hitFrontUV(
   return { face: q.face, u: hit.u, v: hit.v };
 }
 
+export function screenDeltaToFaceUV(
+  layout: CubeLayout,
+  dx: number,
+  dy: number,
+): { du: number; dv: number } | null {
+  const q = frontFaceScreenQuad(layout);
+  if (!q) return null;
+  const ux = q.tr.x - q.tl.x;
+  const uy = q.tr.y - q.tl.y;
+  const vx = q.bl.x - q.tl.x;
+  const vy = q.bl.y - q.tl.y;
+  const det = ux * vy - uy * vx;
+  if (Math.abs(det) < 1e-6) return null;
+  return {
+    du: (dx * vy - dy * vx) / det,
+    dv: (ux * dy - uy * dx) / det,
+  };
+}
+
 function hitInQuad(
   px: number,
   py: number,
@@ -241,6 +261,13 @@ function facePoint(geom: FaceGeom, u: number, v: number): Vec3 {
   return lerp3(top, bot, v);
 }
 
+export type CubeMotion = {
+  axis: "row" | "col" | null;
+  index: number;
+  offset: number;
+  hovering: boolean;
+};
+
 function facePointScreen(
   geom: FaceGeom,
   u: number,
@@ -253,11 +280,34 @@ function facePointScreen(
   return { x: layout.cx + p.x, y: layout.cy + p.y };
 }
 
+function facePointLifted(
+  geom: FaceGeom,
+  u: number,
+  v: number,
+  lift: number,
+  layout: CubeLayout,
+): Vec2 {
+  const local = facePoint(geom, u, v);
+  const lifted: Vec3 = {
+    x: local.x + geom.normal.x * lift,
+    y: local.y + geom.normal.y * lift,
+    z: local.z + geom.normal.z * lift,
+  };
+  const w = applyRot(lifted, layout.rotX, layout.rotY);
+  const p = project(w, layout.scale);
+  return { x: layout.cx + p.x, y: layout.cy + p.y };
+}
+
 export function drawCube3D(
   ctx: CanvasRenderingContext2D,
   layout: CubeLayout,
   cube: CubeState,
-  opts: { activeFace: FaceId },
+  opts: {
+    activeFace: FaceId;
+    motion?: CubeMotion;
+    /** Unshifted cube for lane peeks (defaults to `cube`). */
+    sourceCube?: CubeState;
+  },
 ): void {
   type FaceDraw = { i: FaceId; depth: number };
   const order: FaceDraw[] = [];
@@ -277,8 +327,23 @@ export function drawCube3D(
   }
   order.sort((a, b) => a.depth - b.depth);
 
+  const motion: CubeMotion = opts.motion ?? {
+    axis: null,
+    index: -1,
+    offset: 0,
+    hovering: false,
+  };
+
   for (const f of order) {
-    drawFace(ctx, layout, f.i, cube, f.i === opts.activeFace);
+    drawFace(
+      ctx,
+      layout,
+      f.i,
+      cube,
+      opts.sourceCube ?? cube,
+      motion,
+      f.i === opts.activeFace,
+    );
   }
 }
 
@@ -287,6 +352,8 @@ function drawFace(
   layout: CubeLayout,
   faceIndex: FaceId,
   cube: CubeState,
+  source: CubeState,
+  motion: CubeMotion,
   isActive: boolean,
 ): void {
   const p = getPalette();
@@ -314,7 +381,6 @@ function drawFace(
   ctx.lineWidth = isActive ? 4 : 2.5;
   ctx.stroke();
 
-  // Lined paper hint
   ctx.save();
   ctx.clip();
   ctx.strokeStyle = isActive ? p.faceRule : p.faceRuleDim;
@@ -333,22 +399,95 @@ function drawFace(
   const stride = 1 / n;
   const cell = (1 - gap * (n - 1)) / n;
   const pad = (stride - cell) / 2;
+  const movingRow =
+    isActive && motion.hovering && motion.axis === "row" ? motion.index : -1;
+  const movingCol =
+    isActive && motion.hovering && motion.axis === "col" ? motion.index : -1;
+  const hoverT = performance.now() / 1000;
+  const liftPulse =
+    quality.hoverAnim && (movingRow >= 0 || movingCol >= 0)
+      ? 0.038 + 0.01 * Math.sin(hoverT * 3.4)
+      : movingRow >= 0 || movingCol >= 0
+        ? 0.04
+        : 0;
+
+  const paintSticker = (
+    colorId: ColorId,
+    u0: number,
+    v0: number,
+    u1: number,
+    v1: number,
+    hovering: boolean,
+  ) => {
+    if (u1 <= 0 || u0 >= 1 || v1 <= 0 || v0 >= 1) return;
+    const kind = stickerForColor(colorId);
+    const s0 = facePointLifted(geom, u0, v0, hovering ? liftPulse : 0, layout);
+    const s1 = facePointLifted(geom, u1, v0, hovering ? liftPulse : 0, layout);
+    const s2 = facePointLifted(geom, u1, v1, hovering ? liftPulse : 0, layout);
+    const s3 = facePointLifted(geom, u0, v1, hovering ? liftPulse : 0, layout);
+    drawStickerOnQuad(
+      ctx,
+      kind,
+      s0,
+      s1,
+      s2,
+      s3,
+      q,
+      hovering,
+      hoverT,
+      quality.stickerShadows,
+    );
+  };
 
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
+      if (r === movingRow || c === movingCol) continue;
       const colorId = board[r]![c] as ColorId;
-      const kind = stickerForColor(colorId);
-      const u0 = c * stride + pad;
-      const v0 = r * stride + pad;
-      const u1 = u0 + cell;
-      const v1 = v0 + cell;
-      const s0 = facePointScreen(geom, u0, v0, layout);
-      const s1 = facePointScreen(geom, u1, v0, layout);
-      const s2 = facePointScreen(geom, u1, v1, layout);
-      const s3 = facePointScreen(geom, u0, v1, layout);
-      drawStickerOnQuad(ctx, kind, s0, s1, s2, s3, q, quality.stickerShadows);
+      paintSticker(
+        colorId,
+        c * stride + pad,
+        r * stride + pad,
+        c * stride + pad + cell,
+        r * stride + pad + cell,
+        false,
+      );
     }
   }
+
+  if (movingRow >= 0) {
+    const r = movingRow;
+    const items = lanePreview(
+      source,
+      faceIndex,
+      "row",
+      r,
+      motion.offset,
+    );
+    for (const { pos, color } of items) {
+      const u0 = (pos - 0.5) * stride + pad;
+      const u1 = u0 + cell;
+      const v0 = r * stride + pad;
+      const v1 = v0 + cell;
+      paintSticker(color, u0, v0, u1, v1, true);
+    }
+  } else if (movingCol >= 0) {
+    const c = movingCol;
+    const items = lanePreview(
+      source,
+      faceIndex,
+      "col",
+      c,
+      motion.offset,
+    );
+    for (const { pos, color } of items) {
+      const u0 = c * stride + pad;
+      const u1 = u0 + cell;
+      const v0 = (pos - 0.5) * stride + pad;
+      const v1 = v0 + cell;
+      paintSticker(color, u0, v0, u1, v1, true);
+    }
+  }
+
   ctx.restore();
   ctx.restore();
 }
@@ -365,6 +504,8 @@ function drawStickerOnQuad(
   br: Vec2,
   bl: Vec2,
   faceQuad: Vec2[],
+  hovering: boolean,
+  hoverT: number,
   shadows: boolean,
 ): void {
   const cx = (tl.x + tr.x + br.x + bl.x) / 4;
@@ -375,7 +516,16 @@ function drawStickerOnQuad(
   const bh =
     (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) /
     2;
-  const s = Math.min(bw, bh);
+  const anim = getQuality().hoverAnim && hovering;
+  const phase = hoverT * 4.2 + cx * 0.02 + cy * 0.015;
+  const bob = anim ? Math.sin(phase) * 2.4 : 0;
+  const wobble = anim ? Math.sin(phase * 0.85 + 0.6) * 0.045 : 0;
+  const breathe = anim
+    ? 1.04 + Math.sin(phase * 0.7) * 0.025
+    : hovering
+      ? 1.03
+      : 1;
+  const s = Math.min(bw, bh) * breathe;
 
   ctx.save();
   ctx.beginPath();
@@ -386,23 +536,29 @@ function drawStickerOnQuad(
   ctx.closePath();
   ctx.clip();
 
+  if (anim) {
+    ctx.translate(cx, cy + bob);
+    ctx.rotate(wobble);
+    ctx.translate(-cx, -cy - bob);
+  }
+
   const img = stickerImage(kind);
   if (shadows) {
-    ctx.shadowColor = "rgba(0,0,0,0.25)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
+    ctx.shadowColor = hovering ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.2)";
+    ctx.shadowBlur = hovering ? 12 : 6;
+    ctx.shadowOffsetY = hovering ? 6 : 3;
   }
   if (img && img.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, cx - s / 2, cy - s / 2, s, s);
+    ctx.drawImage(img, cx - s / 2, cy - s / 2 + bob, s, s);
   } else {
     const p = getPalette();
     ctx.fillStyle = p.paper;
-    ctx.fillRect(cx - s / 2, cy - s / 2, s, s);
+    ctx.fillRect(cx - s / 2, cy - s / 2 + bob, s, s);
     ctx.fillStyle = p.ink;
     ctx.font = `800 ${Math.floor(s * 0.22)}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(kind.slice(0, 3).toUpperCase(), cx, cy);
+    ctx.fillText(kind.slice(0, 3).toUpperCase(), cx, cy + bob);
   }
   ctx.restore();
 }

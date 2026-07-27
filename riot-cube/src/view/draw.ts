@@ -105,7 +105,7 @@ export function drawHud(
   ctx.font = "600 16px 'Patrick Hand', sans-serif";
   ctx.textAlign = "left";
   ctx.fillText(
-    `Orbit the cube. Dock turns faces (${opts.faceName} facing).`,
+    `Orbit freely. Dock / swipe twists lanes (${opts.faceName}).`,
     56,
     124,
   );
@@ -209,10 +209,10 @@ function dockBtnFallback(
   ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
 }
 
-/** D-pad turns the face toward that screen side; select turns the facing face. */
+/** D-pad twists selected lane; selector toggles row/col. */
 export function drawPlayDock(
   ctx: CanvasRenderingContext2D,
-  opts: { turnDir: 1 | -1 },
+  opts: { mode: "row" | "col"; index: number; size: number },
 ): PlayDock {
   const p = getPalette();
   const edge = 20;
@@ -270,14 +270,14 @@ export function drawPlayDock(
     dockBtnFallback(ctx, down, "\u02C5"),
   );
 
-  const selLabel = opts.turnDir === 1 ? "CW" : "CCW";
+  const selLabel = opts.mode === "row" ? `R${opts.index + 1}` : `C${opts.index + 1}`;
   const selImg = uiButtonImage("select");
   drawDockImage(ctx, select, selImg, () =>
     dockBtnFallback(ctx, select, selLabel, { fill: p.accent, ink: p.ink }),
   );
   if (selImg) {
     ctx.fillStyle = p.ink;
-    ctx.font = "800 32px 'Chakra Petch', sans-serif";
+    ctx.font = "800 36px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(selLabel, select.x + select.w / 2, select.y + select.h / 2 + 2);
@@ -419,8 +419,8 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = p.paper;
   ctx.font = "600 17px 'Patrick Hand', sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("\u2022 Drag / chevrons orbit the cube", 150, 748);
-  ctx.fillText("\u2022 Dock turns faces \u00B7 double-tap CW/CCW to flip", 150, 778);
+  ctx.fillText("\u2022 Dock / swipe twists lanes like a Rubik\u2019s Cube", 150, 748);
+  ctx.fillText("\u2022 Select R/C \u00B7 D-pad twists or changes lane", 150, 778);
   ctx.fillText("\u2022 Try 2\u00D72 in settings if 3\u00D73 is rough", 150, 808);
 
   drawPaperButton(ctx, HOME_PLAY, "PLAY", {

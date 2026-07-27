@@ -4,15 +4,15 @@ import {
   type CubeState,
   type FaceId,
   type TurnDir,
-  createSolved,
   defaultScrambleMoves,
   faceTurn,
   isSolved,
   mulberry32,
   scramble,
 } from "./rubik";
+import { applyLaneTwist, type LaneTwist } from "./lane";
 
-export type { FaceId, CubeSize };
+export type { FaceId, CubeSize, LaneTwist };
 export { CUBE_SIZES, FACE_COUNT } from "./rubik";
 export type GameStatus = "playing" | "solved";
 
@@ -21,7 +21,6 @@ const SIZE_KEY = "riotcube_size";
 export type Session = {
   size: CubeSize;
   cube: CubeState;
-  /** Camera-facing face (for HUD / turn targeting). */
   face: FaceId;
   moveCount: number;
   status: GameStatus;
@@ -61,12 +60,10 @@ function seedFrom(): number {
   return (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
 }
 
-/** Fresh scrambled session. */
 export function startSession(size: CubeSize = loadCubeSize()): Session {
   const seed = seedFrom();
   const rng = mulberry32(seed);
-  const moves = defaultScrambleMoves(size);
-  const cube = scramble(size, moves, rng);
+  const cube = scramble(size, defaultScrambleMoves(size), rng);
   return {
     size,
     cube,
@@ -77,19 +74,12 @@ export function startSession(size: CubeSize = loadCubeSize()): Session {
   };
 }
 
-export function restartSolved(session: Session): Session {
-  return {
-    ...session,
-    cube: createSolved(session.size),
-    moveCount: 0,
-    status: "solved",
-    face: session.face,
-  };
-}
-
 export function doScramble(session: Session): Session {
-  const moves = defaultScrambleMoves(session.size);
-  const cube = scramble(session.size, moves, session.rng);
+  const cube = scramble(
+    session.size,
+    defaultScrambleMoves(session.size),
+    session.rng,
+  );
   return {
     ...session,
     cube,
@@ -108,15 +98,21 @@ export function applyFaceTurn(
   face: FaceId,
   dir: TurnDir = 1,
 ): Session {
-  if (session.status === "solved" && isSolved(session.cube)) {
-    // Allow turning after solved to keep playing / mess it up again.
-  }
   const cube = faceTurn(session.cube, face, dir);
-  const solved = isSolved(cube);
   return {
     ...session,
     cube,
     moveCount: session.moveCount + 1,
-    status: solved ? "solved" : "playing",
+    status: isSolved(cube) ? "solved" : "playing",
+  };
+}
+
+export function applyTwist(session: Session, twist: LaneTwist): Session {
+  const cube = applyLaneTwist(session.cube, session.face, twist);
+  return {
+    ...session,
+    cube,
+    moveCount: session.moveCount + 1,
+    status: isSolved(cube) ? "solved" : "playing",
   };
 }
