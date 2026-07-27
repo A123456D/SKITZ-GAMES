@@ -44,8 +44,8 @@ import {
 import {
   drawCube3D,
   drawCubeOrbitButtons,
-  facingFace,
   facingFaceDot,
+  facingFaceQuat,
   FACE_NAMES,
   hitFrontUV,
   hitOrbitButton,
@@ -54,11 +54,19 @@ import {
   type CubeMotion,
 } from "./view/cube3d";
 import {
-  applyOrbitDrag,
-  orbitStepTarget,
+  applyOrbitDragQuat,
+  orbitStepQuat,
   ORBIT_DRAG_SENS,
-  snapOrbitToFace,
+  snapOrbitQuat,
 } from "./view/orbit";
+import {
+  type Quat,
+  quatCopy,
+  quatDot,
+  quatFromEulerYX,
+  quatIdentity,
+  quatSlerp,
+} from "./view/quat";
 import {
   cycleSfxVolume,
   getSfxVolume,
@@ -111,19 +119,15 @@ let springUv = 0;
 let springAxis: "row" | "col" | null = null;
 let springIndex = -1;
 
-const DEFAULT_ROT_X = 0.04;
-const DEFAULT_ROT_Y = -0.05;
-let rotX = DEFAULT_ROT_X;
-let rotY = DEFAULT_ROT_Y;
-let targetRotX = DEFAULT_ROT_X;
-let targetRotY = DEFAULT_ROT_Y;
+const DEFAULT_ORIENT = quatFromEulerYX(0.04, -0.05);
+let orient: Quat = quatCopy(DEFAULT_ORIENT);
+let targetOrient: Quat = quatCopy(DEFAULT_ORIENT);
 let rotating = false;
 
 let orbitDrag: {
   x0: number;
   y0: number;
-  rotX0: number;
-  rotY0: number;
+  q0: Quat;
 } | null = null;
 
 let orbitBtns: ReturnType<typeof drawCubeOrbitButtons> | null = null;
@@ -133,8 +137,9 @@ function cubeLayout(): CubeLayout {
     cx: W / 2,
     cy: 560,
     scale: session.size <= 2 ? 230 : 215,
-    rotX,
-    rotY,
+    q: orient,
+    rotX: 0,
+    rotY: 0,
   };
 }
 
@@ -160,7 +165,7 @@ function canvasPoint(e: PointerEvent): { x: number; y: number } {
 }
 
 function syncActiveFace(): void {
-  const face = facingFace(rotX, rotY) as FaceId;
+  const face = facingFaceQuat(orient) as FaceId;
   if (face !== session.face) {
     session = setActiveFace(session, face);
   }
@@ -201,10 +206,8 @@ function resetPlayVisuals(): void {
   springUv = 0;
   springAxis = null;
   springIndex = -1;
-  rotX = DEFAULT_ROT_X;
-  rotY = DEFAULT_ROT_Y;
-  targetRotX = rotX;
-  targetRotY = rotY;
+  orient = quatCopy(DEFAULT_ORIENT);
+  targetOrient = quatCopy(orient);
 }
 
 function doTwist(twist: LaneTwist): void {
@@ -224,47 +227,33 @@ function orbitSens(): number {
   return coarse ? ORBIT_DRAG_SENS * 1.55 : ORBIT_DRAG_SENS;
 }
 
-function snapAngles(rx: number, ry: number): { x: number; y: number } {
-  const snapped = snapOrbitToFace(rx, ry);
+function snapOrient(q: Quat): Quat {
+  const snapped = snapOrbitQuat(q);
   // Home tip only on front — keeps a little depth without reintroducing gimbal snaps.
   if (
-    Math.abs(nearestAngle(snapped.x, 0) - snapped.x) < 0.001 &&
-    Math.abs(nearestAngle(snapped.y, 0) - snapped.y) < 0.001
+    facingFaceQuat(snapped) === 0 &&
+    Math.abs(quatDot(snapped, quatIdentity())) > 0.999
   ) {
-    return { x: DEFAULT_ROT_X, y: DEFAULT_ROT_Y };
+    return quatCopy(DEFAULT_ORIENT);
   }
   return snapped;
-}
-
-function nearestAngle(from: number, to: number): number {
-  let d = to - from;
-  while (d > Math.PI) d -= Math.PI * 2;
-  while (d < -Math.PI) d += Math.PI * 2;
-  return from + d;
 }
 
 function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
   if (drag || session.status !== "playing") return;
   orbitDrag = null;
   if (rotating) {
-    rotX = targetRotX;
-    rotY = targetRotY;
+    orient = quatCopy(targetOrient);
     rotating = false;
     syncActiveFace();
   }
-  let tx = rotX;
-  let ty = rotY;
-  if (Math.abs(tx - DEFAULT_ROT_X) < 0.02 && Math.abs(ty - DEFAULT_ROT_Y) < 0.02) {
-    tx = 0;
-    ty = 0;
+  let q = orient;
+  if (Math.abs(quatDot(q, DEFAULT_ORIENT)) > 0.999) {
+    q = quatIdentity();
   } else {
-    const snapped = snapOrbitToFace(tx, ty);
-    tx = snapped.x;
-    ty = snapped.y;
+    q = snapOrbitQuat(q);
   }
-  const next = orbitStepTarget(tx, ty, dir);
-  targetRotX = next.rotX;
-  targetRotY = next.rotY;
+  targetOrient = orbitStepQuat(q, dir);
   rotating = true;
   sfxPaperFlutter();
   syncActiveFace();
@@ -272,15 +261,13 @@ function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
 
 function beginOrbitDrag(x: number, y: number): void {
   rotating = false;
-  orbitDrag = { x0: x, y0: y, rotX0: rotX, rotY0: rotY };
+  orbitDrag = { x0: x, y0: y, q0: quatCopy(orient) };
 }
 
 function endOrbitDrag(): void {
   if (!orbitDrag) return;
   orbitDrag = null;
-  const snapped = snapAngles(rotX, rotY);
-  targetRotX = nearestAngle(rotX, snapped.x);
-  targetRotY = nearestAngle(rotY, snapped.y);
+  targetOrient = snapOrient(orient);
   rotating = true;
 }
 
@@ -412,17 +399,10 @@ function tick(): void {
     }
     if (rotating && !orbitDrag) {
       const speed = 0.14;
-      rotX += (targetRotX - rotX) * speed;
-      rotY += (targetRotY - rotY) * speed;
-      if (
-        Math.abs(targetRotX - rotX) < 0.01 &&
-        Math.abs(targetRotY - rotY) < 0.01
-      ) {
-        const snapped = snapAngles(targetRotX, targetRotY);
-        rotX = snapped.x;
-        rotY = snapped.y;
-        targetRotX = rotX;
-        targetRotY = rotY;
+      orient = quatSlerp(orient, targetOrient, speed);
+      if (Math.abs(quatDot(orient, targetOrient)) > 0.9995) {
+        orient = snapOrient(targetOrient);
+        targetOrient = quatCopy(orient);
         rotating = false;
         syncActiveFace();
       }
@@ -569,7 +549,7 @@ canvas.addEventListener(
     }
 
     const layout = cubeLayout();
-    const headOn = facingFaceDot(rotX, rotY) >= 0.75;
+    const headOn = facingFaceDot(orient) >= 0.75;
     const hit = headOn && !rotating ? hitFrontUV(layout, p.x, p.y) : null;
     if (hit && hit.face === session.face) {
       const n = session.size;
@@ -607,17 +587,8 @@ canvas.addEventListener(
     if (orbitDrag) {
       const dx = p.x - orbitDrag.x0;
       const dy = p.y - orbitDrag.y0;
-      const next = applyOrbitDrag(
-        orbitDrag.rotX0,
-        orbitDrag.rotY0,
-        dx,
-        dy,
-        orbitSens(),
-      );
-      rotX = next.rotX;
-      rotY = next.rotY;
-      targetRotX = rotX;
-      targetRotY = rotY;
+      orient = applyOrbitDragQuat(orbitDrag.q0, dx, dy, orbitSens());
+      targetOrient = quatCopy(orient);
       syncActiveFace();
       return;
     }

@@ -5,9 +5,15 @@ import { getQuality } from "./quality";
 import { stickerImage } from "./stickers";
 import { getPalette, getTheme } from "./theme";
 import { drawCover, getThemeArt } from "./themeAssets";
+import {
+  type Quat,
+  quatFromEulerYX,
+  quatRotateVec,
+} from "./quat";
 
 export type Vec3 = { x: number; y: number; z: number };
 export type Vec2 = { x: number; y: number };
+export type { Quat };
 
 export type { FaceId };
 export const FACE_NAMES = ["FRONT", "BACK", "RIGHT", "LEFT", "TOP", "BOTTOM"] as const;
@@ -75,20 +81,8 @@ const FACES: FaceGeom[] = [
   },
 ];
 
-function rotX(v: Vec3, a: number): Vec3 {
-  const c = Math.cos(a);
-  const s = Math.sin(a);
-  return { x: v.x, y: v.y * c - v.z * s, z: v.y * s + v.z * c };
-}
-
-function rotY(v: Vec3, a: number): Vec3 {
-  const c = Math.cos(a);
-  const s = Math.sin(a);
-  return { x: v.x * c + v.z * s, y: v.y, z: -v.x * s + v.z * c };
-}
-
-function applyRot(v: Vec3, rx: number, ry: number): Vec3 {
-  return rotY(rotX(v, rx), ry);
+function applyRot(v: Vec3, q: Quat): Vec3 {
+  return quatRotateVec(q, v);
 }
 
 function project(v: Vec3, scale: number): Vec2 {
@@ -108,15 +102,17 @@ export type CubeLayout = {
   cx: number;
   cy: number;
   scale: number;
+  q: Quat;
+  /** Unused legacy fields; rotation uses `q`. */
   rotX: number;
   rotY: number;
 };
 
-export function facingFace(rotX: number, rotY: number): FaceId {
+export function facingFaceQuat(q: Quat): FaceId {
   let best: FaceId = 0;
   let bestZ = -Infinity;
   for (let i = 0; i < 6; i++) {
-    const n = applyRot(FACES[i]!.normal, rotX, rotY);
+    const n = applyRot(FACES[i]!.normal, q);
     if (n.z > bestZ) {
       bestZ = n.z;
       best = i as FaceId;
@@ -125,9 +121,14 @@ export function facingFace(rotX: number, rotY: number): FaceId {
   return best;
 }
 
-export function facingFaceDot(rotX: number, rotY: number): number {
-  const face = facingFace(rotX, rotY);
-  return applyRot(FACES[face]!.normal, rotX, rotY).z;
+/** Euler-compat wrapper for tests / callers that still pass pitch/yaw. */
+export function facingFace(rotX: number, rotY: number): FaceId {
+  return facingFaceQuat(quatFromEulerYX(rotX, rotY));
+}
+
+export function facingFaceDot(q: Quat): number {
+  const face = facingFaceQuat(q);
+  return applyRot(FACES[face]!.normal, q).z;
 }
 
 /**
@@ -135,8 +136,7 @@ export function facingFaceDot(rotX: number, rotY: number): number {
  * (left/right/up/down in canvas space, +Y down).
  */
 export function faceTowardScreenDir(
-  rotX: number,
-  rotY: number,
+  q: Quat,
   dir: "left" | "right" | "up" | "down",
 ): FaceId {
   const target =
@@ -150,7 +150,7 @@ export function faceTowardScreenDir(
   let best: FaceId = 0;
   let bestDot = -Infinity;
   for (let i = 0; i < 6; i++) {
-    const n = applyRot(FACES[i]!.normal, rotX, rotY);
+    const n = applyRot(FACES[i]!.normal, q);
     const xy = Math.hypot(n.x, n.y) || 1;
     const nx = n.x / xy;
     const ny = n.y / xy;
@@ -168,12 +168,12 @@ export function faceTowardScreenDir(
 export function frontFaceScreenQuad(
   layout: CubeLayout,
 ): { tl: Vec2; tr: Vec2; br: Vec2; bl: Vec2; face: FaceId } | null {
-  const face = facingFace(layout.rotX, layout.rotY);
+  const face = facingFaceQuat(layout.q);
   const geom = FACES[face]!;
-  const n = applyRot(geom.normal, layout.rotX, layout.rotY);
+  const n = applyRot(geom.normal, layout.q);
   if (n.z < 0.35) return null;
   const pts = geom.corners.map((c) => {
-    const w = applyRot(c, layout.rotX, layout.rotY);
+    const w = applyRot(c, layout.q);
     const p = project(w, layout.scale);
     return { x: layout.cx + p.x, y: layout.cy + p.y };
   });
@@ -276,7 +276,7 @@ function facePointScreen(
   layout: CubeLayout,
 ): Vec2 {
   const local = facePoint(geom, u, v);
-  const w = applyRot(local, layout.rotX, layout.rotY);
+  const w = applyRot(local, layout.q);
   const p = project(w, layout.scale);
   return { x: layout.cx + p.x, y: layout.cy + p.y };
 }
@@ -294,7 +294,7 @@ function facePointLifted(
     y: local.y + geom.normal.y * lift,
     z: local.z + geom.normal.z * lift,
   };
-  const w = applyRot(lifted, layout.rotX, layout.rotY);
+  const w = applyRot(lifted, layout.q);
   const p = project(w, layout.scale);
   return { x: layout.cx + p.x, y: layout.cy + p.y };
 }
@@ -313,7 +313,7 @@ export function drawCube3D(
   type FaceDraw = { i: FaceId; depth: number };
   const order: FaceDraw[] = [];
   for (let i = 0; i < 6; i++) {
-    const n = applyRot(FACES[i]!.normal, layout.rotX, layout.rotY);
+    const n = applyRot(FACES[i]!.normal, layout.q);
     if (n.z <= 0.02) continue;
     const center = applyRot(
       {
@@ -321,8 +321,7 @@ export function drawCube3D(
         y: FACES[i]!.normal.y,
         z: FACES[i]!.normal.z,
       },
-      layout.rotX,
-      layout.rotY,
+      layout.q,
     );
     order.push({ i: i as FaceId, depth: center.z });
   }
@@ -364,7 +363,7 @@ function drawFace(
   const quality = getQuality();
 
   const q = geom.corners.map((c) => {
-    const w = applyRot(c, layout.rotX, layout.rotY);
+    const w = applyRot(c, layout.q);
     const pr = project(w, layout.scale);
     return { x: layout.cx + pr.x, y: layout.cy + pr.y };
   });

@@ -9,60 +9,111 @@
  *   right (drag right) → LEFT  (‹ button)
  *   left  (drag left)  → RIGHT (› button)
  *
- * Chevron / snap steps are screen-relative so vertical flips stay vertical
+ * Screen-space quaternion orbit so vertical flips stay vertical
  * even after leaving the front face (avoids Euler gimbal → LEFT/RIGHT).
  */
+import type { FaceId } from "../core/rubik";
 import {
-  faceTowardScreenDir,
-  facingFace,
-  type FaceId,
-} from "./cube3d";
+  type Quat,
+  applyScreenOrbit,
+  quatCopy,
+  quatDot,
+  quatFromAxisAngle,
+  quatFromEulerYX,
+  quatIdentity,
+  quatMul,
+  quatNormalize,
+  quatRotateVec,
+} from "./quat";
+
+export {
+  applyScreenOrbit,
+  quatFromEulerYX,
+  type Quat,
+} from "./quat";
 
 export const ORBIT_DRAG_SENS = 0.0042;
 export const SNAP_Q = Math.PI / 2;
 
-/** Canonical pitch/yaw pairs that put each face toward the camera. */
-const FACE_ORIENTS: Record<FaceId, ReadonlyArray<{ x: number; y: number }>> = {
-  0: [{ x: 0, y: 0 }], // FRONT
-  1: [
-    { x: SNAP_Q * 2, y: 0 },
-    { x: -SNAP_Q * 2, y: 0 },
-    { x: 0, y: Math.PI },
-    { x: 0, y: -Math.PI },
-  ], // BACK
-  2: [{ x: 0, y: -SNAP_Q }], // RIGHT
-  3: [{ x: 0, y: SNAP_Q }], // LEFT
-  4: [{ x: -SNAP_Q, y: 0 }], // TOP
-  5: [{ x: SNAP_Q, y: 0 }], // BOTTOM
-};
+/** Face normals — same as cube3d FACES. */
+const FACE_NORMALS: ReadonlyArray<{ x: number; y: number; z: number }> = [
+  { x: 0, y: 0, z: 1 }, // FRONT
+  { x: 0, y: 0, z: -1 }, // BACK
+  { x: 1, y: 0, z: 0 }, // RIGHT
+  { x: -1, y: 0, z: 0 }, // LEFT
+  { x: 0, y: -1, z: 0 }, // TOP
+  { x: 0, y: 1, z: 0 }, // BOTTOM
+];
 
-function angleDelta(from: number, to: number): number {
-  let d = to - from;
-  while (d > Math.PI) d -= Math.PI * 2;
-  while (d < -Math.PI) d += Math.PI * 2;
-  return d;
-}
+/** Base euler YX orientations for each of the 6 faces. */
+const FACE_BASE: ReadonlyArray<[number, number]> = [
+  [0, 0], // FRONT
+  [Math.PI, 0], // BACK
+  [0, -SNAP_Q], // RIGHT
+  [0, SNAP_Q], // LEFT
+  [-SNAP_Q, 0], // TOP
+  [SNAP_Q, 0], // BOTTOM
+];
 
-/** Nearest canonical orientation for a face, measured from current angles. */
-export function orientForFace(
-  face: FaceId,
-  fromX: number,
-  fromY: number,
-): { rotX: number; rotY: number } {
-  let best = FACE_ORIENTS[face]![0]!;
-  let bestCost = Infinity;
-  for (const o of FACE_ORIENTS[face]!) {
-    const cost =
-      Math.abs(angleDelta(fromX, o.x)) + Math.abs(angleDelta(fromY, o.y));
-    if (cost < bestCost) {
-      bestCost = cost;
-      best = o;
+/** 24 cube orientations = 6 faces × 4 in-plane rolls (Rz * eulerYX). */
+function buildCanonicalSnaps(): Quat[] {
+  const snaps: Quat[] = [];
+  for (const [rx, ry] of FACE_BASE) {
+    const base = quatFromEulerYX(rx, ry);
+    for (let k = 0; k < 4; k++) {
+      const roll = quatFromAxisAngle(0, 0, 1, k * SNAP_Q);
+      snaps.push(quatNormalize(quatMul(roll, base)));
     }
   }
-  return {
-    rotX: fromX + angleDelta(fromX, best.x),
-    rotY: fromY + angleDelta(fromY, best.y),
-  };
+  return snaps;
+}
+
+const SNAP_ORIENTS = buildCanonicalSnaps();
+
+export function facingFaceQuat(q: Quat): FaceId {
+  let best: FaceId = 0;
+  let bestZ = -Infinity;
+  for (let i = 0; i < 6; i++) {
+    const n = quatRotateVec(q, FACE_NORMALS[i]!);
+    if (n.z > bestZ) {
+      bestZ = n.z;
+      best = i as FaceId;
+    }
+  }
+  return best;
+}
+
+/**
+ * Which cube face points most toward a screen direction
+ * (left/right/up/down in canvas space, +Y down).
+ */
+export function faceTowardScreenDir(
+  q: Quat,
+  dir: "left" | "right" | "up" | "down",
+): FaceId {
+  const target =
+    dir === "left"
+      ? { x: -1, y: 0 }
+      : dir === "right"
+        ? { x: 1, y: 0 }
+        : dir === "up"
+          ? { x: 0, y: -1 }
+          : { x: 0, y: 1 };
+  let best: FaceId = 0;
+  let bestDot = -Infinity;
+  for (let i = 0; i < 6; i++) {
+    const n = quatRotateVec(q, FACE_NORMALS[i]!);
+    const xy = Math.hypot(n.x, n.y) || 1;
+    const nx = n.x / xy;
+    const ny = n.y / xy;
+    const dot = nx * target.x + ny * target.y;
+    const score = dot - Math.max(0, n.z) * 0.15;
+    if (score > bestDot) {
+      bestDot = score;
+      best = i as FaceId;
+    }
+  }
+  return best;
 }
 
 /**
@@ -70,36 +121,38 @@ export function orientForFace(
  * Grab-style vertical: ˄ pulls the bottom-of-view face forward.
  */
 export function faceAfterOrbitDir(
-  rotX: number,
-  rotY: number,
+  q: Quat,
   dir: "left" | "right" | "up" | "down",
 ): FaceId {
-  if (dir === "up") return faceTowardScreenDir(rotX, rotY, "down");
-  if (dir === "down") return faceTowardScreenDir(rotX, rotY, "up");
-  if (dir === "left") return faceTowardScreenDir(rotX, rotY, "left");
-  return faceTowardScreenDir(rotX, rotY, "right");
+  if (dir === "up") return faceTowardScreenDir(q, "down");
+  if (dir === "down") return faceTowardScreenDir(q, "up");
+  if (dir === "left") return faceTowardScreenDir(q, "left");
+  return faceTowardScreenDir(q, "right");
 }
 
-/** Target angles after one chevron step from the current view. */
-export function orbitStepTarget(
-  rotX: number,
-  rotY: number,
-  dir: "left" | "right" | "up" | "down",
-): { rotX: number; rotY: number } {
-  const face = faceAfterOrbitDir(rotX, rotY, dir);
-  return orientForFace(face, rotX, rotY);
+/** Snap free-orbit quaternion onto the nearest of 24 cube orientations. */
+export function snapOrbitQuat(q: Quat): Quat {
+  let best = SNAP_ORIENTS[0]!;
+  let bestAbs = -1;
+  for (const s of SNAP_ORIENTS) {
+    const d = Math.abs(quatDot(q, s));
+    if (d > bestAbs) {
+      bestAbs = d;
+      best = s;
+    }
+  }
+  if (quatDot(q, best) < 0) {
+    return { x: -best.x, y: -best.y, z: -best.z, w: -best.w };
+  }
+  return quatCopy(best);
 }
 
-export function applyOrbitDrag(
-  rotX0: number,
-  rotY0: number,
+export function applyOrbitDragQuat(
+  q0: Quat,
   dx: number,
   dy: number,
   sens = ORBIT_DRAG_SENS,
-): { rotX: number; rotY: number } {
-  // Grab-style: finger up (dy < 0) increases rotX → BOTTOM from front.
-  // Axis-lock: once the gesture is mostly vertical or horizontal, ignore the
-  // other axis so a vertical flip cannot pick up yaw and snap to LEFT/RIGHT.
+): Quat {
   const ax = Math.abs(dx);
   const ay = Math.abs(dy);
   let useDx = dx;
@@ -108,32 +161,37 @@ export function applyOrbitDrag(
     if (ay >= ax) useDx = 0;
     else useDy = 0;
   }
-  const rotX = rotX0 - useDy * sens;
-  const rotY = rotY0 + useDx * sens;
-  return { rotX, rotY };
+  const dPitch = -useDy * sens;
+  const dYaw = useDx * sens;
+  return applyScreenOrbit(q0, dPitch, dYaw);
 }
 
-/** @deprecated Prefer orbitStepTarget — kept for tests of front-face deltas. */
-export function orbitStepDelta(
+export function orbitStepQuat(
+  q: Quat,
   dir: "left" | "right" | "up" | "down",
-): { dRotX: number; dRotY: number } {
-  if (dir === "left") return { dRotX: 0, dRotY: SNAP_Q };
-  if (dir === "right") return { dRotX: 0, dRotY: -SNAP_Q };
-  if (dir === "up") return { dRotX: SNAP_Q, dRotY: 0 };
-  return { dRotX: -SNAP_Q, dRotY: 0 };
+): Quat {
+  let next: Quat;
+  if (dir === "up") next = applyScreenOrbit(q, SNAP_Q, 0);
+  else if (dir === "down") next = applyScreenOrbit(q, -SNAP_Q, 0);
+  else if (dir === "left") next = applyScreenOrbit(q, 0, SNAP_Q);
+  else next = applyScreenOrbit(q, 0, -SNAP_Q);
+  return snapOrbitQuat(next);
 }
 
-/** Face reached after a full quarter-turn step from front. */
-export function faceAfterOrbitStep(dir: "left" | "right" | "up" | "down"): FaceId {
-  return faceAfterOrbitDir(0, 0, dir);
+/** Face reached after a full quarter-turn step from front (identity). */
+export function faceAfterOrbitStep(
+  dir: "left" | "right" | "up" | "down",
+): FaceId {
+  return facingFaceQuat(orbitStepQuat(quatIdentity(), dir));
 }
 
-/** Snap free-orbit angles onto the nearest face-on orientation. */
-export function snapOrbitToFace(
-  rotX: number,
-  rotY: number,
-): { x: number; y: number } {
-  const face = facingFace(rotX, rotY);
-  const o = orientForFace(face, rotX, rotY);
-  return { x: o.rotX, y: o.rotY };
+/** Euler-compat drag wrapper (euler → quat → facing via euler rebuild). */
+export function applyOrbitDrag(
+  rotX0: number,
+  rotY0: number,
+  dx: number,
+  dy: number,
+  sens = ORBIT_DRAG_SENS,
+): Quat {
+  return applyOrbitDragQuat(quatFromEulerYX(rotX0, rotY0), dx, dy, sens);
 }
