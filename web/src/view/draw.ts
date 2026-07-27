@@ -2308,18 +2308,45 @@ function drawTokenDoor(ctx: CanvasRenderingContext2D, c: Vec2, size: number): vo
 }
 
 /** Faint tie-line between two geared discs so the coupling reads at a glance. */
-export function drawGearLink(ctx: CanvasRenderingContext2D, layout: Layout, a: Vec2, b: Vec2): void {
+export function drawGearLink(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  a: Vec2,
+  b: Vec2,
+  boardW = 0,
+): void {
   const pa = cellCenter(layout, a);
   const pb = cellCenter(layout, b);
   ctx.save();
   ctx.strokeStyle = P.TABLE_OUTLINE;
-  ctx.globalAlpha = 0.3;
+  ctx.globalAlpha = 0.35;
   ctx.lineWidth = 2;
   ctx.setLineDash([3, 6]);
-  ctx.beginPath();
-  ctx.moveTo(pa.x, pa.y);
-  ctx.lineTo(pb.x, pb.y);
-  ctx.stroke();
+
+  const dx = Math.abs(a.x - b.x);
+  const wrapX = boardW > 0 && dx > boardW / 2 && a.y === b.y;
+  if (wrapX) {
+    // Cylinder wrap: draw stubs to the near edges instead of a long false chord.
+    const left = a.x < b.x ? b : a;
+    const right = a.x < b.x ? a : b;
+    const pLeft = cellCenter(layout, left);
+    const pRight = cellCenter(layout, right);
+    const step = layout.cell + layout.gap;
+    const x0 = layout.origin.x - layout.gap * 0.5;
+    const x1 = layout.origin.x + boardW * step - layout.gap * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(pLeft.x, pLeft.y);
+    ctx.lineTo(x0, pLeft.y);
+    ctx.moveTo(pRight.x, pRight.y);
+    ctx.lineTo(x1, pRight.y);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.stroke();
+  }
+
   ctx.setLineDash([]);
   ctx.globalAlpha = 1;
   ctx.restore();

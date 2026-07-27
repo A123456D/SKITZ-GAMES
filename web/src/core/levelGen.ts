@@ -74,9 +74,21 @@ function profile(diff: number) {
   const pulseLimit = phase === 1 ? 3 : phase === 2 ? (slot >= 5 ? 2 : 3) : slot >= 4 ? 2 : 3;
   const undoLimit = 0;
   const gearPairs =
-    phase === 1 ? 0 : phase === 2 ? Math.min(1 + Math.floor(slot / 2), 4) : Math.min(2 + Math.floor(slot / 2), 5);
-  const rowShifts = phase === 3 ? Math.min(1 + Math.floor((slot - 1) / 2), 3) : 0;
-  const minMoves = Math.min(size * size - 1, 3 + slot + (phase - 1) * 2);
+    phase === 1
+      ? 0
+      : phase === 2
+        ? slot <= 2
+          ? 1
+          : slot <= 4
+            ? 2
+            : 2
+        : slot <= 3
+          ? 1
+          : 2;
+  // Phase 3 row wraps must keep geared partners together → horizontal links only.
+  const gearMode: "any" | "row" = phase >= 3 ? "row" : "any";
+  const rowShifts = phase === 3 ? Math.min(1 + Math.floor((slot - 1) / 2), 2) : 0;
+  const minMoves = Math.min(size * size - 1, 3 + slot + (phase - 1));
   return {
     diff: d,
     phase,
@@ -86,6 +98,7 @@ function profile(diff: number) {
     pulseLimit,
     undoLimit,
     gearPairs,
+    gearMode,
     rowShifts,
     minMoves,
     hasGears: phase >= 2,
@@ -187,26 +200,47 @@ function tablesFromPorts(w: number, h: number, ports: number[][]): TableDef[] {
   return tables;
 }
 
-/** Pair adjacent discs into bidirectional gear links. */
-function linkGears(tables: TableDef[], w: number, pairs: number, rng: Rng): void {
+/**
+ * Pair discs that share a real pipe edge — never random grid neighbors.
+ * Opposite gears (sign -1): turn one, the partner reverses.
+ * Phase 3 uses same-row pairs only so row shifts keep partners adjacent.
+ */
+function linkGears(
+  tables: TableDef[],
+  edges: Edge[],
+  w: number,
+  pairs: number,
+  rng: Rng,
+  mode: "any" | "row",
+): void {
   if (pairs <= 0) return;
-  const byHub = new Map<string, TableDef>();
-  for (const t of tables) byHub.set(`${t.hub.x},${t.hub.y}`, t);
-  const candidates: [TableDef, TableDef][] = [];
-  for (const t of tables) {
-    if (t.link) continue;
-    const right = byHub.get(`${t.hub.x + 1},${t.hub.y}`);
-    const down = byHub.get(`${t.hub.x},${t.hub.y + 1}`);
-    if (right && !right.link) candidates.push([t, right]);
-    if (down && !down.link) candidates.push([t, down]);
+  const byId = new Map(tables.map((t) => [t.id, t]));
+  type Cand = { a: TableDef; b: TableDef; score: number };
+  const candidates: Cand[] = [];
+  for (const e of edges) {
+    const a = byId.get(e.a);
+    const b = byId.get(e.b);
+    if (!a || !b) continue;
+    const pa = cellPos(e.a, w);
+    const pb = cellPos(e.b, w);
+    const horizontal = pa.y === pb.y;
+    if (mode === "row" && !horizontal) continue;
+    const rank = (m: number) =>
+      m === M.STRAIGHT ? 4 : m === M.ELBOW ? 3 : m === M.ENDCAP ? 2 : 1;
+    // Prefer clear “shaft” pairs over busy tees/crosses.
+    const score = rank(a.module) + rank(b.module) + (horizontal ? 0.25 : 0);
+    candidates.push({ a, b, score });
   }
+  const ordered = shuffle(rng, candidates).sort((x, y) => y.score - x.score);
   let linked = 0;
-  for (const [a, b] of shuffle(rng, candidates)) {
+  const used = new Set<number>();
+  for (const { a, b } of ordered) {
     if (linked >= pairs) break;
-    if (a.link || b.link) continue;
-    const sign: 1 | -1 = rng() < 0.5 ? 1 : -1;
-    a.link = { partner: b.id, sign };
-    b.link = { partner: a.id, sign };
+    if (used.has(a.id) || used.has(b.id)) continue;
+    a.link = { partner: b.id, sign: -1 };
+    b.link = { partner: a.id, sign: -1 };
+    used.add(a.id);
+    used.add(b.id);
     linked++;
   }
 }
@@ -320,46 +354,56 @@ function scrambleAndVerify(
   const visited = new Set<number>();
 
   // Scramble with rotateTable so geared partners stay in sync. Only emit
-  // solution steps for the disc the player actually turns (not the partner).
+  // solution steps for the disc the player turns (one per gear pair).
   for (const t of shuffle(rng, [...g.tables])) {
     if (visited.has(t.id) || t.locked) continue;
+    // Prefer turning the lower id in a gear pair so the solution is stable.
+    if (t.link && t.id > t.link.partner) continue;
     const amount = 1 + Math.floor(rng() * 3);
-    const sign = rng() < 0.5 ? 1 : -1;
-    if (!rotateTable(g, t.id, sign * amount)) continue;
-    for (let k = 0; k < amount; k++) rotateSteps.push(move(t.id, (-sign) as -1 | 1));
+    const dir: 1 | -1 = rng() < 0.5 ? 1 : -1;
+    if (!rotateTable(g, t.id, dir * amount)) continue;
+    for (let k = 0; k < amount; k++) rotateSteps.push(move(t.id, (-dir) as -1 | 1));
     visited.add(t.id);
     if (t.link) visited.add(t.link.partner);
   }
 
-  // Ensure nothing accidentally still solved (ungeared leftovers).
+  // Nudge any ungeared disc that is still at the solved angle.
   for (const t of g.tables) {
-    if (t.locked || (t.link && visited.has(t.link.partner) && !visited.has(t.id))) continue;
+    if (visited.has(t.id) || t.locked) continue;
+    if (t.link && t.id > t.link.partner) continue;
     const sol = solvedTables.find((x) => x.id === t.id)!;
-    if (((t.rotationQ % 4) + 4) % 4 === ((sol.rotationQ % 4) + 4) % 4) {
-      if (t.link && visited.has(t.id)) continue;
-      rotateTable(g, t.id, 1);
-      rotateSteps.push(move(t.id, -1));
-      visited.add(t.id);
-      if (t.link) visited.add(t.link.partner);
-    }
+    if (((t.rotationQ % 4) + 4) % 4 !== ((sol.rotationQ % 4) + 4) % 4) continue;
+    rotateTable(g, t.id, 1);
+    rotateSteps.push(move(t.id, -1));
+    visited.add(t.id);
+    if (t.link) visited.add(t.link.partner);
   }
 
-  for (let i = rotateSteps.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [rotateSteps[i], rotateSteps[j]] = [rotateSteps[j], rotateSteps[i]];
-  }
+  // Keep solution order = reverse of scramble (do not shuffle geared undos).
+  rotateSteps.reverse();
 
-  // Phase 3: break the board with row wraps. Player undoes shifts first.
+  // Phase 3: wrap whole rows. Horizontal gear pairs stay adjacent.
   const shiftSteps: MoveStep[] = [];
+  const shiftedRows = new Set<number>();
   for (let i = 0; i < opts.rowShifts; i++) {
-    const y = Math.floor(rng() * h);
+    let y = Math.floor(rng() * h);
+    // Avoid shifting the same row twice (undoes itself).
+    for (let guard = 0; guard < h && shiftedRows.has(y); guard++) y = (y + 1) % h;
+    if (shiftedRows.has(y)) continue;
     const dir: 1 | -1 = rng() < 0.5 ? 1 : -1;
     if (!shiftRow(g, y, dir)) continue;
+    shiftedRows.add(y);
     shiftSteps.push(rowShift(y, -dir));
   }
+  // Undo shifts first, then undos rotations.
+  shiftSteps.reverse();
 
   const solution = [...shiftSteps, ...rotateSteps];
-  if (rotateSteps.length < opts.minMoves) return null;
+  if (rotateSteps.length < Math.min(opts.minMoves, Math.max(3, opts.size))) return null;
+
+  // Must still have the requested gear pairs when the phase asks for them.
+  const gearCount = g.tables.filter((t) => t.link).length / 2;
+  if (opts.gearPairs > 0 && gearCount < 1) return null;
 
   const level: LevelData = {
     id: `diff_${difficulty}`,
@@ -415,13 +459,13 @@ function scrambleAndVerify(
  * runs against a wall-clock budget: once spent, quality filters relax rather
  * than letting a slow device keep searching.
  */
-const BUDGET_MS = 120;
+const BUDGET_MS = 220;
 
 export function generateLevel(difficulty: number, seed: number): LevelData {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, difficulty));
   const rng = mulberry32((seed >>> 0) ^ Math.imul(d, 0x9e3779b9));
   const opts = profile(d);
-  const attempts = opts.phase >= 3 ? 400 : opts.phase >= 2 ? 300 : 150;
+  const attempts = opts.phase >= 3 ? 500 : opts.phase >= 2 ? 400 : 180;
   const started = now();
 
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -431,28 +475,20 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
     const edges = buildTopology(w, h, extras, rng);
     const ports = portsFromEdges(w, h, edges);
     const tables = tablesFromPorts(w, h, ports);
-    linkGears(tables, w, opts.gearPairs, rng);
+    linkGears(tables, edges, w, opts.gearPairs, rng, opts.gearMode);
+    // Never strip phase rules on timeout — only skip the slow anti-cheap filter.
     const overBudget = now() - started > BUDGET_MS;
     const level = scrambleAndVerify(tables, w, h, rng, opts, d, overBudget);
     if (level) return level;
   }
 
-  // Last-resort: smaller board, no gears/shifts, no anti-shortcut
-  const w = Math.max(4, opts.size - 1);
-  const edges = buildTopology(w, w, 0, rng);
+  // Last resort: same phase rules, softer move floor — never a silent phase downgrade.
+  const w = opts.size;
+  const edges = buildTopology(w, w, Math.max(0, opts.extraEdges - 1), rng);
   const ports = portsFromEdges(w, w, edges);
   const tables = tablesFromPorts(w, w, ports);
-  const soft = {
-    ...opts,
-    size: w,
-    minMoves: 3,
-    extraEdges: 0,
-    gearPairs: 0,
-    rowShifts: 0,
-    hasGears: false,
-    allowRowShift: false,
-    allowBoardTurn: false,
-  };
+  linkGears(tables, edges, w, opts.gearPairs, rng, opts.gearMode);
+  const soft = { ...opts, minMoves: 2 };
   const level = scrambleAndVerify(tables, w, w, rng, soft, d, true);
   if (level) return level;
 

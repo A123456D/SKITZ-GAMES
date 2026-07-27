@@ -1911,7 +1911,7 @@ function drawPlay(): void {
   for (const t of session.state.tables) {
     if (t.link && t.id < t.link.partner) {
       const p = session.state.tables.find((x) => x.id === t.link!.partner);
-      if (p) drawGearLink(ctx, layout, t.hub, p.hub);
+      if (p) drawGearLink(ctx, layout, t.hub, p.hub, session.state.width);
     }
   }
 
