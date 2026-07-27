@@ -702,6 +702,7 @@ async function boot(): Promise<void> {
   await Promise.all([loadLogo(), loadStickers()]);
   ensureThemeArt("classic");
   ensureThemeArt("grime");
+  ensureThemeArt("anime");
   syncActiveFace();
   requestAnimationFrame(tick);
 }

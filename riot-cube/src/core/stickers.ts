@@ -11,6 +11,7 @@ export const TILE_KINDS = [
   "spray",
   "smiley",
   "eye",
+  "mask",
 ] as const;
 
 export type TileKind = (typeof TILE_KINDS)[number];
