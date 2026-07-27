@@ -39,8 +39,8 @@ export function ensureThemeArt(id: ThemeId = getTheme()): void {
   const dir = `./themes/${id}`;
   void (async () => {
     const [bg, btn] = await Promise.all([
-      loadImg(`${dir}/bg.jpg?v=1`),
-      loadImg(`${dir}/btn.jpg?v=1`),
+      loadImg(`${dir}/bg.jpg?v=3`),
+      loadImg(`${dir}/btn.jpg?v=3`),
     ]);
     art.set(id, { bg, btn, loaded: true });
     onReady?.();
