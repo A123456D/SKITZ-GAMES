@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  --bg: #0c0c0c;
+  --bg: #030203;
 }
 
 * {
@@ -29,10 +29,7 @@ body {
   place-items: center;
   overscroll-behavior: none;
   touch-action: none;
-  background:
-    radial-gradient(ellipse at 50% 20%, #2a1520 0%, transparent 55%),
-    radial-gradient(ellipse at 80% 90%, #1a2a12 0%, transparent 45%),
-    var(--bg);
+  background: var(--bg);
 }
 
 #game {

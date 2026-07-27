@@ -1,220 +1,122 @@
 import {
-  generateBoard,
+  CUBE_SIZES,
+  type CubeSize,
+  type CubeState,
+  type FaceId,
+  type TurnDir,
+  createSolved,
+  defaultScrambleMoves,
+  faceTurn,
+  isSolved,
   mulberry32,
-  resolveBoard,
-  type Board,
-} from "./board";
-import { twistCubeFaces } from "./cubeTwist";
-import {
-  rotatingPlayKinds,
-  type Goal,
-  type LevelDef,
-  type TileKind,
-  type Twist,
-} from "./types";
+  scramble,
+} from "./rubik";
 
-export type GameStatus = "playing" | "won" | "lost";
-/** F B R L U D */
-export type FaceId = 0 | 1 | 2 | 3 | 4 | 5;
-export const FACE_COUNT = 6;
+export type { FaceId, CubeSize };
+export { CUBE_SIZES, FACE_COUNT } from "./rubik";
+export type GameStatus = "playing" | "solved";
 
-export type CubeFaces = [Board, Board, Board, Board, Board, Board];
+const SIZE_KEY = "riotcube_size";
 
 export type Session = {
-  level: LevelDef;
-  board: Board;
-  faces: CubeFaces;
+  size: CubeSize;
+  cube: CubeState;
+  /** Camera-facing face (for HUD / turn targeting). */
   face: FaceId;
-  movesLeft: number;
-  score: number;
-  goals: Goal[];
+  moveCount: number;
   status: GameStatus;
-  comboPeak: number;
   rng: () => number;
-  lastTwist: Twist | null;
-  /** Active sticker pool for the latest generation. */
-  kinds: readonly TileKind[];
-  /** Advances each refill so unused stickers rotate into play. */
-  gen: number;
 };
 
-export function starsForScore(score: number, thresholds: [number, number, number]): 0 | 1 | 2 | 3 {
-  if (score >= thresholds[2]) return 3;
-  if (score >= thresholds[1]) return 2;
-  if (score >= thresholds[0]) return 1;
-  return 0;
-}
-
-function hashId(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619);
+export function loadCubeSize(): CubeSize {
+  try {
+    const v = Number(localStorage.getItem(SIZE_KEY));
+    if ((CUBE_SIZES as readonly number[]).includes(v)) return v as CubeSize;
+  } catch {
+    /* ignore */
   }
-  return h >>> 0;
+  return 3;
 }
 
-function goalKinds(level: LevelDef): TileKind[] {
-  return level.goals.map((g) => g.kind);
+export function saveCubeSize(size: CubeSize): void {
+  try {
+    localStorage.setItem(SIZE_KEY, String(size));
+  } catch {
+    /* ignore */
+  }
 }
 
-/** Locked level pool, or a rotating window that always keeps goals available. */
-function poolFor(level: LevelDef, generation: number): readonly TileKind[] {
-  if (level.kinds?.length) return level.kinds;
-  return rotatingPlayKinds(generation, goalKinds(level));
+export function cycleCubeSize(current: CubeSize): CubeSize {
+  const i = CUBE_SIZES.indexOf(current);
+  const next = CUBE_SIZES[(i + 1) % CUBE_SIZES.length]!;
+  saveCubeSize(next);
+  return next;
 }
 
-function fixedFace(level: LevelDef, face: FaceId): TileKind[][] | undefined {
-  if (face === 0) return level.board;
-  if (face === 1) return level.boardBack;
-  if (face === 2) return level.boardRight;
-  if (face === 3) return level.boardLeft;
-  if (face === 4) return level.boardTop;
-  return level.boardBottom;
+export function sizeLabel(size: number): string {
+  return `${size}\u00D7${size}`;
 }
 
-export function startSession(level: LevelDef): Session {
-  const seed = level.seed ?? hashId(level.id);
-  const rng = mulberry32(seed ^ 0x9e3779b9);
-  const size = level.size;
-  const kinds = poolFor(level, 0);
-  const faces = Array.from({ length: FACE_COUNT }, (_, i) => {
-    const fixed = fixedFace(level, i as FaceId);
-    if (fixed) return fixed.map((row) => row.slice());
-    // Each face starts on its own generation slice so stickers vary around the cube.
-    return generateBoard(
-      size,
-      (seed ^ Math.imul(i + 1, 0x9e3779b9)) >>> 0,
-      poolFor(level, i),
-    );
-  }) as CubeFaces;
+function seedFrom(): number {
+  return (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
+}
 
+/** Fresh scrambled session. */
+export function startSession(size: CubeSize = loadCubeSize()): Session {
+  const seed = seedFrom();
+  const rng = mulberry32(seed);
+  const moves = defaultScrambleMoves(size);
+  const cube = scramble(size, moves, rng);
   return {
-    level,
-    faces,
+    size,
+    cube,
     face: 0,
-    board: faces[0],
-    movesLeft: level.moves,
-    score: 0,
-    goals: level.goals.map((g) => ({ ...g, have: 0 })),
+    moveCount: 0,
     status: "playing",
-    comboPeak: 0,
     rng,
-    lastTwist: null,
-    kinds,
-    gen: 0,
   };
 }
 
-function applyClearsToGoals(goals: Goal[], cleared: { kind: TileKind; count: number }[]): Goal[] {
-  return goals.map((g) => {
-    const hit = cleared.find((c) => c.kind === g.kind);
-    if (!hit) return g;
-    return { ...g, have: Math.min(g.need, g.have + hit.count) };
-  });
-}
-
-function goalsMet(goals: Goal[]): boolean {
-  return goals.every((g) => g.have >= g.need);
-}
-
-function finishStatus(goals: Goal[], movesLeft: number): GameStatus {
-  if (goalsMet(goals)) return "won";
-  if (movesLeft <= 0) return "lost";
-  return "playing";
-}
-
-export type TwistResult = {
-  session: Session;
-  didTwist: boolean;
-  scoreGain: number;
-  combo: number;
-  /** True when this twist spent a move (only matching clears). */
-  spentMove: boolean;
-};
-
-/**
- * Twist a slice. Dry twists (no clear) are free.
- * Matching twists spend one move.
- */
-export function applyTwist(session: Session, twist: Twist): TwistResult {
-  if (session.status !== "playing") {
-    return { session, didTwist: false, scoreGain: 0, combo: 0, spentMove: false };
-  }
-  const facesTwisted = twistCubeFaces(session.faces, session.face, twist);
-  const genBase = session.gen;
-  const resolved = resolveBoard(facesTwisted[session.face]!, session.rng, (refillIndex) =>
-    poolFor(session.level, genBase + 1 + refillIndex),
-  );
-  const scored = resolved.scoreGain > 0;
-
-  if (scored && session.movesLeft <= 0) {
-    return { session, didTwist: false, scoreGain: 0, combo: 0, spentMove: false };
-  }
-
-  const goals = applyClearsToGoals(session.goals, resolved.totalCleared);
-  const movesLeft = scored ? session.movesLeft - 1 : session.movesLeft;
-  const score = session.score + resolved.scoreGain;
-  const comboPeak = Math.max(session.comboPeak, resolved.combo);
-  const gen = genBase + resolved.refillCount;
-  const kinds = poolFor(session.level, gen);
-
-  const faces = facesTwisted.map((f, i) =>
-    i === session.face ? resolved.board : f,
-  ) as CubeFaces;
-
-  return {
-    session: {
-      ...session,
-      faces,
-      board: faces[session.face]!,
-      movesLeft,
-      score,
-      goals,
-      status: finishStatus(goals, movesLeft),
-      comboPeak,
-      lastTwist: twist,
-      kinds,
-      gen,
-    },
-    didTwist: true,
-    scoreGain: resolved.scoreGain,
-    combo: resolved.combo,
-    spentMove: scored,
-  };
-}
-
-/** Spend one move to flip to another face. */
-export function spendOrbit(session: Session): { session: Session; didSpend: boolean } {
-  if (session.status !== "playing" || session.movesLeft <= 0) {
-    return { session, didSpend: false };
-  }
-  const movesLeft = session.movesLeft - 1;
-  return {
-    session: {
-      ...session,
-      movesLeft,
-      status: finishStatus(session.goals, movesLeft),
-    },
-    didSpend: true,
-  };
-}
-
-/** Point session at whichever face is currently facing the camera. */
-export function setActiveFace(session: Session, face: FaceId): Session {
+export function restartSolved(session: Session): Session {
   return {
     ...session,
-    face,
-    board: session.faces[face]!,
+    cube: createSolved(session.size),
+    moveCount: 0,
+    status: "solved",
+    face: session.face,
   };
 }
 
-export function restartSession(session: Session): Session {
-  return startSession(session.level);
+export function doScramble(session: Session): Session {
+  const moves = defaultScrambleMoves(session.size);
+  const cube = scramble(session.size, moves, session.rng);
+  return {
+    ...session,
+    cube,
+    moveCount: 0,
+    status: "playing",
+  };
 }
 
-export function nextLevelIndex(levels: LevelDef[], currentId: string): number {
-  const i = levels.findIndex((l) => l.id === currentId);
-  if (i < 0 || i + 1 >= levels.length) return -1;
-  return i + 1;
+export function setActiveFace(session: Session, face: FaceId): Session {
+  if (session.face === face) return session;
+  return { ...session, face };
+}
+
+export function applyFaceTurn(
+  session: Session,
+  face: FaceId,
+  dir: TurnDir = 1,
+): Session {
+  if (session.status === "solved" && isSolved(session.cube)) {
+    // Allow turning after solved to keep playing / mess it up again.
+  }
+  const cube = faceTurn(session.cube, face, dir);
+  const solved = isSolved(cube);
+  return {
+    ...session,
+    cube,
+    moveCount: session.moveCount + 1,
+    status: solved ? "solved" : "playing",
+  };
 }
