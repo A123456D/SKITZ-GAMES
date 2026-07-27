@@ -37,7 +37,8 @@ export type Layout = {
 
 export function boardLayout(state: GridState): Layout {
   // Dense boards: tight gaps so the grid reads as one tiled circuit.
-  const padX = 52; // room for phase-3 row chevrons beside the grid
+  // Wide side gutters keep phase-3 row arrows fully on-canvas.
+  const padX = 78;
   const boardTop = 236;
   const boardBottom = 1050;
   const availW = W - padX * 2;
@@ -1109,7 +1110,7 @@ export function drawWheel(
   const sx = squash > 1 ? 1 / Math.sqrt(squash) : squash;
   stamp(
     ctx,
-    `face|${theme}|${pal}|${table.module}|${table.locked ? 1 : 0}|${table.link ? 1 : 0}|${rKey}|cyberHud1`,
+    `face|${theme}|${pal}|${table.module}|${table.locked ? 1 : 0}|${table.link ? 1 : 0}|${rKey}|gearTeeth2`,
     faceSize,
     faceSize,
     (c) => paintWheelFace(c, table, r, theme, lightFace, dark, face),
@@ -1733,28 +1734,28 @@ function paintWheelFace(
   }
 
   if (table.link) {
+    // Bold cog teeth — linked discs must read at a glance.
     ctx.fillStyle = ink;
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = Math.max(1.6, r * 0.045);
     ctx.beginPath();
-    if (tri) {
-      // Three edge midpoints — reads as linked paper corners.
-      for (let i = 0; i < 3; i++) {
-        const a0 = Math.PI / 2 + (i * Math.PI * 2) / 3;
-        const a1 = Math.PI / 2 + ((i + 1) * Math.PI * 2) / 3;
-        const x = ((Math.cos(a0) + Math.cos(a1)) / 2) * r * 0.92;
-        const y = ((Math.sin(a0) + Math.sin(a1)) / 2) * r * 0.92;
-        ctx.moveTo(x + r * 0.055, y);
-        ctx.arc(x, y, r * 0.055, 0, Math.PI * 2);
-      }
-    } else {
-      for (let i = 0; i < 12; i++) {
-        const a = (Math.PI * 2 * i) / 12;
-        const x = Math.cos(a) * r * 0.97;
-        const y = Math.sin(a) * r * 0.97;
-        ctx.moveTo(x + r * 0.055, y);
-        ctx.arc(x, y, r * 0.055, 0, Math.PI * 2);
-      }
+    const teeth = tri ? 9 : 14;
+    for (let i = 0; i < teeth; i++) {
+      const a0 = -Math.PI / 2 + (i * Math.PI * 2) / teeth;
+      const a1 = -Math.PI / 2 + ((i + 0.45) * Math.PI * 2) / teeth;
+      const outer = r * 1.08;
+      const inner = r * 0.92;
+      ctx.moveTo(Math.cos(a0) * inner, Math.sin(a0) * inner);
+      ctx.lineTo(Math.cos(a0) * outer, Math.sin(a0) * outer);
+      ctx.lineTo(Math.cos(a1) * outer, Math.sin(a1) * outer);
+      ctx.lineTo(Math.cos(a1) * inner, Math.sin(a1) * inner);
     }
+    ctx.closePath();
     ctx.fill();
+    // Inner ring so the coupling still reads when teeth sit under wiring.
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.78, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   if (table.module === Module.GATE) {
@@ -2307,48 +2308,203 @@ function drawTokenDoor(ctx: CanvasRenderingContext2D, c: Vec2, size: number): vo
   ctx.restore();
 }
 
-/** Faint tie-line between two geared discs so the coupling reads at a glance. */
+/** Stable pair index for each geared disc (partners share one index). */
+export function gearPairIndex(tables: TableDef[], id: number): number {
+  const roots: number[] = [];
+  for (const t of tables) {
+    if (!t.link || t.id > t.link.partner) continue;
+    roots.push(t.id);
+  }
+  roots.sort((a, b) => a - b);
+  const t = tables.find((x) => x.id === id);
+  if (!t?.link) return -1;
+  const root = Math.min(t.id, t.link.partner);
+  return roots.indexOf(root);
+}
+
+export function gearPairLabel(index: number): string {
+  return String.fromCharCode(65 + (((index % 26) + 26) % 26));
+}
+
+/** High-contrast pair tints that still sit on paper / dark themes. */
+export function gearPairColor(index: number): string {
+  const tones = ["#C45C26", "#1F6F8B", "#3D7A4A", "#8B3A62", "#6B5B2E", "#2F5D8C"];
+  return tones[((index % tones.length) + tones.length) % tones.length]!;
+}
+
+/**
+ * Bold cable between geared partners + midpoint letter so pairs match at a glance.
+ */
 export function drawGearLink(
   ctx: CanvasRenderingContext2D,
   layout: Layout,
   a: Vec2,
   b: Vec2,
   boardW = 0,
+  pairIndex = 0,
 ): void {
   const pa = cellCenter(layout, a);
   const pb = cellCenter(layout, b);
+  const color = gearPairColor(pairIndex);
+  const label = gearPairLabel(pairIndex);
   ctx.save();
-  ctx.strokeStyle = P.TABLE_OUTLINE;
-  ctx.globalAlpha = 0.35;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([3, 6]);
+
+  const strokePath = (width: number, style: string, alpha: number, dash: number[] | null) => {
+    ctx.strokeStyle = style;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    ctx.setLineDash(dash ?? []);
+    const dx = Math.abs(a.x - b.x);
+    const wrapX = boardW > 0 && dx > boardW / 2 && a.y === b.y;
+    ctx.beginPath();
+    if (wrapX) {
+      const left = a.x < b.x ? b : a;
+      const right = a.x < b.x ? a : b;
+      const pLeft = cellCenter(layout, left);
+      const pRight = cellCenter(layout, right);
+      const step = layout.cell + layout.gap;
+      const x0 = layout.origin.x - layout.gap * 0.5;
+      const x1 = layout.origin.x + boardW * step - layout.gap * 0.5;
+      ctx.moveTo(pLeft.x, pLeft.y);
+      ctx.lineTo(x0, pLeft.y);
+      ctx.moveTo(pRight.x, pRight.y);
+      ctx.lineTo(x1, pRight.y);
+    } else {
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+    }
+    ctx.stroke();
+  };
+
+  // Paper underlay so the cable stays readable on any theme.
+  strokePath(7, P.PAPER, 0.92, null);
+  strokePath(4.2, color, 1, null);
+  strokePath(2.2, P.INK, 0.55, [5, 7]);
 
   const dx = Math.abs(a.x - b.x);
   const wrapX = boardW > 0 && dx > boardW / 2 && a.y === b.y;
-  if (wrapX) {
-    // Cylinder wrap: draw stubs to the near edges instead of a long false chord.
+  if (!wrapX) {
+    const mx = (pa.x + pb.x) / 2;
+    const my = (pa.y + pb.y) / 2;
+    drawGearPairChip(ctx, mx, my, label, color, 13);
+  } else {
+    // Wrap: chip beside each stub so the pair still matches.
     const left = a.x < b.x ? b : a;
     const right = a.x < b.x ? a : b;
     const pLeft = cellCenter(layout, left);
     const pRight = cellCenter(layout, right);
-    const step = layout.cell + layout.gap;
-    const x0 = layout.origin.x - layout.gap * 0.5;
-    const x1 = layout.origin.x + boardW * step - layout.gap * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(pLeft.x, pLeft.y);
-    ctx.lineTo(x0, pLeft.y);
-    ctx.moveTo(pRight.x, pRight.y);
-    ctx.lineTo(x1, pRight.y);
-    ctx.stroke();
-  } else {
-    ctx.beginPath();
-    ctx.moveTo(pa.x, pa.y);
-    ctx.lineTo(pb.x, pb.y);
-    ctx.stroke();
+    drawGearPairChip(ctx, layout.origin.x + 10, pLeft.y, label, color, 12);
+    drawGearPairChip(
+      ctx,
+      layout.origin.x + boardW * (layout.cell + layout.gap) - layout.gap - 10,
+      pRight.y,
+      label,
+      color,
+      12,
+    );
   }
 
   ctx.setLineDash([]);
   ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+export function drawGearPairChip(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  label: string,
+  color: string,
+  r = 12,
+): void {
+  ctx.save();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = P.PAPER;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = P.INK;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = P.INK;
+  ctx.font = font(800, Math.round(r * 1.15));
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, x, y + 0.5);
+  ctx.restore();
+}
+
+/** Letter chip on a geared disc (upright, not spun with the face). */
+export function drawGearDiscBadge(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  hub: Vec2,
+  pairIndex: number,
+): void {
+  const c = cellCenter(layout, hub);
+  const r = Math.min(layout.cell * 0.48, (layout.cell + layout.gap) * 0.46);
+  drawGearPairChip(
+    ctx,
+    c.x + r * 0.62,
+    c.y - r * 0.62,
+    gearPairLabel(pairIndex),
+    gearPairColor(pairIndex),
+    Math.max(11, r * 0.28),
+  );
+}
+
+/** Large side chevron for row shifts — fully opaque, hard to miss. */
+export function drawRowShiftArrow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  dir: -1 | 1,
+  r = 20,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = P.PAPER;
+  ctx.strokeStyle = P.INK;
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // Soft inner ring for depth.
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.arc(0, 0, r - 4, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // Filled chevron pointing left (-1) or right (+1).
+  ctx.fillStyle = P.INK;
+  const s = r * 0.42;
+  ctx.beginPath();
+  if (dir < 0) {
+    ctx.moveTo(s * 0.55, -s);
+    ctx.lineTo(-s * 0.65, 0);
+    ctx.lineTo(s * 0.55, s);
+    ctx.lineTo(s * 0.15, s * 0.35);
+    ctx.lineTo(-s * 0.15, 0);
+    ctx.lineTo(s * 0.15, -s * 0.35);
+  } else {
+    ctx.moveTo(-s * 0.55, -s);
+    ctx.lineTo(s * 0.65, 0);
+    ctx.lineTo(-s * 0.55, s);
+    ctx.lineTo(-s * 0.15, s * 0.35);
+    ctx.lineTo(s * 0.15, 0);
+    ctx.lineTo(-s * 0.15, -s * 0.35);
+  }
+  ctx.closePath();
+  ctx.fill();
   ctx.restore();
 }
 
