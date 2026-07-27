@@ -1,68 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { createSolved, F, type ColorId, type CubeState } from "./rubik";
-import { applyLaneTwist } from "./lane";
+import { createSolved, faceTurn, F, U } from "./rubik";
+import { applyLaneTwist, twistBelt } from "./lane";
 
-function readFaceLine(
-  cube: CubeState,
-  face: number,
-  axis: "row" | "col",
-  index: number,
-): ColorId[] {
-  const n = cube.size;
-  const line: ColorId[] = [];
-  if (axis === "row") {
-    for (let c = 0; c < n; c++) line.push(cube.faces[face]![index]![c] as ColorId);
-  } else {
-    for (let r = 0; r < n; r++) line.push(cube.faces[face]![r]![index] as ColorId);
-  }
-  return line;
-}
+describe("applyLaneTwist uses belt for all lanes", () => {
+  it("F row 0 amount 1 equals twistBelt, not faceTurn U", () => {
+    const cube = createSolved(3);
+    const twist = { axis: "row" as const, index: 0, dir: 1 as const, amount: 1 };
+    const viaLane = applyLaneTwist(cube, F, twist);
+    const viaBelt = twistBelt(cube, F, twist);
+    const viaFace = faceTurn(cube, U, 1);
 
-/** Same cell-center math as cube3d outerSlide paint. */
-function slideCenters(
-  n: number,
-  dir: 1 | -1,
-  progress: number,
-  faces: number,
-): { start: number[]; end: number[] } {
-  const slide = progress * faces * n;
-  const span = faces * n;
-  const start: number[] = [];
-  const end: number[] = [];
-  for (let c = 0; c < n; c++) {
-    start.push(c + 0.5 + dir * slide);
-    end.push(c + 0.5 + dir * slide - dir * span);
-  }
-  return { start, end };
-}
+    expect(viaLane).toEqual(viaBelt);
+    expect(viaLane).not.toEqual(viaFace);
+  });
 
-describe("outer lane start/end slide", () => {
-  for (const dir of [1, -1] as const) {
-    it(`F bottom dir=${dir}: endLine differs and lands on centers at p=1`, () => {
-      const n = 3;
-      const face = F;
-      const axis = "row" as const;
-      const index = n - 1;
-      const cube = createSolved(n);
-      const result = applyLaneTwist(cube, face, { axis, index, dir, amount: 1 });
-      const startLine = readFaceLine(cube, face, axis, index);
-      const endLine = readFaceLine(result, face, axis, index);
+  it("F bottom row equals twistBelt", () => {
+    const cube = createSolved(3);
+    const twist = { axis: "row" as const, index: 2, dir: -1 as const, amount: 1 };
+    expect(applyLaneTwist(cube, F, twist)).toEqual(twistBelt(cube, F, twist));
+  });
 
-      expect(endLine).not.toEqual(startLine);
-      expect(endLine).toHaveLength(n);
-
-      const { end } = slideCenters(n, dir, 1, 1);
-      for (let c = 0; c < n; c++) {
-        expect(end[c]).toBeCloseTo(c + 0.5, 6);
-      }
-    });
-  }
-
-  it("amount=2 slides two face-widths so end centers at p=1", () => {
-    const n = 3;
-    const { end } = slideCenters(n, 1, 1, 2);
-    for (let c = 0; c < n; c++) {
-      expect(end[c]).toBeCloseTo(c + 0.5, 6);
-    }
+  it("middle row still equals twistBelt", () => {
+    const cube = createSolved(3);
+    const twist = { axis: "row" as const, index: 1, dir: 1 as const, amount: 2 };
+    expect(applyLaneTwist(cube, F, twist)).toEqual(twistBelt(cube, F, twist));
   });
 });

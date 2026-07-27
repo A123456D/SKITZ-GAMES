@@ -269,14 +269,6 @@ export type CubeMotion = {
   hovering: boolean;
   /** Radians; rotates active-face stickers around face center in UV. */
   faceSpin?: number;
-  /** Outer-lane commit: slide start→end face line (not belt preview). */
-  outerSlide?: {
-    dir: 1 | -1;
-    progress: number; // eased 0..1
-    startLine: readonly number[];
-    endLine: readonly number[];
-    faces: number; // face-widths to slide
-  };
 };
 
 /** Rotate UV around face center. +angle = screen CW with V-down (matches faceTurn CW). */
@@ -501,73 +493,23 @@ function drawFace(
 
   if (movingRow >= 0) {
     const r = movingRow;
-    const slide = motion.outerSlide;
-    if (slide) {
-      const cellSlide = slide.progress * slide.faces * n;
-      const span = slide.faces * n;
-      for (let c = 0; c < n; c++) {
-        const startPos = c + 0.5 + slide.dir * cellSlide;
-        const endPos = c + 0.5 + slide.dir * cellSlide - slide.dir * span;
-        const v0 = r * stride + pad;
-        const v1 = v0 + cell;
-        const paintAt = (pos: number, color: number) => {
-          const u0 = (pos - 0.5) * stride + pad;
-          const u1 = u0 + cell;
-          paintSticker(color as ColorId, u0, v0, u1, v1, true);
-        };
-        paintAt(startPos, slide.startLine[c]!);
-        paintAt(endPos, slide.endLine[c]!);
-      }
-    } else {
-      const items = lanePreview(
-        source,
-        faceIndex,
-        "row",
-        r,
-        motion.offset,
-      );
-      for (const { pos, color } of items) {
-        const u0 = (pos - 0.5) * stride + pad;
-        const u1 = u0 + cell;
-        const v0 = r * stride + pad;
-        const v1 = v0 + cell;
-        paintSticker(color, u0, v0, u1, v1, true);
-      }
+    const items = lanePreview(source, faceIndex, "row", r, motion.offset);
+    for (const { pos, color } of items) {
+      const u0 = (pos - 0.5) * stride + pad;
+      const u1 = u0 + cell;
+      const v0 = r * stride + pad;
+      const v1 = v0 + cell;
+      paintSticker(color, u0, v0, u1, v1, true);
     }
   } else if (movingCol >= 0) {
     const c = movingCol;
-    const slide = motion.outerSlide;
-    if (slide) {
-      const cellSlide = slide.progress * slide.faces * n;
-      const span = slide.faces * n;
-      for (let r = 0; r < n; r++) {
-        const startPos = r + 0.5 + slide.dir * cellSlide;
-        const endPos = r + 0.5 + slide.dir * cellSlide - slide.dir * span;
-        const u0 = c * stride + pad;
-        const u1 = u0 + cell;
-        const paintAt = (pos: number, color: number) => {
-          const v0 = (pos - 0.5) * stride + pad;
-          const v1 = v0 + cell;
-          paintSticker(color as ColorId, u0, v0, u1, v1, true);
-        };
-        paintAt(startPos, slide.startLine[r]!);
-        paintAt(endPos, slide.endLine[r]!);
-      }
-    } else {
-      const items = lanePreview(
-        source,
-        faceIndex,
-        "col",
-        c,
-        motion.offset,
-      );
-      for (const { pos, color } of items) {
-        const u0 = c * stride + pad;
-        const u1 = u0 + cell;
-        const v0 = (pos - 0.5) * stride + pad;
-        const v1 = v0 + cell;
-        paintSticker(color, u0, v0, u1, v1, true);
-      }
+    const items = lanePreview(source, faceIndex, "col", c, motion.offset);
+    for (const { pos, color } of items) {
+      const u0 = c * stride + pad;
+      const u1 = u0 + cell;
+      const v0 = (pos - 0.5) * stride + pad;
+      const v1 = v0 + cell;
+      paintSticker(color, u0, v0, u1, v1, true);
     }
   }
 

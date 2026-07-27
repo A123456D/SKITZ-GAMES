@@ -3,7 +3,6 @@ import {
   type CubeState,
   type FaceId,
   cloneCube,
-  faceTurn,
   F,
   B,
   R,
@@ -147,30 +146,17 @@ export function twistBelt(
   return next;
 }
 
-/**
- * Map a lane on the viewing face to a real Rubik face turn when the lane is
- * an outer layer. Middle layers use a belt slice.
- */
+/** All lanes: sticker-by-sticker belt twist (same as middle row). */
 export function applyLaneTwist(
   cube: CubeState,
   view: FaceId,
   twist: LaneTwist,
 ): CubeState {
-  const n = cube.size;
-  const amount = Math.max(1, twist.amount ?? 1);
-  let c = cube;
-  for (let i = 0; i < amount; i++) {
-    const move = mapOuterLane(view, twist.axis, twist.index, n, twist.dir);
-    if (move) {
-      c = faceTurn(c, move.face, move.dir);
-    } else {
-      c = twistBelt(c, view, { ...twist, amount: 1 });
-    }
-  }
-  return c;
+  return twistBelt(cube, view, twist);
 }
 
-function mapOuterLane(
+/** Map outer lane → face turn (kept for reference/tests; unused by applyLaneTwist). */
+export function mapOuterLane(
   view: FaceId,
   axis: LaneAxis,
   index: number,
