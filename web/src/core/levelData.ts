@@ -7,6 +7,7 @@ import { makeTable, type TableDef } from "./tableDef";
  * Solution / replay step.
  * - rotate disc: tableId >= 0, delta = ±1 (or multi via repeated steps)
  * - cycle triangle: tableId === -1, (x,y) set, delta = ±1 (ori flip)
+ * - row shift: tableId === -2, y set, delta = ±1 (discs in that row wrap)
  * - board turn: tableId === -3, delta = ±1 (grid remap; discs keep rotationQ)
  */
 export type MoveStep = {
@@ -32,6 +33,12 @@ export type LevelData = {
   solution: MoveStep[];
   hint?: string;
   tutorial?: boolean;
+  /** Phase 2+: geared discs that turn together. */
+  hasGears?: boolean;
+  /** Phase 3: player may shift rows. */
+  allowRowShift?: boolean;
+  /** Phase 3: player may rotate the whole board. */
+  allowBoardTurn?: boolean;
 };
 
 export function buildState(level: LevelData): GridState {
@@ -105,4 +112,9 @@ export function triangleAt(x: number, y: number, delta = 1): MoveStep {
 /** Rotate the whole board by ±1 quarter. */
 export function boardTurn(delta: number): MoveStep {
   return { tableId: -3, delta };
+}
+
+/** Shift every disc in row `y` by ±1 (wrap). */
+export function rowShift(y: number, delta: number): MoveStep {
+  return { tableId: -2, delta, y };
 }

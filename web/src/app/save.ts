@@ -27,7 +27,11 @@ export type ActiveRunData = {
   levelIndex: number;
   seed: number;
   rotations: number[];
+  hubs?: { x: number; y: number }[];
+  width?: number;
+  height?: number;
   historyRotations: number[][];
+  historyHubs?: { x: number; y: number }[][];
   moves: number;
   undosRemaining: number;
   pulsesUsed: number;

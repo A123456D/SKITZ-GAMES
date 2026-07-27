@@ -37,7 +37,7 @@ export type Layout = {
 
 export function boardLayout(state: GridState): Layout {
   // Dense boards: tight gaps so the grid reads as one tiled circuit.
-  const padX = 18;
+  const padX = 52; // room for phase-3 row chevrons beside the grid
   const boardTop = 236;
   const boardBottom = 1050;
   const availW = W - padX * 2;

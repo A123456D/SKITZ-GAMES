@@ -1,4 +1,4 @@
-import { DIFFICULTY_COUNT, generateLevel, levelTitle } from "./core/levelCatalog";
+import { DIFFICULTY_COUNT, generateLevel, levelTitle, phaseOf } from "./core/levelCatalog";
 import { Kind } from "./core/cellKind";
 import { getCell } from "./core/gridState";
 import {
@@ -11,7 +11,9 @@ import {
   restart,
   selectTable,
   stars,
+  tryBoardTurn,
   tryRotate,
+  tryRowShift,
   undo,
   type PuzzleSession,
 } from "./core/puzzleSession";
@@ -221,7 +223,7 @@ const TUTORIAL_FLOW: TutStep[] = [
     body: [
       "Larger boards stay one circuit.",
       "No open stubs. No separate islands.",
-      "Ambiguity grows with size — that is the game.",
+      "Ambiguity grows with size — then gears, then row shifts.",
     ],
     nextLabel: "TRY LESSON 2",
   },
@@ -450,13 +452,21 @@ function runRotations(): number[] {
   return session?.state.tables.map((t) => t.rotationQ) ?? [];
 }
 
+function runHubs(): { x: number; y: number }[] {
+  return session?.state.tables.map((t) => ({ x: t.hub.x, y: t.hub.y })) ?? [];
+}
+
 function persistRun(): void {
   if (!session || inTutorial) return;
   const run: ActiveRunData = {
     levelIndex,
     seed: playSeed,
     rotations: runRotations(),
+    hubs: runHubs(),
+    width: session.state.width,
+    height: session.state.height,
     historyRotations: session.history.map((state) => state.tables.map((t) => t.rotationQ)),
+    historyHubs: session.history.map((state) => state.tables.map((t) => ({ x: t.hub.x, y: t.hub.y }))),
     moves: session.moves,
     undosRemaining: session.undosRemaining,
     pulsesUsed: session.pulsesUsed,
@@ -483,16 +493,34 @@ function restoreSavedRun(): boolean {
   levelIndex = run.levelIndex;
   playSeed = run.seed >>> 0;
   session = loadLevel(generateLevel(levelIndex + 1, playSeed));
-  const applyRotations = (tables: PuzzleSession["state"]["tables"], rotations: number[]): void => {
+  if (
+    Number.isFinite(run.width) &&
+    Number.isFinite(run.height) &&
+    run.width! > 0 &&
+    run.height! > 0
+  ) {
+    session.state.width = run.width!;
+    session.state.height = run.height!;
+    session.level = { ...session.level, width: run.width!, height: run.height! };
+  }
+  const applyPose = (
+    tables: PuzzleSession["state"]["tables"],
+    rotations: number[],
+    hubs?: { x: number; y: number }[],
+  ): void => {
     tables.forEach((table, i) => {
       const q = rotations[i];
       if (Number.isFinite(q)) table.rotationQ = ((Math.round(q) % 4) + 4) % 4;
+      const hub = hubs?.[i];
+      if (hub && Number.isFinite(hub.x) && Number.isFinite(hub.y)) {
+        table.hub = { x: hub.x, y: hub.y };
+      }
     });
   };
-  applyRotations(session.state.tables, run.rotations);
-  session.history = (Array.isArray(run.historyRotations) ? run.historyRotations : []).map((rotations) => {
+  applyPose(session.state.tables, run.rotations, run.hubs);
+  session.history = (Array.isArray(run.historyRotations) ? run.historyRotations : []).map((rotations, hi) => {
     const snapshot = buildState(session!.level);
-    applyRotations(snapshot.tables, rotations);
+    applyPose(snapshot.tables, rotations, run.historyHubs?.[hi]);
     return snapshot;
   });
   session.moves = Math.max(0, Number(run.moves) || 0);
@@ -1138,6 +1166,35 @@ function onButton(id: string): void {
     displayResult = session.result;
     beamProgress = 1;
     persistRun();
+  }
+  if (id === "board_ccw") {
+    if (tryBoardTurn(session, -1)) {
+      layout = boardLayout(session.state);
+      displayResult = session.result;
+      beamProgress = 1;
+      sfxTick();
+      persistRun();
+    }
+  }
+  if (id === "board_cw") {
+    if (tryBoardTurn(session, 1)) {
+      layout = boardLayout(session.state);
+      displayResult = session.result;
+      beamProgress = 1;
+      sfxTick();
+      persistRun();
+    }
+  }
+  if (id.startsWith("row_L_") || id.startsWith("row_R_")) {
+    const left = id.startsWith("row_L_");
+    const y = Number(id.slice(6));
+    if (Number.isInteger(y) && tryRowShift(session, y, left ? -1 : 1)) {
+      layout = boardLayout(session.state);
+      displayResult = session.result;
+      beamProgress = 1;
+      sfxTick();
+      persistRun();
+    }
   }
   if (id === "reset") {
     restart(session);
@@ -1803,6 +1860,52 @@ function drawPlay(): void {
     ctx.fillText("Follow the finger — tap Next to learn each symbol", W / 2, 148);
   }
   drawHairlineGrid(ctx, session.state, layout);
+
+  // Phase 3: neat row-shift chevrons + corner board-turn buttons.
+  if (session.level.allowRowShift && !victory && !pendingWin) {
+    const s = layout.cell + layout.gap;
+    for (let y = 0; y < session.state.height; y++) {
+      const cy = layout.origin.y + y * s + layout.cell / 2;
+      const left: ButtonRect = {
+        x: layout.origin.x - 44,
+        y: cy - 16,
+        w: 32,
+        h: 32,
+        id: `row_L_${y}`,
+      };
+      const right: ButtonRect = {
+        x: layout.origin.x + session.state.width * s - layout.gap + 12,
+        y: cy - 16,
+        w: 32,
+        h: 32,
+        id: `row_R_${y}`,
+      };
+      drawRoundButton(ctx, left.x + 16, left.y + 16, 14, "‹", false, time);
+      drawRoundButton(ctx, right.x + 16, right.y + 16, 14, "›", false, time);
+      buttons.push(left, right);
+    }
+  }
+  if (session.level.allowBoardTurn && !victory && !pendingWin) {
+    const s = layout.cell + layout.gap;
+    const boardW = session.state.width * s - layout.gap;
+    const tl: ButtonRect = {
+      x: layout.origin.x - 8,
+      y: layout.origin.y - 36,
+      w: 36,
+      h: 36,
+      id: "board_ccw",
+    };
+    const tr: ButtonRect = {
+      x: layout.origin.x + boardW - 28,
+      y: layout.origin.y - 36,
+      w: 36,
+      h: 36,
+      id: "board_cw",
+    };
+    drawRoundButton(ctx, tl.x + 18, tl.y + 18, 16, "↺", false, time);
+    drawRoundButton(ctx, tr.x + 18, tr.y + 18, 16, "↻", false, time);
+    buttons.push(tl, tr);
+  }
 
   // Gear tie-lines sit under the discs.
   for (const t of session.state.tables) {

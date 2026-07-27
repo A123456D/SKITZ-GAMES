@@ -5,6 +5,7 @@ import { cloneGrid, getCell, getTable, inBounds, type GridState } from "./gridSt
 import { buildState, type LevelData, type MoveStep } from "./levelData";
 import { rotateTable, setTableRotation } from "./rotateOps";
 import { rotateBoard } from "./boardTurn";
+import { shiftRow } from "./rowShift";
 
 export type PuzzleSession = {
   level: LevelData;
@@ -215,6 +216,7 @@ export function tryRotateTriangle(session: PuzzleSession, x: number, y: number, 
  */
 export function tryBoardTurn(session: PuzzleSession, deltaQ: number): boolean {
   if (session.result.won) return false;
+  if (!session.level.allowBoardTurn && !session.level.tutorial) return false;
   const steps = ((deltaQ % 4) + 4) % 4;
   if (steps === 0) return false;
   pushHistory(session);
@@ -234,14 +236,47 @@ export function tryBoardTurn(session: PuzzleSession, deltaQ: number): boolean {
   return true;
 }
 
-/** Replay one authored solution step (rotate / triangle / board turn). */
+/** Shift every disc in row `y` by ±1 with wrap. */
+export function tryRowShift(session: PuzzleSession, y: number, delta: number): boolean {
+  if (session.result.won) return false;
+  if (!session.level.allowRowShift && !session.level.tutorial) return false;
+  if (delta === 0) return false;
+  pushHistory(session);
+  if (!shiftRow(session.state, y, delta)) {
+    session.history.pop();
+    return false;
+  }
+  session.moves += 1;
+  session.selectedTable = -1;
+  syncLatent(session);
+  hideBeams(session);
+  session.result.moveApplied = true;
+  session.result.tableId = -2;
+  session.result.deltaQ = delta;
+  return true;
+}
+
+/** Replay one authored solution step (rotate / triangle / row shift / board turn). */
 export function applySolutionStep(session: PuzzleSession, step: MoveStep): boolean {
   if (step.tableId === -1) {
     if (step.x === undefined || step.y === undefined) return false;
     return tryRotateTriangle(session, step.x, step.y, step.delta || 1);
   }
+  if (step.tableId === -2) {
+    if (step.y === undefined) return false;
+    // Bypass allow flag during authored replay / generation verify.
+    const prev = session.level.allowRowShift;
+    session.level = { ...session.level, allowRowShift: true };
+    const ok = tryRowShift(session, step.y, step.delta || 1);
+    session.level = { ...session.level, allowRowShift: prev };
+    return ok;
+  }
   if (step.tableId === -3) {
-    return tryBoardTurn(session, step.delta || 1);
+    const prev = session.level.allowBoardTurn;
+    session.level = { ...session.level, allowBoardTurn: true };
+    const ok = tryBoardTurn(session, step.delta || 1);
+    session.level = { ...session.level, allowBoardTurn: prev };
+    return ok;
   }
   return tryRotate(session, step.tableId, step.delta);
 }

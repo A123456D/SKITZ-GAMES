@@ -143,17 +143,26 @@ describe("dense procedural levels", () => {
     expect(session.result.won).toBe(true);
   });
 
-  it("board size grows one step per desk until the cap", () => {
-    const sizes = [1, 2, 3, 4, 5, 6, 7, 10, 12].map((d) => generateLevel(d, 50 + d).width);
-    expect(sizes).toEqual([3, 4, 5, 6, 7, 8, 8, 8, 8]);
+  it("board size repeats each phase slot", () => {
+    const p1 = [1, 2, 3, 4, 5, 6].map((d) => generateLevel(d, 50 + d).width);
+    const p2 = [7, 8, 9, 10, 11, 12].map((d) => generateLevel(d, 50 + d).width);
+    expect(p1).toEqual([3, 4, 5, 6, 7, 8]);
+    expect(p2).toEqual([3, 4, 5, 6, 7, 8]);
   });
 
-  it("late desks lock some hubs", () => {
-    const level = generateLevel(10, 909);
-    expect(level.tables.some((t) => t.locked)).toBe(true);
+  it("phase 2 boards use gear links", () => {
+    const level = generateLevel(8, 909);
+    expect(level.hasGears).toBe(true);
+    expect(level.tables.some((t) => !!t.link)).toBe(true);
   });
 
-  for (const d of [1, 3, 5, 8, 11]) {
+  it("phase 3 boards allow row shift and board turn", () => {
+    const level = generateLevel(13, 404);
+    expect(level.allowRowShift).toBe(true);
+    expect(level.allowBoardTurn).toBe(true);
+  });
+
+  for (const d of [1, 3, 5, 8, 13]) {
     it(`diff ${d} generates a closed solvable net`, () => {
       const level = generateLevel(d, 1000 + d * 17);
       expect(level.tables.length).toBe(level.width * level.height);
@@ -163,14 +172,13 @@ describe("dense procedural levels", () => {
       }
       expect(pulse(session)).toBe(true);
       expect(session.result.won).toBe(true);
-      // Starting position must not already be closed
       const start = loadLevel(level);
       expect(start.latent.won).toBe(false);
     });
   }
 
   it("difficulty count is stable", () => {
-    expect(DIFFICULTY_COUNT).toBe(12);
+    expect(DIFFICULTY_COUNT).toBe(18);
   });
 });
 

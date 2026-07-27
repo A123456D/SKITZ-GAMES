@@ -1,16 +1,24 @@
 /**
  * Dense Net/Pipes-style circuit generator.
  * Every cell is a disc; win = no loose ends + one connected component.
+ *
+ * Three phases × six board sizes (3×3 → 8×8):
+ *   Phase 1 — turn discs
+ *   Phase 2 — geared discs turn together
+ *   Phase 3 — gears + row shifts + board turns
  */
 import { Dir, type Vec2 } from "./cellKind";
-import { buildState, cell, move, type LevelData, type MoveStep } from "./levelData";
+import { buildState, cell, move, rowShift, type LevelData, type MoveStep } from "./levelData";
 import { Module as M, makeTable, type TableDef } from "./tableDef";
 import { moduleForPorts } from "./portWiring";
-import { setTableRotation } from "./rotateOps";
+import { rotateTable, setTableRotation } from "./rotateOps";
 import { applySolutionStep, loadLevel, pulse } from "./puzzleSession";
 import { analyzeNetwork, buildFastNet, fastWon, solve } from "./networkSolver";
+import { shiftRow } from "./rowShift";
 
-export const DIFFICULTY_COUNT = 12;
+export const PHASE_COUNT = 3;
+export const PHASE_LEN = 6;
+export const DIFFICULTY_COUNT = PHASE_COUNT * PHASE_LEN;
 
 type Rng = () => number;
 
@@ -38,23 +46,52 @@ function shuffle<T>(rng: Rng, arr: T[]): T[] {
   return a;
 }
 
+/** 1-based phase for a 1-based difficulty. */
+export function phaseOf(diff: number): 1 | 2 | 3 {
+  const d = Math.max(1, Math.min(DIFFICULTY_COUNT, diff));
+  return (Math.floor((d - 1) / PHASE_LEN) + 1) as 1 | 2 | 3;
+}
+
+/** 1-based slot within the phase (1..6). */
+export function phaseSlot(diff: number): number {
+  const d = Math.max(1, Math.min(DIFFICULTY_COUNT, diff));
+  return ((d - 1) % PHASE_LEN) + 1;
+}
+
 export function levelTitle(diff: number): string {
-  return `No. ${String(diff).padStart(3, "0")}`;
+  const p = phaseOf(diff);
+  const s = phaseSlot(diff);
+  return `P${p} · ${String(s).padStart(2, "0")}`;
 }
 
 function profile(diff: number) {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, diff));
-  // Desks 1–6 grow one step; 7–12 stay at the mobile-friendly 8×8 cap and
-  // harden via chords, fewer pulses, and locked hubs.
-  const size = Math.min(8, 2 + d);
-  const extraEdges =
-    d <= 2 ? 0 : d <= 6 ? 1 : d <= 8 ? 2 : d <= 10 ? 3 : 4;
-  const pulseLimit = d >= 11 ? 1 : d >= 9 ? 2 : 3;
-  const undoLimit = 0; // unused — undo is free
-  // Lock high-degree hubs late so fewer discs can be spun freely.
-  const lockedHubs = d <= 8 ? 0 : d === 9 ? 2 : d === 10 ? 4 : d === 11 ? 6 : 8;
-  const minMoves = Math.min(size * size - 1, 3 + Math.floor(d * 1.35));
-  return { diff: d, size, extraEdges, pulseLimit, undoLimit, lockedHubs, minMoves };
+  const phase = phaseOf(d);
+  const slot = phaseSlot(d);
+  // Same size curve every phase: slot 1 → 3×3 … slot 6 → 8×8.
+  const size = Math.min(8, 2 + slot);
+  const extraEdges = slot <= 2 ? 0 : slot <= 4 ? 1 : 2;
+  const pulseLimit = phase === 1 ? 3 : phase === 2 ? (slot >= 5 ? 2 : 3) : slot >= 4 ? 2 : 3;
+  const undoLimit = 0;
+  const gearPairs =
+    phase === 1 ? 0 : phase === 2 ? Math.min(1 + Math.floor(slot / 2), 4) : Math.min(2 + Math.floor(slot / 2), 5);
+  const rowShifts = phase === 3 ? Math.min(1 + Math.floor((slot - 1) / 2), 3) : 0;
+  const minMoves = Math.min(size * size - 1, 3 + slot + (phase - 1) * 2);
+  return {
+    diff: d,
+    phase,
+    slot,
+    size,
+    extraEdges,
+    pulseLimit,
+    undoLimit,
+    gearPairs,
+    rowShifts,
+    minMoves,
+    hasGears: phase >= 2,
+    allowRowShift: phase >= 3,
+    allowBoardTurn: phase >= 3,
+  };
 }
 
 type Edge = { a: number; b: number }; // cell indices
@@ -150,6 +187,30 @@ function tablesFromPorts(w: number, h: number, ports: number[][]): TableDef[] {
   return tables;
 }
 
+/** Pair adjacent discs into bidirectional gear links. */
+function linkGears(tables: TableDef[], w: number, pairs: number, rng: Rng): void {
+  if (pairs <= 0) return;
+  const byHub = new Map<string, TableDef>();
+  for (const t of tables) byHub.set(`${t.hub.x},${t.hub.y}`, t);
+  const candidates: [TableDef, TableDef][] = [];
+  for (const t of tables) {
+    if (t.link) continue;
+    const right = byHub.get(`${t.hub.x + 1},${t.hub.y}`);
+    const down = byHub.get(`${t.hub.x},${t.hub.y + 1}`);
+    if (right && !right.link) candidates.push([t, right]);
+    if (down && !down.link) candidates.push([t, down]);
+  }
+  let linked = 0;
+  for (const [a, b] of shuffle(rng, candidates)) {
+    if (linked >= pairs) break;
+    if (a.link || b.link) continue;
+    const sign: 1 | -1 = rng() < 0.5 ? 1 : -1;
+    a.link = { partner: b.id, sign };
+    b.link = { partner: a.id, sign };
+    linked++;
+  }
+}
+
 function emptyGrid(w: number, h: number) {
   return Array.from({ length: w * h }, () => cell.empty());
 }
@@ -239,54 +300,66 @@ function scrambleAndVerify(
     undoLimit: opts.undoLimit,
     pulseLimit: opts.pulseLimit,
     tokenBudget: 0,
-    tables: solvedTables.map((t) => ({ ...t, hub: { ...t.hub } })),
+    tables: solvedTables.map((t) => ({
+      ...t,
+      hub: { ...t.hub },
+      link: t.link ? { ...t.link } : undefined,
+    })),
     cells,
     solution: [],
+    hasGears: opts.hasGears,
+    allowRowShift: opts.allowRowShift,
+    allowBoardTurn: opts.allowBoardTurn,
   };
 
   const solvedNet = analyzeNetwork(buildState(solved));
   if (!solvedNet.won) return null;
 
   const g = buildState(solved);
-  const solution: MoveStep[] = [];
+  const rotateSteps: MoveStep[] = [];
+  const visited = new Set<number>();
 
-  // Lock high-degree hubs at their solved rotation so late desks force
-  // routing around fixed junctions instead of spinning everything.
-  if (opts.lockedHubs > 0) {
-    const hubs = g.tables
-      .filter((t) => t.module === M.CROSS || t.module === M.TEE)
-      .sort((a, b) => {
-        const rank = (m: number) => (m === M.CROSS ? 2 : 1);
-        return rank(b.module) - rank(a.module);
-      });
-    for (const t of shuffle(rng, hubs).slice(0, opts.lockedHubs)) {
-      t.locked = true;
-    }
-  }
-
-  for (const t of g.tables) {
-    if (t.locked) continue;
-    const amount = 1 + Math.floor(rng() * 3); // 1..3
+  // Scramble with rotateTable so geared partners stay in sync. Only emit
+  // solution steps for the disc the player actually turns (not the partner).
+  for (const t of shuffle(rng, [...g.tables])) {
+    if (visited.has(t.id) || t.locked) continue;
+    const amount = 1 + Math.floor(rng() * 3);
     const sign = rng() < 0.5 ? 1 : -1;
-    setTableRotation(g, t.id, t.rotationQ + sign * amount);
-    for (let k = 0; k < amount; k++) solution.push(move(t.id, (-sign) as -1 | 1));
+    if (!rotateTable(g, t.id, sign * amount)) continue;
+    for (let k = 0; k < amount; k++) rotateSteps.push(move(t.id, (-sign) as -1 | 1));
+    visited.add(t.id);
+    if (t.link) visited.add(t.link.partner);
   }
-  // Ensure nothing accidentally still solved
+
+  // Ensure nothing accidentally still solved (ungeared leftovers).
   for (const t of g.tables) {
-    if (t.locked) continue;
+    if (t.locked || (t.link && visited.has(t.link.partner) && !visited.has(t.id))) continue;
     const sol = solvedTables.find((x) => x.id === t.id)!;
     if (((t.rotationQ % 4) + 4) % 4 === ((sol.rotationQ % 4) + 4) % 4) {
-      setTableRotation(g, t.id, t.rotationQ + 1);
-      solution.push(move(t.id, -1));
+      if (t.link && visited.has(t.id)) continue;
+      rotateTable(g, t.id, 1);
+      rotateSteps.push(move(t.id, -1));
+      visited.add(t.id);
+      if (t.link) visited.add(t.link.partner);
     }
   }
 
-  for (let i = solution.length - 1; i > 0; i--) {
+  for (let i = rotateSteps.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    [solution[i], solution[j]] = [solution[j], solution[i]];
+    [rotateSteps[i], rotateSteps[j]] = [rotateSteps[j], rotateSteps[i]];
   }
 
-  if (solution.length < opts.minMoves) return null;
+  // Phase 3: break the board with row wraps. Player undoes shifts first.
+  const shiftSteps: MoveStep[] = [];
+  for (let i = 0; i < opts.rowShifts; i++) {
+    const y = Math.floor(rng() * h);
+    const dir: 1 | -1 = rng() < 0.5 ? 1 : -1;
+    if (!shiftRow(g, y, dir)) continue;
+    shiftSteps.push(rowShift(y, -dir));
+  }
+
+  const solution = [...shiftSteps, ...rotateSteps];
+  if (rotateSteps.length < opts.minMoves) return null;
 
   const level: LevelData = {
     id: `diff_${difficulty}`,
@@ -305,17 +378,23 @@ function scrambleAndVerify(
     cells: emptyGrid(w, h),
     solution,
     tutorial: false,
+    hasGears: opts.hasGears,
+    allowRowShift: opts.allowRowShift,
+    allowBoardTurn: opts.allowBoardTurn,
     hint:
       difficulty === 1
         ? "Turn every disc so all marks meet. No open ends. Then PULSE."
-        : difficulty === 5
-          ? "One continuous circuit — every stub must meet another."
-          : undefined,
+        : difficulty === 7
+          ? "Linked discs turn together — watch the gear partners."
+          : difficulty === 13
+            ? "Shift rows with the side arrows. Corner buttons turn the board."
+            : undefined,
   };
 
   if (solve(buildState(level)).won) return null;
 
-  if (!skipAntiCheap) {
+  // Fast anti-cheap only works without gears; geared boards skip it.
+  if (!skipAntiCheap && !opts.hasGears) {
     const exactDepth = difficulty >= 8 ? 2 : 3;
     const probeLen = difficulty >= 10 ? 5 : 4;
     const probes = difficulty >= 10 ? 1200 : 800;
@@ -342,28 +421,38 @@ export function generateLevel(difficulty: number, seed: number): LevelData {
   const d = Math.max(1, Math.min(DIFFICULTY_COUNT, difficulty));
   const rng = mulberry32((seed >>> 0) ^ Math.imul(d, 0x9e3779b9));
   const opts = profile(d);
-  const attempts = d >= 10 ? 400 : d >= 7 ? 250 : 150;
+  const attempts = opts.phase >= 3 ? 400 : opts.phase >= 2 ? 300 : 150;
   const started = now();
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     const w = opts.size;
     const h = opts.size;
-    // Slight jitter on chords so retries differ
     const extras = Math.max(0, opts.extraEdges + (rng() < 0.35 ? -1 : 0) + (rng() < 0.25 ? 1 : 0));
     const edges = buildTopology(w, h, extras, rng);
     const ports = portsFromEdges(w, h, edges);
     const tables = tablesFromPorts(w, h, ports);
+    linkGears(tables, w, opts.gearPairs, rng);
     const overBudget = now() - started > BUDGET_MS;
     const level = scrambleAndVerify(tables, w, h, rng, opts, d, overBudget);
     if (level) return level;
   }
 
-  // Last-resort: smaller board, no anti-shortcut
+  // Last-resort: smaller board, no gears/shifts, no anti-shortcut
   const w = Math.max(4, opts.size - 1);
   const edges = buildTopology(w, w, 0, rng);
   const ports = portsFromEdges(w, w, edges);
   const tables = tablesFromPorts(w, w, ports);
-  const soft = { ...opts, size: w, minMoves: 3, extraEdges: 0 };
+  const soft = {
+    ...opts,
+    size: w,
+    minMoves: 3,
+    extraEdges: 0,
+    gearPairs: 0,
+    rowShifts: 0,
+    hasGears: false,
+    allowRowShift: false,
+    allowBoardTurn: false,
+  };
   const level = scrambleAndVerify(tables, w, w, rng, soft, d, true);
   if (level) return level;
 
