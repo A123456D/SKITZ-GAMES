@@ -1,19 +1,29 @@
 /** Sticker art kinds used as Rubik face “colors”. */
 export const TILE_KINDS = [
-  "smirk",
-  "flame",
+  "glitch",
+  "punk",
+  "hood",
   "ramen",
   "mask",
   "katana",
-  "goggles",
-  "bubble",
-  "cat",
-  "control",
-  "juice",
-  "peace",
+  "eyepatch",
+  "tears",
   "butterfly",
-  "school",
+  "bolt",
+  "pill",
+  "chain",
+  "ghost",
+  "bunny",
   "tv",
+  "candle",
+  "crow",
+  "bear",
+  "poison",
+  "heart",
+  "eye",
+  "hourglass",
+  "soda",
+  "grimoire",
 ] as const;
 
 export type TileKind = (typeof TILE_KINDS)[number];
@@ -32,12 +42,12 @@ export type FaceStickers = readonly [
  * Solved cube = every sticker on a face matches that face’s kind.
  */
 export const FACE_STICKERS: FaceStickers = [
-  "smirk",
-  "flame",
+  "glitch",
+  "punk",
+  "hood",
   "ramen",
   "mask",
   "katana",
-  "goggles",
 ];
 
 /** Shuffle TILE_KINDS and take 6 distinct kinds for the six faces. */
