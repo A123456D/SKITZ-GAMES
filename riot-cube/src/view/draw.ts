@@ -409,7 +409,7 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = p.accent;
   ctx.font = "600 20px 'Patrick Hand', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("A real Rubik\u2019s Cube. No timer. Just twist.", W / 2, 680);
+  ctx.fillText("A sticker Rubik\u2019s Cube. No timer. Just twist.", W / 2, 680);
 
   ctx.fillStyle = p.panel;
   roundRect(ctx, 120, 710, 480, 120, 8);

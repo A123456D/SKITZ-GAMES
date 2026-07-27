@@ -1,4 +1,7 @@
 import type { ColorId, CubeState, FaceId } from "../core/rubik";
+import { stickerForColor, type TileKind } from "../core/stickers";
+import { getQuality } from "./quality";
+import { stickerImage } from "./stickers";
 import { getPalette } from "./theme";
 
 export type Vec3 = { x: number; y: number; z: number };
@@ -290,6 +293,7 @@ function drawFace(
   const geom = FACES[faceIndex]!;
   const board = cube.faces[faceIndex]!;
   const n = cube.size;
+  const quality = getQuality();
 
   const q = geom.corners.map((c) => {
     const w = applyRot(c, layout.rotX, layout.rotY);
@@ -304,13 +308,28 @@ function drawFace(
   ctx.lineTo(q[2]!.x, q[2]!.y);
   ctx.lineTo(q[3]!.x, q[3]!.y);
   ctx.closePath();
-  ctx.fillStyle = p.ink;
+  ctx.fillStyle = isActive ? p.faceActive : p.faceSide;
   ctx.fill();
   ctx.strokeStyle = isActive ? p.accent : p.faceStroke;
   ctx.lineWidth = isActive ? 4 : 2.5;
   ctx.stroke();
 
-  const gap = 0.06;
+  // Lined paper hint
+  ctx.save();
+  ctx.clip();
+  ctx.strokeStyle = isActive ? p.faceRule : p.faceRuleDim;
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 8; i++) {
+    const t = i / 8;
+    const a = lerp2(q[0]!, q[3]!, t);
+    const b = lerp2(q[1]!, q[2]!, t);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  const gap = 0.04;
   const stride = 1 / n;
   const cell = (1 - gap * (n - 1)) / n;
   const pad = (stride - cell) / 2;
@@ -318,6 +337,7 @@ function drawFace(
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
       const colorId = board[r]![c] as ColorId;
+      const kind = stickerForColor(colorId);
       const u0 = c * stride + pad;
       const v0 = r * stride + pad;
       const u1 = u0 + cell;
@@ -326,18 +346,63 @@ function drawFace(
       const s1 = facePointScreen(geom, u1, v0, layout);
       const s2 = facePointScreen(geom, u1, v1, layout);
       const s3 = facePointScreen(geom, u0, v1, layout);
-      ctx.beginPath();
-      ctx.moveTo(s0.x, s0.y);
-      ctx.lineTo(s1.x, s1.y);
-      ctx.lineTo(s2.x, s2.y);
-      ctx.lineTo(s3.x, s3.y);
-      ctx.closePath();
-      ctx.fillStyle = p.faceColors[colorId]!;
-      ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,0.35)";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+      drawStickerOnQuad(ctx, kind, s0, s1, s2, s3, q, quality.stickerShadows);
     }
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+function lerp2(a: Vec2, b: Vec2, t: number): Vec2 {
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+
+function drawStickerOnQuad(
+  ctx: CanvasRenderingContext2D,
+  kind: TileKind,
+  tl: Vec2,
+  tr: Vec2,
+  br: Vec2,
+  bl: Vec2,
+  faceQuad: Vec2[],
+  shadows: boolean,
+): void {
+  const cx = (tl.x + tr.x + br.x + bl.x) / 4;
+  const cy = (tl.y + tr.y + br.y + bl.y) / 4;
+  const bw =
+    (Math.hypot(tr.x - tl.x, tr.y - tl.y) + Math.hypot(br.x - bl.x, br.y - bl.y)) /
+    2;
+  const bh =
+    (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) /
+    2;
+  const s = Math.min(bw, bh);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(faceQuad[0]!.x, faceQuad[0]!.y);
+  ctx.lineTo(faceQuad[1]!.x, faceQuad[1]!.y);
+  ctx.lineTo(faceQuad[2]!.x, faceQuad[2]!.y);
+  ctx.lineTo(faceQuad[3]!.x, faceQuad[3]!.y);
+  ctx.closePath();
+  ctx.clip();
+
+  const img = stickerImage(kind);
+  if (shadows) {
+    ctx.shadowColor = "rgba(0,0,0,0.25)";
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 3;
+  }
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.drawImage(img, cx - s / 2, cy - s / 2, s, s);
+  } else {
+    const p = getPalette();
+    ctx.fillStyle = p.paper;
+    ctx.fillRect(cx - s / 2, cy - s / 2, s, s);
+    ctx.fillStyle = p.ink;
+    ctx.font = `800 ${Math.floor(s * 0.22)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(kind.slice(0, 3).toUpperCase(), cx, cy);
   }
   ctx.restore();
 }

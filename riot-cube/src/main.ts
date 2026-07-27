@@ -58,6 +58,7 @@ import {
   unlockAudio,
 } from "./audio/paper";
 import { loadUiButtons } from "./view/uiButtons";
+import { loadStickers } from "./view/stickers";
 import { detectQuality, getQuality } from "./view/quality";
 import {
   applyThemeChrome,
@@ -243,6 +244,7 @@ canvas.addEventListener("pointerdown", (e) => {
     }
     if (hitUiRect(SETTINGS_THEME, x, y)) {
       cycleTheme();
+      void loadStickers();
       return;
     }
     if (hitUiRect(SETTINGS_SIZE, x, y)) {
@@ -396,7 +398,7 @@ window.addEventListener("orientationchange", resize);
 async function boot(): Promise<void> {
   applyThemeChrome();
   resize();
-  await Promise.all([loadLogo(), loadUiButtons()]);
+  await Promise.all([loadLogo(), loadUiButtons(), loadStickers()]);
   requestAnimationFrame(tick);
 }
 
