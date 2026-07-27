@@ -73,9 +73,9 @@ let settingsFrom: Screen = "home";
 
 let session: Session = startSession(LEVEL_1);
 let floatText: { text: string; life: number } | null = null;
-/** Selected row/col for bottom dock slide buttons. */
-let controlRow = 0;
-let controlCol = 0;
+/** Selected row/col for bottom dock — selected lane floats. */
+let controlMode: "row" | "col" = "row";
+let controlIndex = 0;
 let playDock: PlayDock | null = null;
 
 type DragState = {
@@ -181,6 +181,15 @@ function activeMotion(): {
       hovering: Math.abs(springUv) > 0.01,
     };
   }
+  // Idle selection from the dock — keep that lane floating.
+  if (screen === "play" && session.status === "playing") {
+    return {
+      axis: controlMode,
+      index: controlIndex,
+      offset: 0,
+      hovering: true,
+    };
+  }
   return { axis: null, index: -1, offset: 0, hovering: false };
 }
 
@@ -206,8 +215,8 @@ function resetPlayVisuals(): void {
 function goHome(): void {
   screen = "home";
   resetPlayVisuals();
-  controlRow = 0;
-  controlCol = 0;
+  controlMode = "row";
+  controlIndex = 0;
   session = startSession(LEVEL_1);
   syncActiveFace();
   paint();
@@ -215,8 +224,8 @@ function goHome(): void {
 
 function startPlay(): void {
   resetPlayVisuals();
-  controlRow = 0;
-  controlCol = 0;
+  controlMode = "row";
+  controlIndex = 0;
   session = startSession(LEVEL_1);
   syncActiveFace();
   screen = "play";
@@ -253,7 +262,7 @@ function paint(): void {
   const motion = activeMotion();
   const sourceFaces = session.faces;
   let displayFaces = sourceFaces;
-  if (motion.axis && motion.hovering && !visualBoard) {
+  if (motion.axis && motion.hovering && Math.abs(motion.offset) > 0.001 && !visualBoard) {
     const previewed = previewCubeFaces(
       sourceFaces,
       session.face,
@@ -286,9 +295,8 @@ function paint(): void {
   ctx.fillText(`FACE · ${faceName}`, W / 2, 1008);
 
   const n = session.level.size;
-  controlRow = ((controlRow % n) + n) % n;
-  controlCol = ((controlCol % n) + n) % n;
-  playDock = drawPlayDock(ctx, { row: controlRow, col: controlCol, size: n });
+  controlIndex = ((controlIndex % n) + n) % n;
+  playDock = drawPlayDock(ctx, { mode: controlMode, index: controlIndex, size: n });
 
   if (floatText && floatText.life > 0) {
     ctx.save();
@@ -350,7 +358,13 @@ function tick(): void {
     if (crumpleT >= 1 && pendingTwist) finishCrumple();
   }
   const needsPaint =
-    dirty || drag || orbitDrag || crumples.length || rotating || springAxis;
+    dirty ||
+    drag ||
+    orbitDrag ||
+    crumples.length ||
+    rotating ||
+    springAxis ||
+    (session.status === "playing" && !busy);
   if (needsPaint) paint();
   requestAnimationFrame(tick);
 }
@@ -404,8 +418,8 @@ function doTwist(twist: Twist): void {
 }
 
 function inCubeOrbitZone(_layout: CubeLayout, x: number, y: number): boolean {
-  // Keep clear of the bottom dock (~1140+). Stickers still claim the face first.
-  return y > 195 && y < 1125 && x > 24 && x < W - 24;
+  // Keep clear of the bottom dock. Stickers still claim the face first.
+  return y > 195 && y < 1110 && x > 24 && x < W - 24;
 }
 
 function orbitSens(): number {
@@ -420,53 +434,57 @@ function hitPlayDock(x: number, y: number): boolean {
   if (!playDock || session.status !== "playing" || busy) return false;
   const n = session.level.size;
   const d = playDock;
-  if (hitUiRect(d.tipUp, x, y)) {
-    startOrbitStep("up");
-    return true;
-  }
-  if (hitUiRect(d.tipDown, x, y)) {
-    startOrbitStep("down");
-    return true;
-  }
-  if (hitUiRect(d.rowPrev, x, y)) {
-    controlRow = (controlRow - 1 + n) % n;
+
+  if (hitUiRect(d.select, x, y)) {
+    controlMode = controlMode === "row" ? "col" : "row";
+    controlIndex = Math.min(controlIndex, n - 1);
     sfxPaperRustle();
     paint();
     return true;
   }
-  if (hitUiRect(d.rowNext, x, y)) {
-    controlRow = (controlRow + 1) % n;
-    sfxPaperRustle();
-    paint();
-    return true;
-  }
-  if (hitUiRect(d.rowLeft, x, y)) {
-    doTwist({ axis: "row", index: controlRow, dir: -1, amount: 1 });
-    return true;
-  }
-  if (hitUiRect(d.rowRight, x, y)) {
-    doTwist({ axis: "row", index: controlRow, dir: 1, amount: 1 });
-    return true;
-  }
-  if (hitUiRect(d.colPrev, x, y)) {
-    controlCol = (controlCol - 1 + n) % n;
-    sfxPaperRustle();
-    paint();
-    return true;
-  }
-  if (hitUiRect(d.colNext, x, y)) {
-    controlCol = (controlCol + 1) % n;
-    sfxPaperRustle();
-    paint();
-    return true;
-  }
-  if (hitUiRect(d.colUp, x, y)) {
-    doTwist({ axis: "col", index: controlCol, dir: -1, amount: 1 });
-    return true;
-  }
-  if (hitUiRect(d.colDown, x, y)) {
-    doTwist({ axis: "col", index: controlCol, dir: 1, amount: 1 });
-    return true;
+
+  if (controlMode === "row") {
+    if (hitUiRect(d.left, x, y)) {
+      doTwist({ axis: "row", index: controlIndex, dir: -1, amount: 1 });
+      return true;
+    }
+    if (hitUiRect(d.right, x, y)) {
+      doTwist({ axis: "row", index: controlIndex, dir: 1, amount: 1 });
+      return true;
+    }
+    if (hitUiRect(d.up, x, y)) {
+      controlIndex = (controlIndex - 1 + n) % n;
+      sfxPaperRustle();
+      paint();
+      return true;
+    }
+    if (hitUiRect(d.down, x, y)) {
+      controlIndex = (controlIndex + 1) % n;
+      sfxPaperRustle();
+      paint();
+      return true;
+    }
+  } else {
+    if (hitUiRect(d.up, x, y)) {
+      doTwist({ axis: "col", index: controlIndex, dir: -1, amount: 1 });
+      return true;
+    }
+    if (hitUiRect(d.down, x, y)) {
+      doTwist({ axis: "col", index: controlIndex, dir: 1, amount: 1 });
+      return true;
+    }
+    if (hitUiRect(d.left, x, y)) {
+      controlIndex = (controlIndex - 1 + n) % n;
+      sfxPaperRustle();
+      paint();
+      return true;
+    }
+    if (hitUiRect(d.right, x, y)) {
+      controlIndex = (controlIndex + 1) % n;
+      sfxPaperRustle();
+      paint();
+      return true;
+    }
   }
   return false;
 }
@@ -639,8 +657,7 @@ canvas.addEventListener(
     const n = session.level.size;
     const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
     const r = Math.min(n - 1, Math.max(0, Math.floor(hit.v * n)));
-    controlRow = r;
-    controlCol = c;
+    controlIndex = controlMode === "row" ? r : c;
     drag = {
       u0: hit.u,
       v0: hit.v,
