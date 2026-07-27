@@ -30,6 +30,7 @@ Dev: `npm run dev` (port 5175).
 - **Dry twists are free** · **matching clears** and **flips** each cost a move
 - Only the face you look at scores
 - Three levels with rising pressure
++ Six levels with a clear difficulty climb
 
 ## Godot / Android
 
