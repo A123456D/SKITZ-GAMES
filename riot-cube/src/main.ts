@@ -19,19 +19,18 @@ import { previewCube } from "./core/lane";
 import {
   W,
   H,
-  analogPadCenter,
-  drawAnalogStick,
   drawDesk,
   drawEndOverlay,
   drawFaceTurnButtons,
   drawHomeScreen,
   drawHud,
   drawMenuButton,
+  drawOrbitFinger,
   drawPauseMenu,
   drawPlayActions,
   drawSettingsScreen,
   drawStickersScreen,
-  hitAnalogPad,
+  hitOrbitBand,
   hitPlayHint,
   hitPlayScramble,
   hitPlayStickers,
@@ -75,7 +74,6 @@ import {
 } from "./view/cube3d";
 import {
   applyOrbitDragQuat,
-  applyScreenOrbit,
   orbitStepQuat,
   ORBIT_DRAG_SENS,
   snapOrbitQuat,
@@ -133,8 +131,8 @@ let faceTurnBtns: FaceTurnButtons | null = null;
 let hintFace: FaceId | null = null;
 let hintUntil = 0;
 
-let analogActive = false;
-let analogKnob = { x: 0, y: 0 };
+/** Finger position while free-orbit dragging (transparent circle). */
+let orbitFinger: { x: number; y: number } | null = null;
 
 let stickerDraft: (TileKind | null)[] = [null, null, null, null, null, null];
 let stickerSlot = 0;
@@ -292,8 +290,7 @@ function resetPlayVisuals(): void {
   springIndex = -1;
   turnAnim = null;
   orbitDrag = null;
-  analogActive = false;
-  analogKnob = { x: 0, y: 0 };
+  orbitFinger = null;
   hintFace = null;
   hintUntil = 0;
   rotating = false;
@@ -372,11 +369,13 @@ function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
 function beginOrbitDrag(x: number, y: number): void {
   rotating = false;
   orbitDrag = { x0: x, y0: y, q0: quatCopy(orient) };
+  orbitFinger = { x, y };
 }
 
 function endOrbitDrag(): void {
   if (!orbitDrag) return;
   orbitDrag = null;
+  orbitFinger = null;
   targetOrient = snapOrient(orient);
   rotating = true;
 }
@@ -489,7 +488,7 @@ function paint(): void {
 
   if (session.status === "playing") {
     drawPlayActions(ctx, { hintsOn: getHintsEnabled() });
-    drawAnalogStick(ctx, analogKnob.x, analogKnob.y);
+    if (orbitFinger) drawOrbitFinger(ctx, orbitFinger.x, orbitFinger.y);
     faceTurnBtns = drawFaceTurnButtons(ctx);
   } else {
     faceTurnBtns = null;
@@ -531,7 +530,7 @@ function tick(ts: number): void {
         springIndex = -1;
       }
     }
-    if (rotating && !orbitDrag && !analogActive) {
+    if (rotating && !orbitDrag) {
       const speed = 0.14;
       orient = quatSlerp(orient, targetOrient, speed);
       if (Math.abs(quatDot(orient, targetOrient)) > 0.9995) {
@@ -540,16 +539,6 @@ function tick(ts: number): void {
         rotating = false;
         syncActiveFace();
       }
-    }
-    if (analogActive) {
-      const rate = 0.0028 * dt;
-      orient = applyScreenOrbit(
-        orient,
-        -analogKnob.y * rate * 60,
-        analogKnob.x * rate * 60,
-      );
-      targetOrient = quatCopy(orient);
-      syncActiveFace();
     }
   }
   paint();
@@ -753,23 +742,6 @@ canvas.addEventListener(
       openStickersPicker();
       return;
     }
-    if (hitAnalogPad(p.x, p.y)) {
-      analogActive = true;
-      rotating = false;
-      orbitDrag = null;
-      drag = null;
-      const c = analogPadCenter();
-      const maxR = 48;
-      let nx = (p.x - c.x) / maxR;
-      let ny = (p.y - c.y) / maxR;
-      const len = Math.hypot(nx, ny) || 1;
-      if (len > 1) {
-        nx /= len;
-        ny /= len;
-      }
-      analogKnob = { x: nx, y: ny };
-      return;
-    }
     if (hitFaceTurnButtons(p.x, p.y)) return;
 
     if (orbitBtns) {
@@ -802,7 +774,8 @@ canvas.addEventListener(
       return;
     }
 
-    if (inCubeOrbitZone(layout, p.x, p.y)) {
+    // Prefer the mid band between cube and HINT row for free orbit + finger ring.
+    if (hitOrbitBand(p.x, p.y) || inCubeOrbitZone(layout, p.x, p.y)) {
       beginOrbitDrag(p.x, p.y);
     }
   },
@@ -835,25 +808,12 @@ canvas.addEventListener(
 
     if (screen !== "play" || session.status !== "playing") return;
 
-    if (analogActive) {
-      const c = analogPadCenter();
-      const maxR = 48;
-      let nx = (p.x - c.x) / maxR;
-      let ny = (p.y - c.y) / maxR;
-      const len = Math.hypot(nx, ny) || 1;
-      if (len > 1) {
-        nx /= len;
-        ny /= len;
-      }
-      analogKnob = { x: nx, y: ny };
-      return;
-    }
-
     if (orbitDrag) {
       const dx = p.x - orbitDrag.x0;
       const dy = p.y - orbitDrag.y0;
       orient = applyOrbitDragQuat(orbitDrag.q0, dx, dy, orbitSens());
       targetOrient = quatCopy(orient);
+      orbitFinger = { x: p.x, y: p.y };
       syncActiveFace();
       return;
     }
@@ -902,13 +862,6 @@ function endDrag(): void {
     return;
   }
   if (screen !== "play") return;
-  if (analogActive) {
-    analogActive = false;
-    analogKnob = { x: 0, y: 0 };
-    targetOrient = snapOrient(orient);
-    rotating = true;
-    return;
-  }
   if (orbitDrag) {
     endOrbitDrag();
     return;
@@ -949,12 +902,6 @@ canvas.addEventListener("pointercancel", () => {
     return;
   }
   if (screen !== "play") return;
-  if (analogActive) {
-    analogActive = false;
-    analogKnob = { x: 0, y: 0 };
-    targetOrient = snapOrient(orient);
-    rotating = true;
-  }
   if (orbitDrag) endOrbitDrag();
   if (drag?.axis) {
     springAxis = drag.axis;

@@ -612,57 +612,35 @@ export function hitPlayHint(x: number, y: number, hintsOn: boolean): boolean {
   return hitRect(PLAY_HINT, x, y);
 }
 
-/** Virtual analog orbit pad — left of CCW/CW dock. */
-export const ANALOG_PAD: UiRect = { x: 20, y: 1148, w: 150, h: 112 };
+/**
+ * Soft orbit gesture band between the cube and the HINT/SCRAMBLE row.
+ * Drag here to spin the cube; a translucent circle follows the finger.
+ */
+export const ORBIT_BAND: UiRect = { x: 48, y: 880, w: 624, h: 140 };
 
-export function hitAnalogPad(x: number, y: number): boolean {
-  return hitRect(ANALOG_PAD, x, y);
+export function hitOrbitBand(x: number, y: number): boolean {
+  return hitRect(ORBIT_BAND, x, y);
 }
 
-export function analogPadCenter(): { x: number; y: number } {
-  return {
-    x: ANALOG_PAD.x + ANALOG_PAD.w / 2,
-    y: ANALOG_PAD.y + ANALOG_PAD.h / 2,
-  };
-}
-
-export function drawAnalogStick(
+/** Finger-follow ring while orbiting (no opaque pad). */
+export function drawOrbitFinger(
   ctx: CanvasRenderingContext2D,
-  knobNx: number,
-  knobNy: number,
+  x: number,
+  y: number,
 ): void {
-  const p = getPalette();
-  const { x, y, w, h } = ANALOG_PAD;
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  const maxR = Math.min(w, h) * 0.32;
-
-  ctx.fillStyle = p.panel;
-  roundRect(ctx, x, y, w, h, 12);
-  ctx.fill();
-  ctx.strokeStyle = p.panelEdge;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.fillStyle = p.accent;
-  ctx.fillRect(x + 14, y - 6, 36, 10);
-
+  ctx.save();
   ctx.beginPath();
-  ctx.arc(cx, cy, maxR + 10, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.arc(x, y, 36, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
   ctx.fill();
-  ctx.strokeStyle = p.ink;
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255,255,255,0.45)";
+  ctx.lineWidth = 2.5;
   ctx.stroke();
-
-  const kx = cx + knobNx * maxR;
-  const ky = cy + knobNy * maxR;
   ctx.beginPath();
-  ctx.arc(kx, ky, 22, 0, Math.PI * 2);
-  ctx.fillStyle = p.paper;
+  ctx.arc(x, y, 10, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.28)";
   ctx.fill();
-  ctx.strokeStyle = p.hot;
-  ctx.lineWidth = 3;
-  ctx.stroke();
+  ctx.restore();
 }
 
 const SLOT_LABELS = ["F", "B", "R", "L", "U", "D"] as const;
