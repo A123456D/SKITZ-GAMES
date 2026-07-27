@@ -346,8 +346,11 @@ function tick(): void {
     rotX += (targetRotX - rotX) * speed;
     rotY += (targetRotY - rotY) * speed;
     if (Math.abs(targetRotX - rotX) < 0.01 && Math.abs(targetRotY - rotY) < 0.01) {
-      rotX = targetRotX;
-      rotY = targetRotY;
+      const snapped = snapAngles(targetRotX, targetRotY);
+      rotX = snapped.x;
+      rotY = snapped.y;
+      targetRotX = rotX;
+      targetRotY = rotY;
       rotating = false;
       syncActiveFace();
     }
@@ -491,24 +494,22 @@ function hitPlayDock(x: number, y: number): boolean {
 }
 
 function snapAngles(rx: number, ry: number): { x: number; y: number } {
-  // Snap to axis-aligned face views. Keep a tiny tip only on the home pose
-  // so the front view stays slightly 3D without leaving other faces crooked.
-  let x = Math.round(rx / SNAP_Q) * SNAP_Q;
-  // Pitch only reaches top/bottom — never tumble past ±90°.
-  x = Math.max(-SNAP_Q, Math.min(SNAP_Q, x));
-  let qy = Math.round(ry / SNAP_Q);
-  qy = ((qy % 4) + 4) % 4;
-  if (qy > 2) qy -= 4;
+  // Snap to axis-aligned face views. Tiny home tip only on upright front.
+  const qx = Math.round(rx / SNAP_Q);
+  const qy = Math.round(ry / SNAP_Q);
+  let x = qx * SNAP_Q;
   let y = qy * SNAP_Q;
-  if (Math.abs(x) < 0.001 && Math.abs(y) < 0.001) {
+  const pitchCycle = ((qx % 4) + 4) % 4;
+  const yawCycle = ((qy % 4) + 4) % 4;
+  if (pitchCycle === 0 && yawCycle === 0) {
     x = DEFAULT_ROT_X;
     y = DEFAULT_ROT_Y;
   }
   return { x, y };
 }
 
-/** Closest yaw to `from` that matches `to` (avoids 270° spins on wrap). */
-function nearestYaw(from: number, to: number): number {
+/** Closest angle to `from` that matches `to` (avoids long-way spins on snap). */
+function nearestAngle(from: number, to: number): number {
   let d = to - from;
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;
@@ -518,39 +519,26 @@ function nearestYaw(from: number, to: number): number {
 function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
   if (busy || drag || session.status !== "playing") return;
   orbitDrag = null;
-  // Finish any in-flight tip before stacking another step (stops runaway spin).
+  // Finish any in-flight tip before stacking another step.
   if (rotating) {
     rotX = targetRotX;
     rotY = targetRotY;
     rotating = false;
     syncActiveFace();
   }
-  const snapped = snapAngles(rotX, rotY);
-  let tx = snapped.x;
-  let ty = snapped.y;
-  // Step from the pure grid, not from the tiny home tip
+  // Step on the quarter-turn grid (strip home tip), keep full angle so flips never stop.
+  let tx = rotX;
+  let ty = rotY;
   if (Math.abs(tx - DEFAULT_ROT_X) < 0.02 && Math.abs(ty - DEFAULT_ROT_Y) < 0.02) {
     tx = 0;
     ty = 0;
+  } else {
+    tx = Math.round(tx / SNAP_Q) * SNAP_Q;
+    ty = Math.round(ty / SNAP_Q) * SNAP_Q;
   }
   const { dRotX, dRotY } = orbitStepDelta(dir);
-  tx += dRotX;
-  ty += dRotY;
-  // Re-apply home tip if we landed on front; clamp so we never oversell pitch.
-  const landed = snapAngles(tx, ty);
-  const nextY = nearestYaw(rotY, landed.y);
-  // Already at pitch/yaw limit for this step — ignore so it doesn't twitch/spin.
-  if (Math.abs(landed.x - rotX) < 0.02 && Math.abs(nextY - rotY) < 0.02) {
-    rotX = landed.x;
-    rotY = nextY;
-    targetRotX = rotX;
-    targetRotY = rotY;
-    syncActiveFace();
-    paint();
-    return;
-  }
-  targetRotX = landed.x;
-  targetRotY = nextY;
+  targetRotX = tx + dRotX;
+  targetRotY = ty + dRotY;
   rotating = true;
   sfxPaperFlutter();
   syncActiveFace();
@@ -566,8 +554,8 @@ function endOrbitDrag(): void {
   if (!orbitDrag) return;
   orbitDrag = null;
   const snapped = snapAngles(rotX, rotY);
-  targetRotX = snapped.x;
-  targetRotY = nearestYaw(rotY, snapped.y);
+  targetRotX = nearestAngle(rotX, snapped.x);
+  targetRotY = nearestAngle(rotY, snapped.y);
   rotating = true;
 }
 

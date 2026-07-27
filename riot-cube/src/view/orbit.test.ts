@@ -32,13 +32,20 @@ describe("orbit mapping (do not flip casually)", () => {
     expect(facingFace(left.rotX, left.rotY)).toBe(2);
   });
 
-  it("pitch clamps at ±90° so a second tip does not tumble", () => {
+  it("pitch can tumble past ±90° for infinite vertical flips", () => {
     const pastBottom = applyOrbitDrag(SNAP_Q, 0, 0, -SNAP_Q / ORBIT_DRAG_SENS);
-    expect(pastBottom.rotX).toBe(SNAP_Q);
-    expect(facingFace(pastBottom.rotX, pastBottom.rotY)).toBe(5);
+    expect(pastBottom.rotX).toBeCloseTo(SNAP_Q * 2, 5);
+    expect(facingFace(pastBottom.rotX, pastBottom.rotY)).toBe(1); // BACK
 
     const pastTop = applyOrbitDrag(-SNAP_Q, 0, 0, SNAP_Q / ORBIT_DRAG_SENS);
-    expect(pastTop.rotX).toBe(-SNAP_Q);
-    expect(facingFace(pastTop.rotX, pastTop.rotY)).toBe(4);
+    expect(pastTop.rotX).toBeCloseTo(-SNAP_Q * 2, 5);
+    expect(facingFace(pastTop.rotX, pastTop.rotY)).toBe(1); // BACK
+  });
+
+  it("quarter-turn steps keep flipping around the vertical loop", () => {
+    expect(facingFace(SNAP_Q, 0)).toBe(5); // BOTTOM
+    expect(facingFace(SNAP_Q * 2, 0)).toBe(1); // BACK
+    expect(facingFace(SNAP_Q * 3, 0)).toBe(4); // TOP
+    expect(facingFace(SNAP_Q * 4, 0)).toBe(0); // FRONT
   });
 });

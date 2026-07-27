@@ -22,9 +22,9 @@ export function applyOrbitDrag(
   sens = ORBIT_DRAG_SENS,
 ): { rotX: number; rotY: number } {
   // Grab-style: finger up (dy < 0) increases rotX → BOTTOM.
-  let rotX = rotX0 - dy * sens;
+  // No pitch clamp — free orbit can tumble forever in any direction.
+  const rotX = rotX0 - dy * sens;
   const rotY = rotY0 + dx * sens;
-  rotX = Math.max(-SNAP_Q, Math.min(SNAP_Q, rotX));
   return { rotX, rotY };
 }
 
