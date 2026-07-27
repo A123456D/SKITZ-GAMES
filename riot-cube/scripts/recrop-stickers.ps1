@@ -12,6 +12,7 @@ $ch = [int]($src.Height / $rows)
 # Expand slightly into black gutter so white borders aren't clipped
 $expandX = [int]($cw * 0.03)
 $expandY = [int]($ch * 0.03)
+# sneaker = historical razor-blade sheet slot; not in TILE_KINDS
 $names = @('skull','heart','bolt','star','flame','diamond','headphones','bomb','eightball','spray','smiley','sneaker')
 
 function Test-SheetBlack([byte]$r,[byte]$g,[byte]$b) {
@@ -19,7 +20,7 @@ function Test-SheetBlack([byte]$r,[byte]$g,[byte]$b) {
 }
 
 for ($i = 0; $i -lt 12; $i++) {
-  if ($names[$i] -eq 'eightball') { continue }
+  if ($names[$i] -eq 'eightball' -or $names[$i] -eq 'sneaker') { continue }
   $col = $i % $cols
   $row = [int][math]::Floor($i / $cols)
   $x0 = [math]::Max(0, $col * $cw - $expandX)

@@ -10,7 +10,6 @@ export const TILE_KINDS = [
   "bomb",
   "spray",
   "smiley",
-  "sneaker",
   "eye",
 ] as const;
 

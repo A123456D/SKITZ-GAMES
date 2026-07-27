@@ -12,7 +12,7 @@ $ch = [int]($src.Height / $rows)
 $expandX = [int]($cw * 0.04)
 $expandY = [int]($ch * 0.04)
 
-# Row-major mapping onto TILE_KINDS (+ eye)
+# Row-major sheet slots (sneaker/razor blade skipped — removed from TILE_KINDS)
 $names = @(
   'heart',       # purple stitched heart
   'bomb',        # voodoo teddy
@@ -23,9 +23,9 @@ $names = @(
   'diamond',     # dice
   'flame',       # pinned red heart
   'spray',       # purple spray can
-  'sneaker',     # razor blade
+  'sneaker',     # razor blade (historical sheet slot; not cropped)
   'bolt',        # blue lightning
-  'eye'          # dripping eye (new kind)
+  'eye'          # dripping eye
 )
 
 function Test-SheetBlack([byte]$r,[byte]$g,[byte]$b) {
@@ -33,6 +33,7 @@ function Test-SheetBlack([byte]$r,[byte]$g,[byte]$b) {
 }
 
 for ($i = 0; $i -lt 12; $i++) {
+  if ($names[$i] -eq 'sneaker') { continue }
   $col = $i % $cols
   $row = [int][math]::Floor($i / $cols)
   $x0 = [math]::Max(0, $col * $cw - $expandX)
