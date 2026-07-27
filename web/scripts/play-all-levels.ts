@@ -17,20 +17,33 @@ function expectedGears(diff: number): number {
   const phase = phaseOf(diff);
   const slot = phaseSlot(diff);
   if (phase === 1) return 0;
-  if (phase === 2) {
-    if (slot <= 1) return 1;
-    if (slot <= 3) return 2;
-    if (slot <= 5) return 3;
-    return 4;
-  }
-  if (slot <= 2) return 2;
-  if (slot <= 4) return 3;
-  return 4;
+  const size = Math.min(8, 3 + slot);
+  const interior = Math.max(0, size - 2) * Math.max(0, size - 2);
+  const maxPairs = Math.floor(interior / 2);
+  const wanted =
+    phase === 2
+      ? slot <= 1
+        ? 1
+        : slot <= 3
+          ? 2
+          : slot <= 5
+            ? 3
+            : 4
+      : slot <= 2
+        ? 2
+        : slot <= 4
+          ? 3
+          : 4;
+  return Math.min(wanted, maxPairs);
+}
+
+function isRim(hub: { x: number; y: number }, w: number, h: number): boolean {
+  return hub.x <= 0 || hub.y <= 0 || hub.x >= w - 1 || hub.y >= h - 1;
 }
 
 function gearLinksOk(
   level: ReturnType<typeof generateLevel>,
-  opts: { requireDistant: boolean; expectPairs?: number },
+  opts: { requireDistant: boolean; requireInterior: boolean; expectPairs?: number },
 ): string | null {
   const byId = new Map(level.tables.map((t) => [t.id, t]));
   const seen = new Set<number>();
@@ -40,6 +53,11 @@ function gearLinksOk(
     const p = byId.get(t.link.partner);
     if (!p?.link || p.link.partner !== t.id) return `broken link on ${t.id}`;
     if (t.link.sign !== -1 || p.link.sign !== -1) return `gear sign not opposite on ${t.id}`;
+    if (opts.requireInterior) {
+      if (isRim(t.hub, level.width, level.height) || isRim(p.hub, level.width, level.height)) {
+        return `gear on rim: ${t.id}@(${t.hub.x},${t.hub.y}) ${p.id}@(${p.hub.x},${p.hub.y})`;
+      }
+    }
     const man = Math.abs(t.hub.x - p.hub.x) + Math.abs(t.hub.y - p.hub.y);
     if (opts.requireDistant && man < 2) {
       return `gear pair too close: ${t.id}-${p.id} (${t.hub.x},${t.hub.y})-(${p.hub.x},${p.hub.y}) man=${man}`;
@@ -65,7 +83,11 @@ for (let d = 1; d <= DIFFICULTY_COUNT; d++) {
     const label = `${levelTitle(d)} seed=${seed}`;
     try {
       const level = generateLevel(d, seed);
-      const gErr = gearLinksOk(level, { requireDistant: true, expectPairs: expect });
+      const gErr = gearLinksOk(level, {
+        requireDistant: true,
+        requireInterior: true,
+        expectPairs: expect,
+      });
       if (gErr) {
         console.log("GEAR FAIL", label, gErr);
         fails++;
@@ -98,7 +120,7 @@ for (let d = 1; d <= DIFFICULTY_COUNT; d++) {
             width: session.state.width,
             height: session.state.height,
           },
-          { requireDistant: false },
+          { requireDistant: false, requireInterior: false },
         );
         if (mid) {
           console.log("MID GEAR FAIL", label, "after", i, mid);

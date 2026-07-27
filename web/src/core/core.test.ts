@@ -143,14 +143,14 @@ describe("dense procedural levels", () => {
     expect(session.result.won).toBe(true);
   });
 
-  it("board size repeats each phase slot", () => {
+  it("board size grows each phase; geared phases start at 4×4", () => {
     const p1 = [1, 2, 3, 4, 5, 6].map((d) => generateLevel(d, 50 + d).width);
     const p2 = [7, 8, 9, 10, 11, 12].map((d) => generateLevel(d, 50 + d).width);
     expect(p1).toEqual([3, 4, 5, 6, 7, 8]);
-    expect(p2).toEqual([3, 4, 5, 6, 7, 8]);
+    expect(p2).toEqual([4, 5, 6, 7, 8, 8]);
   });
 
-  it("phase 2+ gear pairs sit apart on the board", () => {
+  it("phase 2+ gear pairs sit apart and off the rim", () => {
     for (const d of [7, 10, 12, 15, 18]) {
       const level = generateLevel(d, 808 + d);
       const pairs: Array<[number, number]> = [];
@@ -160,6 +160,12 @@ describe("dense procedural levels", () => {
         const p = level.tables.find((x) => x.id === t.link!.partner)!;
         const man = Math.abs(t.hub.x - p.hub.x) + Math.abs(t.hub.y - p.hub.y);
         expect(man).toBeGreaterThanOrEqual(2);
+        for (const hub of [t.hub, p.hub]) {
+          expect(hub.x).toBeGreaterThan(0);
+          expect(hub.y).toBeGreaterThan(0);
+          expect(hub.x).toBeLessThan(level.width - 1);
+          expect(hub.y).toBeLessThan(level.height - 1);
+        }
         pairs.push([t.id, p.id]);
         seen.add(t.id);
         seen.add(p.id);
