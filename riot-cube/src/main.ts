@@ -325,9 +325,6 @@ function beginOnboarding(): void {
 
 let session: Session = resumeOrStartSession(loadCubeSize(), activeStickerPool());
 
-if (!hasOnboarded()) {
-  beginOnboarding();
-}
 let faceTurnBtns: FaceTurnButtons | null = null;
 
 let hintMove: HintMove | null = null;
@@ -1319,6 +1316,10 @@ async function boot(): Promise<void> {
     /* next paint picks up art */
   });
   resize();
+  // After play-state lets exist — early onboarding used to TDZ-crash on fresh installs.
+  if (!hasOnboarded()) beginOnboarding();
+  // First paint immediately so iPhone isn't stuck on a black shell while art loads.
+  requestAnimationFrame(tick);
   await Promise.all([loadLogo(), loadStickers()]);
   ensureThemeArt("classroom");
   ensureThemeArt("edgy");
@@ -1327,7 +1328,6 @@ async function boot(): Promise<void> {
   ensureAnimeArtBoth();
   syncMusicForTheme(getTheme());
   syncActiveFace();
-  requestAnimationFrame(tick);
 }
 
 boot();
