@@ -66,23 +66,23 @@
     </div>
     <p class="hint" id="hint">Swipe a row or column to fold it</p>
     <div class="actions">
-      <button type="button" id="btnUndo">
+      <button type="button" id="btnUndo" aria-label="Undo">
         <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8H5v4"/><path d="M5 12a7 7 0 1 0 2-4.9"/></svg>
         <span class="btn-label">Undo</span>
       </button>
-      <button type="button" id="btnHint" title="Aim a scoring fold">
+      <button type="button" id="btnHint" title="Aim a scoring fold" aria-label="Hint">
         <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a5.5 5.5 0 0 0-3 10.1V15h6v-1.9A5.5 5.5 0 0 0 12 3Z"/></svg>
         <span class="btn-label">Hint</span>
       </button>
-      <button type="button" id="btnReset" title="Reshuffle board">
+      <button type="button" id="btnReset" title="Reshuffle board" aria-label="Reset">
         <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h6M14 7h6M7 4v6M17 4v6M4 17h6M14 17h6M7 14v6M17 14v6"/></svg>
         <span class="btn-label">Reset</span>
       </button>
-      <button type="button" class="primary" id="btnPulse">
+      <button type="button" class="primary" id="btnPulse" aria-label="Pulse">
         <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h3l2-5 3 10 2-5h8"/></svg>
         <span class="btn-label">Pulse</span>
       </button>
-      <button type="button" id="btnMenu">
+      <button type="button" id="btnMenu" aria-label="Menu">
         <svg class="btn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         <span class="btn-label">Menu</span>
       </button>
