@@ -1,5 +1,4 @@
 import type { ColorId, CubeState, FaceId } from "../core/rubik";
-import { OCCUPY } from "../core/rubik";
 import { stickerForColor, type TileKind } from "../core/stickers";
 import { lanePreview } from "../core/lane";
 import type { HintMove } from "../core/hint";
@@ -495,8 +494,6 @@ export function drawCube3D(
     sourceCube?: CubeState;
     /** Per-face sticker kinds; defaults to FACE_STICKERS. */
     faceStickers?: readonly TileKind[];
-    /** CLEAR mode: faces already wiped to black occupy stickers. */
-    clearedFaces?: readonly boolean[];
     /** Animated move guide (line travels along the suggested turn). */
     hintMove?: HintMove | null;
     /** 0..1 animation phase for the hint line. */
@@ -537,7 +534,6 @@ export function drawCube3D(
       motion,
       f.i === opts.activeFace,
       opts.faceStickers,
-      opts.clearedFaces?.[f.i] === true,
     );
   }
 
@@ -555,7 +551,6 @@ function drawFace(
   motion: CubeMotion,
   isActive: boolean,
   faceStickers?: readonly TileKind[],
-  cleared = false,
 ): void {
   const p = getPalette();
   const geom = FACES[faceIndex]!;
@@ -651,10 +646,6 @@ function drawFace(
     const s1 = facePointLifted(geom, corners[1]!.u, corners[1]!.v, lift, layout);
     const s2 = facePointLifted(geom, corners[2]!.u, corners[2]!.v, lift, layout);
     const s3 = facePointLifted(geom, corners[3]!.u, corners[3]!.v, lift, layout);
-    if (cleared || colorId === OCCUPY) {
-      drawOccupySticker(ctx, s0, s1, s2, s3, q);
-      return;
-    }
     const kind = stickerForColor(colorId, faceStickers);
     drawStickerOnQuad(
       ctx,
@@ -740,42 +731,6 @@ function drawFace(
 
 function lerp2(a: Vec2, b: Vec2, t: number): Vec2 {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-}
-
-/** Black occupy sticker — fills a cleared face cell once. */
-function drawOccupySticker(
-  ctx: CanvasRenderingContext2D,
-  tl: Vec2,
-  tr: Vec2,
-  br: Vec2,
-  bl: Vec2,
-  faceQuad: Vec2[],
-): void {
-  const cx = (tl.x + tr.x + br.x + bl.x) / 4;
-  const cy = (tl.y + tr.y + br.y + bl.y) / 4;
-  const bw =
-    (Math.hypot(tr.x - tl.x, tr.y - tl.y) + Math.hypot(br.x - bl.x, br.y - bl.y)) /
-    2;
-  const bh =
-    (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) /
-    2;
-  const s = Math.min(bw, bh) * 0.92;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(faceQuad[0]!.x, faceQuad[0]!.y);
-  ctx.lineTo(faceQuad[1]!.x, faceQuad[1]!.y);
-  ctx.lineTo(faceQuad[2]!.x, faceQuad[2]!.y);
-  ctx.lineTo(faceQuad[3]!.x, faceQuad[3]!.y);
-  ctx.closePath();
-  ctx.clip();
-
-  ctx.fillStyle = "#0a0a0a";
-  ctx.fillRect(cx - s / 2, cy - s / 2, s, s);
-  ctx.strokeStyle = "rgba(255,255,255,0.12)";
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(cx - s / 2, cy - s / 2, s, s);
-  ctx.restore();
 }
 
 function drawStickerOnQuad(

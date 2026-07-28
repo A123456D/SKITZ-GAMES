@@ -93,9 +93,6 @@ export function drawHud(
   opts: {
     sfxVol?: number;
     moves?: number;
-    mode?: "classic" | "clear";
-    cleared?: number;
-    moveLimit?: number | null;
   },
 ): void {
   const p = getPalette();
@@ -114,32 +111,17 @@ export function drawHud(
   ctx.fillText("RIOT CUBE", 50, 58);
 
   if (opts.moves != null) {
-    const chip = movesChipRect(opts.mode === "clear");
+    const chip = movesChipRect();
     ctx.fillStyle = p.hudBg;
     roundRect(ctx, chip.x, chip.y, chip.w, chip.h, 5);
     ctx.fill();
     ctx.strokeStyle = p.ink;
     ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.fillStyle = p.hot;
-    ctx.fillRect(chip.x + 10, chip.y - 5, 28, 8);
     ctx.fillStyle = p.hudInk;
     ctx.font = "700 16px 'Chakra Petch', sans-serif";
     ctx.textAlign = "left";
-    if (opts.mode === "clear") {
-      const left =
-        opts.moveLimit == null
-          ? `${opts.moves}`
-          : `${Math.max(0, opts.moveLimit - opts.moves)}`;
-      const limitTxt = opts.moveLimit == null ? "∞" : String(opts.moveLimit);
-      ctx.fillText(
-        `${opts.cleared ?? 0}/6  ·  ${left}/${limitTxt}`,
-        chip.x + 12,
-        chip.y + 26,
-      );
-    } else {
-      ctx.fillText(`${opts.moves} MOVES`, chip.x + 12, chip.y + 26);
-    }
+    ctx.fillText(`${opts.moves} MOVES`, chip.x + 12, chip.y + 26);
   }
 
   if (getTheme() === "anime") {
@@ -148,17 +130,13 @@ export function drawHud(
   drawVolumeButton(ctx, opts.sfxVol ?? 0.4);
 }
 
-/** Moves / clear-progress chip under the title — opens the mode editor. */
-export function movesChipRect(clearMode = false): UiRect {
-  return { x: 36, y: 84, w: clearMode ? 200 : 120, h: 40 };
+/** Moves chip under the title. */
+export function movesChipRect(): UiRect {
+  return { x: 36, y: 84, w: 120, h: 40 };
 }
 
-export function hitMovesChip(
-  x: number,
-  y: number,
-  clearMode = false,
-): boolean {
-  return hitRect(movesChipRect(clearMode), x, y);
+export function hitMovesChip(x: number, y: number): boolean {
+  return hitRect(movesChipRect(), x, y);
 }
 
 export const ANIME_MODE_BTN: UiRect = { x: 270, y: 28, w: 120, h: 46 };
@@ -337,15 +315,9 @@ export function drawFaceTurnButtons(ctx: CanvasRenderingContext2D): FaceTurnButt
 
 export function drawEndOverlay(
   ctx: CanvasRenderingContext2D,
-  opts: {
-    moves: number;
-    outcome?: "solved" | "lost";
-    mode?: "classic" | "clear";
-    cleared?: number;
-  },
+  opts: { moves: number },
 ): void {
   const p = getPalette();
-  const lost = opts.outcome === "lost";
   ctx.fillStyle = "rgba(0,0,0,0.55)";
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = p.paper;
@@ -357,25 +329,9 @@ export function drawEndOverlay(
   ctx.fillStyle = p.ink;
   ctx.font = "800 40px 'Permanent Marker', sans-serif";
   ctx.textAlign = "left";
-  if (lost) {
-    ctx.fillText("OUT OF MOVES", 150, 530);
-  } else if (opts.mode === "clear") {
-    ctx.fillText("CLEARED!", 150, 530);
-  } else {
-    ctx.fillText("SOLVED!", 150, 530);
-  }
+  ctx.fillText("SOLVED!", 150, 530);
   ctx.font = "700 20px 'Chakra Petch', sans-serif";
-  if (opts.mode === "clear") {
-    ctx.fillText(
-      lost
-        ? `${opts.cleared ?? 0}/6 faces · ${opts.moves} moves`
-        : `All 6 faces · ${opts.moves} moves`,
-      150,
-      575,
-    );
-  } else {
-    ctx.fillText(`${opts.moves} moves`, 150, 575);
-  }
+  ctx.fillText(`${opts.moves} moves`, 150, 575);
 
   ctx.fillStyle = p.hot;
   roundRect(ctx, 230, 640, 260, 54, 7);
@@ -454,10 +410,9 @@ function drawPaperButton(
   ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
 }
 
-export const HOME_PLAY: UiRect = { x: 150, y: 780, w: 420, h: 68 };
-export const HOME_MODE: UiRect = { x: 150, y: 864, w: 420, h: 60 };
-export const HOME_HOW: UiRect = { x: 150, y: 940, w: 420, h: 60 };
-export const HOME_SETTINGS: UiRect = { x: 150, y: 1016, w: 420, h: 60 };
+export const HOME_PLAY: UiRect = { x: 150, y: 820, w: 420, h: 72 };
+export const HOME_HOW: UiRect = { x: 150, y: 910, w: 420, h: 64 };
+export const HOME_SETTINGS: UiRect = { x: 150, y: 990, w: 420, h: 64 };
 
 let logoImg: HTMLImageElement | null = null;
 let logoReady = false;
@@ -476,23 +431,20 @@ export function loadLogo(): Promise<void> {
   });
 }
 
-export function drawHomeScreen(
-  ctx: CanvasRenderingContext2D,
-  opts: { modeLabel: string },
-): void {
+export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   const p = getPalette();
   drawDesk(ctx);
 
   if (logoImg && logoReady) {
     const maxW = 520;
-    const maxH = 440;
+    const maxH = 480;
     const scale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
     const lw = logoImg.width * scale;
     const lh = logoImg.height * scale;
-    ctx.drawImage(logoImg, (W - lw) / 2, 80, lw, lh);
+    ctx.drawImage(logoImg, (W - lw) / 2, 100, lw, lh);
   } else {
     ctx.fillStyle = p.paper;
-    roundRect(ctx, 70, 200, 580, 160, 8);
+    roundRect(ctx, 70, 220, 580, 160, 8);
     ctx.fill();
     ctx.strokeStyle = p.ink;
     ctx.lineWidth = 4;
@@ -500,23 +452,18 @@ export function drawHomeScreen(
     ctx.fillStyle = p.ink;
     ctx.font = "800 64px 'Permanent Marker', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("RIOT CUBE", W / 2, 290);
+    ctx.fillText("RIOT CUBE", W / 2, 310);
   }
 
   ctx.fillStyle = p.accent;
   ctx.font = "600 20px 'Patrick Hand', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("A sticker Rubik\u2019s Cube. No timer. Just twist.", W / 2, 730);
+  ctx.fillText("A sticker Rubik\u2019s Cube. No timer. Just twist.", W / 2, 760);
 
   drawPaperButton(ctx, HOME_PLAY, "PLAY", {
     fill: p.hot,
     text: p.white,
     tape: p.accent,
-  });
-  drawPaperButton(ctx, HOME_MODE, `GAME MODE  ·  ${opts.modeLabel}`, {
-    fill: p.paper,
-    text: p.ink,
-    tape: p.hot,
   });
   drawPaperButton(ctx, HOME_HOW, "HOW TO PLAY", {
     fill: p.paper,
@@ -532,21 +479,17 @@ export function drawHomeScreen(
 
 export const PAUSE_RESUME: UiRect = { x: 160, y: 340, w: 400, h: 64 };
 export const PAUSE_THEMES: UiRect = { x: 160, y: 420, w: 400, h: 60 };
-export const PAUSE_MODE: UiRect = { x: 160, y: 496, w: 400, h: 60 };
-export const PAUSE_HOW: UiRect = { x: 160, y: 572, w: 400, h: 60 };
-export const PAUSE_SETTINGS: UiRect = { x: 160, y: 648, w: 400, h: 60 };
-export const PAUSE_HOME: UiRect = { x: 160, y: 724, w: 400, h: 60 };
+export const PAUSE_HOW: UiRect = { x: 160, y: 496, w: 400, h: 60 };
+export const PAUSE_SETTINGS: UiRect = { x: 160, y: 572, w: 400, h: 60 };
+export const PAUSE_HOME: UiRect = { x: 160, y: 648, w: 400, h: 60 };
 
-export function drawPauseMenu(
-  ctx: CanvasRenderingContext2D,
-  opts: { modeLabel: string },
-): void {
+export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   const p = getPalette();
   ctx.fillStyle = "rgba(0,0,0,0.72)";
   ctx.fillRect(0, 0, W, H);
 
   ctx.fillStyle = p.paper;
-  roundRect(ctx, 100, 220, 520, 620, 10);
+  roundRect(ctx, 100, 220, 520, 560, 10);
   ctx.fill();
   ctx.strokeStyle = p.ink;
   ctx.lineWidth = 4;
@@ -568,11 +511,6 @@ export function drawPauseMenu(
     text: p.ink,
     tape: p.hot,
   });
-  drawPaperButton(ctx, PAUSE_MODE, `GAME MODE  ·  ${opts.modeLabel}`, {
-    fill: p.paper,
-    text: p.ink,
-    tape: p.accent,
-  });
   drawPaperButton(ctx, PAUSE_HOW, "HOW TO PLAY", {
     fill: p.paper,
     text: p.ink,
@@ -588,74 +526,12 @@ export function drawPauseMenu(
   });
 }
 
-export const SETTINGS_VOL: UiRect = { x: 140, y: 280, w: 440, h: 54 };
-export const SETTINGS_MUSIC: UiRect = { x: 140, y: 348, w: 440, h: 54 };
-export const SETTINGS_THEME: UiRect = { x: 140, y: 416, w: 440, h: 54 };
-export const SETTINGS_SIZE: UiRect = { x: 140, y: 484, w: 440, h: 54 };
-export const SETTINGS_MODE: UiRect = { x: 140, y: 552, w: 440, h: 54 };
-export const SETTINGS_MOVES: UiRect = { x: 140, y: 620, w: 440, h: 54 };
-export const SETTINGS_HINTS: UiRect = { x: 140, y: 688, w: 440, h: 54 };
-export const SETTINGS_BACK: UiRect = { x: 140, y: 776, w: 440, h: 54 };
-
-/** Focused MODE / MOVES editor opened from the HUD moves chip. */
-export const MODE_EDITOR_MODE: UiRect = { x: 140, y: 420, w: 440, h: 64 };
-export const MODE_EDITOR_MOVES: UiRect = { x: 140, y: 510, w: 440, h: 64 };
-export const MODE_EDITOR_BACK: UiRect = { x: 140, y: 620, w: 440, h: 58 };
-
-export function drawModeEditorScreen(
-  ctx: CanvasRenderingContext2D,
-  opts: {
-    modeLabel: string;
-    moveLimitLabel: string;
-    /** Primary action under the toggles. */
-    primaryLabel?: string;
-    subtitle?: string;
-  },
-): void {
-  const p = getPalette();
-  drawDesk(ctx);
-  const primary = opts.primaryLabel ?? "BACK";
-
-  ctx.fillStyle = p.paper;
-  roundRect(ctx, 80, 280, 560, 460, 10);
-  ctx.fill();
-  ctx.strokeStyle = p.ink;
-  ctx.lineWidth = 4;
-  ctx.stroke();
-  ctx.fillStyle = p.accent;
-  ctx.fillRect(120, 268, 110, 18);
-
-  ctx.fillStyle = p.ink;
-  ctx.font = "800 36px 'Permanent Marker', sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("GAME MODE", W / 2, 360);
-
-  ctx.font = "600 18px 'Patrick Hand', sans-serif";
-  ctx.fillStyle = p.muted;
-  ctx.fillText(
-    opts.subtitle ?? "Classic solve or Clear faces · move cap",
-    W / 2,
-    400,
-  );
-
-  drawPaperButton(ctx, MODE_EDITOR_MODE, `MODE  ·  ${opts.modeLabel}`, {
-    fill: p.panel,
-    text: p.hot,
-  });
-  drawPaperButton(
-    ctx,
-    MODE_EDITOR_MOVES,
-    `MOVES  ·  ${opts.moveLimitLabel}`,
-    {
-      fill: p.panel,
-      text: p.accent,
-    },
-  );
-  drawPaperButton(ctx, MODE_EDITOR_BACK, primary, {
-    fill: p.hot,
-    text: p.white,
-  });
-}
+export const SETTINGS_VOL: UiRect = { x: 140, y: 320, w: 440, h: 58 };
+export const SETTINGS_MUSIC: UiRect = { x: 140, y: 392, w: 440, h: 58 };
+export const SETTINGS_THEME: UiRect = { x: 140, y: 464, w: 440, h: 58 };
+export const SETTINGS_SIZE: UiRect = { x: 140, y: 536, w: 440, h: 58 };
+export const SETTINGS_HINTS: UiRect = { x: 140, y: 608, w: 440, h: 58 };
+export const SETTINGS_BACK: UiRect = { x: 140, y: 700, w: 440, h: 58 };
 
 export function drawSettingsScreen(
   ctx: CanvasRenderingContext2D,
@@ -664,8 +540,6 @@ export function drawSettingsScreen(
     musicVol: number;
     themeLabel: string;
     sizeLabel: string;
-    modeLabel: string;
-    moveLimitLabel: string;
     hintsOn: boolean;
   },
 ): void {
@@ -673,22 +547,22 @@ export function drawSettingsScreen(
   drawDesk(ctx);
 
   ctx.fillStyle = p.paper;
-  roundRect(ctx, 80, 130, 560, 740, 10);
+  roundRect(ctx, 80, 150, 560, 660, 10);
   ctx.fill();
   ctx.strokeStyle = p.ink;
   ctx.lineWidth = 4;
   ctx.stroke();
   ctx.fillStyle = p.accent;
-  ctx.fillRect(120, 118, 100, 18);
+  ctx.fillRect(120, 138, 100, 18);
 
   ctx.fillStyle = p.ink;
   ctx.font = "800 42px 'Permanent Marker', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("SETTINGS", W / 2, 210);
+  ctx.fillText("SETTINGS", W / 2, 230);
 
   ctx.font = "600 18px 'Patrick Hand', sans-serif";
   ctx.fillStyle = p.muted;
-  ctx.fillText("Sound, look, mode, cube, and hints", W / 2, 252);
+  ctx.fillText("Sound, music, look, cube, and hints", W / 2, 275);
 
   const volLabel =
     opts.sfxVol <= 0.001 ? "MUTED" : opts.sfxVol < 0.55 ? "SOFT" : "NORMAL";
@@ -711,14 +585,6 @@ export function drawSettingsScreen(
     text: p.hot,
   });
   drawPaperButton(ctx, SETTINGS_SIZE, `CUBE  \u00B7  ${opts.sizeLabel}`, {
-    fill: p.panel,
-    text: p.accent,
-  });
-  drawPaperButton(ctx, SETTINGS_MODE, `MODE  \u00B7  ${opts.modeLabel}`, {
-    fill: p.panel,
-    text: p.hot,
-  });
-  drawPaperButton(ctx, SETTINGS_MOVES, `MOVES  \u00B7  ${opts.moveLimitLabel}`, {
     fill: p.panel,
     text: p.accent,
   });
@@ -842,17 +708,9 @@ export const HELP_PAGES = [
   {
     title: "GOAL",
     lines: [
-      "CLASSIC — match every face to one sticker kind.",
-      "CLEAR — complete a face to black it out.",
-      "In CLEAR, wipe all six faces to win.",
-    ],
-  },
-  {
-    title: "CLEAR",
-    lines: [
-      "A uniform face clears and turns black.",
-      "Black occupy stickers mark that face done.",
-      "Pick a move limit in Settings, or Unlimited.",
+      "Each face of the cube wants one sticker kind.",
+      "Twist until every face is a matching set.",
+      "No timer. Your progress is saved automatically.",
     ],
   },
   {
@@ -874,9 +732,9 @@ export const HELP_PAGES = [
   {
     title: "TOOLS",
     lines: [
-      "GAME MODE — on Home, Menu, or the moves chip.",
-      "MOVES — Cap for Clear mode, or Unlimited.",
-      "STICKERS / SCRAMBLE / HINT — usual tools.",
+      "STICKERS — pick the six face designs.",
+      "SCRAMBLE — shuffle for a fresh puzzle (icons stay).",
+      "HINT — draw a suggested move (Settings).",
       "Try 2\u00D72 in Settings if 3\u00D73 feels rough.",
     ],
   },

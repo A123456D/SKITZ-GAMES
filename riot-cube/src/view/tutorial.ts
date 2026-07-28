@@ -22,8 +22,8 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
     title: "WELCOME",
     lines: [
       "Riot Cube is a sticker Rubik's Cube.",
-      "There is no timer — just twist until you win.",
-      "This quick practice will teach the controls.",
+      "No timer — twist until every face matches.",
+      "Your puzzle progress is saved automatically.",
     ],
     action: "next",
     hint: "Tap NEXT when you are ready",
@@ -31,9 +31,9 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     title: "THE GOAL",
     lines: [
-      "CLASSIC — make every face one matching sticker.",
-      "CLEAR — complete a face to black it out; clear all six.",
-      "Pick the mode anytime from Home, Menu, or the moves chip.",
+      "Each face wants one matching sticker kind.",
+      "Keep twisting until all six faces are solid sets.",
+      "Coming back later? Play resumes where you left off.",
     ],
     action: "next",
     hint: "Tap NEXT to try a swipe",
@@ -92,7 +92,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
     title: "READY",
     lines: [
       "HINT draws a suggested move (toggle in Settings).",
-      "MENU opens themes, mode, and more.",
+      "MENU opens themes and more.",
       "You're set — go solve it.",
     ],
     action: "next",

@@ -1,19 +1,16 @@
 import {
   applyFaceTurn,
   applyTwist,
-  clearedCount,
   cycleCubeSize,
-  cycleGameMode,
-  cycleMoveLimit,
   doScramble,
   loadCubeSize,
-  loadGameMode,
-  loadMoveLimit,
-  modeLabel,
-  moveLimitLabel,
+  cloneSession,
+  resumeOrStartSession,
   saveCubeSize,
+  saveProgress,
   setActiveFace,
   setFaceStickers,
+  setProgressSaveSuspended,
   sizeLabel,
   startSession,
   type FaceId,
@@ -32,7 +29,6 @@ import {
   drawHomeScreen,
   drawHud,
   drawMenuButton,
-  drawModeEditorScreen,
   drawOrbitFinger,
   drawPauseMenu,
   drawPlayActions,
@@ -44,7 +40,6 @@ import {
   hitPlayHint,
   hitPlayScramble,
   hitPlayStickers,
-  hitMovesChip,
   hitRetry,
   hitSolvedHome,
   hitStickersGridKind,
@@ -56,23 +51,16 @@ import {
   loadLogo,
   stickersGridContentHeight,
   HOME_HOW,
-  HOME_MODE,
   HOME_PLAY,
   HOME_SETTINGS,
   MENU_BTN,
-  MODE_EDITOR_BACK,
-  MODE_EDITOR_MODE,
-  MODE_EDITOR_MOVES,
   PAUSE_HOME,
   PAUSE_HOW,
-  PAUSE_MODE,
   PAUSE_RESUME,
   PAUSE_SETTINGS,
   PAUSE_THEMES,
   SETTINGS_BACK,
   SETTINGS_HINTS,
-  SETTINGS_MODE,
-  SETTINGS_MOVES,
   SETTINGS_MUSIC,
   SETTINGS_SIZE,
   SETTINGS_THEME,
@@ -245,33 +233,32 @@ type Screen =
   | "play"
   | "menu"
   | "settings"
-  | "modeEditor"
   | "stickers"
-  | "themes"
-  | "help";
+  | "themes";
 let screen: Screen = "home";
 let settingsFrom: Screen = "home";
-let modeEditorFrom: Screen = "play";
 let themesFrom: Screen = "settings";
 let stickersFrom: Screen = "play";
 /** After theme change / onboarding — must APPLY a full set. */
 let stickersMustPick = false;
-let helpFrom: Screen = "home";
-let helpPage = 0;
 
-/** First-run funnel: tutorial → mode → theme → stickers. */
-type OnboardingStep = "help" | "mode" | "theme" | "stickers" | null;
+/** First-run funnel: tutorial → theme → stickers. */
+type OnboardingStep = "help" | "theme" | "stickers" | null;
 let onboarding: OnboardingStep = null;
 /** Theme must be tapped during onboarding before DONE. */
 let onboardingThemePicked = false;
 
 /** Interactive on-cube tutorial. */
 let tutorial: { step: number; from: Screen } | null = null;
+/** Puzzle to restore after tutorial practice (progress stays intact). */
+let progressBeforeTutorial: Session | null = null;
 
 function beginTutorial(from: Screen): void {
   tutorial = { step: 0, from };
+  progressBeforeTutorial = cloneSession(session);
+  setProgressSaveSuspended(true);
   resetPlayVisuals();
-  // Fresh scramble for practice, keep player icons.
+  // Fresh scramble for practice — does not overwrite saved progress.
   session = startSession(session.size, activeStickerPool(), session.faceStickers);
   syncActiveFace();
   screen = "play";
@@ -310,9 +297,17 @@ function finishTutorial(): void {
   markHelpSeen();
   const from = tutorial?.from ?? "home";
   tutorial = null;
+  setProgressSaveSuspended(false);
+  if (progressBeforeTutorial) {
+    session = progressBeforeTutorial;
+    progressBeforeTutorial = null;
+    saveProgress(session);
+    syncActiveFace();
+  }
   if (onboarding === "help") {
-    onboarding = "mode";
-    openModeEditor("home");
+    onboarding = "theme";
+    onboardingThemePicked = false;
+    openThemes("home");
     return;
   }
   if (from === "menu") screen = "menu";
@@ -328,7 +323,7 @@ function beginOnboarding(): void {
   beginTutorial("home");
 }
 
-let session: Session = startSession(loadCubeSize(), activeStickerPool());
+let session: Session = resumeOrStartSession(loadCubeSize(), activeStickerPool());
 
 if (!hasOnboarded()) {
   beginOnboarding();
@@ -656,26 +651,6 @@ function openStickersPicker(from: Screen = "play"): void {
   sfxPaperRustle();
 }
 
-function openModeEditor(from: Screen): void {
-  modeEditorFrom = from;
-  drag = null;
-  orbitDrag = null;
-  rotating = false;
-  screen = "modeEditor";
-  sfxPaperRustle();
-}
-
-function restartForModePrefs(): void {
-  session = startSession(
-    session.size,
-    activeStickerPool(),
-    session.faceStickers,
-  );
-  resetPlayVisuals();
-  syncActiveFace();
-  clearHint();
-}
-
 function finishOnboarding(): void {
   markOnboarded();
   onboarding = "stickers";
@@ -713,7 +688,7 @@ function paint(): void {
   drawDesk(ctx);
 
   if (screen === "home") {
-    drawHomeScreen(ctx, { modeLabel: modeLabel(loadGameMode()) });
+    drawHomeScreen(ctx);
     return;
   }
   if (screen === "settings") {
@@ -722,21 +697,7 @@ function paint(): void {
       musicVol: getMusicVolume(),
       themeLabel: getThemeLabel(),
       sizeLabel: sizeLabel(session.size),
-      modeLabel: modeLabel(loadGameMode()),
-      moveLimitLabel: moveLimitLabel(loadMoveLimit()),
       hintsOn: getHintsEnabled(),
-    });
-    return;
-  }
-  if (screen === "modeEditor") {
-    drawModeEditorScreen(ctx, {
-      modeLabel: modeLabel(loadGameMode()),
-      moveLimitLabel: moveLimitLabel(loadMoveLimit()),
-      primaryLabel: onboarding === "mode" ? "NEXT" : "BACK",
-      subtitle:
-        onboarding === "mode"
-          ? "Pick Classic or Clear, then tap NEXT"
-          : undefined,
     });
     return;
   }
@@ -800,9 +761,6 @@ function paint(): void {
   drawHud(ctx, {
     sfxVol: getSfxVolume(),
     moves: session.moveCount,
-    mode: session.mode,
-    cleared: clearedCount(session),
-    moveLimit: session.moveLimit,
   });
   drawMenuButton(ctx);
 
@@ -811,7 +769,6 @@ function paint(): void {
     motion,
     sourceCube: source,
     faceStickers: session.faceStickers,
-    clearedFaces: session.mode === "clear" ? session.cleared : undefined,
     hintMove: hintT > 0 && hintT < 1 ? hintMove : null,
     hintT,
   });
@@ -842,16 +799,13 @@ function paint(): void {
     });
   }
 
-  if (session.status === "solved" || session.status === "lost") {
+  if (session.status === "solved") {
     drawEndOverlay(ctx, {
       moves: session.moveCount,
-      outcome: session.status === "lost" ? "lost" : "solved",
-      mode: session.mode,
-      cleared: clearedCount(session),
     });
   }
   if (screen === "menu" && !tutorial) {
-    drawPauseMenu(ctx, { modeLabel: modeLabel(loadGameMode()) });
+    drawPauseMenu(ctx);
   }
 }
 
@@ -912,7 +866,7 @@ function startPlay(): void {
     return;
   }
   resetPlayVisuals();
-  session = startSession(
+  session = resumeOrStartSession(
     session.size,
     activeStickerPool(),
     session.faceStickers,
@@ -936,10 +890,6 @@ canvas.addEventListener(
       if (hitUiRect(HOME_PLAY, p.x, p.y)) {
         sfxPaperFlutter();
         startPlay();
-        return;
-      }
-      if (hitUiRect(HOME_MODE, p.x, p.y)) {
-        openModeEditor("home");
         return;
       }
       if (hitUiRect(HOME_HOW, p.x, p.y)) {
@@ -996,36 +946,8 @@ canvas.addEventListener(
       }
       if (hitUiRect(SETTINGS_SIZE, p.x, p.y)) {
         const next = cycleCubeSize(session.size);
-        if (settingsFrom === "menu")
-          session = startSession(next, activeStickerPool(), session.faceStickers);
-        else session = { ...session, size: next };
+        session = startSession(next, activeStickerPool(), session.faceStickers);
         clearHint();
-        return;
-      }
-      if (hitUiRect(SETTINGS_MODE, p.x, p.y)) {
-        cycleGameMode(loadGameMode());
-        if (settingsFrom === "menu") {
-          session = startSession(
-            session.size,
-            activeStickerPool(),
-            session.faceStickers,
-          );
-          clearHint();
-        }
-        sfxPaperRustle();
-        return;
-      }
-      if (hitUiRect(SETTINGS_MOVES, p.x, p.y)) {
-        cycleMoveLimit(loadMoveLimit());
-        if (settingsFrom === "menu") {
-          session = startSession(
-            session.size,
-            activeStickerPool(),
-            session.faceStickers,
-          );
-          clearHint();
-        }
-        sfxPaperRustle();
         return;
       }
       if (hitUiRect(SETTINGS_HINTS, p.x, p.y)) {
@@ -1036,39 +958,6 @@ canvas.addEventListener(
       }
       if (hitUiRect(SETTINGS_BACK, p.x, p.y)) {
         screen = settingsFrom === "menu" ? "menu" : settingsFrom;
-        return;
-      }
-      return;
-    }
-
-    if (screen === "modeEditor") {
-      if (hitUiRect(MODE_EDITOR_MODE, p.x, p.y)) {
-        cycleGameMode(loadGameMode());
-        if (onboarding !== "mode") restartForModePrefs();
-        sfxPaperRustle();
-        return;
-      }
-      if (hitUiRect(MODE_EDITOR_MOVES, p.x, p.y)) {
-        cycleMoveLimit(loadMoveLimit());
-        if (onboarding !== "mode") restartForModePrefs();
-        sfxPaperRustle();
-        return;
-      }
-      if (hitUiRect(MODE_EDITOR_BACK, p.x, p.y)) {
-        if (onboarding === "mode") {
-          onboarding = "theme";
-          onboardingThemePicked = false;
-          openThemes("home");
-          return;
-        }
-        if (modeEditorFrom === "home") {
-          screen = "home";
-        } else if (modeEditorFrom === "menu") {
-          screen = "menu";
-        } else {
-          screen = "play";
-        }
-        sfxPaperRustle();
         return;
       }
       return;
@@ -1148,10 +1037,6 @@ canvas.addEventListener(
         openThemes("menu");
         return;
       }
-      if (hitUiRect(PAUSE_MODE, p.x, p.y)) {
-        openModeEditor("menu");
-        return;
-      }
       if (hitUiRect(PAUSE_HOW, p.x, p.y)) {
         openHelp("menu");
         return;
@@ -1168,17 +1053,13 @@ canvas.addEventListener(
       return;
     }
 
-    if (session.status === "solved" || session.status === "lost") {
+    if (session.status === "solved") {
       if (hitVolumeButton(p.x, p.y)) {
         cycleHudVolume();
         return;
       }
       if (hitAnimeModeButton(p.x, p.y)) {
         applyAnimeModeToggle();
-        return;
-      }
-      if (hitMovesChip(p.x, p.y, session.mode === "clear")) {
-        openModeEditor("play");
         return;
       }
       if (hitUiRect(MENU_BTN, p.x, p.y)) {
@@ -1219,8 +1100,8 @@ canvas.addEventListener(
         else advanceTutorial();
         return;
       }
-      // Block menu / mode chip during tutorial
-      if (hitUiRect(MENU_BTN, p.x, p.y) || hitMovesChip(p.x, p.y, session.mode === "clear")) {
+      // Block menu during tutorial
+      if (hitUiRect(MENU_BTN, p.x, p.y)) {
         return;
       }
     } else if (hitUiRect(MENU_BTN, p.x, p.y)) {
@@ -1234,10 +1115,6 @@ canvas.addEventListener(
 
     if (hitAnimeModeButton(p.x, p.y)) {
       applyAnimeModeToggle();
-      return;
-    }
-    if (!tutorial && hitMovesChip(p.x, p.y, session.mode === "clear")) {
-      openModeEditor("play");
       return;
     }
 
