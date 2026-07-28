@@ -459,9 +459,10 @@ function drawPaperButton(
   ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
 }
 
-export const HOME_PLAY: UiRect = { x: 150, y: 820, w: 420, h: 72 };
-export const HOME_HOW: UiRect = { x: 150, y: 910, w: 420, h: 64 };
-export const HOME_SETTINGS: UiRect = { x: 150, y: 990, w: 420, h: 64 };
+export const HOME_PLAY: UiRect = { x: 150, y: 780, w: 420, h: 68 };
+export const HOME_MODE: UiRect = { x: 150, y: 864, w: 420, h: 60 };
+export const HOME_HOW: UiRect = { x: 150, y: 940, w: 420, h: 60 };
+export const HOME_SETTINGS: UiRect = { x: 150, y: 1016, w: 420, h: 60 };
 
 let logoImg: HTMLImageElement | null = null;
 let logoReady = false;
@@ -480,20 +481,23 @@ export function loadLogo(): Promise<void> {
   });
 }
 
-export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
+export function drawHomeScreen(
+  ctx: CanvasRenderingContext2D,
+  opts: { modeLabel: string },
+): void {
   const p = getPalette();
   drawDesk(ctx);
 
   if (logoImg && logoReady) {
     const maxW = 520;
-    const maxH = 480;
+    const maxH = 440;
     const scale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
     const lw = logoImg.width * scale;
     const lh = logoImg.height * scale;
-    ctx.drawImage(logoImg, (W - lw) / 2, 100, lw, lh);
+    ctx.drawImage(logoImg, (W - lw) / 2, 80, lw, lh);
   } else {
     ctx.fillStyle = p.paper;
-    roundRect(ctx, 70, 220, 580, 160, 8);
+    roundRect(ctx, 70, 200, 580, 160, 8);
     ctx.fill();
     ctx.strokeStyle = p.ink;
     ctx.lineWidth = 4;
@@ -501,18 +505,23 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = p.ink;
     ctx.font = "800 64px 'Permanent Marker', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("RIOT CUBE", W / 2, 310);
+    ctx.fillText("RIOT CUBE", W / 2, 290);
   }
 
   ctx.fillStyle = p.accent;
   ctx.font = "600 20px 'Patrick Hand', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("A sticker Rubik\u2019s Cube. No timer. Just twist.", W / 2, 760);
+  ctx.fillText("A sticker Rubik\u2019s Cube. No timer. Just twist.", W / 2, 730);
 
   drawPaperButton(ctx, HOME_PLAY, "PLAY", {
     fill: p.hot,
     text: p.white,
     tape: p.accent,
+  });
+  drawPaperButton(ctx, HOME_MODE, `GAME MODE  ·  ${opts.modeLabel}`, {
+    fill: p.paper,
+    text: p.ink,
+    tape: p.hot,
   });
   drawPaperButton(ctx, HOME_HOW, "HOW TO PLAY", {
     fill: p.paper,
@@ -528,12 +537,15 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
 
 export const PAUSE_RESUME: UiRect = { x: 160, y: 340, w: 400, h: 64 };
 export const PAUSE_THEMES: UiRect = { x: 160, y: 420, w: 400, h: 60 };
-export const PAUSE_HOW: UiRect = { x: 160, y: 496, w: 400, h: 60 };
-export const PAUSE_SETTINGS: UiRect = { x: 160, y: 572, w: 400, h: 60 };
-export const PAUSE_SCRAMBLE: UiRect = { x: 160, y: 648, w: 400, h: 60 };
+export const PAUSE_MODE: UiRect = { x: 160, y: 496, w: 400, h: 60 };
+export const PAUSE_HOW: UiRect = { x: 160, y: 572, w: 400, h: 60 };
+export const PAUSE_SETTINGS: UiRect = { x: 160, y: 648, w: 400, h: 60 };
 export const PAUSE_HOME: UiRect = { x: 160, y: 724, w: 400, h: 60 };
 
-export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
+export function drawPauseMenu(
+  ctx: CanvasRenderingContext2D,
+  opts: { modeLabel: string },
+): void {
   const p = getPalette();
   ctx.fillStyle = "rgba(0,0,0,0.72)";
   ctx.fillRect(0, 0, W, H);
@@ -561,6 +573,11 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
     text: p.ink,
     tape: p.hot,
   });
+  drawPaperButton(ctx, PAUSE_MODE, `GAME MODE  ·  ${opts.modeLabel}`, {
+    fill: p.paper,
+    text: p.ink,
+    tape: p.accent,
+  });
   drawPaperButton(ctx, PAUSE_HOW, "HOW TO PLAY", {
     fill: p.paper,
     text: p.ink,
@@ -569,10 +586,6 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   drawPaperButton(ctx, PAUSE_SETTINGS, "SETTINGS", {
     fill: p.paper,
     text: p.ink,
-  });
-  drawPaperButton(ctx, PAUSE_SCRAMBLE, "SCRAMBLE", {
-    fill: p.panel,
-    text: p.accent,
   });
   drawPaperButton(ctx, PAUSE_HOME, "HOME", {
     fill: p.panel,
@@ -599,10 +612,14 @@ export function drawModeEditorScreen(
   opts: {
     modeLabel: string;
     moveLimitLabel: string;
+    /** Primary action under the toggles. */
+    primaryLabel?: string;
+    subtitle?: string;
   },
 ): void {
   const p = getPalette();
   drawDesk(ctx);
+  const primary = opts.primaryLabel ?? "BACK";
 
   ctx.fillStyle = p.paper;
   roundRect(ctx, 80, 280, 560, 460, 10);
@@ -620,7 +637,11 @@ export function drawModeEditorScreen(
 
   ctx.font = "600 18px 'Patrick Hand', sans-serif";
   ctx.fillStyle = p.muted;
-  ctx.fillText("Classic solve or Clear faces · move cap", W / 2, 400);
+  ctx.fillText(
+    opts.subtitle ?? "Classic solve or Clear faces · move cap",
+    W / 2,
+    400,
+  );
 
   drawPaperButton(ctx, MODE_EDITOR_MODE, `MODE  ·  ${opts.modeLabel}`, {
     fill: p.panel,
@@ -635,7 +656,7 @@ export function drawModeEditorScreen(
       text: p.accent,
     },
   );
-  drawPaperButton(ctx, MODE_EDITOR_BACK, "BACK", {
+  drawPaperButton(ctx, MODE_EDITOR_BACK, primary, {
     fill: p.hot,
     text: p.white,
   });
@@ -738,7 +759,12 @@ export function hitThemePicker(x: number, y: number): ThemeId | null {
 
 export function drawThemesScreen(
   ctx: CanvasRenderingContext2D,
-  opts: { selected: ThemeId; animeMode: "day" | "dark" },
+  opts: {
+    selected: ThemeId;
+    animeMode: "day" | "dark";
+    backLabel?: string;
+    subtitle?: string;
+  },
 ): void {
   const p = getPalette();
   drawDesk(ctx);
@@ -758,7 +784,11 @@ export function drawThemesScreen(
   ctx.fillText("THEMES", W / 2, 200);
   ctx.font = "600 18px 'Patrick Hand', sans-serif";
   ctx.fillStyle = p.muted;
-  ctx.fillText("Pick a sticker pack \u00B7 music follows the vibe", W / 2, 245);
+  ctx.fillText(
+    opts.subtitle ?? "Pick a sticker pack \u00B7 music follows the vibe",
+    W / 2,
+    245,
+  );
 
   for (let i = 0; i < THEMES.length; i++) {
     const def = THEMES[i]!;
@@ -807,7 +837,7 @@ export function drawThemesScreen(
     );
   }
 
-  drawPaperButton(ctx, THEMES_BACK, "BACK", {
+  drawPaperButton(ctx, THEMES_BACK, opts.backLabel ?? "BACK", {
     fill: p.hot,
     text: p.white,
   });
@@ -849,7 +879,7 @@ export const HELP_PAGES = [
   {
     title: "TOOLS",
     lines: [
-      "MODE — Classic solve or Clear faces.",
+      "GAME MODE — on Home, Menu, or the moves chip.",
       "MOVES — Cap for Clear mode, or Unlimited.",
       "STICKERS / SCRAMBLE / HINT — usual tools.",
       "Try 2\u00D72 in Settings if 3\u00D73 feels rough.",
@@ -863,7 +893,7 @@ export const HELP_BACK: UiRect = { x: 140, y: 1060, w: 440, h: 58 };
 
 export function drawHelpScreen(
   ctx: CanvasRenderingContext2D,
-  opts: { page: number },
+  opts: { page: number; hideBack?: boolean },
 ): void {
   const p = getPalette();
   drawDesk(ctx);
@@ -926,10 +956,12 @@ export function drawHelpScreen(
     fill: p.accent,
     text: p.ink,
   });
-  drawPaperButton(ctx, HELP_BACK, "BACK", {
-    fill: p.hot,
-    text: p.white,
-  });
+  if (!opts.hideBack) {
+    drawPaperButton(ctx, HELP_BACK, "BACK", {
+      fill: p.hot,
+      text: p.white,
+    });
+  }
 }
 
 /** Mid play row — HINT / SCRAMBLE / STICKERS above the face-turn dock. */

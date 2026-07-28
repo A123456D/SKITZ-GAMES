@@ -60,6 +60,7 @@ import {
   HELP_PAGES,
   HELP_PREV,
   HOME_HOW,
+  HOME_MODE,
   HOME_PLAY,
   HOME_SETTINGS,
   MENU_BTN,
@@ -68,8 +69,8 @@ import {
   MODE_EDITOR_MOVES,
   PAUSE_HOME,
   PAUSE_HOW,
+  PAUSE_MODE,
   PAUSE_RESUME,
-  PAUSE_SCRAMBLE,
   PAUSE_SETTINGS,
   PAUSE_THEMES,
   SETTINGS_BACK,
@@ -147,17 +148,33 @@ import {
 import { getHintsEnabled, toggleHintsEnabled } from "./view/prefs";
 
 const HELP_SEEN_KEY = "riotcube_seen_help";
-
-function hasSeenHelp(): boolean {
-  try {
-    return localStorage.getItem(HELP_SEEN_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
+const ONBOARD_KEY = "riotcube_onboarded";
 
 function markHelpSeen(): void {
   try {
+    localStorage.setItem(HELP_SEEN_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+function hasOnboarded(): boolean {
+  try {
+    if (localStorage.getItem(ONBOARD_KEY) === "1") return true;
+    // Returning players who already finished help before onboarding existed.
+    if (localStorage.getItem(HELP_SEEN_KEY) === "1") {
+      localStorage.setItem(ONBOARD_KEY, "1");
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+function markOnboarded(): void {
+  try {
+    localStorage.setItem(ONBOARD_KEY, "1");
     localStorage.setItem(HELP_SEEN_KEY, "1");
   } catch {
     /* ignore */
@@ -224,6 +241,24 @@ let modeEditorFrom: Screen = "play";
 let themesFrom: Screen = "settings";
 let helpFrom: Screen = "home";
 let helpPage = 0;
+
+/** First-run funnel: help → mode → theme. */
+type OnboardingStep = "help" | "mode" | "theme" | null;
+let onboarding: OnboardingStep = null;
+/** Theme must be tapped during onboarding before DONE. */
+let onboardingThemePicked = false;
+
+function beginOnboarding(): void {
+  onboarding = "help";
+  onboardingThemePicked = false;
+  helpFrom = "home";
+  helpPage = 0;
+  screen = "help";
+}
+
+if (!hasOnboarded()) {
+  beginOnboarding();
+}
 
 let session: Session = startSession(loadCubeSize(), activeStickerPool());
 let faceTurnBtns: FaceTurnButtons | null = null;
@@ -547,6 +582,14 @@ function restartForModePrefs(): void {
   clearHint();
 }
 
+function finishOnboarding(): void {
+  markOnboarded();
+  onboarding = null;
+  onboardingThemePicked = false;
+  screen = "home";
+  sfxPaperFlutter();
+}
+
 function openThemes(from: Screen): void {
   themesFrom = from;
   screen = "themes";
@@ -562,12 +605,23 @@ function openHelp(from: Screen): void {
 
 function closeHelp(): void {
   markHelpSeen();
+  if (onboarding === "help") {
+    onboarding = "mode";
+    openModeEditor("home");
+    return;
+  }
   screen = helpFrom;
   sfxPaperRustle();
 }
 
 function pickTheme(id: ThemeId): void {
-  if (id === getTheme()) return;
+  if (onboarding === "theme") {
+    onboardingThemePicked = true;
+  }
+  if (id === getTheme()) {
+    if (onboarding === "theme") sfxPaperRustle();
+    return;
+  }
   setTheme(id);
   applyThemeChange();
   sfxPaperFlutter();
@@ -577,7 +631,7 @@ function paint(): void {
   drawDesk(ctx);
 
   if (screen === "home") {
-    drawHomeScreen(ctx);
+    drawHomeScreen(ctx, { modeLabel: modeLabel(loadGameMode()) });
     return;
   }
   if (screen === "settings") {
@@ -596,6 +650,11 @@ function paint(): void {
     drawModeEditorScreen(ctx, {
       modeLabel: modeLabel(loadGameMode()),
       moveLimitLabel: moveLimitLabel(loadMoveLimit()),
+      primaryLabel: onboarding === "mode" ? "NEXT" : "BACK",
+      subtitle:
+        onboarding === "mode"
+          ? "Pick Classic or Clear, then tap NEXT"
+          : undefined,
     });
     return;
   }
@@ -603,11 +662,24 @@ function paint(): void {
     drawThemesScreen(ctx, {
       selected: getTheme(),
       animeMode: getAnimeMode(),
+      backLabel:
+        onboarding === "theme"
+          ? onboardingThemePicked
+            ? "DONE"
+            : "PICK A THEME"
+          : "BACK",
+      subtitle:
+        onboarding === "theme"
+          ? "Tap a pack to choose your look"
+          : undefined,
     });
     return;
   }
   if (screen === "help") {
-    drawHelpScreen(ctx, { page: helpPage });
+    drawHelpScreen(ctx, {
+      page: helpPage,
+      hideBack: onboarding === "help",
+    });
     return;
   }
   if (screen === "stickers") {
@@ -683,7 +755,7 @@ function paint(): void {
     });
   }
   if (screen === "menu") {
-    drawPauseMenu(ctx);
+    drawPauseMenu(ctx, { modeLabel: modeLabel(loadGameMode()) });
   }
 }
 
@@ -736,14 +808,15 @@ function goHome(): void {
 }
 
 function startPlay(): void {
+  if (!hasOnboarded()) {
+    beginOnboarding();
+    sfxPaperFlutter();
+    return;
+  }
   resetPlayVisuals();
   session = startSession(session.size, activeStickerPool());
   saveCubeSize(session.size);
   syncActiveFace();
-  if (!hasSeenHelp()) {
-    openHelp("play");
-    return;
-  }
   screen = "play";
   sfxPaperRustle();
 }
@@ -761,6 +834,10 @@ canvas.addEventListener(
       if (hitUiRect(HOME_PLAY, p.x, p.y)) {
         sfxPaperFlutter();
         startPlay();
+        return;
+      }
+      if (hitUiRect(HOME_MODE, p.x, p.y)) {
+        openModeEditor("home");
         return;
       }
       if (hitUiRect(HOME_HOW, p.x, p.y)) {
@@ -792,7 +869,7 @@ canvas.addEventListener(
         }
         return;
       }
-      if (hitUiRect(HELP_BACK, p.x, p.y)) {
+      if (onboarding !== "help" && hitUiRect(HELP_BACK, p.x, p.y)) {
         closeHelp();
         return;
       }
@@ -810,6 +887,14 @@ canvas.addEventListener(
         return;
       }
       if (hitUiRect(THEMES_BACK, p.x, p.y)) {
+        if (onboarding === "theme") {
+          if (!onboardingThemePicked) {
+            sfxPaperRustle();
+            return;
+          }
+          finishOnboarding();
+          return;
+        }
         screen = themesFrom;
         sfxPaperRustle();
         return;
@@ -873,18 +958,30 @@ canvas.addEventListener(
     if (screen === "modeEditor") {
       if (hitUiRect(MODE_EDITOR_MODE, p.x, p.y)) {
         cycleGameMode(loadGameMode());
-        restartForModePrefs();
+        if (onboarding !== "mode") restartForModePrefs();
         sfxPaperRustle();
         return;
       }
       if (hitUiRect(MODE_EDITOR_MOVES, p.x, p.y)) {
         cycleMoveLimit(loadMoveLimit());
-        restartForModePrefs();
+        if (onboarding !== "mode") restartForModePrefs();
         sfxPaperRustle();
         return;
       }
       if (hitUiRect(MODE_EDITOR_BACK, p.x, p.y)) {
-        screen = modeEditorFrom === "menu" ? "menu" : "play";
+        if (onboarding === "mode") {
+          onboarding = "theme";
+          onboardingThemePicked = false;
+          openThemes("home");
+          return;
+        }
+        if (modeEditorFrom === "home") {
+          screen = "home";
+        } else if (modeEditorFrom === "menu") {
+          screen = "menu";
+        } else {
+          screen = "play";
+        }
         sfxPaperRustle();
         return;
       }
@@ -944,6 +1041,10 @@ canvas.addEventListener(
         openThemes("menu");
         return;
       }
+      if (hitUiRect(PAUSE_MODE, p.x, p.y)) {
+        openModeEditor("menu");
+        return;
+      }
       if (hitUiRect(PAUSE_HOW, p.x, p.y)) {
         openHelp("menu");
         return;
@@ -951,14 +1052,6 @@ canvas.addEventListener(
       if (hitUiRect(PAUSE_SETTINGS, p.x, p.y)) {
         settingsFrom = "menu";
         screen = "settings";
-        return;
-      }
-      if (hitUiRect(PAUSE_SCRAMBLE, p.x, p.y)) {
-        session = doScramble(session);
-        resetPlayVisuals();
-        syncActiveFace();
-        screen = "play";
-        sfxPaperRustle();
         return;
       }
       if (hitUiRect(PAUSE_HOME, p.x, p.y)) {
