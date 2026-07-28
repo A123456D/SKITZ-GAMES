@@ -886,6 +886,72 @@ export const HELP_PREV: UiRect = { x: 140, y: 980, w: 200, h: 58 };
 export const HELP_NEXT: UiRect = { x: 380, y: 980, w: 200, h: 58 };
 export const HELP_BACK: UiRect = { x: 140, y: 1060, w: 440, h: 58 };
 
+/** Coach card during the interactive tutorial (top of play view). */
+export const TUTORIAL_NEXT: UiRect = { x: 420, y: 248, w: 200, h: 50 };
+export const TUTORIAL_SKIP: UiRect = { x: 100, y: 248, w: 200, h: 50 };
+
+export function drawTutorialCoach(
+  ctx: CanvasRenderingContext2D,
+  opts: {
+    step: number;
+    total: number;
+    title: string;
+    lines: readonly string[];
+    hint: string;
+    showNext: boolean;
+    showSkip: boolean;
+    nextLabel?: string;
+  },
+): void {
+  const p = getPalette();
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  roundRect(ctx, 48, 78, 624, 240, 10);
+  ctx.fill();
+  ctx.fillStyle = p.paper;
+  roundRect(ctx, 56, 86, 608, 224, 8);
+  ctx.fill();
+  ctx.strokeStyle = p.ink;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillStyle = p.hot;
+  ctx.fillRect(72, 78, 72, 12);
+
+  ctx.fillStyle = p.ink;
+  ctx.font = "800 26px 'Permanent Marker', sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(opts.title, 80, 128);
+  ctx.fillStyle = p.muted;
+  ctx.font = "600 16px 'Patrick Hand', sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(`${opts.step + 1} / ${opts.total}`, 640, 128);
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = p.ink;
+  ctx.font = "600 18px 'Patrick Hand', sans-serif";
+  let y = 158;
+  for (const line of opts.lines) {
+    ctx.fillText(line, 80, y);
+    y += 26;
+  }
+
+  ctx.fillStyle = p.accent;
+  ctx.font = "700 16px 'Chakra Petch', sans-serif";
+  ctx.fillText(opts.hint, 80, 248);
+
+  if (opts.showSkip) {
+    drawPaperButton(ctx, TUTORIAL_SKIP, "SKIP", {
+      fill: p.panel,
+      text: p.muted,
+    });
+  }
+  if (opts.showNext) {
+    drawPaperButton(ctx, TUTORIAL_NEXT, opts.nextLabel ?? "NEXT", {
+      fill: p.accent,
+      text: p.ink,
+    });
+  }
+}
+
 export function drawHelpScreen(
   ctx: CanvasRenderingContext2D,
   opts: { page: number; hideBack?: boolean },
@@ -1077,6 +1143,9 @@ export function drawStickersScreen(
     draft: readonly (TileKind | null)[];
     slot: number;
     scroll: number;
+    /** Extra line under the title (e.g. theme rematch). */
+    banner?: string;
+    hideBack?: boolean;
   },
 ): void {
   const p = getPalette();
@@ -1097,7 +1166,11 @@ export function drawStickersScreen(
   ctx.fillText("CHOOSE STICKERS", W / 2, 95);
   ctx.font = "600 16px 'Patrick Hand', sans-serif";
   ctx.fillStyle = p.muted;
-  ctx.fillText("Pick 6 different stickers for the faces", W / 2, 128);
+  ctx.fillText(
+    opts.banner ?? "Pick 6 different stickers for the faces",
+    W / 2,
+    128,
+  );
 
   const slotW = 88;
   const slotGap = 12;
@@ -1171,10 +1244,12 @@ export function drawStickersScreen(
 
   const filled = opts.draft.filter(Boolean).length;
   const ready = filled === 6 && new Set(opts.draft).size === 6;
-  drawPaperButton(ctx, STICKERS_BACK, "BACK", {
-    fill: p.panel,
-    text: p.accent,
-  });
+  if (!opts.hideBack) {
+    drawPaperButton(ctx, STICKERS_BACK, "BACK", {
+      fill: p.panel,
+      text: p.accent,
+    });
+  }
   drawPaperButton(ctx, STICKERS_RANDOM, "RANDOM", {
     fill: p.paper,
     text: p.ink,

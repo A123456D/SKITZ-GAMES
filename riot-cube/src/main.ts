@@ -21,7 +21,7 @@ import {
   type Session,
 } from "./core/session";
 import { suggestHintMove, type HintMove } from "./core/hint";
-import { pickFaceStickers, stickerPoolForTheme, type TileKind } from "./core/stickers";
+import { pickFaceStickers, isValidFaceStickers, stickerPoolForTheme, type TileKind } from "./core/stickers";
 import { previewCube } from "./core/lane";
 import {
   W,
@@ -29,7 +29,6 @@ import {
   drawDesk,
   drawEndOverlay,
   drawFaceTurnButtons,
-  drawHelpScreen,
   drawHomeScreen,
   drawHud,
   drawMenuButton,
@@ -40,6 +39,7 @@ import {
   drawSettingsScreen,
   drawStickersScreen,
   drawThemesScreen,
+  drawTutorialCoach,
   hitOrbitBand,
   hitPlayHint,
   hitPlayScramble,
@@ -55,10 +55,6 @@ import {
   hitAnimeModeButton,
   loadLogo,
   stickersGridContentHeight,
-  HELP_BACK,
-  HELP_NEXT,
-  HELP_PAGES,
-  HELP_PREV,
   HOME_HOW,
   HOME_MODE,
   HOME_PLAY,
@@ -87,8 +83,11 @@ import {
   STICKERS_RANDOM,
   THEMES_ANIME_MODE,
   THEMES_BACK,
+  TUTORIAL_NEXT,
+  TUTORIAL_SKIP,
   type FaceTurnButtons,
 } from "./view/draw";
+import { TUTORIAL_STEPS, type TutorialAction } from "./view/tutorial";
 import {
   drawCube3D,
   drawCubeOrbitButtons,
@@ -190,32 +189,40 @@ function activeStickerPool() {
   );
 }
 
-/** Drop face stickers that aren't in the active theme pool so art can load. */
-function rematchStickersToActivePool(): void {
+/** Drop invalid stickers for the active theme — never auto-randomize. Opens picker. */
+function rematchStickersToActivePool(): boolean {
   const pool = activeStickerPool();
-  const ok = session.faceStickers.every((k) =>
-    (pool as readonly string[]).includes(k),
-  );
-  if (!ok) {
-    session = setFaceStickers(
-      session,
-      pickFaceStickers(() => Math.random(), pool),
-    );
+  if (isValidFaceStickers(session.faceStickers, pool)) {
+    if (screen === "stickers") {
+      stickerDraft = [...session.faceStickers];
+      stickerSlot = 0;
+    }
+    return false;
   }
-  if (screen === "stickers") {
-    stickerDraft = stickerDraft.map((k) =>
-      k && (pool as readonly string[]).includes(k) ? k : null,
-    );
-    const empty = stickerDraft.findIndex((k) => !k);
-    stickerSlot = empty >= 0 ? empty : 0;
-  }
+  const used = new Set<string>();
+  stickerDraft = session.faceStickers.map((k) => {
+    if ((pool as readonly string[]).includes(k) && !used.has(k)) {
+      used.add(k);
+      return k;
+    }
+    return null;
+  });
+  const empty = stickerDraft.findIndex((k) => !k);
+  stickerSlot = empty >= 0 ? empty : 0;
+  stickersScroll = 0;
+  stickersScrollDrag = null;
+  stickersMustPick = true;
+  stickersFrom = screen === "themes" ? themesFrom : screen;
+  screen = "stickers";
+  sfxPaperRustle();
+  return true;
 }
 
 function applyThemeChange(): void {
   reloadThemeArt(getTheme());
-  rematchStickersToActivePool();
   void loadStickers();
   syncMusicForTheme(getTheme());
+  rematchStickersToActivePool();
 }
 
 function applyAnimeModeToggle(): void {
@@ -246,28 +253,86 @@ let screen: Screen = "home";
 let settingsFrom: Screen = "home";
 let modeEditorFrom: Screen = "play";
 let themesFrom: Screen = "settings";
+let stickersFrom: Screen = "play";
+/** After theme change / onboarding — must APPLY a full set. */
+let stickersMustPick = false;
 let helpFrom: Screen = "home";
 let helpPage = 0;
 
-/** First-run funnel: help → mode → theme. */
-type OnboardingStep = "help" | "mode" | "theme" | null;
+/** First-run funnel: tutorial → mode → theme → stickers. */
+type OnboardingStep = "help" | "mode" | "theme" | "stickers" | null;
 let onboarding: OnboardingStep = null;
 /** Theme must be tapped during onboarding before DONE. */
 let onboardingThemePicked = false;
 
+/** Interactive on-cube tutorial. */
+let tutorial: { step: number; from: Screen } | null = null;
+
+function beginTutorial(from: Screen): void {
+  tutorial = { step: 0, from };
+  resetPlayVisuals();
+  // Fresh scramble for practice, keep player icons.
+  session = startSession(session.size, activeStickerPool(), session.faceStickers);
+  syncActiveFace();
+  screen = "play";
+  sfxPaperRustle();
+}
+
+function tutorialStep() {
+  return tutorial ? TUTORIAL_STEPS[tutorial.step]! : null;
+}
+
+function tutorialAllows(action: TutorialAction): boolean {
+  if (!tutorial) return true;
+  const step = tutorialStep();
+  if (!step) return true;
+  if (step.action === "next") return false;
+  return step.action === action;
+}
+
+function advanceTutorial(): void {
+  if (!tutorial) return;
+  if (tutorial.step >= TUTORIAL_STEPS.length - 1) {
+    finishTutorial();
+    return;
+  }
+  tutorial = { ...tutorial, step: tutorial.step + 1 };
+  sfxPaperRustle();
+}
+
+function noteTutorial(action: TutorialAction): void {
+  if (!tutorial) return;
+  const step = tutorialStep();
+  if (step && step.action === action) advanceTutorial();
+}
+
+function finishTutorial(): void {
+  markHelpSeen();
+  const from = tutorial?.from ?? "home";
+  tutorial = null;
+  if (onboarding === "help") {
+    onboarding = "mode";
+    openModeEditor("home");
+    return;
+  }
+  if (from === "menu") screen = "menu";
+  else if (from === "play") screen = "play";
+  else screen = "home";
+  sfxPaperFlutter();
+}
+
 function beginOnboarding(): void {
   onboarding = "help";
   onboardingThemePicked = false;
-  helpFrom = "home";
-  helpPage = 0;
-  screen = "help";
+  stickersMustPick = false;
+  beginTutorial("home");
 }
+
+let session: Session = startSession(loadCubeSize(), activeStickerPool());
 
 if (!hasOnboarded()) {
   beginOnboarding();
 }
-
-let session: Session = startSession(loadCubeSize(), activeStickerPool());
 let faceTurnBtns: FaceTurnButtons | null = null;
 
 let hintMove: HintMove | null = null;
@@ -444,6 +509,7 @@ function resetPlayVisuals(): void {
 
 function doTwist(twist: LaneTwist, fromUv = 0): void {
   if (session.status !== "playing" || turnAnim) return;
+  if (tutorial && !tutorialAllows("swipe")) return;
   const amount = Math.max(1, twist.amount ?? 1);
   const n = session.size;
   const toUv = (twist.dir * amount) / n;
@@ -451,6 +517,7 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
   // Already dragged to (or past) the commit distance — land immediately.
   if (sameDir && Math.abs(fromUv) >= Math.abs(toUv) * 0.92) {
     session = applyTwist(session, { ...twist, amount });
+    noteTutorial("swipe");
     sfxPaperSlide();
     return;
   }
@@ -470,6 +537,7 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
 
 function doFaceTurn(dir: 1 | -1): void {
   if (session.status !== "playing" || turnAnim) return;
+  if (tutorial && !tutorialAllows("faceTurn")) return;
   turnAnim = { kind: "face", face: session.face, dir, t: 0, ms: TURN_MS };
   sfxPaperSlide();
 }
@@ -499,6 +567,7 @@ function snapOrient(q: Quat): Quat {
 
 function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
   if (drag || session.status !== "playing") return;
+  if (tutorial && !tutorialAllows("orbit")) return;
   orbitDrag = null;
   if (rotating) {
     orient = quatCopy(targetOrient);
@@ -507,17 +576,16 @@ function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
   }
   let q = orient;
   if (Math.abs(quatDot(q, DEFAULT_ORIENT)) > 0.999) {
-    q = quatIdentity();
-  } else {
-    q = snapOrbitQuat(q);
+    q = quatCopy(DEFAULT_ORIENT);
   }
-  targetOrient = orbitStepQuat(q, dir);
+  targetOrient = snapOrient(orbitStepQuat(q, dir));
   rotating = true;
-  sfxPaperFlutter();
-  syncActiveFace();
+  noteTutorial("orbit");
+  sfxPaperRustle();
 }
 
 function beginOrbitDrag(x: number, y: number): void {
+  if (tutorial && !tutorialAllows("orbit")) return;
   rotating = false;
   orbitDrag = { x0: x, y0: y, q0: quatCopy(orient) };
   orbitFinger = { x, y };
@@ -529,6 +597,7 @@ function endOrbitDrag(): void {
   orbitFinger = null;
   targetOrient = snapOrient(orient);
   rotating = true;
+  noteTutorial("orbit");
 }
 
 function hitFaceTurnButtons(x: number, y: number): boolean {
@@ -563,9 +632,24 @@ function triggerHint(): void {
   sfxPaperFlutter();
 }
 
-function openStickersPicker(): void {
-  stickerDraft = [...session.faceStickers];
-  stickerSlot = 0;
+function openStickersPicker(from: Screen = "play"): void {
+  const pool = activeStickerPool();
+  stickersFrom = from;
+  stickersMustPick = false;
+  if (isValidFaceStickers(session.faceStickers, pool)) {
+    stickerDraft = [...session.faceStickers];
+  } else {
+    const used = new Set<string>();
+    stickerDraft = session.faceStickers.map((k) => {
+      if ((pool as readonly string[]).includes(k) && !used.has(k)) {
+        used.add(k);
+        return k;
+      }
+      return null;
+    });
+  }
+  const empty = stickerDraft.findIndex((k) => !k);
+  stickerSlot = empty >= 0 ? empty : 0;
   stickersScroll = 0;
   stickersScrollDrag = null;
   screen = "stickers";
@@ -581,9 +665,12 @@ function openModeEditor(from: Screen): void {
   sfxPaperRustle();
 }
 
-/** Apply saved mode / move-limit prefs and start a fresh run. */
 function restartForModePrefs(): void {
-  session = startSession(session.size, activeStickerPool());
+  session = startSession(
+    session.size,
+    activeStickerPool(),
+    session.faceStickers,
+  );
   resetPlayVisuals();
   syncActiveFace();
   clearHint();
@@ -591,9 +678,11 @@ function restartForModePrefs(): void {
 
 function finishOnboarding(): void {
   markOnboarded();
-  onboarding = null;
+  onboarding = "stickers";
   onboardingThemePicked = false;
-  screen = "home";
+  stickersMustPick = true;
+  openStickersPicker("home");
+  stickersMustPick = true;
   sfxPaperFlutter();
 }
 
@@ -604,21 +693,7 @@ function openThemes(from: Screen): void {
 }
 
 function openHelp(from: Screen): void {
-  helpFrom = from;
-  helpPage = 0;
-  screen = "help";
-  sfxPaperRustle();
-}
-
-function closeHelp(): void {
-  markHelpSeen();
-  if (onboarding === "help") {
-    onboarding = "mode";
-    openModeEditor("home");
-    return;
-  }
-  screen = helpFrom;
-  sfxPaperRustle();
+  beginTutorial(from === "menu" ? "menu" : from === "play" ? "play" : "home");
 }
 
 function pickTheme(id: ThemeId): void {
@@ -682,18 +757,15 @@ function paint(): void {
     });
     return;
   }
-  if (screen === "help") {
-    drawHelpScreen(ctx, {
-      page: helpPage,
-      hideBack: onboarding === "help",
-    });
-    return;
-  }
   if (screen === "stickers") {
     drawStickersScreen(ctx, {
       draft: stickerDraft,
       slot: stickerSlot,
       scroll: stickersScroll,
+      banner: stickersMustPick
+        ? "New theme — pick 6 stickers (scramble won’t change them)"
+        : undefined,
+      hideBack: stickersMustPick,
     });
     return;
   }
@@ -746,11 +818,28 @@ function paint(): void {
   orbitBtns = drawCubeOrbitButtons(ctx, layout.cx, layout.cy, layout.scale, W, H);
 
   if (session.status === "playing") {
-    drawPlayActions(ctx, { hintsOn: getHintsEnabled() });
+    drawPlayActions(ctx, {
+      hintsOn: getHintsEnabled() && !tutorial,
+    });
     if (orbitFinger) drawOrbitFinger(ctx, orbitFinger.x, orbitFinger.y);
     faceTurnBtns = drawFaceTurnButtons(ctx);
   } else {
     faceTurnBtns = null;
+  }
+
+  if (tutorial && screen === "play") {
+    const step = tutorialStep()!;
+    const last = tutorial.step >= TUTORIAL_STEPS.length - 1;
+    drawTutorialCoach(ctx, {
+      step: tutorial.step,
+      total: TUTORIAL_STEPS.length,
+      title: step.title,
+      lines: step.lines,
+      hint: step.hint,
+      showNext: step.action === "next",
+      showSkip: onboarding !== "help",
+      nextLabel: last ? "DONE" : "NEXT",
+    });
   }
 
   if (session.status === "solved" || session.status === "lost") {
@@ -761,7 +850,7 @@ function paint(): void {
       cleared: clearedCount(session),
     });
   }
-  if (screen === "menu") {
+  if (screen === "menu" && !tutorial) {
     drawPauseMenu(ctx, { modeLabel: modeLabel(loadGameMode()) });
   }
 }
@@ -777,11 +866,13 @@ function tick(ts: number): void {
         turnAnim.t = 1;
         if (turnAnim.kind === "face") {
           session = applyFaceTurn(session, turnAnim.face, turnAnim.dir);
+          noteTutorial("faceTurn");
         } else {
           const face = session.face;
           session = { ...session, face: turnAnim.face };
           session = applyTwist(session, turnAnim.twist);
           session = { ...session, face };
+          noteTutorial("swipe");
         }
         turnAnim = null;
       }
@@ -821,7 +912,11 @@ function startPlay(): void {
     return;
   }
   resetPlayVisuals();
-  session = startSession(session.size, activeStickerPool());
+  session = startSession(
+    session.size,
+    activeStickerPool(),
+    session.faceStickers,
+  );
   saveCubeSize(session.size);
   syncActiveFace();
   screen = "play";
@@ -854,30 +949,6 @@ canvas.addEventListener(
       if (hitUiRect(HOME_SETTINGS, p.x, p.y)) {
         settingsFrom = "home";
         screen = "settings";
-        return;
-      }
-      return;
-    }
-
-    if (screen === "help") {
-      if (hitUiRect(HELP_PREV, p.x, p.y)) {
-        if (helpPage > 0) {
-          helpPage -= 1;
-          sfxPaperRustle();
-        }
-        return;
-      }
-      if (hitUiRect(HELP_NEXT, p.x, p.y)) {
-        if (helpPage >= HELP_PAGES.length - 1) {
-          closeHelp();
-        } else {
-          helpPage += 1;
-          sfxPaperRustle();
-        }
-        return;
-      }
-      if (onboarding !== "help" && hitUiRect(HELP_BACK, p.x, p.y)) {
-        closeHelp();
         return;
       }
       return;
@@ -926,7 +997,7 @@ canvas.addEventListener(
       if (hitUiRect(SETTINGS_SIZE, p.x, p.y)) {
         const next = cycleCubeSize(session.size);
         if (settingsFrom === "menu")
-          session = startSession(next, activeStickerPool());
+          session = startSession(next, activeStickerPool(), session.faceStickers);
         else session = { ...session, size: next };
         clearHint();
         return;
@@ -934,7 +1005,11 @@ canvas.addEventListener(
       if (hitUiRect(SETTINGS_MODE, p.x, p.y)) {
         cycleGameMode(loadGameMode());
         if (settingsFrom === "menu") {
-          session = startSession(session.size, activeStickerPool());
+          session = startSession(
+            session.size,
+            activeStickerPool(),
+            session.faceStickers,
+          );
           clearHint();
         }
         sfxPaperRustle();
@@ -943,7 +1018,11 @@ canvas.addEventListener(
       if (hitUiRect(SETTINGS_MOVES, p.x, p.y)) {
         cycleMoveLimit(loadMoveLimit());
         if (settingsFrom === "menu") {
-          session = startSession(session.size, activeStickerPool());
+          session = startSession(
+            session.size,
+            activeStickerPool(),
+            session.faceStickers,
+          );
           clearHint();
         }
         sfxPaperRustle();
@@ -996,8 +1075,12 @@ canvas.addEventListener(
     }
 
     if (screen === "stickers") {
-      if (hitUiRect(STICKERS_BACK, p.x, p.y)) {
-        screen = "play";
+      if (!stickersMustPick && hitUiRect(STICKERS_BACK, p.x, p.y)) {
+        screen = stickersFrom === "menu" ? "menu" : stickersFrom;
+        if (tutorial && tutorialStep()?.action === "stickers") {
+          // Closed without applying — stay on stickers step
+          screen = "play";
+        }
         sfxPaperRustle();
         return;
       }
@@ -1015,7 +1098,24 @@ canvas.addEventListener(
         ) {
           session = setFaceStickers(session, stickerDraft as TileKind[]);
           clearHint();
-          screen = "play";
+          stickersMustPick = false;
+          if (onboarding === "stickers") {
+            onboarding = null;
+            screen = "home";
+            sfxPaperFlutter();
+            return;
+          }
+          if (tutorial && tutorialStep()?.action === "stickers") {
+            screen = "play";
+            noteTutorial("stickers");
+            return;
+          }
+          screen =
+            stickersFrom === "menu"
+              ? "menu"
+              : stickersFrom === "home"
+                ? "home"
+                : "play";
           sfxPaperFlutter();
         }
         return;
@@ -1103,7 +1203,27 @@ canvas.addEventListener(
       cycleHudVolume();
       return;
     }
-    if (hitUiRect(MENU_BTN, p.x, p.y)) {
+
+    if (tutorial && screen === "play") {
+      const step = tutorialStep()!;
+      if (
+        onboarding !== "help" &&
+        step.action === "next" &&
+        hitUiRect(TUTORIAL_SKIP, p.x, p.y)
+      ) {
+        finishTutorial();
+        return;
+      }
+      if (step.action === "next" && hitUiRect(TUTORIAL_NEXT, p.x, p.y)) {
+        if (tutorial.step >= TUTORIAL_STEPS.length - 1) finishTutorial();
+        else advanceTutorial();
+        return;
+      }
+      // Block menu / mode chip during tutorial
+      if (hitUiRect(MENU_BTN, p.x, p.y) || hitMovesChip(p.x, p.y, session.mode === "clear")) {
+        return;
+      }
+    } else if (hitUiRect(MENU_BTN, p.x, p.y)) {
       drag = null;
       orbitDrag = null;
       rotating = false;
@@ -1111,29 +1231,33 @@ canvas.addEventListener(
       sfxPaperRustle();
       return;
     }
+
     if (hitAnimeModeButton(p.x, p.y)) {
       applyAnimeModeToggle();
       return;
     }
-    if (hitMovesChip(p.x, p.y, session.mode === "clear")) {
+    if (!tutorial && hitMovesChip(p.x, p.y, session.mode === "clear")) {
       openModeEditor("play");
       return;
     }
 
-    const hintsOn = getHintsEnabled();
-    if (hitPlayHint(p.x, p.y, hintsOn)) {
+    const playHintsLayout = getHintsEnabled() && !tutorial;
+    if (hitPlayHint(p.x, p.y, playHintsLayout)) {
       triggerHint();
       return;
     }
-    if (hitPlayScramble(p.x, p.y, hintsOn)) {
+    if (hitPlayScramble(p.x, p.y, playHintsLayout)) {
+      if (tutorial && !tutorialAllows("scramble")) return;
       session = doScramble(session);
       resetPlayVisuals();
       syncActiveFace();
+      noteTutorial("scramble");
       sfxPaperRustle();
       return;
     }
-    if (hitPlayStickers(p.x, p.y, hintsOn)) {
-      openStickersPicker();
+    if (hitPlayStickers(p.x, p.y, playHintsLayout)) {
+      if (tutorial && !tutorialAllows("stickers")) return;
+      openStickersPicker("play");
       return;
     }
     if (hitFaceTurnButtons(p.x, p.y)) return;
@@ -1151,6 +1275,7 @@ canvas.addEventListener(
     const hit =
       headOn && !rotating && !turnAnim ? hitFrontUV(layout, p.x, p.y) : null;
     if (hit && hit.face === session.face) {
+      if (tutorial && !tutorialAllows("swipe")) return;
       const n = session.size;
       const c = Math.min(n - 1, Math.max(0, Math.floor(hit.u * n)));
       const r = Math.min(n - 1, Math.max(0, Math.floor(hit.v * n)));

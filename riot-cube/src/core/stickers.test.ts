@@ -30,13 +30,16 @@ describe("stickers", () => {
     expect(stickerForColor(5, map)).toBe(map[5]);
   });
 
-  it("startSession and doScramble assign faceStickers", () => {
+  it("doScramble keeps the same face stickers", () => {
     const a = startSession(3);
-    expect(a.faceStickers).toHaveLength(6);
-    expect(new Set(a.faceStickers).size).toBe(6);
-
+    const stickers = [...a.faceStickers];
     const b = doScramble(a);
-    expect(b.faceStickers).toHaveLength(6);
-    expect(new Set(b.faceStickers).size).toBe(6);
+    expect(b.faceStickers).toEqual(stickers);
+  });
+
+  it("startSession reuses keepStickers when valid for pool", () => {
+    const a = startSession(3);
+    const b = startSession(3, a.faceStickers, a.faceStickers);
+    expect(b.faceStickers).toEqual(a.faceStickers);
   });
 });

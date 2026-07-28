@@ -385,6 +385,72 @@ export function pickFaceStickers(
   ];
 }
 
+/** Stable first-six from a pool (not random) — used until the player picks. */
+export function defaultFaceStickers(
+  pool: readonly TileKind[] = EDGY_STICKER_POOL,
+): FaceStickers {
+  const src = pool.length >= 6 ? pool : EDGY_STICKER_POOL;
+  return [
+    src[0]!,
+    src[1]!,
+    src[2]!,
+    src[3]!,
+    src[4]!,
+    src[5]!,
+  ];
+}
+
+export function isValidFaceStickers(
+  map: readonly TileKind[],
+  pool: readonly TileKind[],
+): boolean {
+  if (map.length !== 6) return false;
+  const set = new Set(map);
+  if (set.size !== 6) return false;
+  const allowed = new Set<string>(pool);
+  for (const k of map) {
+    if (!allowed.has(k)) return false;
+  }
+  return true;
+}
+
+const FACE_STICKERS_KEY = "riotcube_face_stickers";
+
+export function loadSavedFaceStickers(
+  pool: readonly TileKind[],
+): FaceStickers | null {
+  try {
+    const raw = localStorage.getItem(FACE_STICKERS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    const map = parsed.filter((k): k is TileKind => typeof k === "string");
+    if (!isValidFaceStickers(map, pool)) return null;
+    return map as unknown as FaceStickers;
+  } catch {
+    return null;
+  }
+}
+
+export function saveFaceStickers(map: FaceStickers): void {
+  try {
+    localStorage.setItem(FACE_STICKERS_KEY, JSON.stringify(map));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Prefer keep → saved → stable defaults. Never random. */
+export function resolveFaceStickers(
+  pool: readonly TileKind[],
+  keep?: readonly TileKind[] | null,
+): FaceStickers {
+  if (keep && isValidFaceStickers(keep, pool)) return keep as FaceStickers;
+  const saved = loadSavedFaceStickers(pool);
+  if (saved) return saved;
+  return defaultFaceStickers(pool);
+}
+
 export function stickerForColor(
   colorId: number,
   map: readonly TileKind[] = FACE_STICKERS,

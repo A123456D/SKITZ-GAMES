@@ -17,7 +17,8 @@ import {
 } from "./rubik";
 import { applyLaneTwist, type LaneTwist } from "./lane";
 import {
-  pickFaceStickers,
+  resolveFaceStickers,
+  saveFaceStickers,
   type FaceStickers,
   type TileKind,
   TILE_KINDS,
@@ -167,10 +168,11 @@ function limitFromPrefs(mode: GameMode): number | null {
 export function startSession(
   size: CubeSize = loadCubeSize(),
   stickerPool: readonly TileKind[] = TILE_KINDS,
+  keepStickers?: readonly TileKind[] | null,
 ): Session {
   const seed = seedFrom();
   const rng = mulberry32(seed);
-  const faceStickers = pickFaceStickers(rng, stickerPool);
+  const faceStickers = resolveFaceStickers(stickerPool, keepStickers);
   const cube = scramble(size, defaultScrambleMoves(size), rng);
   const mode = loadGameMode();
   return {
@@ -196,6 +198,7 @@ export function doScramble(session: Session): Session {
     rng,
   );
   const mode = loadGameMode();
+  // Keep the player's sticker icons — scramble only mixes the cube.
   return {
     ...session,
     cube,
@@ -205,6 +208,7 @@ export function doScramble(session: Session): Session {
     mode,
     cleared: emptyCleared(),
     moveLimit: limitFromPrefs(mode),
+    faceStickers: session.faceStickers,
   };
 }
 
@@ -218,9 +222,11 @@ export function setFaceStickers(
   for (const k of map) {
     if (!(TILE_KINDS as readonly string[]).includes(k)) return session;
   }
+  const faceStickers = map as FaceStickers;
+  saveFaceStickers(faceStickers);
   return {
     ...session,
-    faceStickers: map as FaceStickers,
+    faceStickers,
   };
 }
 
