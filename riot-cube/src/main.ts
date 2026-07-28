@@ -22,6 +22,7 @@ import {
   drawDesk,
   drawEndOverlay,
   drawFaceTurnButtons,
+  drawHelpScreen,
   drawHomeScreen,
   drawHud,
   drawMenuButton,
@@ -30,6 +31,7 @@ import {
   drawPlayActions,
   drawSettingsScreen,
   drawStickersScreen,
+  drawThemesScreen,
   hitOrbitBand,
   hitPlayHint,
   hitPlayScramble,
@@ -38,20 +40,29 @@ import {
   hitSolvedHome,
   hitStickersGridKind,
   hitStickersSlot,
+  hitThemePicker,
   hitUiRect,
   hitVolumeButton,
   hitAnimeModeButton,
   loadLogo,
   stickersGridContentHeight,
+  HELP_BACK,
+  HELP_NEXT,
+  HELP_PAGES,
+  HELP_PREV,
+  HOME_HOW,
   HOME_PLAY,
   HOME_SETTINGS,
   MENU_BTN,
   PAUSE_HOME,
+  PAUSE_HOW,
   PAUSE_RESUME,
   PAUSE_SCRAMBLE,
   PAUSE_SETTINGS,
+  PAUSE_THEMES,
   SETTINGS_BACK,
   SETTINGS_HINTS,
+  SETTINGS_MUSIC,
   SETTINGS_SIZE,
   SETTINGS_THEME,
   SETTINGS_VOL,
@@ -59,6 +70,8 @@ import {
   STICKERS_BACK,
   STICKERS_GRID,
   STICKERS_RANDOM,
+  THEMES_ANIME_MODE,
+  THEMES_BACK,
   type FaceTurnButtons,
 } from "./view/draw";
 import {
@@ -94,15 +107,22 @@ import {
   sfxPaperSlide,
   unlockAudio,
 } from "./audio/paper";
+import {
+  cycleMusicVolume,
+  getMusicVolume,
+  syncMusicForTheme,
+  unlockMusic,
+} from "./audio/music";
 import { loadStickers } from "./view/stickers";
 import { detectQuality, getQuality } from "./view/quality";
 import {
   applyThemeChrome,
-  cycleTheme,
   getAnimeMode,
   getTheme,
   getThemeLabel,
+  setTheme,
   toggleAnimeMode,
+  type ThemeId,
 } from "./view/theme";
 import {
   ensureAnimeArtBoth,
@@ -111,6 +131,24 @@ import {
   reloadThemeArt,
 } from "./view/themeAssets";
 import { getHintsEnabled, toggleHintsEnabled } from "./view/prefs";
+
+const HELP_SEEN_KEY = "riotcube_seen_help";
+
+function hasSeenHelp(): boolean {
+  try {
+    return localStorage.getItem(HELP_SEEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markHelpSeen(): void {
+  try {
+    localStorage.setItem(HELP_SEEN_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
 
 function activeStickerPool() {
   const theme = getTheme();
@@ -145,6 +183,7 @@ function applyThemeChange(): void {
   reloadThemeArt(getTheme());
   rematchStickersToActivePool();
   void loadStickers();
+  syncMusicForTheme(getTheme());
 }
 
 function applyAnimeModeToggle(): void {
@@ -156,9 +195,19 @@ function applyAnimeModeToggle(): void {
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
 
-type Screen = "home" | "play" | "menu" | "settings" | "stickers";
+type Screen =
+  | "home"
+  | "play"
+  | "menu"
+  | "settings"
+  | "stickers"
+  | "themes"
+  | "help";
 let screen: Screen = "home";
 let settingsFrom: Screen = "home";
+let themesFrom: Screen = "settings";
+let helpFrom: Screen = "home";
+let helpPage = 0;
 
 let session: Session = startSession(loadCubeSize(), activeStickerPool());
 let faceTurnBtns: FaceTurnButtons | null = null;
@@ -465,6 +514,32 @@ function openStickersPicker(): void {
   sfxPaperRustle();
 }
 
+function openThemes(from: Screen): void {
+  themesFrom = from;
+  screen = "themes";
+  sfxPaperRustle();
+}
+
+function openHelp(from: Screen): void {
+  helpFrom = from;
+  helpPage = 0;
+  screen = "help";
+  sfxPaperRustle();
+}
+
+function closeHelp(): void {
+  markHelpSeen();
+  screen = helpFrom;
+  sfxPaperRustle();
+}
+
+function pickTheme(id: ThemeId): void {
+  if (id === getTheme()) return;
+  setTheme(id);
+  applyThemeChange();
+  sfxPaperFlutter();
+}
+
 function paint(): void {
   drawDesk(ctx);
 
@@ -475,10 +550,22 @@ function paint(): void {
   if (screen === "settings") {
     drawSettingsScreen(ctx, {
       sfxVol: getSfxVolume(),
+      musicVol: getMusicVolume(),
       themeLabel: getThemeLabel(),
       sizeLabel: sizeLabel(session.size),
       hintsOn: getHintsEnabled(),
     });
+    return;
+  }
+  if (screen === "themes") {
+    drawThemesScreen(ctx, {
+      selected: getTheme(),
+      animeMode: getAnimeMode(),
+    });
+    return;
+  }
+  if (screen === "help") {
+    drawHelpScreen(ctx, { page: helpPage });
     return;
   }
   if (screen === "stickers") {
@@ -601,6 +688,10 @@ function startPlay(): void {
   session = startSession(session.size, activeStickerPool());
   saveCubeSize(session.size);
   syncActiveFace();
+  if (!hasSeenHelp()) {
+    openHelp("play");
+    return;
+  }
   screen = "play";
   sfxPaperRustle();
 }
@@ -610,6 +701,7 @@ canvas.addEventListener(
   (e) => {
     e.preventDefault();
     unlockAudio();
+    unlockMusic();
     canvas.setPointerCapture(e.pointerId);
     const p = canvasPoint(e);
 
@@ -617,6 +709,10 @@ canvas.addEventListener(
       if (hitUiRect(HOME_PLAY, p.x, p.y)) {
         sfxPaperFlutter();
         startPlay();
+        return;
+      }
+      if (hitUiRect(HOME_HOW, p.x, p.y)) {
+        openHelp("home");
         return;
       }
       if (hitUiRect(HOME_SETTINGS, p.x, p.y)) {
@@ -627,15 +723,60 @@ canvas.addEventListener(
       return;
     }
 
+    if (screen === "help") {
+      if (hitUiRect(HELP_PREV, p.x, p.y)) {
+        if (helpPage > 0) {
+          helpPage -= 1;
+          sfxPaperRustle();
+        }
+        return;
+      }
+      if (hitUiRect(HELP_NEXT, p.x, p.y)) {
+        if (helpPage >= HELP_PAGES.length - 1) {
+          closeHelp();
+        } else {
+          helpPage += 1;
+          sfxPaperRustle();
+        }
+        return;
+      }
+      if (hitUiRect(HELP_BACK, p.x, p.y)) {
+        closeHelp();
+        return;
+      }
+      return;
+    }
+
+    if (screen === "themes") {
+      const picked = hitThemePicker(p.x, p.y);
+      if (picked) {
+        pickTheme(picked);
+        return;
+      }
+      if (getTheme() === "anime" && hitUiRect(THEMES_ANIME_MODE, p.x, p.y)) {
+        applyAnimeModeToggle();
+        return;
+      }
+      if (hitUiRect(THEMES_BACK, p.x, p.y)) {
+        screen = themesFrom;
+        sfxPaperRustle();
+        return;
+      }
+      return;
+    }
+
     if (screen === "settings") {
       if (hitUiRect(SETTINGS_VOL, p.x, p.y)) {
         cycleSfxVolume();
         return;
       }
-      if (hitUiRect(SETTINGS_THEME, p.x, p.y)) {
-        cycleTheme();
-        applyThemeChange();
+      if (hitUiRect(SETTINGS_MUSIC, p.x, p.y)) {
+        cycleMusicVolume();
         sfxPaperRustle();
+        return;
+      }
+      if (hitUiRect(SETTINGS_THEME, p.x, p.y)) {
+        openThemes("settings");
         return;
       }
       if (hitUiRect(SETTINGS_SIZE, p.x, p.y)) {
@@ -706,6 +847,14 @@ canvas.addEventListener(
     if (screen === "menu") {
       if (hitUiRect(PAUSE_RESUME, p.x, p.y)) {
         screen = "play";
+        return;
+      }
+      if (hitUiRect(PAUSE_THEMES, p.x, p.y)) {
+        openThemes("menu");
+        return;
+      }
+      if (hitUiRect(PAUSE_HOW, p.x, p.y)) {
+        openHelp("menu");
         return;
       }
       if (hitUiRect(PAUSE_SETTINGS, p.x, p.y)) {
@@ -975,6 +1124,7 @@ async function boot(): Promise<void> {
   ensureThemeArt("doodle");
   ensureThemeArt("relic");
   ensureAnimeArtBoth();
+  syncMusicForTheme(getTheme());
   syncActiveFace();
   requestAnimationFrame(tick);
 }

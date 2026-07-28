@@ -1,0 +1,22 @@
+{
+  "crossfadeMs": 2800,
+  "tracks": [
+    "rainy-tape-rush.mp3",
+    "rainy-tape-rush-b.mp3",
+    "felt-tile-garden.mp3",
+    "felt-tile-garden-2.mp3",
+    "paper-crane-garden.mp3",
+    "paper-crane-garden-2.mp3"
+  ],
+  "beds": {
+    "classroom": ["felt-tile-garden.mp3", "felt-tile-garden-2.mp3"],
+    "doodle": ["paper-crane-garden.mp3", "paper-crane-garden-2.mp3"],
+    "anime": [
+      "paper-crane-garden.mp3",
+      "paper-crane-garden-2.mp3",
+      "felt-tile-garden.mp3"
+    ],
+    "edgy": ["rainy-tape-rush.mp3", "rainy-tape-rush-b.mp3"],
+    "relic": ["rainy-tape-rush-b.mp3", "felt-tile-garden-2.mp3"]
+  }
+}

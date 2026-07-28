@@ -1,0 +1,7 @@
+Soundtrack beds for Riot Cube (theme-mapped shuffle):
+
+- rainy-tape-rush.mp3 / rainy-tape-rush-b.mp3 → EDGY / RELIC
+- felt-tile-garden.mp3 / felt-tile-garden-2.mp3 → CLASS ROOM / RELIC / ANIME
+- paper-crane-garden.mp3 / paper-crane-garden-2.mp3 → DOODLE / ANIME
+
+Provided by the project owner for in-game use.

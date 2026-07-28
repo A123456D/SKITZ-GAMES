@@ -71,6 +71,15 @@ export function unlockAudio(): void {
   bus();
 }
 
+/** Shared Web Audio context for SFX + music (one context avoids Android ducking). */
+export function getSharedAudioContext(): AudioContext | null {
+  return ac();
+}
+
+export function isAudioUnlocked(): boolean {
+  return unlocked;
+}
+
 export function getSfxVolume(): number {
   return sfxVol;
 }

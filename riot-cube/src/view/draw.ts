@@ -1,4 +1,10 @@
-import { getAnimeMode, getPalette, getTheme } from "./theme";
+import {
+  getAnimeMode,
+  getPalette,
+  getTheme,
+  THEMES,
+  type ThemeId,
+} from "./theme";
 import { drawCover, getThemeArt } from "./themeAssets";
 import { stickerPoolForTheme, type TileKind } from "../core/stickers";
 import { stickerImage } from "./stickers";
@@ -382,8 +388,9 @@ function drawPaperButton(
   ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
 }
 
-export const HOME_PLAY: UiRect = { x: 150, y: 860, w: 420, h: 78 };
-export const HOME_SETTINGS: UiRect = { x: 150, y: 960, w: 420, h: 70 };
+export const HOME_PLAY: UiRect = { x: 150, y: 820, w: 420, h: 72 };
+export const HOME_HOW: UiRect = { x: 150, y: 910, w: 420, h: 64 };
+export const HOME_SETTINGS: UiRect = { x: 150, y: 990, w: 420, h: 64 };
 
 let logoImg: HTMLImageElement | null = null;
 let logoReady = false;
@@ -408,11 +415,11 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
 
   if (logoImg && logoReady) {
     const maxW = 520;
-    const maxH = 520;
+    const maxH = 480;
     const scale = Math.min(maxW / logoImg.width, maxH / logoImg.height);
     const lw = logoImg.width * scale;
     const lh = logoImg.height * scale;
-    ctx.drawImage(logoImg, (W - lw) / 2, 120, lw, lh);
+    ctx.drawImage(logoImg, (W - lw) / 2, 100, lw, lh);
   } else {
     ctx.fillStyle = p.paper;
     roundRect(ctx, 70, 220, 580, 160, 8);
@@ -429,27 +436,16 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = p.accent;
   ctx.font = "600 20px 'Patrick Hand', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("A sticker Rubik\u2019s Cube. No timer. Just twist.", W / 2, 680);
-
-  // Light card + dark ink so tips stay readable on every theme (anime panel is white).
-  ctx.fillStyle = p.paper;
-  roundRect(ctx, 120, 710, 480, 120, 8);
-  ctx.fill();
-  ctx.strokeStyle = p.ink;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.fillStyle = p.accent;
-  ctx.fillRect(160, 700, 70, 14);
-  ctx.fillStyle = p.ink;
-  ctx.font = "600 17px 'Patrick Hand', sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText("\u2022 Face-turn buttons spin the facing face", 150, 748);
-  ctx.fillText("\u2022 Swipe a lane on the cube \u00B7 orbit to peek", 150, 778);
-  ctx.fillText("\u2022 Try 2\u00D72 in settings if 3\u00D73 is rough", 150, 808);
+  ctx.fillText("A sticker Rubik\u2019s Cube. No timer. Just twist.", W / 2, 760);
 
   drawPaperButton(ctx, HOME_PLAY, "PLAY", {
     fill: p.hot,
     text: p.white,
+    tape: p.accent,
+  });
+  drawPaperButton(ctx, HOME_HOW, "HOW TO PLAY", {
+    fill: p.paper,
+    text: p.ink,
     tape: p.accent,
   });
   drawPaperButton(ctx, HOME_SETTINGS, "SETTINGS", {
@@ -459,10 +455,12 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   });
 }
 
-export const PAUSE_RESUME: UiRect = { x: 160, y: 420, w: 400, h: 72 };
-export const PAUSE_SETTINGS: UiRect = { x: 160, y: 520, w: 400, h: 68 };
-export const PAUSE_SCRAMBLE: UiRect = { x: 160, y: 610, w: 400, h: 68 };
-export const PAUSE_HOME: UiRect = { x: 160, y: 700, w: 400, h: 68 };
+export const PAUSE_RESUME: UiRect = { x: 160, y: 340, w: 400, h: 64 };
+export const PAUSE_THEMES: UiRect = { x: 160, y: 420, w: 400, h: 60 };
+export const PAUSE_HOW: UiRect = { x: 160, y: 496, w: 400, h: 60 };
+export const PAUSE_SETTINGS: UiRect = { x: 160, y: 572, w: 400, h: 60 };
+export const PAUSE_SCRAMBLE: UiRect = { x: 160, y: 648, w: 400, h: 60 };
+export const PAUSE_HOME: UiRect = { x: 160, y: 724, w: 400, h: 60 };
 
 export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   const p = getPalette();
@@ -470,22 +468,32 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   ctx.fillRect(0, 0, W, H);
 
   ctx.fillStyle = p.paper;
-  roundRect(ctx, 100, 280, 520, 520, 10);
+  roundRect(ctx, 100, 220, 520, 620, 10);
   ctx.fill();
   ctx.strokeStyle = p.ink;
   ctx.lineWidth = 4;
   ctx.stroke();
   ctx.fillStyle = p.hot;
-  ctx.fillRect(140, 268, 90, 18);
+  ctx.fillRect(140, 208, 90, 18);
 
   ctx.fillStyle = p.ink;
   ctx.font = "800 40px 'Permanent Marker', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("MENU", W / 2, 350);
+  ctx.fillText("MENU", W / 2, 290);
 
   drawPaperButton(ctx, PAUSE_RESUME, "RESUME", {
     fill: p.accent,
     text: p.ink,
+  });
+  drawPaperButton(ctx, PAUSE_THEMES, "THEMES", {
+    fill: p.paper,
+    text: p.ink,
+    tape: p.hot,
+  });
+  drawPaperButton(ctx, PAUSE_HOW, "HOW TO PLAY", {
+    fill: p.paper,
+    text: p.ink,
+    tape: p.accent,
   });
   drawPaperButton(ctx, PAUSE_SETTINGS, "SETTINGS", {
     fill: p.paper,
@@ -501,16 +509,18 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   });
 }
 
-export const SETTINGS_VOL: UiRect = { x: 140, y: 370, w: 440, h: 64 };
-export const SETTINGS_THEME: UiRect = { x: 140, y: 448, w: 440, h: 64 };
-export const SETTINGS_SIZE: UiRect = { x: 140, y: 526, w: 440, h: 64 };
-export const SETTINGS_HINTS: UiRect = { x: 140, y: 604, w: 440, h: 64 };
-export const SETTINGS_BACK: UiRect = { x: 140, y: 700, w: 440, h: 64 };
+export const SETTINGS_VOL: UiRect = { x: 140, y: 320, w: 440, h: 58 };
+export const SETTINGS_MUSIC: UiRect = { x: 140, y: 392, w: 440, h: 58 };
+export const SETTINGS_THEME: UiRect = { x: 140, y: 464, w: 440, h: 58 };
+export const SETTINGS_SIZE: UiRect = { x: 140, y: 536, w: 440, h: 58 };
+export const SETTINGS_HINTS: UiRect = { x: 140, y: 608, w: 440, h: 58 };
+export const SETTINGS_BACK: UiRect = { x: 140, y: 700, w: 440, h: 58 };
 
 export function drawSettingsScreen(
   ctx: CanvasRenderingContext2D,
   opts: {
     sfxVol: number;
+    musicVol: number;
     themeLabel: string;
     sizeLabel: string;
     hintsOn: boolean;
@@ -520,30 +530,40 @@ export function drawSettingsScreen(
   drawDesk(ctx);
 
   ctx.fillStyle = p.paper;
-  roundRect(ctx, 80, 170, 560, 660, 10);
+  roundRect(ctx, 80, 150, 560, 660, 10);
   ctx.fill();
   ctx.strokeStyle = p.ink;
   ctx.lineWidth = 4;
   ctx.stroke();
   ctx.fillStyle = p.accent;
-  ctx.fillRect(120, 158, 100, 18);
+  ctx.fillRect(120, 138, 100, 18);
 
   ctx.fillStyle = p.ink;
   ctx.font = "800 42px 'Permanent Marker', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("SETTINGS", W / 2, 250);
+  ctx.fillText("SETTINGS", W / 2, 230);
 
   ctx.font = "600 18px 'Patrick Hand', sans-serif";
   ctx.fillStyle = p.muted;
-  ctx.fillText("Sound, look, cube, and hints", W / 2, 295);
+  ctx.fillText("Sound, music, look, cube, and hints", W / 2, 275);
 
   const volLabel =
     opts.sfxVol <= 0.001 ? "MUTED" : opts.sfxVol < 0.55 ? "SOFT" : "NORMAL";
-  drawPaperButton(ctx, SETTINGS_VOL, `SOUND  \u00B7  ${volLabel}`, {
+  const musicLabel =
+    opts.musicVol <= 0.001
+      ? "MUTED"
+      : opts.musicVol < 0.5
+        ? "SOFT"
+        : "NORMAL";
+  drawPaperButton(ctx, SETTINGS_VOL, `SFX  \u00B7  ${volLabel}`, {
     fill: p.panel,
     text: p.accent,
   });
-  drawPaperButton(ctx, SETTINGS_THEME, `THEME  \u00B7  ${opts.themeLabel}`, {
+  drawPaperButton(ctx, SETTINGS_MUSIC, `MUSIC  \u00B7  ${musicLabel}`, {
+    fill: p.panel,
+    text: p.accent,
+  });
+  drawPaperButton(ctx, SETTINGS_THEME, `THEMES  \u00B7  ${opts.themeLabel}`, {
     fill: p.panel,
     text: p.hot,
   });
@@ -561,6 +581,209 @@ export function drawSettingsScreen(
     },
   );
   drawPaperButton(ctx, SETTINGS_BACK, "BACK", {
+    fill: p.hot,
+    text: p.white,
+  });
+}
+
+/** Theme picker — one row per pack, anime gets a DAY/DARK toggle. */
+export const THEMES_BACK: UiRect = { x: 140, y: 1120, w: 440, h: 58 };
+export const THEMES_ANIME_MODE: UiRect = { x: 140, y: 1020, w: 440, h: 58 };
+
+export function themePickerRect(index: number): UiRect {
+  return { x: 140, y: 280 + index * 88, w: 440, h: 76 };
+}
+
+export function hitThemePicker(x: number, y: number): ThemeId | null {
+  for (let i = 0; i < THEMES.length; i++) {
+    if (hitRect(themePickerRect(i), x, y)) return THEMES[i]!.id;
+  }
+  return null;
+}
+
+export function drawThemesScreen(
+  ctx: CanvasRenderingContext2D,
+  opts: { selected: ThemeId; animeMode: "day" | "dark" },
+): void {
+  const p = getPalette();
+  drawDesk(ctx);
+
+  ctx.fillStyle = p.paper;
+  roundRect(ctx, 80, 120, 560, 1100, 10);
+  ctx.fill();
+  ctx.strokeStyle = p.ink;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.fillStyle = p.hot;
+  ctx.fillRect(120, 108, 100, 18);
+
+  ctx.fillStyle = p.ink;
+  ctx.font = "800 40px 'Permanent Marker', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("THEMES", W / 2, 200);
+  ctx.font = "600 18px 'Patrick Hand', sans-serif";
+  ctx.fillStyle = p.muted;
+  ctx.fillText("Pick a sticker pack \u00B7 music follows the vibe", W / 2, 245);
+
+  for (let i = 0; i < THEMES.length; i++) {
+    const def = THEMES[i]!;
+    const r = themePickerRect(i);
+    const on = def.id === opts.selected;
+    const art = getThemeArt(def.id);
+    drawPaperButton(ctx, r, "", {
+      fill: on ? p.accent : p.panel,
+      text: p.ink,
+      tape: on ? p.hot : undefined,
+    });
+    if (art.bg && art.bg.complete && art.bg.naturalWidth > 0) {
+      ctx.save();
+      roundRect(ctx, r.x + 12, r.y + 12, 52, 52, 6);
+      ctx.clip();
+      drawCover(ctx, art.bg, r.x + 12, r.y + 12, 52, 52);
+      ctx.restore();
+      ctx.strokeStyle = p.ink;
+      ctx.lineWidth = 2;
+      roundRect(ctx, r.x + 12, r.y + 12, 52, 52, 6);
+      ctx.stroke();
+    }
+    ctx.fillStyle = on ? p.ink : p.accent;
+    ctx.font = "800 26px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(def.label, r.x + 80, r.y + r.h / 2);
+    if (on) {
+      ctx.fillStyle = p.hot;
+      ctx.font = "700 14px 'Patrick Hand', sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText("ON", r.x + r.w - 18, r.y + r.h / 2);
+    }
+  }
+
+  if (opts.selected === "anime") {
+    drawPaperButton(
+      ctx,
+      THEMES_ANIME_MODE,
+      `ANIME MODE  \u00B7  ${opts.animeMode === "day" ? "DAY" : "DARK"}`,
+      {
+        fill: p.paper,
+        text: p.ink,
+        tape: p.accent,
+      },
+    );
+  }
+
+  drawPaperButton(ctx, THEMES_BACK, "BACK", {
+    fill: p.hot,
+    text: p.white,
+  });
+}
+
+export const HELP_PAGES = [
+  {
+    title: "GOAL",
+    lines: [
+      "Each face of the cube wants one sticker kind.",
+      "Twist until every face is a matching set.",
+      "No timer. No move limit. Just solve it.",
+    ],
+  },
+  {
+    title: "TWIST",
+    lines: [
+      "Swipe a row or column on the front face.",
+      "Drag freely — longer swipes move more cells.",
+      "CW / CCW buttons spin the whole facing face.",
+    ],
+  },
+  {
+    title: "ORBIT",
+    lines: [
+      "Tap the arrows around the cube to peek.",
+      "Or drag in the empty space beside the cube.",
+      "Turn the cube to work on another face.",
+    ],
+  },
+  {
+    title: "TOOLS",
+    lines: [
+      "STICKERS — pick the six face designs.",
+      "SCRAMBLE — shuffle for a fresh puzzle.",
+      "HINT — draw a suggested move (Settings).",
+      "Try 2\u00D72 in Settings if 3\u00D73 feels rough.",
+    ],
+  },
+] as const;
+
+export const HELP_PREV: UiRect = { x: 140, y: 980, w: 200, h: 58 };
+export const HELP_NEXT: UiRect = { x: 380, y: 980, w: 200, h: 58 };
+export const HELP_BACK: UiRect = { x: 140, y: 1060, w: 440, h: 58 };
+
+export function drawHelpScreen(
+  ctx: CanvasRenderingContext2D,
+  opts: { page: number },
+): void {
+  const p = getPalette();
+  drawDesk(ctx);
+  const page = Math.max(0, Math.min(HELP_PAGES.length - 1, opts.page));
+  const content = HELP_PAGES[page]!;
+
+  ctx.fillStyle = p.paper;
+  roundRect(ctx, 80, 160, 560, 1000, 10);
+  ctx.fill();
+  ctx.strokeStyle = p.ink;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.fillStyle = p.accent;
+  ctx.fillRect(120, 148, 120, 18);
+
+  ctx.fillStyle = p.ink;
+  ctx.font = "800 40px 'Permanent Marker', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("HOW TO PLAY", W / 2, 250);
+
+  ctx.fillStyle = p.hot;
+  ctx.fillRect(160, 300, 80, 14);
+  ctx.fillStyle = p.ink;
+  ctx.font = "800 36px 'Permanent Marker', sans-serif";
+  ctx.fillText(content.title, W / 2, 370);
+
+  ctx.font = "600 22px 'Patrick Hand', sans-serif";
+  ctx.fillStyle = p.ink;
+  ctx.textAlign = "left";
+  let y = 450;
+  for (const line of content.lines) {
+    const words = line.split(" ");
+    let row = "";
+    for (const w of words) {
+      const next = row ? `${row} ${w}` : w;
+      if (ctx.measureText(next).width > 460) {
+        ctx.fillText(row, 140, y);
+        y += 36;
+        row = w;
+      } else {
+        row = next;
+      }
+    }
+    if (row) {
+      ctx.fillText(row, 140, y);
+      y += 48;
+    }
+  }
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = p.muted;
+  ctx.font = "600 18px 'Patrick Hand', sans-serif";
+  ctx.fillText(`${page + 1} / ${HELP_PAGES.length}`, W / 2, 920);
+
+  drawPaperButton(ctx, HELP_PREV, "PREV", {
+    fill: page <= 0 ? p.paperDeep : p.panel,
+    text: page <= 0 ? p.muted : p.accent,
+  });
+  drawPaperButton(ctx, HELP_NEXT, page >= HELP_PAGES.length - 1 ? "DONE" : "NEXT", {
+    fill: p.accent,
+    text: p.ink,
+  });
+  drawPaperButton(ctx, HELP_BACK, "BACK", {
     fill: p.hot,
     text: p.white,
   });
