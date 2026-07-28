@@ -89,19 +89,19 @@ const games = (await getCollection('games'))
 	.hero__peek {
 		position: absolute;
 		z-index: 0;
-		/* Tiny head peeking up from under the mark’s bottom edge. */
-		width: min(58px, 14vw);
+		inset: 0;
+		margin: auto;
+		width: min(52px, 12vw);
 		height: auto;
-		left: 18%;
-		bottom: 10%;
 		pointer-events: none;
 		user-select: none;
-		transform: translate(-50%, 110%);
+		/* Parked dead-center behind the mark until a peek. */
+		transform: translate(0, 0) scale(0.92);
 		opacity: 0;
 		filter: drop-shadow(2px 3px 0 rgba(22, 19, 16, 0.16));
-		/* 5 bottom-edge spots × 10s = 50s master loop; visible ~3s each. */
-		animation: hero-bottom-peeks 50s linear infinite;
-		will-change: transform, opacity, left;
+		/* 4 edges × 10s = 40s; each peek ~3s of slide-out / hold / slide-in. */
+		animation: hero-edge-peeks 40s linear infinite;
+		will-change: transform, opacity;
 	}
 
 	.hero__logo {
@@ -117,8 +117,7 @@ const games = (await getCollection('games'))
 
 	@media (max-width: 520px) {
 		.hero__peek {
-			width: min(46px, 12vw);
-			bottom: 9%;
+			width: min(42px, 11vw);
 		}
 	}
 
@@ -156,108 +155,76 @@ const games = (await getCollection('games'))
 	}
 
 	/*
-	  Each 10s slot: tuck under → rise (~0.4s) → hold to 3s → tuck → wait.
-	  Spots along the bottom edge: L → mid-L → center → mid-R → R.
+	  Hidden behind center → slide past an edge → hold ~3s → slide back.
+	  Order: bottom, top, right, left (feels random enough across visits).
 	*/
-	@keyframes hero-bottom-peeks {
-		/* left */
+	@keyframes hero-edge-peeks {
+		/* bottom */
 		0%,
-		0.6% {
-			left: 16%;
+		1% {
 			opacity: 0;
-			transform: translate(-50%, 115%) rotate(-10deg);
+			transform: translate(0, 0) scale(0.92);
 		}
-		1.4%,
-		6% {
-			left: 16%;
+		3%,
+		7.5% {
 			opacity: 1;
-			transform: translate(-50%, 12%) rotate(-8deg);
+			transform: translate(6%, 58%) rotate(-6deg) scale(1);
 		}
-		7%,
-		19.9% {
-			left: 16%;
+		9.5%,
+		24.9% {
 			opacity: 0;
-			transform: translate(-50%, 115%) rotate(-10deg);
+			transform: translate(0, 0) scale(0.92);
 		}
 
-		/* mid-left */
-		20%,
-		20.6% {
-			left: 32%;
-			opacity: 0;
-			transform: translate(-50%, 115%) rotate(-4deg);
-		}
-		21.4%,
+		/* top */
+		25%,
 		26% {
-			left: 32%;
+			opacity: 0;
+			transform: translate(0, 0) scale(0.92);
+		}
+		28%,
+		32.5% {
 			opacity: 1;
-			transform: translate(-50%, 10%) rotate(-3deg);
+			transform: translate(-4%, -56%) rotate(5deg) scale(1);
 		}
-		27%,
-		39.9% {
-			left: 32%;
+		34.5%,
+		49.9% {
 			opacity: 0;
-			transform: translate(-50%, 115%) rotate(-4deg);
-		}
-
-		/* center */
-		40%,
-		40.6% {
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, 115%) rotate(0deg);
-		}
-		41.4%,
-		46% {
-			left: 50%;
-			opacity: 1;
-			transform: translate(-50%, 8%) rotate(0deg);
-		}
-		47%,
-		59.9% {
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, 115%) rotate(0deg);
-		}
-
-		/* mid-right */
-		60%,
-		60.6% {
-			left: 68%;
-			opacity: 0;
-			transform: translate(-50%, 115%) rotate(4deg);
-		}
-		61.4%,
-		66% {
-			left: 68%;
-			opacity: 1;
-			transform: translate(-50%, 10%) rotate(3deg);
-		}
-		67%,
-		79.9% {
-			left: 68%;
-			opacity: 0;
-			transform: translate(-50%, 115%) rotate(4deg);
+			transform: translate(0, 0) scale(0.92);
 		}
 
 		/* right */
-		80%,
-		80.6% {
-			left: 84%;
+		50%,
+		51% {
 			opacity: 0;
-			transform: translate(-50%, 115%) rotate(10deg);
+			transform: translate(0, 0) scale(0.92);
 		}
-		81.4%,
-		86% {
-			left: 84%;
+		53%,
+		57.5% {
 			opacity: 1;
-			transform: translate(-50%, 12%) rotate(8deg);
+			transform: translate(62%, 8%) rotate(8deg) scale(1);
 		}
-		87%,
-		100% {
-			left: 84%;
+		59.5%,
+		74.9% {
 			opacity: 0;
-			transform: translate(-50%, 115%) rotate(10deg);
+			transform: translate(0, 0) scale(0.92);
+		}
+
+		/* left */
+		75%,
+		76% {
+			opacity: 0;
+			transform: translate(0, 0) scale(0.92);
+		}
+		78%,
+		82.5% {
+			opacity: 1;
+			transform: translate(-62%, -6%) rotate(-8deg) scale(1);
+		}
+		84.5%,
+		100% {
+			opacity: 0;
+			transform: translate(0, 0) scale(0.92);
 		}
 	}
 
