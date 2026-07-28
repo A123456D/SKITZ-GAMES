@@ -70,26 +70,23 @@ const links = [
 		transform: rotate(-1.5deg);
 		overflow: visible;
 		isolation: isolate;
-		padding-right: 0.45rem;
-		margin-right: -0.15rem;
 	}
 
 	.logo__peek {
 		position: absolute;
 		z-index: 0;
-		height: 1.85rem;
+		height: 1.15rem;
 		width: auto;
+		left: 18%;
+		bottom: 2%;
 		pointer-events: none;
 		user-select: none;
-		/* Peek from the upper-right — opposite side from the home hero. */
-		right: -0.15rem;
-		top: -0.35rem;
-		transform: rotate(7deg) translate(35%, -55%);
+		transform: translate(-50%, 120%);
 		opacity: 0;
-		filter: drop-shadow(2px 2px 0 rgba(22, 19, 16, 0.14));
-		/* Same 3s / 10s cadence, offset so nav peeks between hero peeks. */
-		animation: nav-peek-cycle 10s ease-in-out 5s infinite;
-		will-change: transform, opacity;
+		filter: drop-shadow(1px 2px 0 rgba(22, 19, 16, 0.14));
+		/* Same bottom-edge tour; start mid-cycle so nav doesn't match home. */
+		animation: nav-bottom-peeks 50s linear 5s infinite;
+		will-change: transform, opacity, left;
 	}
 
 	.logo__mark {
@@ -103,14 +100,8 @@ const links = [
 	}
 
 	@media (max-width: 520px) {
-		.logo {
-			padding-right: 0.3rem;
-		}
-
 		.logo__peek {
-			height: 1.55rem;
-			right: -0.05rem;
-			top: -0.25rem;
+			height: 0.95rem;
 		}
 
 		.logo__mark {
@@ -153,21 +144,105 @@ const links = [
 		}
 	}
 
-	@keyframes nav-peek-cycle {
+	@keyframes nav-bottom-peeks {
+		/* right first (offset feel from hero) */
 		0%,
-		2% {
+		0.6% {
+			left: 82%;
 			opacity: 0;
-			transform: rotate(7deg) translate(35%, -55%);
+			transform: translate(-50%, 125%) rotate(8deg);
 		}
-		6%,
-		30% {
+		1.4%,
+		6% {
+			left: 82%;
 			opacity: 1;
-			transform: rotate(7deg) translate(0, 0);
+			transform: translate(-50%, 18%) rotate(6deg);
 		}
-		34%,
-		100% {
+		7%,
+		19.9% {
+			left: 82%;
 			opacity: 0;
-			transform: rotate(7deg) translate(35%, -55%);
+			transform: translate(-50%, 125%) rotate(8deg);
+		}
+
+		/* mid-right */
+		20%,
+		20.6% {
+			left: 66%;
+			opacity: 0;
+			transform: translate(-50%, 125%) rotate(3deg);
+		}
+		21.4%,
+		26% {
+			left: 66%;
+			opacity: 1;
+			transform: translate(-50%, 16%) rotate(2deg);
+		}
+		27%,
+		39.9% {
+			left: 66%;
+			opacity: 0;
+			transform: translate(-50%, 125%) rotate(3deg);
+		}
+
+		/* center */
+		40%,
+		40.6% {
+			left: 50%;
+			opacity: 0;
+			transform: translate(-50%, 125%) rotate(0deg);
+		}
+		41.4%,
+		46% {
+			left: 50%;
+			opacity: 1;
+			transform: translate(-50%, 14%) rotate(0deg);
+		}
+		47%,
+		59.9% {
+			left: 50%;
+			opacity: 0;
+			transform: translate(-50%, 125%) rotate(0deg);
+		}
+
+		/* mid-left */
+		60%,
+		60.6% {
+			left: 34%;
+			opacity: 0;
+			transform: translate(-50%, 125%) rotate(-3deg);
+		}
+		61.4%,
+		66% {
+			left: 34%;
+			opacity: 1;
+			transform: translate(-50%, 16%) rotate(-2deg);
+		}
+		67%,
+		79.9% {
+			left: 34%;
+			opacity: 0;
+			transform: translate(-50%, 125%) rotate(-3deg);
+		}
+
+		/* left */
+		80%,
+		80.6% {
+			left: 18%;
+			opacity: 0;
+			transform: translate(-50%, 125%) rotate(-8deg);
+		}
+		81.4%,
+		86% {
+			left: 18%;
+			opacity: 1;
+			transform: translate(-50%, 18%) rotate(-6deg);
+		}
+		87%,
+		100% {
+			left: 18%;
+			opacity: 0;
+			transform: translate(-50%, 125%) rotate(-8deg);
 		}
 	}
 
