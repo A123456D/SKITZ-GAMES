@@ -81,14 +81,16 @@ const { size = 'nav' } = Astro.props;
 
 <script>
 	const PEEK_MS = 3000;
-	const CYCLE_MS = 10000;
+	const GAP_MS = 10000;
 
 	function startPeek(el, delay) {
 		let outTimer = 0;
-		let cycleTimer = 0;
+		let gapTimer = 0;
 
 		const hide = () => {
 			el.classList.remove('is-out');
+			window.clearTimeout(gapTimer);
+			gapTimer = window.setTimeout(show, GAP_MS);
 		};
 
 		const show = () => {
@@ -99,18 +101,7 @@ const { size = 'nav' } = Astro.props;
 			outTimer = window.setTimeout(hide, PEEK_MS);
 		};
 
-		const arm = () => {
-			window.clearTimeout(cycleTimer);
-			cycleTimer = window.setTimeout(() => {
-				show();
-				arm();
-			}, CYCLE_MS);
-		};
-
-		window.setTimeout(() => {
-			show();
-			arm();
-		}, delay);
+		window.setTimeout(show, delay);
 	}
 
 	function boot() {
