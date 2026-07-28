@@ -142,22 +142,6 @@ export const TILE_KINDS = [
   "atlas",
   "omen",
   "vial",
-  // Patch / doodle color swatches
-  "pitch",
-  "grape",
-  "cherry",
-  "cobalt",
-  "blush",
-  "tangerine",
-  "meadow",
-  "lemon",
-  "aqua",
-  "spark",
-  "puddle",
-  "punch",
-  "washi",
-  "cocoa",
-  "sand",
 ] as const;
 
 export type TileKind = (typeof TILE_KINDS)[number];
@@ -342,25 +326,6 @@ export const RELIC_STICKER_POOL = [
   "vial",
 ] as const satisfies readonly TileKind[];
 
-/** Patch / doodle color-swatch pack — names match art. */
-export const PATCH_STICKER_POOL = [
-  "pitch",
-  "grape",
-  "cherry",
-  "cobalt",
-  "blush",
-  "tangerine",
-  "meadow",
-  "lemon",
-  "aqua",
-  "spark",
-  "puddle",
-  "punch",
-  "washi",
-  "cocoa",
-  "sand",
-] as const satisfies readonly TileKind[];
-
 /** Unique sticker kinds available for a theme’s chooser / random pick. */
 export function stickerPoolForTheme(
   theme: string,
@@ -369,7 +334,6 @@ export function stickerPoolForTheme(
   if (theme === "classroom") return CLASSROOM_STICKER_POOL;
   if (theme === "doodle") return DOODLE_STICKER_POOL;
   if (theme === "relic") return RELIC_STICKER_POOL;
-  if (theme === "patch") return PATCH_STICKER_POOL;
   if (theme === "anime") {
     return animeMode === "dark" ? ANIME_DARK_STICKER_POOL : ANIME_STICKER_POOL;
   }

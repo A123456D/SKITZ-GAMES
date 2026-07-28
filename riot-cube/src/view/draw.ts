@@ -60,11 +60,10 @@ export function drawDesk(ctx: CanvasRenderingContext2D): void {
       theme === "classroom" ||
       theme === "doodle" ||
       theme === "relic" ||
-      theme === "patch" ||
       (theme === "anime" && getAnimeMode() === "day");
     if (lightWash) {
       // Bright craft themes: paper wash so the cube stays easy to read.
-      if (theme === "doodle" || theme === "relic" || theme === "patch") {
+      if (theme === "doodle" || theme === "relic") {
         g.addColorStop(0, "rgba(255,255,255,0.18)");
         g.addColorStop(0.45, "rgba(255,255,255,0.08)");
         g.addColorStop(1, "rgba(0,0,0,0.16)");
