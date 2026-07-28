@@ -31,7 +31,9 @@ const { size = 'nav' } = Astro.props;
 		filter: drop-shadow(2px 3px 0 rgba(22, 19, 16, 0.16));
 		transition:
 			opacity 0.35s ease,
-			transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+			transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+			top 0s,
+			left 0s;
 	}
 
 	.peek-sticker--hero {
@@ -55,34 +57,50 @@ const { size = 'nav' } = Astro.props;
 	}
 
 	/*
-	  Always upright. Slide just far enough that only part of the head clears
-	  the painted sticker (the PNG has empty padding, so full-box travel overshoots).
+	  Left is the reference (leave it).
+	  Top/bottom: stay upright, park near that edge, nudge only a little so
+	  just the head clears — no upside-down flips.
+	  Right: same as left but shorter travel (was overshooting).
 	*/
-	.peek-sticker[data-edge='bottom'],
-	.peek-sticker[data-edge='top'],
 	.peek-sticker[data-edge='left'],
 	.peek-sticker[data-edge='right'] {
+		top: 50%;
+		left: 50%;
 		transform: translate(-50%, -50%) rotate(0deg);
 	}
 
-	.peek-sticker--nav[data-edge='bottom'].is-out {
-		opacity: 1;
-		transform: translate(-50%, 0.72rem) rotate(0deg);
+	.peek-sticker[data-edge='top'] {
+		top: 36%;
+		left: 50%;
+		transform: translate(-50%, -50%) rotate(0deg);
 	}
-	.peek-sticker--hero[data-edge='bottom'].is-out {
-		opacity: 1;
-		transform: translate(-50%, min(5.1rem, 17vw)) rotate(0deg);
+	.peek-sticker[data-edge='bottom'] {
+		top: 64%;
+		left: 50%;
+		transform: translate(-50%, -50%) rotate(0deg);
 	}
 
+	/* top — upright, short nudge up */
 	.peek-sticker--nav[data-edge='top'].is-out {
 		opacity: 1;
-		transform: translate(-50%, -0.72rem) rotate(0deg);
+		transform: translate(-50%, calc(-50% - 0.42rem)) rotate(0deg);
 	}
 	.peek-sticker--hero[data-edge='top'].is-out {
 		opacity: 1;
-		transform: translate(-50%, calc(-1 * min(5.1rem, 17vw))) rotate(0deg);
+		transform: translate(-50%, calc(-50% - 1.35rem)) rotate(0deg);
 	}
 
+	/* bottom — upright, short nudge down */
+	.peek-sticker--nav[data-edge='bottom'].is-out {
+		opacity: 1;
+		transform: translate(-50%, calc(-50% + 0.42rem)) rotate(0deg);
+	}
+	.peek-sticker--hero[data-edge='bottom'].is-out {
+		opacity: 1;
+		transform: translate(-50%, calc(-50% + 1.35rem)) rotate(0deg);
+	}
+
+	/* left — unchanged */
 	.peek-sticker--nav[data-edge='left'].is-out {
 		opacity: 1;
 		transform: translate(-1.05rem, -50%) rotate(0deg);
@@ -92,13 +110,14 @@ const { size = 'nav' } = Astro.props;
 		transform: translate(calc(-1 * min(5.6rem, 19vw)), -50%) rotate(0deg);
 	}
 
+	/* right — shorter than left */
 	.peek-sticker--nav[data-edge='right'].is-out {
 		opacity: 1;
-		transform: translate(1.05rem, -50%) rotate(0deg);
+		transform: translate(0.72rem, -50%) rotate(0deg);
 	}
 	.peek-sticker--hero[data-edge='right'].is-out {
 		opacity: 1;
-		transform: translate(min(5.6rem, 19vw), -50%) rotate(0deg);
+		transform: translate(min(3.9rem, 13vw), -50%) rotate(0deg);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
