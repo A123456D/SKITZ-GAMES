@@ -234,7 +234,7 @@ export function lanePreview(
 
   for (let k = 0; k < len; k++) {
     const color = kinds[k]!;
-    let center = k + 0.5 + shift;
+    const center = k + 0.5 + shift;
     const candidates = [
       center,
       center - len,
@@ -243,16 +243,17 @@ export function lanePreview(
       center + 2 * len,
     ];
     let best = center;
-    let bestScore = Infinity;
+    let bestDist = Infinity;
     for (const p of candidates) {
-      const score =
-        p < 0 ? -p * 2 : p > n ? (p - n) * 2 : Math.abs(p - n / 2) * 0.01;
-      if (score < bestScore) {
-        bestScore = score;
+      // Keep stickers that sit on the face or slightly over the rim.
+      if (p < -1.2 || p > n + 1.2) continue;
+      const dist = Math.abs(p - center);
+      if (dist < bestDist) {
+        bestDist = dist;
         best = p;
       }
     }
-    if (best < -1.2 || best > n + 1.2) continue;
+    if (bestDist === Infinity) continue;
     out.push({ pos: best, color });
   }
   return out;

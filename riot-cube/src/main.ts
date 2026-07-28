@@ -120,9 +120,8 @@ function activeStickerPool() {
   );
 }
 
-function applyAnimeModeToggle(): void {
-  toggleAnimeMode();
-  reloadThemeArt(getTheme());
+/** Drop face stickers that aren't in the active theme pool so art can load. */
+function rematchStickersToActivePool(): void {
   const pool = activeStickerPool();
   const ok = session.faceStickers.every((k) =>
     (pool as readonly string[]).includes(k),
@@ -140,8 +139,28 @@ function applyAnimeModeToggle(): void {
     const empty = stickerDraft.findIndex((k) => !k);
     stickerSlot = empty >= 0 ? empty : 0;
   }
+}
+
+function applyThemeChange(): void {
+  reloadThemeArt(getTheme());
+  rematchStickersToActivePool();
   void loadStickers();
+}
+
+function applyAnimeModeToggle(): void {
+  toggleAnimeMode();
+  applyThemeChange();
   sfxPaperRustle();
+}
+
+/** One-cell swipe only — soft rubber past ±1/n so release never animates backward. */
+function clampLaneOffset(offsetUv: number, n: number): number {
+  const limit = 1 / Math.max(1, n);
+  const abs = Math.abs(offsetUv);
+  if (abs <= limit) return offsetUv;
+  const over = abs - limit;
+  const rubber = limit + over / (1 + over * 4);
+  return Math.sign(offsetUv) * Math.min(rubber, limit * 1.25);
 }
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
@@ -331,12 +350,17 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
   const amount = Math.max(1, twist.amount ?? 1);
   const n = session.size;
   const toUv = (twist.dir * amount) / n;
+  // Never ease backward from an overshot drag — settle into the one-cell target.
+  const from =
+    Math.sign(fromUv) === Math.sign(toUv) || fromUv === 0
+      ? Math.sign(toUv) * Math.min(Math.abs(fromUv), Math.abs(toUv))
+      : 0;
   turnAnim = {
     kind: "lane",
     face: session.face,
     axis: twist.axis,
     index: twist.index,
-    fromUv,
+    fromUv: from,
     toUv,
     twist: { ...twist, amount },
     t: 0,
@@ -618,8 +642,7 @@ canvas.addEventListener(
       }
       if (hitUiRect(SETTINGS_THEME, p.x, p.y)) {
         cycleTheme();
-        reloadThemeArt(getTheme());
-        void loadStickers();
+        applyThemeChange();
         sfxPaperRustle();
         return;
       }
@@ -866,7 +889,10 @@ canvas.addEventListener(
       }
       sfxPaperRustle();
     }
-    drag.offsetUv = drag.axis === "row" ? du : dv;
+    drag.offsetUv = clampLaneOffset(
+      drag.axis === "row" ? du : dv,
+      session.size,
+    );
   },
   { passive: false },
 );

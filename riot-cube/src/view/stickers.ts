@@ -18,6 +18,7 @@ let loadedTheme: ThemeId | null = null;
 let loadedAnimeMode: AnimeMode | null = null;
 let loadedVersion = -1;
 let loadPromise: Promise<void> | null = null;
+let loadToken = 0;
 
 function activePool(theme: ThemeId, mode: AnimeMode): readonly TileKind[] {
   return stickerPoolForTheme(theme, theme === "anime" ? mode : "day");
@@ -50,35 +51,32 @@ export function loadStickers(forceTheme?: ThemeId): Promise<void> {
     return loadPromise;
   }
 
-  cache.clear();
+  const token = ++loadToken;
   loadedTheme = theme;
   loadedAnimeMode = mode;
   loadedVersion = STICKER_ASSET_VERSION;
-  const versionAtStart = STICKER_ASSET_VERSION;
   const pool = activePool(theme, mode);
+  const next = new Map<TileKind, HTMLImageElement>();
+
   loadPromise = Promise.all(
     pool.map(
       (kind) =>
         new Promise<void>((resolve) => {
           const img = new Image();
           const primary = `${stickerPath(kind, theme)}?v=${STICKER_ASSET_VERSION}`;
-          const commit = () => {
-            if (
-              loadedTheme === theme &&
-              loadedAnimeMode === mode &&
-              loadedVersion === versionAtStart
-            ) {
-              cache.set(kind, img);
-            }
+          img.onload = () => {
+            if (token === loadToken) next.set(kind, img);
             resolve();
           };
-          img.onload = commit;
           // No day fallback in dark mode — missing files stay missing.
           img.onerror = () => resolve();
           img.src = primary;
         }),
     ),
   ).then(() => {
+    if (token !== loadToken) return;
+    cache.clear();
+    for (const [k, img] of next) cache.set(k, img);
     loadPromise = null;
   });
   return loadPromise;
