@@ -22,11 +22,16 @@ const { size = 'nav' } = Astro.props;
 		position: absolute;
 		z-index: 0;
 		left: 50%;
-		/* Anchor at the top edge of the logo; tucked fully under until .is-out. */
-		top: 0;
+		/*
+		  SKITZ mark PNG is square with empty padding; painted sticker top ≈ 23.4%.
+		  Anchor there so he slides out from behind the real sticker edge, not the
+		  transparent image box.
+		*/
+		top: 23.4%;
 		pointer-events: none;
 		user-select: none;
 		opacity: 0;
+		/* Fully tucked under the painted top edge. */
 		transform: translate(-50%, 0);
 		filter: drop-shadow(2px 3px 0 rgba(22, 19, 16, 0.16));
 		transition:
@@ -54,7 +59,7 @@ const { size = 'nav' } = Astro.props;
 		}
 	}
 
-	/* Half the sticker above the logo top edge. */
+	/* Only the top half clears the painted sticker edge. */
 	.peek-sticker.is-out {
 		opacity: 1;
 		transform: translate(-50%, -50%);
