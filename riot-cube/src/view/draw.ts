@@ -90,7 +90,13 @@ export function drawDesk(ctx: CanvasRenderingContext2D): void {
 
 export function drawHud(
   ctx: CanvasRenderingContext2D,
-  opts: { sfxVol?: number },
+  opts: {
+    sfxVol?: number;
+    moves?: number;
+    mode?: "classic" | "clear";
+    cleared?: number;
+    moveLimit?: number | null;
+  },
 ): void {
   const p = getPalette();
   ctx.fillStyle = p.hudBg;
@@ -106,6 +112,33 @@ export function drawHud(
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillText("RIOT CUBE", 50, 58);
+
+  if (opts.moves != null) {
+    const chipW = opts.mode === "clear" ? 200 : 120;
+    ctx.fillStyle = p.hudBg;
+    roundRect(ctx, 36, 84, chipW, 40, 5);
+    ctx.fill();
+    ctx.strokeStyle = p.ink;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = p.hudInk;
+    ctx.font = "700 16px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "left";
+    if (opts.mode === "clear") {
+      const left =
+        opts.moveLimit == null
+          ? `${opts.moves}`
+          : `${Math.max(0, opts.moveLimit - opts.moves)}`;
+      const limitTxt = opts.moveLimit == null ? "∞" : String(opts.moveLimit);
+      ctx.fillText(
+        `${opts.cleared ?? 0}/6  ·  ${left}/${limitTxt}`,
+        48,
+        110,
+      );
+    } else {
+      ctx.fillText(`${opts.moves} MOVES`, 48, 110);
+    }
+  }
 
   if (getTheme() === "anime") {
     drawAnimeModeButton(ctx);
@@ -294,9 +327,15 @@ export function drawFaceTurnButtons(ctx: CanvasRenderingContext2D): FaceTurnButt
 
 export function drawEndOverlay(
   ctx: CanvasRenderingContext2D,
-  opts: { moves: number },
+  opts: {
+    moves: number;
+    outcome?: "solved" | "lost";
+    mode?: "classic" | "clear";
+    cleared?: number;
+  },
 ): void {
   const p = getPalette();
+  const lost = opts.outcome === "lost";
   ctx.fillStyle = "rgba(0,0,0,0.55)";
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = p.paper;
@@ -308,9 +347,25 @@ export function drawEndOverlay(
   ctx.fillStyle = p.ink;
   ctx.font = "800 40px 'Permanent Marker', sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("SOLVED!", 150, 530);
+  if (lost) {
+    ctx.fillText("OUT OF MOVES", 150, 530);
+  } else if (opts.mode === "clear") {
+    ctx.fillText("CLEARED!", 150, 530);
+  } else {
+    ctx.fillText("SOLVED!", 150, 530);
+  }
   ctx.font = "700 20px 'Chakra Petch', sans-serif";
-  ctx.fillText(`${opts.moves} moves`, 150, 575);
+  if (opts.mode === "clear") {
+    ctx.fillText(
+      lost
+        ? `${opts.cleared ?? 0}/6 faces · ${opts.moves} moves`
+        : `All 6 faces · ${opts.moves} moves`,
+      150,
+      575,
+    );
+  } else {
+    ctx.fillText(`${opts.moves} moves`, 150, 575);
+  }
 
   ctx.fillStyle = p.hot;
   roundRect(ctx, 230, 640, 260, 54, 7);
@@ -510,12 +565,14 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   });
 }
 
-export const SETTINGS_VOL: UiRect = { x: 140, y: 320, w: 440, h: 58 };
-export const SETTINGS_MUSIC: UiRect = { x: 140, y: 392, w: 440, h: 58 };
-export const SETTINGS_THEME: UiRect = { x: 140, y: 464, w: 440, h: 58 };
-export const SETTINGS_SIZE: UiRect = { x: 140, y: 536, w: 440, h: 58 };
-export const SETTINGS_HINTS: UiRect = { x: 140, y: 608, w: 440, h: 58 };
-export const SETTINGS_BACK: UiRect = { x: 140, y: 700, w: 440, h: 58 };
+export const SETTINGS_VOL: UiRect = { x: 140, y: 280, w: 440, h: 54 };
+export const SETTINGS_MUSIC: UiRect = { x: 140, y: 348, w: 440, h: 54 };
+export const SETTINGS_THEME: UiRect = { x: 140, y: 416, w: 440, h: 54 };
+export const SETTINGS_SIZE: UiRect = { x: 140, y: 484, w: 440, h: 54 };
+export const SETTINGS_MODE: UiRect = { x: 140, y: 552, w: 440, h: 54 };
+export const SETTINGS_MOVES: UiRect = { x: 140, y: 620, w: 440, h: 54 };
+export const SETTINGS_HINTS: UiRect = { x: 140, y: 688, w: 440, h: 54 };
+export const SETTINGS_BACK: UiRect = { x: 140, y: 776, w: 440, h: 54 };
 
 export function drawSettingsScreen(
   ctx: CanvasRenderingContext2D,
@@ -524,6 +581,8 @@ export function drawSettingsScreen(
     musicVol: number;
     themeLabel: string;
     sizeLabel: string;
+    modeLabel: string;
+    moveLimitLabel: string;
     hintsOn: boolean;
   },
 ): void {
@@ -531,22 +590,22 @@ export function drawSettingsScreen(
   drawDesk(ctx);
 
   ctx.fillStyle = p.paper;
-  roundRect(ctx, 80, 150, 560, 660, 10);
+  roundRect(ctx, 80, 130, 560, 740, 10);
   ctx.fill();
   ctx.strokeStyle = p.ink;
   ctx.lineWidth = 4;
   ctx.stroke();
   ctx.fillStyle = p.accent;
-  ctx.fillRect(120, 138, 100, 18);
+  ctx.fillRect(120, 118, 100, 18);
 
   ctx.fillStyle = p.ink;
   ctx.font = "800 42px 'Permanent Marker', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("SETTINGS", W / 2, 230);
+  ctx.fillText("SETTINGS", W / 2, 210);
 
   ctx.font = "600 18px 'Patrick Hand', sans-serif";
   ctx.fillStyle = p.muted;
-  ctx.fillText("Sound, music, look, cube, and hints", W / 2, 275);
+  ctx.fillText("Sound, look, mode, cube, and hints", W / 2, 252);
 
   const volLabel =
     opts.sfxVol <= 0.001 ? "MUTED" : opts.sfxVol < 0.55 ? "SOFT" : "NORMAL";
@@ -569,6 +628,14 @@ export function drawSettingsScreen(
     text: p.hot,
   });
   drawPaperButton(ctx, SETTINGS_SIZE, `CUBE  \u00B7  ${opts.sizeLabel}`, {
+    fill: p.panel,
+    text: p.accent,
+  });
+  drawPaperButton(ctx, SETTINGS_MODE, `MODE  \u00B7  ${opts.modeLabel}`, {
+    fill: p.panel,
+    text: p.hot,
+  });
+  drawPaperButton(ctx, SETTINGS_MOVES, `MOVES  \u00B7  ${opts.moveLimitLabel}`, {
     fill: p.panel,
     text: p.accent,
   });
@@ -683,9 +750,17 @@ export const HELP_PAGES = [
   {
     title: "GOAL",
     lines: [
-      "Each face of the cube wants one sticker kind.",
-      "Twist until every face is a matching set.",
-      "No timer. No move limit. Just solve it.",
+      "CLASSIC — match every face to one sticker kind.",
+      "CLEAR — complete a face to black it out.",
+      "In CLEAR, wipe all six faces to win.",
+    ],
+  },
+  {
+    title: "CLEAR",
+    lines: [
+      "A uniform face clears and turns black.",
+      "Black occupy stickers mark that face done.",
+      "Pick a move limit in Settings, or Unlimited.",
     ],
   },
   {
@@ -707,9 +782,9 @@ export const HELP_PAGES = [
   {
     title: "TOOLS",
     lines: [
-      "STICKERS — pick the six face designs.",
-      "SCRAMBLE — shuffle for a fresh puzzle.",
-      "HINT — draw a suggested move (Settings).",
+      "MODE — Classic solve or Clear faces.",
+      "MOVES — Cap for Clear mode, or Unlimited.",
+      "STICKERS / SCRAMBLE / HINT — usual tools.",
       "Try 2\u00D72 in Settings if 3\u00D73 feels rough.",
     ],
   },

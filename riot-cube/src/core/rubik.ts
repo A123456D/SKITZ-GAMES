@@ -51,6 +51,18 @@ export function isSolved(cube: CubeState): boolean {
   return true;
 }
 
+/** True when every sticker on the face shares the same color. */
+export function isFaceUniform(face: FaceGrid): boolean {
+  if (!face.length || !face[0]?.length) return false;
+  const want = face[0]![0]!;
+  for (let r = 0; r < face.length; r++) {
+    for (let c = 0; c < face[r]!.length; c++) {
+      if (face[r]![c] !== want) return false;
+    }
+  }
+  return true;
+}
+
 /** First face that is not uniform in its solved color, or null if solved. */
 export function findUnsolvedFace(cube: CubeState): FaceId | null {
   for (let fi = 0; fi < FACE_COUNT; fi++) {

@@ -1,9 +1,16 @@
 import {
   applyFaceTurn,
   applyTwist,
+  clearedCount,
   cycleCubeSize,
+  cycleGameMode,
+  cycleMoveLimit,
   doScramble,
   loadCubeSize,
+  loadGameMode,
+  loadMoveLimit,
+  modeLabel,
+  moveLimitLabel,
   saveCubeSize,
   setActiveFace,
   setFaceStickers,
@@ -62,6 +69,8 @@ import {
   PAUSE_THEMES,
   SETTINGS_BACK,
   SETTINGS_HINTS,
+  SETTINGS_MODE,
+  SETTINGS_MOVES,
   SETTINGS_MUSIC,
   SETTINGS_SIZE,
   SETTINGS_THEME,
@@ -385,7 +394,7 @@ function resetPlayVisuals(): void {
 }
 
 function doTwist(twist: LaneTwist, fromUv = 0): void {
-  if (session.status === "solved" || turnAnim) return;
+  if (session.status !== "playing" || turnAnim) return;
   const amount = Math.max(1, twist.amount ?? 1);
   const n = session.size;
   const toUv = (twist.dir * amount) / n;
@@ -411,7 +420,7 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
 }
 
 function doFaceTurn(dir: 1 | -1): void {
-  if (session.status === "solved" || turnAnim) return;
+  if (session.status !== "playing" || turnAnim) return;
   turnAnim = { kind: "face", face: session.face, dir, t: 0, ms: TURN_MS };
   sfxPaperSlide();
 }
@@ -553,6 +562,8 @@ function paint(): void {
       musicVol: getMusicVolume(),
       themeLabel: getThemeLabel(),
       sizeLabel: sizeLabel(session.size),
+      modeLabel: modeLabel(loadGameMode()),
+      moveLimitLabel: moveLimitLabel(loadMoveLimit()),
       hintsOn: getHintsEnabled(),
     });
     return;
@@ -606,6 +617,10 @@ function paint(): void {
 
   drawHud(ctx, {
     sfxVol: getSfxVolume(),
+    moves: session.moveCount,
+    mode: session.mode,
+    cleared: clearedCount(session),
+    moveLimit: session.moveLimit,
   });
   drawMenuButton(ctx);
 
@@ -614,6 +629,7 @@ function paint(): void {
     motion,
     sourceCube: source,
     faceStickers: session.faceStickers,
+    clearedFaces: session.mode === "clear" ? session.cleared : undefined,
     hintMove: hintT > 0 && hintT < 1 ? hintMove : null,
     hintT,
   });
@@ -627,8 +643,13 @@ function paint(): void {
     faceTurnBtns = null;
   }
 
-  if (session.status === "solved") {
-    drawEndOverlay(ctx, { moves: session.moveCount });
+  if (session.status === "solved" || session.status === "lost") {
+    drawEndOverlay(ctx, {
+      moves: session.moveCount,
+      outcome: session.status === "lost" ? "lost" : "solved",
+      mode: session.mode,
+      cleared: clearedCount(session),
+    });
   }
   if (screen === "menu") {
     drawPauseMenu(ctx);
@@ -787,6 +808,24 @@ canvas.addEventListener(
         clearHint();
         return;
       }
+      if (hitUiRect(SETTINGS_MODE, p.x, p.y)) {
+        cycleGameMode(loadGameMode());
+        if (settingsFrom === "menu") {
+          session = startSession(session.size, activeStickerPool());
+          clearHint();
+        }
+        sfxPaperRustle();
+        return;
+      }
+      if (hitUiRect(SETTINGS_MOVES, p.x, p.y)) {
+        cycleMoveLimit(loadMoveLimit());
+        if (settingsFrom === "menu") {
+          session = startSession(session.size, activeStickerPool());
+          clearHint();
+        }
+        sfxPaperRustle();
+        return;
+      }
       if (hitUiRect(SETTINGS_HINTS, p.x, p.y)) {
         toggleHintsEnabled();
         if (!getHintsEnabled()) clearHint();
@@ -877,7 +916,7 @@ canvas.addEventListener(
       return;
     }
 
-    if (session.status === "solved") {
+    if (session.status === "solved" || session.status === "lost") {
       if (hitVolumeButton(p.x, p.y)) {
         cycleSfxVolume();
         return;

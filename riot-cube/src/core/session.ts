@@ -1,11 +1,13 @@
 import {
   CUBE_SIZES,
+  FACE_COUNT,
   type CubeSize,
   type CubeState,
   type FaceId,
   type TurnDir,
   defaultScrambleMoves,
   faceTurn,
+  isFaceUniform,
   isSolved,
   mulberry32,
   scramble,
@@ -20,9 +22,25 @@ import {
 
 export type { FaceId, CubeSize, LaneTwist };
 export { CUBE_SIZES, FACE_COUNT } from "./rubik";
-export type GameStatus = "playing" | "solved";
+export type GameStatus = "playing" | "solved" | "lost";
+export type GameMode = "classic" | "clear";
 
 const SIZE_KEY = "riotcube_size";
+const MODE_KEY = "riotcube_mode";
+const MOVE_LIMIT_KEY = "riotcube_move_limit";
+
+/** Preset move caps for clear mode; 0 = unlimited. */
+export const MOVE_LIMIT_STEPS = [0, 30, 50, 80, 120] as const;
+export type MoveLimit = (typeof MOVE_LIMIT_STEPS)[number];
+
+export type ClearedFaces = readonly [
+  boolean,
+  boolean,
+  boolean,
+  boolean,
+  boolean,
+  boolean,
+];
 
 export type Session = {
   size: CubeSize;
@@ -32,7 +50,16 @@ export type Session = {
   status: GameStatus;
   rng: () => number;
   faceStickers: FaceStickers;
+  mode: GameMode;
+  /** Faces already cleared in CLEAR mode. */
+  cleared: ClearedFaces;
+  /** null = unlimited. */
+  moveLimit: number | null;
 };
+
+function emptyCleared(): ClearedFaces {
+  return [false, false, false, false, false, false];
+}
 
 export function loadCubeSize(): CubeSize {
   try {
@@ -63,8 +90,75 @@ export function sizeLabel(size: number): string {
   return `${size}\u00D7${size}`;
 }
 
+export function loadGameMode(): GameMode {
+  try {
+    const v = localStorage.getItem(MODE_KEY);
+    if (v === "clear" || v === "classic") return v;
+  } catch {
+    /* ignore */
+  }
+  return "classic";
+}
+
+export function saveGameMode(mode: GameMode): void {
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function cycleGameMode(current: GameMode = loadGameMode()): GameMode {
+  const next: GameMode = current === "classic" ? "clear" : "classic";
+  saveGameMode(next);
+  return next;
+}
+
+export function modeLabel(mode: GameMode): string {
+  return mode === "clear" ? "CLEAR" : "CLASSIC";
+}
+
+export function loadMoveLimit(): MoveLimit {
+  try {
+    const v = Number(localStorage.getItem(MOVE_LIMIT_KEY));
+    if ((MOVE_LIMIT_STEPS as readonly number[]).includes(v)) {
+      return v as MoveLimit;
+    }
+  } catch {
+    /* ignore */
+  }
+  return 0;
+}
+
+export function saveMoveLimit(limit: MoveLimit): void {
+  try {
+    localStorage.setItem(MOVE_LIMIT_KEY, String(limit));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function cycleMoveLimit(
+  current: MoveLimit = loadMoveLimit(),
+): MoveLimit {
+  const i = MOVE_LIMIT_STEPS.indexOf(current);
+  const next = MOVE_LIMIT_STEPS[(i + 1) % MOVE_LIMIT_STEPS.length]!;
+  saveMoveLimit(next);
+  return next;
+}
+
+export function moveLimitLabel(limit: MoveLimit): string {
+  return limit <= 0 ? "UNLIMITED" : String(limit);
+}
+
 function seedFrom(): number {
   return (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
+}
+
+function limitFromPrefs(mode: GameMode): number | null {
+  if (mode !== "clear") return null;
+  const n = loadMoveLimit();
+  return n <= 0 ? null : n;
 }
 
 export function startSession(
@@ -75,6 +169,7 @@ export function startSession(
   const rng = mulberry32(seed);
   const faceStickers = pickFaceStickers(rng, stickerPool);
   const cube = scramble(size, defaultScrambleMoves(size), rng);
+  const mode = loadGameMode();
   return {
     size,
     cube,
@@ -83,6 +178,9 @@ export function startSession(
     status: "playing",
     rng,
     faceStickers,
+    mode,
+    cleared: emptyCleared(),
+    moveLimit: limitFromPrefs(mode),
   };
 }
 
@@ -94,12 +192,16 @@ export function doScramble(session: Session): Session {
     defaultScrambleMoves(session.size),
     rng,
   );
+  const mode = loadGameMode();
   return {
     ...session,
     cube,
     rng,
     moveCount: 0,
     status: "playing",
+    mode,
+    cleared: emptyCleared(),
+    moveLimit: limitFromPrefs(mode),
   };
 }
 
@@ -124,26 +226,83 @@ export function setActiveFace(session: Session, face: FaceId): Session {
   return { ...session, face };
 }
 
+/** True if any cleared face's sticker layout changed. */
+export function clearedFacesDisturbed(
+  before: CubeState,
+  after: CubeState,
+  cleared: ClearedFaces,
+): boolean {
+  for (let fi = 0; fi < FACE_COUNT; fi++) {
+    if (!cleared[fi]) continue;
+    const a = before.faces[fi]!;
+    const b = after.faces[fi]!;
+    for (let r = 0; r < before.size; r++) {
+      for (let c = 0; c < before.size; c++) {
+        if (a[r]![c] !== b[r]![c]) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function markNewClears(session: Session, cube: CubeState): ClearedFaces {
+  const next = [...session.cleared] as [
+    boolean,
+    boolean,
+    boolean,
+    boolean,
+    boolean,
+    boolean,
+  ];
+  for (let fi = 0; fi < FACE_COUNT; fi++) {
+    if (next[fi]) continue;
+    if (isFaceUniform(cube.faces[fi]!)) next[fi] = true;
+  }
+  return next;
+}
+
+function afterMove(session: Session, cube: CubeState): Session {
+  const moveCount = session.moveCount + 1;
+  let cleared = session.cleared;
+  let status: GameStatus = "playing";
+
+  if (session.mode === "clear") {
+    cleared = markNewClears({ ...session, cube }, cube);
+    if (cleared.every(Boolean)) status = "solved";
+    else if (session.moveLimit != null && moveCount >= session.moveLimit) {
+      status = "lost";
+    }
+  } else if (isSolved(cube)) {
+    status = "solved";
+  }
+
+  return {
+    ...session,
+    cube,
+    moveCount,
+    cleared,
+    status,
+  };
+}
+
 export function applyFaceTurn(
   session: Session,
   face: FaceId,
   dir: TurnDir = 1,
 ): Session {
+  if (session.status !== "playing") return session;
+  // Cleared faces are done — spinning them does nothing useful.
+  if (session.mode === "clear" && session.cleared[face]) return session;
   const cube = faceTurn(session.cube, face, dir);
-  return {
-    ...session,
-    cube,
-    moveCount: session.moveCount + 1,
-    status: isSolved(cube) ? "solved" : "playing",
-  };
+  return afterMove(session, cube);
 }
 
 export function applyTwist(session: Session, twist: LaneTwist): Session {
+  if (session.status !== "playing") return session;
   const cube = applyLaneTwist(session.cube, session.face, twist);
-  return {
-    ...session,
-    cube,
-    moveCount: session.moveCount + 1,
-    status: isSolved(cube) ? "solved" : "playing",
-  };
+  return afterMove(session, cube);
+}
+
+export function clearedCount(session: Session): number {
+  return session.cleared.reduce((n, c) => n + (c ? 1 : 0), 0);
 }
