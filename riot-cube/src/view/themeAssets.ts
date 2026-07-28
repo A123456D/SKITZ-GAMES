@@ -49,8 +49,8 @@ function ensureDir(dir: ThemeAssetDir): void {
   const base = `./themes/${dir}`;
   void (async () => {
     const [bg, btn] = await Promise.all([
-      loadImg(`${base}/bg.jpg?v=10`),
-      loadImg(`${base}/btn.jpg?v=10`),
+      loadImg(`${base}/bg.jpg?v=11`),
+      loadImg(`${base}/btn.jpg?v=11`),
     ]);
     art.set(dir, { bg, btn, loaded: true });
     onReady?.();
