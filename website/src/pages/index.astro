@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
+import PeekSticker from '../components/PeekSticker.astro';
 import { getCollection } from 'astro:content';
 
 const games = (await getCollection('games'))
@@ -15,15 +16,7 @@ const games = (await getCollection('games'))
 		<section class="hero">
 			<div class="wrap hero__inner">
 				<div class="hero__logo-wrap">
-					<img
-						class="hero__peek"
-						src="/images/skitz-peek-nav.png"
-						alt=""
-						width="240"
-						height="180"
-						aria-hidden="true"
-						decoding="async"
-					/>
+					<PeekSticker size="hero" />
 					<img
 						class="hero__logo"
 						src="/images/skitz-mark.png"
@@ -86,24 +79,6 @@ const games = (await getCollection('games'))
 		animation: slap-in 700ms var(--ease) both;
 	}
 
-	.hero__peek {
-		position: absolute;
-		z-index: 0;
-		top: 50%;
-		left: 50%;
-		width: min(52px, 12vw);
-		height: auto;
-		pointer-events: none;
-		user-select: none;
-		/* Centered behind the mark — % moves are vs this tiny box, so we
-		   animate top/left against the wrap (logo-sized) instead. */
-		transform: translate(-50%, -50%) scale(0.92);
-		opacity: 0;
-		filter: drop-shadow(2px 3px 0 rgba(22, 19, 16, 0.16));
-		animation: hero-edge-peeks 40s linear infinite;
-		will-change: top, left, opacity, transform;
-	}
-
 	.hero__logo {
 		position: relative;
 		z-index: 1;
@@ -113,12 +88,6 @@ const games = (await getCollection('games'))
 		transform: rotate(-1.4deg);
 		animation: logo-hover 3.4s ease-in-out infinite;
 		will-change: transform;
-	}
-
-	@media (max-width: 520px) {
-		.hero__peek {
-			width: min(42px, 11vw);
-		}
 	}
 
 	@media (hover: hover) and (pointer: fine) {
@@ -154,105 +123,6 @@ const games = (await getCollection('games'))
 		}
 	}
 
-	/*
-	  Park at wrap center, then move top/left to an edge of the logo box.
-	  Rotation matches the edge: upright from bottom, flipped from top,
-	  sideways from left/right (~3s visible each 10s slot).
-	*/
-	@keyframes hero-edge-peeks {
-		/* bottom — head upright */
-		0%,
-		1% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(0deg) scale(0.92);
-		}
-		3%,
-		7.5% {
-			top: 92%;
-			left: 54%;
-			opacity: 1;
-			transform: translate(-50%, -35%) rotate(0deg) scale(1);
-		}
-		9.5%,
-		24.9% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(0deg) scale(0.92);
-		}
-
-		/* top — upside down so the head clears the top edge */
-		25%,
-		26% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(180deg) scale(0.92);
-		}
-		28%,
-		32.5% {
-			top: 8%;
-			left: 46%;
-			opacity: 1;
-			transform: translate(-50%, -65%) rotate(180deg) scale(1);
-		}
-		34.5%,
-		49.9% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(180deg) scale(0.92);
-		}
-
-		/* right — head toward the outside */
-		50%,
-		51% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(90deg) scale(0.92);
-		}
-		53%,
-		57.5% {
-			top: 48%;
-			left: 94%;
-			opacity: 1;
-			transform: translate(-30%, -50%) rotate(90deg) scale(1);
-		}
-		59.5%,
-		74.9% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(90deg) scale(0.92);
-		}
-
-		/* left — head toward the outside */
-		75%,
-		76% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(-90deg) scale(0.92);
-		}
-		78%,
-		82.5% {
-			top: 52%;
-			left: 6%;
-			opacity: 1;
-			transform: translate(-70%, -50%) rotate(-90deg) scale(1);
-		}
-		84.5%,
-		100% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(-90deg) scale(0.92);
-		}
-	}
-
 	.hero__line {
 		max-width: 28rem;
 		margin: 0;
@@ -282,8 +152,7 @@ const games = (await getCollection('games'))
 		font-family: var(--font-type);
 		font-size: 0.85rem;
 		color: var(--mark);
-		background:
-			linear-gradient(160deg, #fffef9, var(--paper));
+		background: linear-gradient(160deg, #fffef9, var(--paper));
 		border: 2px solid var(--mark);
 		padding: 0.35rem 0.7rem;
 		box-shadow: 3px 3px 0 var(--skitz-green);

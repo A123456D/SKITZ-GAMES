@@ -1,4 +1,6 @@
 ---
+import PeekSticker from './PeekSticker.astro';
+
 const path = Astro.url.pathname;
 const links = [
 	{ href: '/games/', label: 'Games' },
@@ -9,15 +11,7 @@ const links = [
 <header class="site-header">
 	<div class="wrap site-header__inner">
 		<a class="logo" href="/" aria-label="SKITZ home">
-			<img
-				class="logo__peek"
-				src="/images/skitz-peek-nav.png"
-				alt=""
-				width="240"
-				height="180"
-				aria-hidden="true"
-				decoding="async"
-			/>
+			<PeekSticker size="nav" />
 			<img
 				class="logo__mark"
 				src="/images/skitz-mark.png"
@@ -72,22 +66,6 @@ const links = [
 		isolation: isolate;
 	}
 
-	.logo__peek {
-		position: absolute;
-		z-index: 0;
-		top: 50%;
-		left: 50%;
-		height: 1.05rem;
-		width: auto;
-		pointer-events: none;
-		user-select: none;
-		transform: translate(-50%, -50%) scale(0.92);
-		opacity: 0;
-		filter: drop-shadow(1px 2px 0 rgba(22, 19, 16, 0.14));
-		animation: nav-edge-peeks 40s linear 5s infinite;
-		will-change: top, left, opacity, transform;
-	}
-
 	.logo__mark {
 		position: relative;
 		z-index: 1;
@@ -99,10 +77,6 @@ const links = [
 	}
 
 	@media (max-width: 520px) {
-		.logo__peek {
-			height: 0.9rem;
-		}
-
 		.logo__mark {
 			height: 2.85rem;
 		}
@@ -140,100 +114,6 @@ const links = [
 		}
 		50% {
 			transform: translateY(-7px);
-		}
-	}
-
-	@keyframes nav-edge-peeks {
-		/* top — upside down */
-		0%,
-		1% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(180deg) scale(0.92);
-		}
-		3%,
-		7.5% {
-			top: 6%;
-			left: 48%;
-			opacity: 1;
-			transform: translate(-50%, -65%) rotate(180deg) scale(1);
-		}
-		9.5%,
-		24.9% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(180deg) scale(0.92);
-		}
-
-		/* bottom — upright */
-		25%,
-		26% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(0deg) scale(0.92);
-		}
-		28%,
-		32.5% {
-			top: 94%;
-			left: 52%;
-			opacity: 1;
-			transform: translate(-50%, -30%) rotate(0deg) scale(1);
-		}
-		34.5%,
-		49.9% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(0deg) scale(0.92);
-		}
-
-		/* left — head out left */
-		50%,
-		51% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(-90deg) scale(0.92);
-		}
-		53%,
-		57.5% {
-			top: 52%;
-			left: 4%;
-			opacity: 1;
-			transform: translate(-70%, -50%) rotate(-90deg) scale(1);
-		}
-		59.5%,
-		74.9% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(-90deg) scale(0.92);
-		}
-
-		/* right — head out right */
-		75%,
-		76% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(90deg) scale(0.92);
-		}
-		78%,
-		82.5% {
-			top: 48%;
-			left: 96%;
-			opacity: 1;
-			transform: translate(-30%, -50%) rotate(90deg) scale(1);
-		}
-		84.5%,
-		100% {
-			top: 50%;
-			left: 50%;
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(90deg) scale(0.92);
 		}
 	}
 
