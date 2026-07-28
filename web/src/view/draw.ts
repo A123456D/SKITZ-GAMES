@@ -473,10 +473,13 @@ function paintCyberHud(ctx: CanvasRenderingContext2D): void {
   const m = 18;
   const outer = 10;
   const mid = 22;
+  const lite = prefersLiteMotion();
 
   // Outer red glow frame.
-  ctx.shadowColor = "#FF2A2A";
-  ctx.shadowBlur = 18;
+  if (!lite) {
+    ctx.shadowColor = "#FF2A2A";
+    ctx.shadowBlur = 18;
+  }
   ctx.strokeStyle = "#FF2A2A";
   ctx.lineWidth = 2.4;
   ctx.strokeRect(m, m, W - m * 2, H - m * 2);
@@ -504,8 +507,10 @@ function paintCyberHud(ctx: CanvasRenderingContext2D): void {
   ];
   ctx.strokeStyle = "#FF2A2A";
   ctx.lineWidth = 3.2;
-  ctx.shadowColor = "#FF2A2A";
-  ctx.shadowBlur = 10;
+  if (!lite) {
+    ctx.shadowColor = "#FF2A2A";
+    ctx.shadowBlur = 10;
+  }
   for (const [bx, by, sx, sy] of bkt) {
     ctx.beginPath();
     ctx.moveTo(bx + sx * arm, by);
@@ -550,8 +555,8 @@ function paintCyberHud(ctx: CanvasRenderingContext2D): void {
 }
 
 /**
- * Coarse pointers / small viewports: skip the GPU-heavy motion extras
- * (shadowBlur, dense scanlines) while keeping the same animated look.
+ * Coarse pointers / small viewports / Android: skip GPU-heavy neon extras
+ * (shadowBlur, dense dial ticks) while keeping the same look.
  */
 let liteMotionCache: boolean | null = null;
 
@@ -560,9 +565,16 @@ function prefersLiteMotion(): boolean {
   if (typeof window === "undefined") return false;
   let lite = false;
   try {
+    const nav = navigator as Navigator & {
+      deviceMemory?: number;
+      connection?: { saveData?: boolean };
+    };
     lite =
       window.matchMedia("(pointer: coarse)").matches ||
-      Math.min(window.innerWidth, window.innerHeight) < 700;
+      Math.min(window.innerWidth, window.innerHeight) < 700 ||
+      (typeof nav.deviceMemory === "number" && nav.deviceMemory > 0 && nav.deviceMemory <= 4) ||
+      !!nav.connection?.saveData ||
+      /Android/i.test(navigator.userAgent || "");
   } catch {
     /* ignore */
   }
@@ -797,7 +809,7 @@ export function drawWheel(
   const sx = squash > 1 ? 1 / Math.sqrt(squash) : squash;
   stamp(
     ctx,
-    `face|${theme}|${pal}|${table.module}|${table.locked ? 1 : 0}|${table.link ? 1 : 0}|${rKey}|inkNoRim1`,
+    `face|${theme}|${pal}|${table.module}|${table.locked ? 1 : 0}|${table.link ? 1 : 0}|${rKey}|${prefersLiteMotion() ? "lite2" : "full2"}|inkNoRim1`,
     faceSize,
     faceSize,
     (c) => paintWheelFace(c, table, r, theme, lightFace, dark, face),
@@ -832,8 +844,10 @@ export function drawWheel(
       ctx.stroke();
     } else if (theme === "mono") {
       ctx.strokeStyle = "#FF2A2A";
-      ctx.shadowColor = "#FF2A2A";
-      ctx.shadowBlur = 8;
+      if (!prefersLiteMotion()) {
+        ctx.shadowColor = "#FF2A2A";
+        ctx.shadowBlur = 8;
+      }
       ctx.globalAlpha = pulse * 0.95;
       ctx.lineWidth = 2.6;
       ctx.beginPath();
@@ -1048,31 +1062,40 @@ function paintWheelFace(
     // Outer carbon plate.
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
-    const plate = ctx.createRadialGradient(-r * 0.25, -r * 0.3, 0, 0, 0, r);
-    plate.addColorStop(0, "#16161A");
-    plate.addColorStop(0.55, "#0A0A0C");
-    plate.addColorStop(1, "#050506");
-    ctx.fillStyle = plate;
-    ctx.fill();
+    if (lite) {
+      ctx.fillStyle = "#0A0A0C";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
+      ctx.fillStyle = "#050506";
+      ctx.fill();
+    } else {
+      const plate = ctx.createRadialGradient(-r * 0.25, -r * 0.3, 0, 0, 0, r);
+      plate.addColorStop(0, "#16161A");
+      plate.addColorStop(0.55, "#0A0A0C");
+      plate.addColorStop(1, "#050506");
+      ctx.fillStyle = plate;
+      ctx.fill();
 
-    // Deep recessed well.
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
-    const well = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.72);
-    well.addColorStop(0, "#030304");
-    well.addColorStop(0.65, "#08080A");
-    well.addColorStop(1, "#101014");
-    ctx.fillStyle = well;
-    ctx.fill();
+      // Deep recessed well.
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
+      const well = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.72);
+      well.addColorStop(0, "#030304");
+      well.addColorStop(0.65, "#08080A");
+      well.addColorStop(1, "#101014");
+      ctx.fillStyle = well;
+      ctx.fill();
 
-    // Soft red core wash inside the well.
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
-    const core = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.55);
-    core.addColorStop(0, "rgba(255, 42, 42, 0.16)");
-    core.addColorStop(1, "rgba(255, 42, 42, 0)");
-    ctx.fillStyle = core;
-    ctx.fill();
+      // Soft red core wash inside the well.
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
+      const core = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.55);
+      core.addColorStop(0, "rgba(255, 42, 42, 0.16)");
+      core.addColorStop(1, "rgba(255, 42, 42, 0)");
+      ctx.fillStyle = core;
+      ctx.fill();
+    }
 
     ctx.save();
     if (!lite) {
@@ -1083,43 +1106,55 @@ function paintWheelFace(
     ctx.strokeStyle = "#FF2A2A";
     ctx.lineCap = "butt";
     const arcR = r - Math.max(2.2, r * 0.055);
-    const segments = [
-      [0.08, 0.42],
-      [0.52, 0.78],
-      [1.05, 1.35],
-      [1.55, 1.88],
-      [2.1, 2.45],
-      [2.65, 2.95],
-      [3.25, 3.55],
-      [3.85, 4.2],
-      [4.55, 4.9],
-      [5.2, 5.55],
-      [5.85, 6.15],
-    ];
+    const segments = lite
+      ? [
+          [0.1, 0.55],
+          [0.9, 1.4],
+          [1.9, 2.4],
+          [2.9, 3.4],
+          [3.9, 4.4],
+          [5.0, 5.5],
+        ]
+      : [
+          [0.08, 0.42],
+          [0.52, 0.78],
+          [1.05, 1.35],
+          [1.55, 1.88],
+          [2.1, 2.45],
+          [2.65, 2.95],
+          [3.25, 3.55],
+          [3.85, 4.2],
+          [4.55, 4.9],
+          [5.2, 5.55],
+          [5.85, 6.15],
+        ];
     ctx.lineWidth = Math.max(2.8, r * 0.085);
     for (const [a0, a1] of segments) {
       ctx.beginPath();
-      ctx.arc(0, 0, arcR, a0, a1);
+      ctx.arc(0, 0, arcR, a0!, a1!);
       ctx.stroke();
     }
     ctx.shadowBlur = 0;
 
-    // Thin concentric HUD rings.
-    ctx.strokeStyle = "rgba(255, 42, 42, 0.55)";
-    ctx.lineWidth = Math.max(1, r * 0.022);
-    for (const rr of [0.92, 0.82, 0.74]) {
-      ctx.beginPath();
-      ctx.arc(0, 0, r * rr, 0, Math.PI * 2);
-      ctx.stroke();
+    if (!lite) {
+      // Thin concentric HUD rings.
+      ctx.strokeStyle = "rgba(255, 42, 42, 0.55)";
+      ctx.lineWidth = Math.max(1, r * 0.022);
+      for (const rr of [0.92, 0.82, 0.74]) {
+        ctx.beginPath();
+        ctx.arc(0, 0, r * rr, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
 
-    // Degree tick marks.
+    // Degree tick marks — sparse on mobile.
     ctx.strokeStyle = "#FF2A2A";
     ctx.lineWidth = Math.max(0.9, r * 0.018);
     ctx.globalAlpha = 0.85;
-    for (let i = 0; i < 48; i++) {
-      const a = (Math.PI * 2 * i) / 48;
-      const major = i % 4 === 0;
+    const tickCount = lite ? 12 : 48;
+    for (let i = 0; i < tickCount; i++) {
+      const a = (Math.PI * 2 * i) / tickCount;
+      const major = lite ? i % 3 === 0 : i % 4 === 0;
       const inner = r * (major ? 0.78 : 0.84);
       const outer = r * (major ? 0.95 : 0.91);
       ctx.beginPath();
@@ -1574,7 +1609,9 @@ function strokeNeonPinkBeam(
     ctx.restore();
   };
   paint("#FF2DB8", Math.max(4.2, scale * 0.14), 0.28, Math.max(10, scale * 0.28));
-  paint("#FF6EC7", Math.max(2.6, scale * 0.09), 0.7, Math.max(5, scale * 0.16));
+  if (!lite) {
+    paint("#FF6EC7", Math.max(2.6, scale * 0.09), 0.7, Math.max(5, scale * 0.16));
+  }
   paint("#FFE0F8", Math.max(1.15, scale * 0.045), 1, Math.max(2, scale * 0.07));
 }
 
@@ -2357,16 +2394,20 @@ export function drawHudStats(
     ctx.font = fontHand(18);
   } else if (theme === "retro") {
     ctx.fillStyle = "#FF9DE0";
-    ctx.shadowColor = "#FF4FB8";
-    ctx.shadowBlur = 6;
+    if (!prefersLiteMotion()) {
+      ctx.shadowColor = "#FF4FB8";
+      ctx.shadowBlur = 6;
+    }
     ctx.font = fontRetro(13, 700);
   } else if (theme === "punk") {
     ctx.fillStyle = "#C8FF00";
     ctx.font = fontPunk(15);
   } else if (theme === "mono") {
     ctx.fillStyle = "#FF2A2A";
-    ctx.shadowColor = "#FF2A2A";
-    ctx.shadowBlur = 8;
+    if (!prefersLiteMotion()) {
+      ctx.shadowColor = "#FF2A2A";
+      ctx.shadowBlur = 8;
+    }
     ctx.font = fontCyber(14, 600);
   } else {
     ctx.fillStyle = P.INK;
@@ -2845,12 +2886,14 @@ export function drawTitle(ctx: CanvasRenderingContext2D, subtitle?: string): voi
   if (theme === "retro") {
     ctx.save();
     ctx.textAlign = "center";
-    ctx.shadowColor = "#FF4FB8";
-    ctx.shadowBlur = 14;
+    if (!prefersLiteMotion()) {
+      ctx.shadowColor = "#FF4FB8";
+      ctx.shadowBlur = 14;
+    }
     ctx.fillStyle = "#5CFFF8";
     ctx.font = fontRetro(26, 800);
     ctx.fillText("PULSE LINK", W / 2, 58);
-    ctx.shadowBlur = 6;
+    ctx.shadowBlur = prefersLiteMotion() ? 0 : 6;
     ctx.fillStyle = "#FF9DE0";
     ctx.font = fontRetro(12, 600);
     ctx.fillText(subtitle ?? "TURN. LINK. PULSE.", W / 2, 84);
@@ -2878,8 +2921,10 @@ export function drawTitle(ctx: CanvasRenderingContext2D, subtitle?: string): voi
     ctx.save();
     ctx.textAlign = "center";
     // Neon-red wordmark with a soft bloom — matches the terminal HUD.
-    ctx.shadowColor = "#FF2A2A";
-    ctx.shadowBlur = 14;
+    if (!prefersLiteMotion()) {
+      ctx.shadowColor = "#FF2A2A";
+      ctx.shadowBlur = 14;
+    }
     ctx.fillStyle = "#FF2A2A";
     ctx.font = fontCyber(27, 700);
     ctx.fillText("PULSE LINK", W / 2, 58);
@@ -2953,11 +2998,14 @@ export function drawGlassButton(
     ctx.scale(press, press);
     ctx.translate(-cx, -cy);
     const pulse = primary ? 0.55 + 0.2 * Math.sin(time * 3.4) : 0.35;
+    const lite = prefersLiteMotion();
     roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 8);
     ctx.fillStyle = primary ? "#1C0840" : "#12062A";
     ctx.fill();
-    ctx.shadowColor = "#FF4FB8";
-    ctx.shadowBlur = primary ? 14 + pulse * 8 : 8;
+    if (!lite) {
+      ctx.shadowColor = "#FF4FB8";
+      ctx.shadowBlur = primary ? 14 + pulse * 8 : 8;
+    }
     ctx.strokeStyle = primary ? "#FF6EC7" : "#C24A9A";
     ctx.lineWidth = primary ? 2.2 : 1.6;
     roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 8);
@@ -2969,8 +3017,10 @@ export function drawGlassButton(
     roundRect(ctx, rect.x + 4, rect.y + 4, rect.w - 8, rect.h - 8, 5);
     ctx.stroke();
     ctx.globalAlpha = enabled ? 1 : 0.38;
-    ctx.shadowColor = primary ? "#5CFFF8" : "#FF6EC7";
-    ctx.shadowBlur = primary ? 8 : 4;
+    if (!lite) {
+      ctx.shadowColor = primary ? "#5CFFF8" : "#FF6EC7";
+      ctx.shadowBlur = primary ? 8 : 4;
+    }
     ctx.fillStyle = primary ? "#5CFFF8" : "#FFB8E8";
     ctx.font = fontRetro(16, 700);
     ctx.textAlign = "center";
@@ -3031,6 +3081,7 @@ export function drawGlassButton(
     ctx.scale(press, press);
     ctx.translate(-cx, -cy);
     const pulse = primary ? 0.55 + 0.2 * Math.sin(time * 3.4) : 0.35;
+    const lite = prefersLiteMotion();
     const chamfer = Math.min(14, rect.h * 0.4);
     const panel = (): void => {
       const { x, y, w, h } = rect;
@@ -3049,8 +3100,10 @@ export function drawGlassButton(
     panel();
     ctx.fillStyle = fill;
     ctx.fill();
-    ctx.shadowColor = "#FF2A2A";
-    ctx.shadowBlur = primary ? 14 + pulse * 8 : 8;
+    if (!lite) {
+      ctx.shadowColor = "#FF2A2A";
+      ctx.shadowBlur = primary ? 14 + pulse * 8 : 8;
+    }
     ctx.strokeStyle = primary ? "#FF2A2A" : "#C02020";
     ctx.lineWidth = primary ? 2.4 : 1.6;
     ctx.lineJoin = "miter";
@@ -3064,8 +3117,10 @@ export function drawGlassButton(
     roundRect(ctx, rect.x + 4, rect.y + 4, rect.w - 8, rect.h - 8, 2);
     ctx.stroke();
     ctx.globalAlpha = enabled ? 1 : 0.4;
-    ctx.shadowColor = "#FF2A2A";
-    ctx.shadowBlur = primary ? 6 : 2;
+    if (!lite) {
+      ctx.shadowColor = "#FF2A2A";
+      ctx.shadowBlur = primary ? 6 : 2;
+    }
     ctx.fillStyle = primary ? "#FF2A2A" : "#FF6A6A";
     ctx.font = fontCyber(16, 600);
     ctx.textAlign = "center";
@@ -3154,12 +3209,15 @@ export function drawRoundButton(
     ctx.save();
     ctx.globalAlpha = enabled ? 1 : 0.38;
     ctx.translate(x, y);
+    const lite = prefersLiteMotion();
     ctx.fillStyle = "#12062A";
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowColor = "#FF4FB8";
-    ctx.shadowBlur = 12;
+    if (!lite) {
+      ctx.shadowColor = "#FF4FB8";
+      ctx.shadowBlur = 12;
+    }
     ctx.strokeStyle = "#FF6EC7";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -3173,8 +3231,10 @@ export function drawRoundButton(
     ctx.arc(0, 0, r - 5, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = enabled ? 1 : 0.38;
-    ctx.shadowColor = "#5CFFF8";
-    ctx.shadowBlur = 6;
+    if (!lite) {
+      ctx.shadowColor = "#5CFFF8";
+      ctx.shadowBlur = 6;
+    }
     ctx.fillStyle = "#5CFFF8";
     ctx.font = fontRetro(Math.round(r * 0.85), 700);
     ctx.textAlign = "center";
@@ -3223,15 +3283,23 @@ export function drawRoundButton(
     ctx.save();
     ctx.globalAlpha = enabled ? 1 : 0.4;
     ctx.translate(x, y);
-    const disc = ctx.createRadialGradient(-r * 0.3, -r * 0.35, 0, 0, 0, r);
-    disc.addColorStop(0, "#1A1A1E");
-    disc.addColorStop(1, "#0A0A0C");
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fillStyle = disc;
-    ctx.fill();
-    ctx.shadowColor = "#FF2A2A";
-    ctx.shadowBlur = 10;
+    const lite = prefersLiteMotion();
+    if (lite) {
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fillStyle = "#0A0A0C";
+      ctx.fill();
+    } else {
+      const disc = ctx.createRadialGradient(-r * 0.3, -r * 0.35, 0, 0, 0, r);
+      disc.addColorStop(0, "#1A1A1E");
+      disc.addColorStop(1, "#0A0A0C");
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fillStyle = disc;
+      ctx.fill();
+      ctx.shadowColor = "#FF2A2A";
+      ctx.shadowBlur = 10;
+    }
     ctx.strokeStyle = "#FF2A2A";
     ctx.lineWidth = 2.4;
     ctx.beginPath();

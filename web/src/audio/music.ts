@@ -58,6 +58,8 @@ let usingA = true;
 let ctx: AudioContext | null = null;
 let gainA: GainNode | null = null;
 let gainB: GainNode | null = null;
+let musicBus: GainNode | null = null;
+let musicComp: DynamicsCompressorNode | null = null;
 let graphReady = false;
 let transitioning = false;
 let fadeRaf = 0;
@@ -68,7 +70,7 @@ let playEpoch = 0;
 
 function trackUrl(file: string): string {
   // Bust HTTP caches so phones pick up re-leveled cyber beds.
-  return `./music/${file}?v=10`;
+  return `./music/${file}?v=11`;
 }
 
 function artworkUrl(file: string): string {
@@ -180,10 +182,21 @@ function ensureGraph(): void {
   if (!ctx) return;
   gainA = ctx.createGain();
   gainB = ctx.createGain();
+  musicBus = ctx.createGain();
+  musicComp = ctx.createDynamicsCompressor();
+  // Gentle leveling so cyber beds with big drops stay closer to a steady bed.
+  musicComp.threshold.value = -22;
+  musicComp.knee.value = 18;
+  musicComp.ratio.value = 3.5;
+  musicComp.attack.value = 0.015;
+  musicComp.release.value = 0.28;
+  musicBus.gain.value = 1.15;
   gainA.gain.value = 0;
   gainB.gain.value = 0;
-  gainA.connect(ctx.destination);
-  gainB.connect(ctx.destination);
+  gainA.connect(musicBus);
+  gainB.connect(musicBus);
+  musicBus.connect(musicComp);
+  musicComp.connect(ctx.destination);
   // createMediaElementSource may only be called once per element.
   ctx.createMediaElementSource(a!).connect(gainA);
   ctx.createMediaElementSource(b!).connect(gainB);
