@@ -16,6 +16,15 @@ const games = (await getCollection('games'))
 			<div class="wrap hero__inner">
 				<div class="hero__logo-wrap">
 					<img
+						class="hero__peek"
+						src="/images/skitz-peek.png"
+						alt=""
+						width="720"
+						height="680"
+						aria-hidden="true"
+						decoding="async"
+					/>
+					<img
 						class="hero__logo"
 						src="/images/skitz-mark.png"
 						alt="SKITZ games & apps"
@@ -69,18 +78,55 @@ const games = (await getCollection('games'))
 	}
 
 	.hero__logo-wrap {
+		position: relative;
 		display: grid;
 		place-items: center;
+		isolation: isolate;
+		overflow: visible;
 		animation: slap-in 700ms var(--ease) both;
+		/* Room for the peek sticking out past the mark. */
+		padding: 1.5rem 2.5rem 2.75rem;
+		margin: -1.5rem -1.5rem -1.25rem;
+	}
+
+	.hero__peek {
+		position: absolute;
+		z-index: 0;
+		width: min(210px, 46vw);
+		height: auto;
+		pointer-events: none;
+		user-select: none;
+		/* Peek from the lower-left under the mark. */
+		left: 4%;
+		bottom: -2%;
+		transform: rotate(-8deg);
+		filter: drop-shadow(4px 8px 0 rgba(22, 19, 16, 0.18));
+		animation: peek-bob 3.6s ease-in-out 200ms infinite;
+		will-change: transform;
 	}
 
 	.hero__logo {
+		position: relative;
+		z-index: 1;
 		width: min(460px, 86vw);
 		height: auto;
 		filter: drop-shadow(10px 14px 0 rgba(22, 19, 16, 0.22));
 		transform: rotate(-1.4deg);
 		animation: logo-hover 3.4s ease-in-out infinite;
 		will-change: transform;
+	}
+
+	@media (max-width: 520px) {
+		.hero__logo-wrap {
+			padding: 1.1rem 1.4rem 2.1rem;
+			margin: -0.8rem -0.6rem -0.6rem;
+		}
+
+		.hero__peek {
+			width: min(150px, 42vw);
+			left: -2%;
+			bottom: -4%;
+		}
 	}
 
 	@media (hover: hover) and (pointer: fine) {
@@ -90,9 +136,13 @@ const games = (await getCollection('games'))
 				filter 180ms var(--ease);
 		}
 
-		.hero__logo:hover {
+		.hero__logo-wrap:hover .hero__logo {
 			animation: logo-hover-strong 3.4s ease-in-out infinite;
 			filter: drop-shadow(12px 20px 0 rgba(22, 19, 16, 0.28));
+		}
+
+		.hero__logo-wrap:hover .hero__peek {
+			animation: peek-bob-strong 3.6s ease-in-out infinite;
 		}
 	}
 
@@ -113,6 +163,26 @@ const games = (await getCollection('games'))
 		}
 		50% {
 			transform: rotate(-0.4deg) translateY(-14px) scale(1.03);
+		}
+	}
+
+	@keyframes peek-bob {
+		0%,
+		100% {
+			transform: rotate(-8deg) translateY(0);
+		}
+		50% {
+			transform: rotate(-8deg) translateY(-6px);
+		}
+	}
+
+	@keyframes peek-bob-strong {
+		0%,
+		100% {
+			transform: rotate(-6deg) translateY(-2px);
+		}
+		50% {
+			transform: rotate(-6deg) translateY(-10px);
 		}
 	}
 
