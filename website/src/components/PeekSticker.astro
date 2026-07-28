@@ -39,8 +39,10 @@ const { size = 'nav' } = Astro.props;
 			transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 	}
 
+	/* Hero mark reads lower than the raw alpha bound — sit him into the crest. */
 	.peek-sticker--hero {
-		width: min(72px, 16vw);
+		top: 28%;
+		width: min(96px, 22vw);
 		height: auto;
 	}
 
@@ -51,7 +53,7 @@ const { size = 'nav' } = Astro.props;
 
 	@media (max-width: 520px) {
 		.peek-sticker--hero {
-			width: min(58px, 15vw);
+			width: min(78px, 20vw);
 		}
 
 		.peek-sticker--nav {
@@ -63,6 +65,11 @@ const { size = 'nav' } = Astro.props;
 	.peek-sticker.is-out {
 		opacity: 1;
 		transform: translate(-50%, -50%);
+	}
+
+	/* Slightly less than half out on hero so he stays nested in the mark. */
+	.peek-sticker--hero.is-out {
+		transform: translate(-50%, -42%);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
