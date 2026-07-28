@@ -153,14 +153,12 @@ function applyAnimeModeToggle(): void {
   sfxPaperRustle();
 }
 
-/** One-cell swipe only — soft rubber past ±1/n so release never animates backward. */
+/** One-cell swipe only — hard-cap at ±1/n so previews stop on the next cell. */
 function clampLaneOffset(offsetUv: number, n: number): number {
   const limit = 1 / Math.max(1, n);
-  const abs = Math.abs(offsetUv);
-  if (abs <= limit) return offsetUv;
-  const over = abs - limit;
-  const rubber = limit + over / (1 + over * 4);
-  return Math.sign(offsetUv) * Math.min(rubber, limit * 1.25);
+  if (offsetUv > limit) return limit;
+  if (offsetUv < -limit) return -limit;
+  return offsetUv;
 }
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
@@ -350,11 +348,18 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
   const amount = Math.max(1, twist.amount ?? 1);
   const n = session.size;
   const toUv = (twist.dir * amount) / n;
-  // Never ease backward from an overshot drag — settle into the one-cell target.
-  const from =
-    Math.sign(fromUv) === Math.sign(toUv) || fromUv === 0
-      ? Math.sign(toUv) * Math.min(Math.abs(fromUv), Math.abs(toUv))
-      : 0;
+  const sameDir =
+    fromUv === 0 || Math.sign(fromUv) === Math.sign(toUv);
+  // Drag already reached the one-cell target — commit now so stickers
+  // don't freeze parked on the face rim for the whole turn animation.
+  if (sameDir && Math.abs(fromUv) >= Math.abs(toUv) * 0.92) {
+    session = applyTwist(session, { ...twist, amount });
+    sfxPaperSlide();
+    return;
+  }
+  const from = sameDir
+    ? Math.sign(toUv) * Math.min(Math.abs(fromUv), Math.abs(toUv))
+    : 0;
   turnAnim = {
     kind: "lane",
     face: session.face,
