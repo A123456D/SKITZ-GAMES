@@ -973,6 +973,7 @@ async function boot(): Promise<void> {
   ensureThemeArt("classroom");
   ensureThemeArt("edgy");
   ensureThemeArt("doodle");
+  ensureThemeArt("relic");
   ensureAnimeArtBoth();
   syncActiveFace();
   requestAnimationFrame(tick);

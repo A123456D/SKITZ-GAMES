@@ -1,4 +1,4 @@
-export const THEME_IDS = ["classroom", "edgy", "anime", "doodle"] as const;
+export const THEME_IDS = ["classroom", "edgy", "anime", "doodle", "relic"] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
 export type ThemePalette = {
@@ -223,6 +223,41 @@ const DOODLE_PALETTE: ThemePalette = {
   browser: "#e2e8f0",
 };
 
+/** Dark museum / occult relics — charcoal, crimson, electric purple. */
+const RELIC_PALETTE: ThemePalette = {
+  desk0: "#121018",
+  desk1: "#07060a",
+  accent: "#a855f7",
+  hot: "#e11d48",
+  paper: "#f3efe6",
+  paperDeep: "#e5dcc8",
+  ink: "#0a0a0a",
+  muted: "#94a3b8",
+  panel: "#16121c",
+  panelEdge: "#e11d48",
+  hudBg: "#1a1622",
+  hudInk: "#f3efe6",
+  faceActive: "#f4eee0",
+  faceSide: "#e5dcc8",
+  faceStroke: "#1a120c",
+  faceRule: "rgba(168,85,247,0.2)",
+  faceRuleDim: "rgba(168,85,247,0.12)",
+  faceColors: [
+    "#a855f7", // F purple
+    "#38bdf8", // B sky
+    "#e11d48", // R crimson
+    "#fbbf24", // L amber
+    "#f3efe6", // U cream
+    "#0f0a14", // D void
+  ],
+  rule: "rgba(168,85,247,0.28)",
+  margin: "rgba(225,29,72,0.45)",
+  tape: "#a855f7",
+  losePanel: "#0c0a10",
+  white: "#fafafa",
+  browser: "#07060a",
+};
+
 export const ANIME_MODES = ["day", "dark"] as const;
 export type AnimeMode = (typeof ANIME_MODES)[number];
 
@@ -234,6 +269,7 @@ export const THEMES: ThemeDef[] = [
   { id: "edgy", label: "EDGY", palette: EDGY_PALETTE },
   { id: "anime", label: "ANIME", palette: ANIME_PALETTE },
   { id: "doodle", label: "DOODLE", palette: DOODLE_PALETTE },
+  { id: "relic", label: "RELIC", palette: RELIC_PALETTE },
 ];
 
 const THEME_KEY = "riotcube_theme";
@@ -247,7 +283,7 @@ function loadStored(): ThemeId {
     let v = localStorage.getItem(THEME_KEY);
     if (v === "classic") v = "classroom";
     if (v === "grime") v = "edgy";
-    if (v === "classroom" || v === "edgy" || v === "anime" || v === "doodle") {
+    if (v === "classroom" || v === "edgy" || v === "anime" || v === "doodle" || v === "relic") {
       try {
         localStorage.setItem(THEME_KEY, v);
       } catch {
@@ -324,7 +360,7 @@ export function setTheme(id: ThemeId): void {
   applyThemeChrome();
 }
 
-/** Cycle classroom → edgy → anime → doodle → … */
+/** Cycle classroom → edgy → anime → doodle → relic → … */
 export function cycleTheme(): ThemeId {
   const i = THEME_IDS.indexOf(current);
   const next = THEME_IDS[(i + 1) % THEME_IDS.length]!;
