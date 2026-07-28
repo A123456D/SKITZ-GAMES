@@ -15,7 +15,6 @@ const { size = 'nav' } = Astro.props;
 	aria-hidden="true"
 	decoding="async"
 	data-peek-sticker
-	data-edge="bottom"
 />
 
 <style>
@@ -23,17 +22,16 @@ const { size = 'nav' } = Astro.props;
 		position: absolute;
 		z-index: 0;
 		left: 50%;
-		top: 50%;
+		/* Anchor at the top edge of the logo; tucked fully under until .is-out. */
+		top: 0;
 		pointer-events: none;
 		user-select: none;
 		opacity: 0;
-		transform: translate(-50%, -50%) rotate(0deg);
+		transform: translate(-50%, 0);
 		filter: drop-shadow(2px 3px 0 rgba(22, 19, 16, 0.16));
 		transition:
 			opacity 0.35s ease,
-			transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-			top 0s,
-			left 0s;
+			transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 	}
 
 	.peek-sticker--hero {
@@ -56,68 +54,10 @@ const { size = 'nav' } = Astro.props;
 		}
 	}
 
-	/*
-	  Left is the reference (leave it).
-	  Top/bottom: stay upright, park near that edge, nudge only a little so
-	  just the head clears — no upside-down flips.
-	  Right: same as left but shorter travel (was overshooting).
-	*/
-	.peek-sticker[data-edge='left'],
-	.peek-sticker[data-edge='right'] {
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%) rotate(0deg);
-	}
-
-	.peek-sticker[data-edge='top'] {
-		top: 36%;
-		left: 50%;
-		transform: translate(-50%, -50%) rotate(0deg);
-	}
-	.peek-sticker[data-edge='bottom'] {
-		top: 64%;
-		left: 50%;
-		transform: translate(-50%, -50%) rotate(0deg);
-	}
-
-	/* top — upright, short nudge up */
-	.peek-sticker--nav[data-edge='top'].is-out {
+	/* Half the sticker above the logo top edge. */
+	.peek-sticker.is-out {
 		opacity: 1;
-		transform: translate(-50%, calc(-50% - 0.42rem)) rotate(0deg);
-	}
-	.peek-sticker--hero[data-edge='top'].is-out {
-		opacity: 1;
-		transform: translate(-50%, calc(-50% - 1.35rem)) rotate(0deg);
-	}
-
-	/* bottom — upright, short nudge down */
-	.peek-sticker--nav[data-edge='bottom'].is-out {
-		opacity: 1;
-		transform: translate(-50%, calc(-50% + 0.42rem)) rotate(0deg);
-	}
-	.peek-sticker--hero[data-edge='bottom'].is-out {
-		opacity: 1;
-		transform: translate(-50%, calc(-50% + 1.35rem)) rotate(0deg);
-	}
-
-	/* left — unchanged */
-	.peek-sticker--nav[data-edge='left'].is-out {
-		opacity: 1;
-		transform: translate(-1.05rem, -50%) rotate(0deg);
-	}
-	.peek-sticker--hero[data-edge='left'].is-out {
-		opacity: 1;
-		transform: translate(calc(-1 * min(5.6rem, 19vw)), -50%) rotate(0deg);
-	}
-
-	/* right — shorter than left */
-	.peek-sticker--nav[data-edge='right'].is-out {
-		opacity: 1;
-		transform: translate(0.72rem, -50%) rotate(0deg);
-	}
-	.peek-sticker--hero[data-edge='right'].is-out {
-		opacity: 1;
-		transform: translate(min(3.9rem, 13vw), -50%) rotate(0deg);
+		transform: translate(-50%, -50%);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -128,17 +68,10 @@ const { size = 'nav' } = Astro.props;
 </style>
 
 <script>
-	const EDGES = ['bottom', 'top', 'left', 'right'];
 	const PEEK_MS = 3000;
 	const CYCLE_MS = 10000;
 
-	function nextEdge(prev) {
-		const pool = prev ? EDGES.filter((e) => e !== prev) : EDGES.slice();
-		return pool[Math.floor(Math.random() * pool.length)];
-	}
-
 	function startPeek(el, delay) {
-		let prev = null;
 		let outTimer = 0;
 		let cycleTimer = 0;
 
@@ -147,9 +80,6 @@ const { size = 'nav' } = Astro.props;
 		};
 
 		const show = () => {
-			const edge = nextEdge(prev);
-			prev = edge;
-			el.dataset.edge = edge;
 			el.classList.remove('is-out');
 			void el.offsetWidth;
 			el.classList.add('is-out');
