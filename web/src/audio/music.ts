@@ -68,7 +68,7 @@ let playEpoch = 0;
 
 function trackUrl(file: string): string {
   // Bust HTTP caches so phones pick up re-leveled cyber beds.
-  return `./music/${file}?v=9`;
+  return `./music/${file}?v=10`;
 }
 
 function artworkUrl(file: string): string {
@@ -415,7 +415,7 @@ function loadManifest(): Promise<void> {
   if (manifestPromise) return manifestPromise;
   manifestPromise = (async () => {
     try {
-      const res = await fetch("./music/playlist.json?v=9", { cache: "no-cache" });
+      const res = await fetch("./music/playlist.json?v=10", { cache: "no-cache" });
       if (!res.ok) return;
       const data = (await res.json()) as PlaylistManifest;
       const clean = (list: unknown): string[] =>

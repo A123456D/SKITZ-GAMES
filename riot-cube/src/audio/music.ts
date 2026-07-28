@@ -53,7 +53,7 @@ function readStoredVol(): number {
 }
 
 function trackUrl(file: string): string {
-  return `./music/${file}?v=1`;
+  return `./music/${file}?v=2`;
 }
 
 function shuffleInPlace(list: string[]): void {
@@ -282,7 +282,7 @@ async function ensureManifest(): Promise<void> {
   if (manifestPromise) return manifestPromise;
   manifestPromise = (async () => {
     try {
-      const res = await fetch("./music/playlist.json?v=1");
+      const res = await fetch("./music/playlist.json?v=2");
       if (!res.ok) return;
       const data = (await res.json()) as PlaylistManifest;
       allTracks = (data.tracks ?? []).filter(Boolean);

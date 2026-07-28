@@ -133,12 +133,12 @@ function tornPaperRect(
 /**
  * Backgrounds are static per theme but cost several full-screen gradients (and
  * ~35 strokes for retro's grid), so they are painted once into a cache canvas
- * and blitted every frame. CYBER adds cheap animated overlays on top of the blit.
+ * and blitted every frame. Cyber / retro stay static (no per-frame motion).
  */
 let bgCache: HTMLCanvasElement | null = null;
 let bgCacheTheme = "";
 
-export function drawBackground(ctx: CanvasRenderingContext2D, time = 0): void {
+export function drawBackground(ctx: CanvasRenderingContext2D, _time = 0): void {
   const theme = getThemeId();
   ensureThemeArt(theme);
   const pal = paletteKey();
@@ -151,8 +151,6 @@ export function drawBackground(ctx: CanvasRenderingContext2D, time = 0): void {
     const bctx = bgCache.getContext("2d");
     if (!bctx) {
       paintBackground(ctx, theme);
-      if (theme === "mono") paintCyberMotion(ctx, time);
-      if (theme === "retro") paintRetroMotion(ctx, time);
       return;
     }
     bctx.clearRect(0, 0, W, H);
@@ -160,8 +158,6 @@ export function drawBackground(ctx: CanvasRenderingContext2D, time = 0): void {
     bgCacheTheme = `${theme}|${pal}`;
   }
   ctx.drawImage(bgCache, 0, 0);
-  if (theme === "mono") paintCyberMotion(ctx, time);
-  if (theme === "retro") paintRetroMotion(ctx, time);
 }
 
 function paintBackground(ctx: CanvasRenderingContext2D, theme: ThemeId): void {
@@ -554,129 +550,6 @@ function paintCyberHud(ctx: CanvasRenderingContext2D): void {
 }
 
 /**
- * Per-frame CYBER motion — red pulse, scan, floor crawl on the black terminal.
- * Kept soft and edge-weighted so the puzzle board stays readable.
- */
-function paintCyberMotion(ctx: CanvasRenderingContext2D, time: number): void {
-  const horizon = H * 0.42;
-  const vx = W * 0.5;
-  const pulse = 0.5 + 0.5 * Math.sin(time * 1.7);
-  const pulse2 = 0.5 + 0.5 * Math.sin(time * 2.3 + 1.1);
-
-  ctx.save();
-
-  // Breathing red core behind the board.
-  const glowR = W * (0.28 + pulse * 0.08);
-  const glow = ctx.createRadialGradient(vx, H * 0.48, 0, vx, H * 0.48, glowR);
-  glow.addColorStop(0, `rgba(255, 42, 42, ${0.1 + pulse * 0.1})`);
-  glow.addColorStop(0.45, `rgba(255, 42, 42, ${0.04 + pulse * 0.04})`);
-  glow.addColorStop(1, "rgba(255, 42, 42, 0)");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, H * 0.48 - glowR, W, glowR * 2);
-
-  // Soft horizon shimmer.
-  ctx.globalAlpha = 0.2 + pulse2 * 0.25;
-  ctx.strokeStyle = "#FF2A2A";
-  ctx.lineWidth = 1.2;
-  ctx.shadowColor = "#FF2A2A";
-  ctx.shadowBlur = 8;
-  ctx.beginPath();
-  ctx.moveTo(W * 0.18, horizon);
-  ctx.lineTo(W * 0.82, horizon);
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-
-  // Perspective floor lines crawling toward the camera.
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, horizon, W, H - horizon);
-  ctx.clip();
-  const scroll = ((time * 0.35) % 1 + 1) % 1;
-  ctx.strokeStyle = "#FF2A2A";
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 9; i++) {
-    const u = (i + scroll) / 9;
-    const y = horizon + (H - horizon) * (u * u);
-    ctx.globalAlpha = 0.08 + (1 - u) * 0.18;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(W, y);
-    ctx.stroke();
-  }
-  const rayShift = Math.sin(time * 0.4) * 0.04;
-  for (let i = 0; i <= 10; i++) {
-    const t = i / 10 + rayShift;
-    const x0 = t * W;
-    ctx.globalAlpha = 0.06 + (1 - Math.abs(t - 0.5) * 2) * 0.08;
-    ctx.beginPath();
-    ctx.moveTo(x0, H);
-    ctx.lineTo(vx + (x0 - vx) * 0.08, horizon);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // Vertical scan band drifting down the frame.
-  const scanY = ((time * 90) % (H + 160)) - 80;
-  const scan = ctx.createLinearGradient(0, scanY - 40, 0, scanY + 40);
-  scan.addColorStop(0, "rgba(255, 42, 42, 0)");
-  scan.addColorStop(0.5, "rgba(255, 42, 42, 0.07)");
-  scan.addColorStop(1, "rgba(255, 42, 42, 0)");
-  ctx.fillStyle = scan;
-  ctx.fillRect(0, scanY - 40, W, 80);
-
-  // Fine CRT scanlines — desktop only (hundreds of fillRects hurt mobile GPUs).
-  if (!prefersLiteMotion()) {
-    ctx.globalAlpha = 0.045;
-    ctx.fillStyle = "#FF2A2A";
-    const lineOff = Math.floor(time * 28) % 3;
-    for (let y = lineOff; y < H; y += 3) {
-      ctx.fillRect(0, y, W, 1);
-    }
-  }
-
-  // Corner bracket pulse — red ticks breathe.
-  const m = 18;
-  const armPulse = 16 + pulse * 10;
-  ctx.lineCap = "square";
-  ctx.strokeStyle = "#FF2A2A";
-  ctx.lineWidth = 1.8;
-  ctx.globalAlpha = 0.45 + pulse * 0.45;
-  if (!prefersLiteMotion()) {
-    ctx.shadowColor = "#FF2A2A";
-    ctx.shadowBlur = 6;
-  }
-  const corners: [number, number, number, number][] = [
-    [m, m, 1, 1],
-    [W - m, m, -1, 1],
-    [m, H - m, 1, -1],
-    [W - m, H - m, -1, -1],
-  ];
-  for (const [bx, by, sx, sy] of corners) {
-    ctx.beginPath();
-    ctx.moveTo(bx + sx * armPulse, by + sy * 6);
-    ctx.lineTo(bx + sx * 6, by + sy * 6);
-    ctx.lineTo(bx + sx * 6, by + sy * armPulse);
-    ctx.stroke();
-  }
-  ctx.shadowBlur = 0;
-
-  // Occasional edge "data ticks" that blink.
-  ctx.fillStyle = "#FF2A2A";
-  for (let i = 0; i < 6; i++) {
-    const phase = (time * 1.4 + i * 0.9) % (Math.PI * 2);
-    const on = Math.sin(phase) > 0.35 ? 0.65 : 0.12;
-    ctx.globalAlpha = on;
-    const top = i < 3;
-    const x = 70 + i * 105 + Math.sin(time * 0.7 + i) * 6;
-    const y = top ? 28 : H - 30;
-    ctx.fillRect(x, y, 14, 2);
-    ctx.fillRect(x, y, 2, 8 * (top ? 1 : -1));
-  }
-
-  ctx.restore();
-}
-
-/**
  * Coarse pointers / small viewports: skip the GPU-heavy motion extras
  * (shadowBlur, dense scanlines) while keeping the same animated look.
  */
@@ -697,194 +570,6 @@ function prefersLiteMotion(): boolean {
   return lite;
 }
 
-let retroGlowCache: HTMLCanvasElement | null = null;
-let retroScanCache: HTMLCanvasElement | null = null;
-
-/** Cached radial sun-glow sprite (drawn scaled + alpha'd per frame). */
-function retroGlowStrip(): HTMLCanvasElement {
-  if (retroGlowCache) return retroGlowCache;
-  const size = 256;
-  const c = document.createElement("canvas");
-  c.width = size;
-  c.height = size;
-  const g = c.getContext("2d")!;
-  const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  grad.addColorStop(0, "rgba(255, 110, 199, 0.18)");
-  grad.addColorStop(0.4, "rgba(199, 125, 255, 0.08)");
-  grad.addColorStop(1, "rgba(255, 110, 199, 0)");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, size, size);
-  retroGlowCache = c;
-  return c;
-}
-
-/** Cached CRT scan band strip (stretched to full width per frame). */
-function retroScanStrip(): HTMLCanvasElement {
-  if (retroScanCache) return retroScanCache;
-  const c = document.createElement("canvas");
-  c.width = 4;
-  c.height = 100;
-  const g = c.getContext("2d")!;
-  const grad = g.createLinearGradient(0, 0, 0, 100);
-  grad.addColorStop(0, "rgba(92, 255, 248, 0)");
-  grad.addColorStop(0.5, "rgba(255, 110, 199, 0.05)");
-  grad.addColorStop(1, "rgba(92, 255, 248, 0)");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 4, 100);
-  retroScanCache = c;
-  return c;
-}
-
-/**
- * Per-frame RETRO motion — synth sun breathe, grid crawl, star twinkle, CRT wash.
- * Soft and edge-weighted so the board stays readable.
- * On coarse/mobile pointers we drop shadowBlur + dense scanlines (GPU killers)
- * while keeping the same glow, stars, and crawling grid look.
- */
-function paintRetroMotion(ctx: CanvasRenderingContext2D, time: number): void {
-  const horizon = H * 0.52;
-  const vx = W * 0.5;
-  const pulse = 0.5 + 0.5 * Math.sin(time * 1.55);
-  const pulse2 = 0.5 + 0.5 * Math.sin(time * 2.1 + 0.8);
-  const lite = prefersLiteMotion();
-
-  ctx.save();
-
-  // Twinkling stars in the upper sky (deterministic positions).
-  const starCount = lite ? 14 : 28;
-  for (let i = 0; i < starCount; i++) {
-    const sx = ((i * 97 + 41) % 1000) / 1000;
-    const sy = ((i * 53 + 17) % 1000) / 1000;
-    const x = 24 + sx * (W - 48);
-    const y = 28 + sy * (horizon - 70);
-    const twinkle = 0.5 + 0.5 * Math.sin(time * (1.2 + (i % 5) * 0.35) + i * 0.7);
-    const a = 0.15 + twinkle * 0.55;
-    const r = 0.8 + (i % 3) * 0.55 + twinkle * 0.4;
-    ctx.globalAlpha = a;
-    ctx.fillStyle = i % 4 === 0 ? "#5CFFF8" : i % 4 === 1 ? "#FF9DE0" : "#FFFFFF";
-    if (lite) {
-      // Tiny squares are much cheaper than arcs on mobile GPUs.
-      ctx.fillRect(x - r, y - r, r * 2, r * 2);
-    } else {
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  // Breathing magenta/violet sun glow on the horizon. The gradient is baked
-  // once into a strip; per-frame createRadialGradient allocations stuttered
-  // mobile browsers, so we scale + alpha the cached strip instead.
-  const glowR = W * (0.3 + pulse * 0.1);
-  const glowStrip = retroGlowStrip();
-  ctx.globalAlpha = 0.55 + pulse * 0.45;
-  ctx.drawImage(glowStrip, vx - glowR, horizon - glowR, glowR * 2, glowR * 2);
-
-  // Neon horizon shimmer — magenta core, cyan lips.
-  ctx.globalAlpha = 0.25 + pulse2 * 0.35;
-  ctx.strokeStyle = "#FF6EC7";
-  ctx.lineWidth = 2.2;
-  if (!lite) {
-    ctx.shadowColor = "#FF6EC7";
-    ctx.shadowBlur = 12 + pulse * 10;
-  }
-  ctx.beginPath();
-  ctx.moveTo(W * 0.12, horizon);
-  ctx.lineTo(W * 0.88, horizon);
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-  ctx.globalAlpha = 0.35 + pulse * 0.3;
-  ctx.strokeStyle = "#5CFFF8";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(W * 0.28, horizon);
-  ctx.lineTo(W * 0.72, horizon);
-  ctx.stroke();
-
-  // Perspective floor lines crawling toward the camera.
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, horizon, W, H - horizon);
-  ctx.clip();
-  const scroll = ((time * 0.42) % 1 + 1) % 1;
-  const floorLines = lite ? 6 : 10;
-  ctx.strokeStyle = "#FF6EC7";
-  ctx.lineWidth = 1.15;
-  for (let i = 0; i < floorLines; i++) {
-    const u = (i + scroll) / floorLines;
-    const y = horizon + (H - horizon) * Math.pow(u, 1.55);
-    ctx.globalAlpha = 0.08 + (1 - u) * 0.28;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(W, y);
-    ctx.stroke();
-  }
-  // Subtle ray sway so the grid feels alive.
-  const rayShift = Math.sin(time * 0.35) * 0.035;
-  const rayCount = lite ? 8 : 12;
-  ctx.strokeStyle = "#C77DFF";
-  for (let i = 0; i <= rayCount; i++) {
-    const t = i / rayCount + rayShift;
-    const x0 = t * W;
-    ctx.globalAlpha = 0.06 + (1 - Math.abs(t - 0.5) * 2) * 0.1;
-    ctx.beginPath();
-    ctx.moveTo(x0, H);
-    ctx.lineTo(vx + (x0 - vx) * 0.06, horizon);
-    ctx.stroke();
-  }
-  // Center vanishing ray — cyan pulse.
-  ctx.globalAlpha = 0.2 + pulse * 0.25;
-  ctx.strokeStyle = "#5CFFF8";
-  ctx.lineWidth = 1.3;
-  ctx.beginPath();
-  ctx.moveTo(vx, horizon);
-  ctx.lineTo(vx, H);
-  ctx.stroke();
-  ctx.restore();
-
-  // Soft CRT scan band drifting down (cached strip — no per-frame gradient).
-  const scanY = ((time * 70) % (H + 180)) - 90;
-  ctx.globalAlpha = 1;
-  ctx.drawImage(retroScanStrip(), 0, scanY - 50, W, 100);
-
-  // Fine scanlines — desktop only (hundreds of fillRects kill mobile GPUs).
-  if (!lite) {
-    ctx.globalAlpha = 0.035;
-    ctx.fillStyle = "#5CFFF8";
-    const lineOff = Math.floor(time * 22) % 3;
-    for (let y = lineOff; y < H; y += 3) {
-      ctx.fillRect(0, y, W, 1);
-    }
-  }
-
-  // Neon corner ticks that breathe.
-  const m = 28;
-  const arm = 12 + pulse * 10;
-  ctx.lineCap = "square";
-  ctx.lineWidth = 1.7;
-  ctx.globalAlpha = 0.45 + pulse * 0.4;
-  const corners: [number, number, number, number, string][] = [
-    [m, m, 1, 1, "#5CFFF8"],
-    [W - m, m, -1, 1, "#FF6EC7"],
-    [m, H - m, 1, -1, "#FF6EC7"],
-    [W - m, H - m, -1, -1, "#5CFFF8"],
-  ];
-  for (const [bx, by, sx, sy, col] of corners) {
-    ctx.strokeStyle = col;
-    if (!lite) {
-      ctx.shadowColor = col;
-      ctx.shadowBlur = 6;
-    }
-    ctx.beginPath();
-    ctx.moveTo(bx + sx * arm, by + sy * 5);
-    ctx.lineTo(bx + sx * 5, by + sy * 5);
-    ctx.lineTo(bx + sx * 5, by + sy * arm);
-    ctx.stroke();
-  }
-  ctx.shadowBlur = 0;
-
-  ctx.restore();
-}
 
 export function drawHairlineGrid(ctx: CanvasRenderingContext2D, state: GridState, layout: Layout): void {
   const theme = getThemeId();

@@ -2,7 +2,7 @@
   "name": "skitz-website",
   "type": "module",
   "version": "0.1.0",
-  "description": "SKITZ games & apps — Pulsefold and more",
+  "description": "SKITZ games & apps — Pulse Fold and more",
   "engines": {
     "node": ">=22.12.0"
   },
