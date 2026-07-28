@@ -1,7 +1,7 @@
 ---
 title: Pulse Link
 tagline: Turn. Link. Pulse.
-summary: Turn precision wheels to aim lasers into receivers. Freemium — free in the browser, install on Android.
+summary: Turn discs to close one circuit, then pulse to check the network. Free in the browser, install on Android.
 cover: /images/pulse-link-logo.png
 screenshots: []
 featured: true
@@ -18,6 +18,6 @@ webPlayPath: web/index.html
 downloads: {}
 ---
 
-Pulse Link is a mobile-first laser puzzle from SKITZ: **tap a wheel**, turn **↺ / ↻**, and reconnect cyan beams until every receiver lights.
+Pulse Link is a SKITZ circuit puzzle: **tap a disc**, turn it to close every open end, and **pulse** when the board is one connected network. Later desks add geared discs, row shifts, and board turns — same goal, denser boards.
 
-Play free in the browser, or install on Android from Chrome (menu → Install app). Core levels stay free; any later extras are optional support.
+**Free to play** online. **Free to install** on Android via Chrome (Install app).

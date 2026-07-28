@@ -66,25 +66,15 @@ const { title, summary, tagline, cover, platforms, downloads, appStoreUrl, playS
 			</div>
 		</section>
 
-		<section class="section freemium">
+		<section class="section free-note">
 			<div class="wrap">
-				<p class="eyebrow">freemium</p>
-				<h2 class="section-title">Play free. Tip if you want.</h2>
-				<div class="freemium-grid">
-					<div class="sticker freemium-card">
-						<h3>Free forever core</h3>
-						<p>
-							Full web play, Android install from Chrome, and the main puzzle loop — no account
-							wall, no forced ads to start.
-						</p>
-					</div>
-					<div class="sticker freemium-card freemium-card--tilt">
-						<h3>Optional extras</h3>
-						<p>
-							Cosmetics, tip jars, or later DLC-style packs may show up. They never gate the
-							base game — support is optional.
-						</p>
-					</div>
+				<p class="eyebrow">free</p>
+				<h2 class="section-title">Play free. Install free.</h2>
+				<div class="sticker free-card">
+					<p>
+						Full web play, Android install from Chrome, and the whole puzzle loop — no account
+						wall, no paywall on the desks.
+					</p>
 				</div>
 			</div>
 		</section>
@@ -172,42 +162,17 @@ const { title, summary, tagline, cover, platforms, downloads, appStoreUrl, playS
 		font-family: var(--font-type);
 	}
 
-	.freemium-grid {
-		display: grid;
-		gap: 1rem;
+	.free-card {
+		padding: 1.35rem 1.25rem 1.2rem;
+		max-width: 36rem;
+		transform: rotate(-0.8deg);
 		margin-top: 0.5rem;
 	}
 
-	@media (min-width: 720px) {
-		.freemium-grid {
-			grid-template-columns: 1fr 1fr;
-			gap: 1.25rem;
-		}
-	}
-
-	.freemium-card {
-		padding: 1.35rem 1.25rem 1.2rem;
-		transform: rotate(-0.8deg);
-	}
-
-	.freemium-card--tilt {
-		transform: rotate(1deg);
-		box-shadow: 7px 8px 0 var(--skitz-blue);
-	}
-
-	.freemium-card h3 {
-		font-family: var(--font-type);
-		font-size: 1.15rem;
-		text-transform: none;
-		letter-spacing: 0;
-		margin: 0 0 0.55rem;
-		color: var(--mark);
-	}
-
-	.freemium-card p {
+	.free-card p {
 		margin: 0;
 		font-family: var(--font-type);
 		color: var(--mark);
-		font-size: 1.02rem;
+		font-size: 1.05rem;
 	}
 </style>
