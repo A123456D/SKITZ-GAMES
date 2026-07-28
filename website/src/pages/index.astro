@@ -84,25 +84,26 @@ const games = (await getCollection('games'))
 		isolation: isolate;
 		overflow: visible;
 		animation: slap-in 700ms var(--ease) both;
-		/* Room for the peek sticking out past the mark. */
-		padding: 1.5rem 2.5rem 2.75rem;
-		margin: -1.5rem -1.5rem -1.25rem;
+		padding: 0.85rem 1.4rem 1.6rem;
+		margin: -0.6rem -0.6rem -0.4rem;
 	}
 
 	.hero__peek {
 		position: absolute;
 		z-index: 0;
-		width: min(210px, 46vw);
+		width: min(108px, 26vw);
 		height: auto;
 		pointer-events: none;
 		user-select: none;
 		/* Peek from the lower-left under the mark. */
-		left: 4%;
-		bottom: -2%;
-		transform: rotate(-8deg);
-		filter: drop-shadow(4px 8px 0 rgba(22, 19, 16, 0.18));
-		animation: peek-bob 3.6s ease-in-out 200ms infinite;
-		will-change: transform;
+		left: 10%;
+		bottom: 8%;
+		transform: rotate(-8deg) translate(-18%, 70%);
+		opacity: 0;
+		filter: drop-shadow(3px 5px 0 rgba(22, 19, 16, 0.16));
+		/* Visible 3s of every 10s cycle. */
+		animation: hero-peek-cycle 10s ease-in-out infinite;
+		will-change: transform, opacity;
 	}
 
 	.hero__logo {
@@ -118,14 +119,14 @@ const games = (await getCollection('games'))
 
 	@media (max-width: 520px) {
 		.hero__logo-wrap {
-			padding: 1.1rem 1.4rem 2.1rem;
-			margin: -0.8rem -0.6rem -0.6rem;
+			padding: 0.65rem 0.9rem 1.25rem;
+			margin: -0.4rem -0.3rem -0.2rem;
 		}
 
 		.hero__peek {
-			width: min(150px, 42vw);
-			left: -2%;
-			bottom: -4%;
+			width: min(84px, 22vw);
+			left: 6%;
+			bottom: 6%;
 		}
 	}
 
@@ -139,10 +140,6 @@ const games = (await getCollection('games'))
 		.hero__logo-wrap:hover .hero__logo {
 			animation: logo-hover-strong 3.4s ease-in-out infinite;
 			filter: drop-shadow(12px 20px 0 rgba(22, 19, 16, 0.28));
-		}
-
-		.hero__logo-wrap:hover .hero__peek {
-			animation: peek-bob-strong 3.6s ease-in-out infinite;
 		}
 	}
 
@@ -166,23 +163,22 @@ const games = (await getCollection('games'))
 		}
 	}
 
-	@keyframes peek-bob {
+	/* 10s loop: tuck → peek (~0.4s) → hold to 3s → tuck → wait. */
+	@keyframes hero-peek-cycle {
 		0%,
+		2% {
+			opacity: 0;
+			transform: rotate(-8deg) translate(-18%, 70%);
+		}
+		6%,
+		30% {
+			opacity: 1;
+			transform: rotate(-8deg) translate(0, 0);
+		}
+		34%,
 		100% {
-			transform: rotate(-8deg) translateY(0);
-		}
-		50% {
-			transform: rotate(-8deg) translateY(-6px);
-		}
-	}
-
-	@keyframes peek-bob-strong {
-		0%,
-		100% {
-			transform: rotate(-6deg) translateY(-2px);
-		}
-		50% {
-			transform: rotate(-6deg) translateY(-10px);
+			opacity: 0;
+			transform: rotate(-8deg) translate(-18%, 70%);
 		}
 	}
 

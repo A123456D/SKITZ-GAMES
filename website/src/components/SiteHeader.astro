@@ -70,25 +70,26 @@ const links = [
 		transform: rotate(-1.5deg);
 		overflow: visible;
 		isolation: isolate;
-		/* Let the peek stick out past the mark without eating nav space. */
-		padding-right: 0.85rem;
-		margin-right: -0.35rem;
+		padding-right: 0.45rem;
+		margin-right: -0.15rem;
 	}
 
 	.logo__peek {
 		position: absolute;
 		z-index: 0;
-		height: 3.55rem;
+		height: 1.85rem;
 		width: auto;
 		pointer-events: none;
 		user-select: none;
 		/* Peek from the upper-right — opposite side from the home hero. */
-		right: -0.55rem;
-		top: -0.85rem;
-		transform: rotate(7deg);
-		filter: drop-shadow(2px 3px 0 rgba(22, 19, 16, 0.16));
-		animation: nav-peek-bob 3.4s ease-in-out infinite;
-		will-change: transform;
+		right: -0.15rem;
+		top: -0.35rem;
+		transform: rotate(7deg) translate(35%, -55%);
+		opacity: 0;
+		filter: drop-shadow(2px 2px 0 rgba(22, 19, 16, 0.14));
+		/* Same 3s / 10s cadence, offset so nav peeks between hero peeks. */
+		animation: nav-peek-cycle 10s ease-in-out 5s infinite;
+		will-change: transform, opacity;
 	}
 
 	.logo__mark {
@@ -103,13 +104,13 @@ const links = [
 
 	@media (max-width: 520px) {
 		.logo {
-			padding-right: 0.55rem;
+			padding-right: 0.3rem;
 		}
 
 		.logo__peek {
-			height: 2.85rem;
-			right: -0.35rem;
-			top: -0.65rem;
+			height: 1.55rem;
+			right: -0.05rem;
+			top: -0.25rem;
 		}
 
 		.logo__mark {
@@ -129,10 +130,6 @@ const links = [
 		.logo:hover .logo__mark {
 			animation: nav-logo-hover-strong 3.4s ease-in-out infinite;
 			filter: drop-shadow(4px 7px 0 rgba(22, 19, 16, 0.24));
-		}
-
-		.logo:hover .logo__peek {
-			animation: nav-peek-bob-strong 3.4s ease-in-out infinite;
 		}
 	}
 
@@ -156,23 +153,21 @@ const links = [
 		}
 	}
 
-	@keyframes nav-peek-bob {
+	@keyframes nav-peek-cycle {
 		0%,
+		2% {
+			opacity: 0;
+			transform: rotate(7deg) translate(35%, -55%);
+		}
+		6%,
+		30% {
+			opacity: 1;
+			transform: rotate(7deg) translate(0, 0);
+		}
+		34%,
 		100% {
-			transform: rotate(7deg) translateY(0);
-		}
-		50% {
-			transform: rotate(7deg) translateY(-3px);
-		}
-	}
-
-	@keyframes nav-peek-bob-strong {
-		0%,
-		100% {
-			transform: rotate(5deg) translateY(-1px);
-		}
-		50% {
-			transform: rotate(5deg) translateY(-6px);
+			opacity: 0;
+			transform: rotate(7deg) translate(35%, -55%);
 		}
 	}
 
