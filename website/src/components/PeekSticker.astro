@@ -54,54 +54,51 @@ const { size = 'nav' } = Astro.props;
 		}
 	}
 
-	/* Tucked at center (opacity 0). Out slides past that edge with matching spin.
-	   Travel uses rem/vw so the hero clears the large mark ( %-of-self was too short ). */
-	.peek-sticker[data-edge='bottom'] {
+	/*
+	  Always upright. Slide just far enough that only part of the head clears
+	  the painted sticker (the PNG has empty padding, so full-box travel overshoots).
+	*/
+	.peek-sticker[data-edge='bottom'],
+	.peek-sticker[data-edge='top'],
+	.peek-sticker[data-edge='left'],
+	.peek-sticker[data-edge='right'] {
 		transform: translate(-50%, -50%) rotate(0deg);
 	}
+
 	.peek-sticker--nav[data-edge='bottom'].is-out {
 		opacity: 1;
-		transform: translate(-50%, 1.15rem) rotate(0deg);
+		transform: translate(-50%, 0.72rem) rotate(0deg);
 	}
 	.peek-sticker--hero[data-edge='bottom'].is-out {
 		opacity: 1;
-		transform: translate(-50%, min(10.5rem, 36vw)) rotate(0deg);
+		transform: translate(-50%, min(5.1rem, 17vw)) rotate(0deg);
 	}
 
-	.peek-sticker[data-edge='top'] {
-		transform: translate(-50%, -50%) rotate(180deg);
-	}
 	.peek-sticker--nav[data-edge='top'].is-out {
 		opacity: 1;
-		transform: translate(-50%, -1.15rem) rotate(180deg);
+		transform: translate(-50%, -0.72rem) rotate(0deg);
 	}
 	.peek-sticker--hero[data-edge='top'].is-out {
 		opacity: 1;
-		transform: translate(-50%, calc(-1 * min(10.5rem, 36vw))) rotate(180deg);
+		transform: translate(-50%, calc(-1 * min(5.1rem, 17vw))) rotate(0deg);
 	}
 
-	.peek-sticker[data-edge='left'] {
-		transform: translate(-50%, -50%) rotate(-90deg);
-	}
 	.peek-sticker--nav[data-edge='left'].is-out {
 		opacity: 1;
-		transform: translate(-1.55rem, -50%) rotate(-90deg);
+		transform: translate(-1.05rem, -50%) rotate(0deg);
 	}
 	.peek-sticker--hero[data-edge='left'].is-out {
 		opacity: 1;
-		transform: translate(calc(-1 * min(12rem, 40vw)), -50%) rotate(-90deg);
+		transform: translate(calc(-1 * min(5.6rem, 19vw)), -50%) rotate(0deg);
 	}
 
-	.peek-sticker[data-edge='right'] {
-		transform: translate(-50%, -50%) rotate(90deg);
-	}
 	.peek-sticker--nav[data-edge='right'].is-out {
 		opacity: 1;
-		transform: translate(1.55rem, -50%) rotate(90deg);
+		transform: translate(1.05rem, -50%) rotate(0deg);
 	}
 	.peek-sticker--hero[data-edge='right'].is-out {
 		opacity: 1;
-		transform: translate(min(12rem, 40vw), -50%) rotate(90deg);
+		transform: translate(min(5.6rem, 19vw), -50%) rotate(0deg);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
