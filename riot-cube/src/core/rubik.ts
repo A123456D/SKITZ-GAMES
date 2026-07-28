@@ -8,8 +8,10 @@ export const L = 3;
 export const U = 4;
 export const D = 5;
 
-/** Stickers are color ids 0..5 (solved face color). */
-export type ColorId = 0 | 1 | 2 | 3 | 4 | 5;
+/** Stickers are color ids 0..5 (solved face color). 6 = CLEAR-mode occupy. */
+export type ColorId = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+/** Black occupy sticker used when a face is cleared in CLEAR mode. */
+export const OCCUPY = 6 as ColorId;
 export type FaceGrid = ColorId[][];
 export type CubeState = {
   size: number;
@@ -61,6 +63,27 @@ export function isFaceUniform(face: FaceGrid): boolean {
     }
   }
   return true;
+}
+
+/** Uniform real stickers (not occupy) — eligible to clear in CLEAR mode. */
+export function isFaceClearable(face: FaceGrid): boolean {
+  if (!isFaceUniform(face)) return false;
+  const c = face[0]![0]!;
+  return c !== OCCUPY;
+}
+
+/** Paint every cell on a face with one color (mutates). */
+export function fillFaceColor(
+  cube: CubeState,
+  face: FaceId,
+  color: ColorId,
+): void {
+  const g = cube.faces[face]!;
+  for (let r = 0; r < cube.size; r++) {
+    for (let c = 0; c < cube.size; c++) {
+      g[r]![c] = color;
+    }
+  }
 }
 
 /** First face that is not uniform in its solved color, or null if solved. */

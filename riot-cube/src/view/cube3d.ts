@@ -1,4 +1,5 @@
 import type { ColorId, CubeState, FaceId } from "../core/rubik";
+import { OCCUPY } from "../core/rubik";
 import { stickerForColor, type TileKind } from "../core/stickers";
 import { lanePreview } from "../core/lane";
 import type { HintMove } from "../core/hint";
@@ -650,7 +651,7 @@ function drawFace(
     const s1 = facePointLifted(geom, corners[1]!.u, corners[1]!.v, lift, layout);
     const s2 = facePointLifted(geom, corners[2]!.u, corners[2]!.v, lift, layout);
     const s3 = facePointLifted(geom, corners[3]!.u, corners[3]!.v, lift, layout);
-    if (cleared) {
+    if (cleared || colorId === OCCUPY) {
       drawOccupySticker(ctx, s0, s1, s2, s3, q);
       return;
     }

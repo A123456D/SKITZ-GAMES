@@ -1,13 +1,16 @@
 import {
   CUBE_SIZES,
   FACE_COUNT,
+  OCCUPY,
   type CubeSize,
   type CubeState,
   type FaceId,
   type TurnDir,
+  cloneCube,
   defaultScrambleMoves,
   faceTurn,
-  isFaceUniform,
+  fillFaceColor,
+  isFaceClearable,
   isSolved,
   mulberry32,
   scramble,
@@ -245,7 +248,10 @@ export function clearedFacesDisturbed(
   return false;
 }
 
-function markNewClears(session: Session, cube: CubeState): ClearedFaces {
+function markNewClears(
+  session: Session,
+  cube: CubeState,
+): { cleared: ClearedFaces; cube: CubeState } {
   const next = [...session.cleared] as [
     boolean,
     boolean,
@@ -254,20 +260,27 @@ function markNewClears(session: Session, cube: CubeState): ClearedFaces {
     boolean,
     boolean,
   ];
+  let nextCube = cube;
   for (let fi = 0; fi < FACE_COUNT; fi++) {
     if (next[fi]) continue;
-    if (isFaceUniform(cube.faces[fi]!)) next[fi] = true;
+    if (!isFaceClearable(cube.faces[fi]!)) continue;
+    next[fi] = true;
+    if (nextCube === cube) nextCube = cloneCube(cube);
+    fillFaceColor(nextCube, fi as FaceId, OCCUPY);
   }
-  return next;
+  return { cleared: next, cube: nextCube };
 }
 
 function afterMove(session: Session, cube: CubeState): Session {
   const moveCount = session.moveCount + 1;
   let cleared = session.cleared;
+  let nextCube = cube;
   let status: GameStatus = "playing";
 
   if (session.mode === "clear") {
-    cleared = markNewClears({ ...session, cube }, cube);
+    const marked = markNewClears({ ...session, cube }, cube);
+    cleared = marked.cleared;
+    nextCube = marked.cube;
     if (cleared.every(Boolean)) status = "solved";
     else if (session.moveLimit != null && moveCount >= session.moveLimit) {
       status = "lost";
@@ -278,7 +291,7 @@ function afterMove(session: Session, cube: CubeState): Session {
 
   return {
     ...session,
-    cube,
+    cube: nextCube,
     moveCount,
     cleared,
     status,

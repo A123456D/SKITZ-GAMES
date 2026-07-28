@@ -21,7 +21,7 @@ function withClearMode(s: Session): Session {
 }
 
 describe("clear mode", () => {
-  it("marks a face cleared when it becomes uniform", () => {
+  it("replaces cleared face stickers with occupy so slides pull black cells", () => {
     let s = withClearMode(startSession(2));
     s = {
       ...s,
@@ -32,7 +32,11 @@ describe("clear mode", () => {
     };
     s = applyFaceTurn(s, 0, 1);
     expect(s.cleared[0]).toBe(true);
-    expect(s.status).toBe("playing");
+    // Face 0 should now be occupy stickers, not the old solved color.
+    expect(s.cube.faces[0]![0]![0]).toBe(6);
+    expect(s.cube.faces[0]!.every((row) => row.every((c) => c === 6))).toBe(
+      true,
+    );
   });
 
   it("wins when the sixth face clears", () => {
