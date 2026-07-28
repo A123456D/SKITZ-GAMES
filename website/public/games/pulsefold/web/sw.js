@@ -1,5 +1,5 @@
 /* PulseFold — Android install / offline cache. */
-const CACHE = "pulsefold-v7";
+const CACHE = "pulsefold-v8";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
