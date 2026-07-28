@@ -153,14 +153,6 @@ function applyAnimeModeToggle(): void {
   sfxPaperRustle();
 }
 
-/** One-cell swipe only — hard-cap at ±1/n so previews stop on the next cell. */
-function clampLaneOffset(offsetUv: number, n: number): number {
-  const limit = 1 / Math.max(1, n);
-  if (offsetUv > limit) return limit;
-  if (offsetUv < -limit) return -limit;
-  return offsetUv;
-}
-
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
 
@@ -348,24 +340,19 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
   const amount = Math.max(1, twist.amount ?? 1);
   const n = session.size;
   const toUv = (twist.dir * amount) / n;
-  const sameDir =
-    fromUv === 0 || Math.sign(fromUv) === Math.sign(toUv);
-  // Drag already reached the one-cell target — commit now so stickers
-  // don't freeze parked on the face rim for the whole turn animation.
+  const sameDir = fromUv === 0 || Math.sign(fromUv) === Math.sign(toUv);
+  // Already dragged to (or past) the commit distance — land immediately.
   if (sameDir && Math.abs(fromUv) >= Math.abs(toUv) * 0.92) {
     session = applyTwist(session, { ...twist, amount });
     sfxPaperSlide();
     return;
   }
-  const from = sameDir
-    ? Math.sign(toUv) * Math.min(Math.abs(fromUv), Math.abs(toUv))
-    : 0;
   turnAnim = {
     kind: "lane",
     face: session.face,
     axis: twist.axis,
     index: twist.index,
-    fromUv: from,
+    fromUv: sameDir ? fromUv : 0,
     toUv,
     twist: { ...twist, amount },
     t: 0,
@@ -894,10 +881,7 @@ canvas.addEventListener(
       }
       sfxPaperRustle();
     }
-    drag.offsetUv = clampLaneOffset(
-      drag.axis === "row" ? du : dv,
-      session.size,
-    );
+    drag.offsetUv = drag.axis === "row" ? du : dv;
   },
   { passive: false },
 );
@@ -952,8 +936,7 @@ function endDrag(): void {
     return;
   }
   const dir: 1 | -1 = steps > 0 ? 1 : -1;
-  // One sticker per swipe — never a multi-cell jump / “full” lane rotation.
-  const amount = 1;
+  const amount = Math.min(n - 1, Math.abs(steps));
   springAxis = null;
   springIndex = -1;
   springUv = 0;
