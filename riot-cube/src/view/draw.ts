@@ -187,15 +187,10 @@ function drawAnimeModeButton(ctx: CanvasRenderingContext2D): void {
   ctx.fillText(dark ? "DARK" : "DAY", x + w / 2, y + h / 2 + 1);
 }
 
-export const VOL_BTN = { x: 656, y: 28, w: 42, h: 46 };
+export const VOL_BTN: UiRect = { x: 648, y: 20, w: 56, h: 58 };
 
 export function hitVolumeButton(x: number, y: number): boolean {
-  return (
-    x >= VOL_BTN.x &&
-    x <= VOL_BTN.x + VOL_BTN.w &&
-    y >= VOL_BTN.y &&
-    y <= VOL_BTN.y + VOL_BTN.h
-  );
+  return hitRect(VOL_BTN, x, y);
 }
 
 function drawVolumeButton(ctx: CanvasRenderingContext2D, vol: number): void {

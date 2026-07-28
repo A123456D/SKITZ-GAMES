@@ -125,6 +125,7 @@ import {
 import {
   cycleMusicVolume,
   getMusicVolume,
+  setMusicVolume,
   syncMusicForTheme,
   unlockMusic,
 } from "./audio/music";
@@ -221,6 +222,12 @@ function applyAnimeModeToggle(): void {
   toggleAnimeMode();
   applyThemeChange();
   sfxPaperRustle();
+}
+
+/** HUD speaker: cycle SFX + music together so mute actually silences the game. */
+function cycleHudVolume(): void {
+  const next = cycleSfxVolume();
+  setMusicVolume(next);
 }
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
@@ -1063,7 +1070,7 @@ canvas.addEventListener(
 
     if (session.status === "solved" || session.status === "lost") {
       if (hitVolumeButton(p.x, p.y)) {
-        cycleSfxVolume();
+        cycleHudVolume();
         return;
       }
       if (hitAnimeModeButton(p.x, p.y)) {
@@ -1092,16 +1099,16 @@ canvas.addEventListener(
       return;
     }
 
+    if (hitVolumeButton(p.x, p.y)) {
+      cycleHudVolume();
+      return;
+    }
     if (hitUiRect(MENU_BTN, p.x, p.y)) {
       drag = null;
       orbitDrag = null;
       rotating = false;
       screen = "menu";
       sfxPaperRustle();
-      return;
-    }
-    if (hitVolumeButton(p.x, p.y)) {
-      cycleSfxVolume();
       return;
     }
     if (hitAnimeModeButton(p.x, p.y)) {
