@@ -33,6 +33,7 @@ import {
   drawHomeScreen,
   drawHud,
   drawMenuButton,
+  drawModeEditorScreen,
   drawOrbitFinger,
   drawPauseMenu,
   drawPlayActions,
@@ -43,6 +44,7 @@ import {
   hitPlayHint,
   hitPlayScramble,
   hitPlayStickers,
+  hitMovesChip,
   hitRetry,
   hitSolvedHome,
   hitStickersGridKind,
@@ -61,6 +63,9 @@ import {
   HOME_PLAY,
   HOME_SETTINGS,
   MENU_BTN,
+  MODE_EDITOR_BACK,
+  MODE_EDITOR_MODE,
+  MODE_EDITOR_MOVES,
   PAUSE_HOME,
   PAUSE_HOW,
   PAUSE_RESUME,
@@ -209,11 +214,13 @@ type Screen =
   | "play"
   | "menu"
   | "settings"
+  | "modeEditor"
   | "stickers"
   | "themes"
   | "help";
 let screen: Screen = "home";
 let settingsFrom: Screen = "home";
+let modeEditorFrom: Screen = "play";
 let themesFrom: Screen = "settings";
 let helpFrom: Screen = "home";
 let helpPage = 0;
@@ -523,6 +530,23 @@ function openStickersPicker(): void {
   sfxPaperRustle();
 }
 
+function openModeEditor(from: Screen): void {
+  modeEditorFrom = from;
+  drag = null;
+  orbitDrag = null;
+  rotating = false;
+  screen = "modeEditor";
+  sfxPaperRustle();
+}
+
+/** Apply saved mode / move-limit prefs and start a fresh run. */
+function restartForModePrefs(): void {
+  session = startSession(session.size, activeStickerPool());
+  resetPlayVisuals();
+  syncActiveFace();
+  clearHint();
+}
+
 function openThemes(from: Screen): void {
   themesFrom = from;
   screen = "themes";
@@ -565,6 +589,13 @@ function paint(): void {
       modeLabel: modeLabel(loadGameMode()),
       moveLimitLabel: moveLimitLabel(loadMoveLimit()),
       hintsOn: getHintsEnabled(),
+    });
+    return;
+  }
+  if (screen === "modeEditor") {
+    drawModeEditorScreen(ctx, {
+      modeLabel: modeLabel(loadGameMode()),
+      moveLimitLabel: moveLimitLabel(loadMoveLimit()),
     });
     return;
   }
@@ -839,6 +870,27 @@ canvas.addEventListener(
       return;
     }
 
+    if (screen === "modeEditor") {
+      if (hitUiRect(MODE_EDITOR_MODE, p.x, p.y)) {
+        cycleGameMode(loadGameMode());
+        restartForModePrefs();
+        sfxPaperRustle();
+        return;
+      }
+      if (hitUiRect(MODE_EDITOR_MOVES, p.x, p.y)) {
+        cycleMoveLimit(loadMoveLimit());
+        restartForModePrefs();
+        sfxPaperRustle();
+        return;
+      }
+      if (hitUiRect(MODE_EDITOR_BACK, p.x, p.y)) {
+        screen = modeEditorFrom === "menu" ? "menu" : "play";
+        sfxPaperRustle();
+        return;
+      }
+      return;
+    }
+
     if (screen === "stickers") {
       if (hitUiRect(STICKERS_BACK, p.x, p.y)) {
         screen = "play";
@@ -925,6 +977,10 @@ canvas.addEventListener(
         applyAnimeModeToggle();
         return;
       }
+      if (hitMovesChip(p.x, p.y, session.mode === "clear")) {
+        openModeEditor("play");
+        return;
+      }
       if (hitUiRect(MENU_BTN, p.x, p.y)) {
         screen = "menu";
         return;
@@ -957,6 +1013,10 @@ canvas.addEventListener(
     }
     if (hitAnimeModeButton(p.x, p.y)) {
       applyAnimeModeToggle();
+      return;
+    }
+    if (hitMovesChip(p.x, p.y, session.mode === "clear")) {
+      openModeEditor("play");
       return;
     }
 

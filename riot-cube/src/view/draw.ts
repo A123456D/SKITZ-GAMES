@@ -114,13 +114,15 @@ export function drawHud(
   ctx.fillText("RIOT CUBE", 50, 58);
 
   if (opts.moves != null) {
-    const chipW = opts.mode === "clear" ? 200 : 120;
+    const chip = movesChipRect(opts.mode === "clear");
     ctx.fillStyle = p.hudBg;
-    roundRect(ctx, 36, 84, chipW, 40, 5);
+    roundRect(ctx, chip.x, chip.y, chip.w, chip.h, 5);
     ctx.fill();
     ctx.strokeStyle = p.ink;
     ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.fillStyle = p.hot;
+    ctx.fillRect(chip.x + 10, chip.y - 5, 28, 8);
     ctx.fillStyle = p.hudInk;
     ctx.font = "700 16px 'Chakra Petch', sans-serif";
     ctx.textAlign = "left";
@@ -132,11 +134,11 @@ export function drawHud(
       const limitTxt = opts.moveLimit == null ? "∞" : String(opts.moveLimit);
       ctx.fillText(
         `${opts.cleared ?? 0}/6  ·  ${left}/${limitTxt}`,
-        48,
-        110,
+        chip.x + 12,
+        chip.y + 26,
       );
     } else {
-      ctx.fillText(`${opts.moves} MOVES`, 48, 110);
+      ctx.fillText(`${opts.moves} MOVES`, chip.x + 12, chip.y + 26);
     }
   }
 
@@ -144,6 +146,19 @@ export function drawHud(
     drawAnimeModeButton(ctx);
   }
   drawVolumeButton(ctx, opts.sfxVol ?? 0.4);
+}
+
+/** Moves / clear-progress chip under the title — opens the mode editor. */
+export function movesChipRect(clearMode = false): UiRect {
+  return { x: 36, y: 84, w: clearMode ? 200 : 120, h: 40 };
+}
+
+export function hitMovesChip(
+  x: number,
+  y: number,
+  clearMode = false,
+): boolean {
+  return hitRect(movesChipRect(clearMode), x, y);
 }
 
 export const ANIME_MODE_BTN: UiRect = { x: 270, y: 28, w: 120, h: 46 };
@@ -573,6 +588,58 @@ export const SETTINGS_MODE: UiRect = { x: 140, y: 552, w: 440, h: 54 };
 export const SETTINGS_MOVES: UiRect = { x: 140, y: 620, w: 440, h: 54 };
 export const SETTINGS_HINTS: UiRect = { x: 140, y: 688, w: 440, h: 54 };
 export const SETTINGS_BACK: UiRect = { x: 140, y: 776, w: 440, h: 54 };
+
+/** Focused MODE / MOVES editor opened from the HUD moves chip. */
+export const MODE_EDITOR_MODE: UiRect = { x: 140, y: 420, w: 440, h: 64 };
+export const MODE_EDITOR_MOVES: UiRect = { x: 140, y: 510, w: 440, h: 64 };
+export const MODE_EDITOR_BACK: UiRect = { x: 140, y: 620, w: 440, h: 58 };
+
+export function drawModeEditorScreen(
+  ctx: CanvasRenderingContext2D,
+  opts: {
+    modeLabel: string;
+    moveLimitLabel: string;
+  },
+): void {
+  const p = getPalette();
+  drawDesk(ctx);
+
+  ctx.fillStyle = p.paper;
+  roundRect(ctx, 80, 280, 560, 460, 10);
+  ctx.fill();
+  ctx.strokeStyle = p.ink;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.fillStyle = p.accent;
+  ctx.fillRect(120, 268, 110, 18);
+
+  ctx.fillStyle = p.ink;
+  ctx.font = "800 36px 'Permanent Marker', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("GAME MODE", W / 2, 360);
+
+  ctx.font = "600 18px 'Patrick Hand', sans-serif";
+  ctx.fillStyle = p.muted;
+  ctx.fillText("Classic solve or Clear faces · move cap", W / 2, 400);
+
+  drawPaperButton(ctx, MODE_EDITOR_MODE, `MODE  ·  ${opts.modeLabel}`, {
+    fill: p.panel,
+    text: p.hot,
+  });
+  drawPaperButton(
+    ctx,
+    MODE_EDITOR_MOVES,
+    `MOVES  ·  ${opts.moveLimitLabel}`,
+    {
+      fill: p.panel,
+      text: p.accent,
+    },
+  );
+  drawPaperButton(ctx, MODE_EDITOR_BACK, "BACK", {
+    fill: p.hot,
+    text: p.white,
+  });
+}
 
 export function drawSettingsScreen(
   ctx: CanvasRenderingContext2D,
