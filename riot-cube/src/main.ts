@@ -958,6 +958,7 @@ async function boot(): Promise<void> {
   await Promise.all([loadLogo(), loadStickers()]);
   ensureThemeArt("classroom");
   ensureThemeArt("edgy");
+  ensureThemeArt("doodle");
   ensureAnimeArtBoth();
   syncActiveFace();
   requestAnimationFrame(tick);

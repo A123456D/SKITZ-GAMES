@@ -82,6 +82,41 @@ export const TILE_KINDS = [
   "note",
   "cactus",
   "camera",
+  // Doodle creatures
+  "jelly",
+  "grump",
+  "drop",
+  "fire",
+  "soot",
+  "goo",
+  "starry",
+  "ice",
+  "sprout",
+  "bee",
+  "bun",
+  "triple",
+  "bat",
+  "spook",
+  "stalks",
+  "cloud",
+  "meltblob",
+  "bumpy",
+  "sheep",
+  "night",
+  "purr",
+  "uni",
+  "splash",
+  "dino",
+  "bow",
+  "toad",
+  "pebble",
+  "rainbow",
+  "reaper",
+  "king",
+  "angel",
+  "urchin",
+  "swirl",
+  "devil",
 ] as const;
 
 export type TileKind = (typeof TILE_KINDS)[number];
@@ -199,12 +234,52 @@ export const ANIME_DARK_STICKER_POOL = [
   "grimoire",
 ] as const satisfies readonly TileKind[];
 
+/** Doodle creature pack — names match art. */
+export const DOODLE_STICKER_POOL = [
+  "slime",
+  "jelly",
+  "grump",
+  "drop",
+  "fire",
+  "soot",
+  "goo",
+  "starry",
+  "ice",
+  "sprout",
+  "bee",
+  "bun",
+  "triple",
+  "bat",
+  "spook",
+  "stalks",
+  "cloud",
+  "meltblob",
+  "bumpy",
+  "sheep",
+  "night",
+  "purr",
+  "uni",
+  "splash",
+  "dino",
+  "bow",
+  "toad",
+  "pebble",
+  "rainbow",
+  "reaper",
+  "king",
+  "angel",
+  "urchin",
+  "swirl",
+  "devil",
+] as const satisfies readonly TileKind[];
+
 /** Unique sticker kinds available for a theme’s chooser / random pick. */
 export function stickerPoolForTheme(
   theme: string,
   animeMode: "day" | "dark" = "day",
 ): readonly TileKind[] {
   if (theme === "classroom") return CLASSROOM_STICKER_POOL;
+  if (theme === "doodle") return DOODLE_STICKER_POOL;
   if (theme === "anime") {
     return animeMode === "dark" ? ANIME_DARK_STICKER_POOL : ANIME_STICKER_POOL;
   }

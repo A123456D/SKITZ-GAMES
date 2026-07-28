@@ -11,7 +11,7 @@ import {
 } from "./theme";
 
 /** Bump when replacing theme sticker PNGs so SW / memory cache cannot stick. */
-const STICKER_ASSET_VERSION = 14;
+const STICKER_ASSET_VERSION = 15;
 
 const cache = new Map<TileKind, HTMLImageElement>();
 let loadedTheme: ThemeId | null = null;

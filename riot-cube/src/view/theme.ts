@@ -1,4 +1,4 @@
-export const THEME_IDS = ["classroom", "edgy", "anime"] as const;
+export const THEME_IDS = ["classroom", "edgy", "anime", "doodle"] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
 export type ThemePalette = {
@@ -188,6 +188,41 @@ const ANIME_DARK_PALETTE: ThemePalette = {
   browser: "#030406",
 };
 
+/** Sketchbook doodles — white paper, marker yellow accent, ink black. */
+const DOODLE_PALETTE: ThemePalette = {
+  desk0: "#f4f6f8",
+  desk1: "#e2e8f0",
+  accent: "#facc15",
+  hot: "#22d3ee",
+  paper: "#ffffff",
+  paperDeep: "#f1f5f9",
+  ink: "#0f172a",
+  muted: "#64748b",
+  panel: "#0f172a",
+  panelEdge: "#facc15",
+  hudBg: "#ffffff",
+  hudInk: "#0f172a",
+  faceActive: "#ffffff",
+  faceSide: "#e2e8f0",
+  faceStroke: "#0f172a",
+  faceRule: "rgba(34,211,238,0.22)",
+  faceRuleDim: "rgba(34,211,238,0.14)",
+  faceColors: [
+    "#4ade80", // F green
+    "#60a5fa", // B blue
+    "#fb7185", // R pink
+    "#facc15", // L yellow
+    "#ffffff", // U white
+    "#334155", // D slate
+  ],
+  rule: "rgba(15,23,42,0.12)",
+  margin: "rgba(34,211,238,0.4)",
+  tape: "#facc15",
+  losePanel: "#1e293b",
+  white: "#ffffff",
+  browser: "#e2e8f0",
+};
+
 export const ANIME_MODES = ["day", "dark"] as const;
 export type AnimeMode = (typeof ANIME_MODES)[number];
 
@@ -198,6 +233,7 @@ export const THEMES: ThemeDef[] = [
   { id: "classroom", label: "CLASS ROOM", palette: CLASSROOM_PALETTE },
   { id: "edgy", label: "EDGY", palette: EDGY_PALETTE },
   { id: "anime", label: "ANIME", palette: ANIME_PALETTE },
+  { id: "doodle", label: "DOODLE", palette: DOODLE_PALETTE },
 ];
 
 const THEME_KEY = "riotcube_theme";
@@ -211,7 +247,7 @@ function loadStored(): ThemeId {
     let v = localStorage.getItem(THEME_KEY);
     if (v === "classic") v = "classroom";
     if (v === "grime") v = "edgy";
-    if (v === "classroom" || v === "edgy" || v === "anime") {
+    if (v === "classroom" || v === "edgy" || v === "anime" || v === "doodle") {
       try {
         localStorage.setItem(THEME_KEY, v);
       } catch {
@@ -288,7 +324,7 @@ export function setTheme(id: ThemeId): void {
   applyThemeChrome();
 }
 
-/** Cycle classroom → edgy → anime → … */
+/** Cycle classroom → edgy → anime → doodle → … */
 export function cycleTheme(): ThemeId {
   const i = THEME_IDS.indexOf(current);
   const next = THEME_IDS[(i + 1) % THEME_IDS.length]!;

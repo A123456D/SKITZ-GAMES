@@ -32,7 +32,12 @@ function loadImg(src: string): Promise<HTMLImageElement | null> {
 /** Resolve which folder to use for get/reload (anime respects day/dark mode). */
 function resolveDir(id?: ThemeId | ThemeAssetDir): ThemeAssetDir {
   if (id === "anime-dark") return "anime-dark";
-  if (id === "classroom" || id === "edgy" || id === "anime") {
+  if (
+    id === "classroom" ||
+    id === "edgy" ||
+    id === "anime" ||
+    id === "doodle"
+  ) {
     return getThemeAssetDir(id);
   }
   return getThemeAssetDir(getTheme());
