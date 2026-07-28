@@ -1123,6 +1123,7 @@ async function boot(): Promise<void> {
   ensureThemeArt("edgy");
   ensureThemeArt("doodle");
   ensureThemeArt("relic");
+  ensureThemeArt("patch");
   ensureAnimeArtBoth();
   syncMusicForTheme(getTheme());
   syncActiveFace();

@@ -60,10 +60,11 @@ export function drawDesk(ctx: CanvasRenderingContext2D): void {
       theme === "classroom" ||
       theme === "doodle" ||
       theme === "relic" ||
+      theme === "patch" ||
       (theme === "anime" && getAnimeMode() === "day");
     if (lightWash) {
-      // Doodle forest / bright relic hall: paper wash so the cube stays easy to read.
-      if (theme === "doodle" || theme === "relic") {
+      // Bright craft themes: paper wash so the cube stays easy to read.
+      if (theme === "doodle" || theme === "relic" || theme === "patch") {
         g.addColorStop(0, "rgba(255,255,255,0.18)");
         g.addColorStop(0.45, "rgba(255,255,255,0.08)");
         g.addColorStop(1, "rgba(0,0,0,0.16)");
@@ -588,11 +589,11 @@ export function drawSettingsScreen(
 }
 
 /** Theme picker — one row per pack, anime gets a DAY/DARK toggle. */
-export const THEMES_BACK: UiRect = { x: 140, y: 1120, w: 440, h: 58 };
-export const THEMES_ANIME_MODE: UiRect = { x: 140, y: 1020, w: 440, h: 58 };
+export const THEMES_BACK: UiRect = { x: 140, y: 1140, w: 440, h: 56 };
+export const THEMES_ANIME_MODE: UiRect = { x: 140, y: 1040, w: 440, h: 56 };
 
 export function themePickerRect(index: number): UiRect {
-  return { x: 140, y: 280 + index * 88, w: 440, h: 76 };
+  return { x: 140, y: 270 + index * 78, w: 440, h: 68 };
 }
 
 export function hitThemePicker(x: number, y: number): ThemeId | null {

@@ -37,7 +37,8 @@ function resolveDir(id?: ThemeId | ThemeAssetDir): ThemeAssetDir {
     id === "edgy" ||
     id === "anime" ||
     id === "doodle" ||
-    id === "relic"
+    id === "relic" ||
+    id === "patch"
   ) {
     return getThemeAssetDir(id);
   }
@@ -50,8 +51,8 @@ function ensureDir(dir: ThemeAssetDir): void {
   const base = `./themes/${dir}`;
   void (async () => {
     const [bg, btn] = await Promise.all([
-      loadImg(`${base}/bg.jpg?v=15`),
-      loadImg(`${base}/btn.jpg?v=15`),
+      loadImg(`${base}/bg.jpg?v=16`),
+      loadImg(`${base}/btn.jpg?v=16`),
     ]);
     art.set(dir, { bg, btn, loaded: true });
     onReady?.();

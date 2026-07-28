@@ -282,7 +282,7 @@ async function ensureManifest(): Promise<void> {
   if (manifestPromise) return manifestPromise;
   manifestPromise = (async () => {
     try {
-      const res = await fetch("./music/playlist.json?v=2");
+      const res = await fetch("./music/playlist.json?v=3");
       if (!res.ok) return;
       const data = (await res.json()) as PlaylistManifest;
       allTracks = (data.tracks ?? []).filter(Boolean);
