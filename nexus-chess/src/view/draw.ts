@@ -33,6 +33,9 @@ export interface ButtonRect {
 
 let logoImg: HTMLImageElement | null = null;
 let logoReady = false;
+let markImg: HTMLImageElement | null = null;
+let markReady = false;
+const abilityIcons = new Map<string, HTMLImageElement>();
 
 export function loadLogo(): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -47,6 +50,42 @@ export function loadLogo(): Promise<HTMLImageElement | null> {
   });
 }
 
+export function loadNexusMark(): Promise<void> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      markImg = img;
+      markReady = true;
+      resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = "./themes/nexus/nexus-mark.png?v=2";
+  });
+}
+
+export function loadAbilityIcons(): Promise<void> {
+  const ids = ["aegis", "overdrive", "swap"] as const;
+  return Promise.all(
+    ids.map(
+      (id) =>
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            abilityIcons.set(id, img);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = `./themes/nexus/abilities/${id}.png?v=2`;
+        }),
+    ),
+  ).then(() => undefined);
+}
+
+export function getAbilityIcon(id: string): HTMLImageElement | null {
+  const key = id === "tacticalSwap" ? "swap" : id;
+  return abilityIcons.get(key) ?? null;
+}
+
 export function getLogoImage(): HTMLImageElement | null {
   return logoReady ? logoImg : null;
 }
@@ -56,19 +95,31 @@ function hudReserve(h: number, compact: boolean): number {
   return 168;
 }
 
-export function layout(canvas: HTMLCanvasElement): DrawCtx {
+export function layout(canvas: HTMLCanvasElement, prev?: DrawCtx | null): DrawCtx {
   const dpr = window.devicePixelRatio || 1;
   const vv = window.visualViewport;
   const w = Math.floor(vv?.width ?? window.innerWidth);
   const h = Math.floor(vv?.height ?? window.innerHeight);
   const compact = w < 640 || h < 700;
 
-  canvas.width = Math.max(1, Math.floor(w * dpr));
-  canvas.height = Math.max(1, Math.floor(h * dpr));
-  canvas.style.width = w + "px";
-  canvas.style.height = h + "px";
-  const ctx = canvas.getContext("2d")!;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const needResize =
+    !prev ||
+    prev.width !== w ||
+    prev.height !== h ||
+    canvas.width !== Math.floor(w * dpr) ||
+    canvas.height !== Math.floor(h * dpr);
+
+  let ctx: CanvasRenderingContext2D;
+  if (needResize) {
+    canvas.width = Math.max(1, Math.floor(w * dpr));
+    canvas.height = Math.max(1, Math.floor(h * dpr));
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    ctx = canvas.getContext("2d")!;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  } else {
+    ctx = prev.ctx;
+  }
 
   const pad = compact ? 16 : 28;
   const topBar = compact ? 78 : 100;
@@ -158,6 +209,24 @@ function drawNexusGlow(dc: DrawCtx, time: number, flipped: boolean) {
     ctx.fillRect(x, y, cellSize, cellSize);
   }
 
+  // Painted logo mark (crown + X) on the Nexus surface
+  if (markReady && markImg) {
+    const markH = zone * 0.82;
+    const aspect = markImg.naturalWidth / Math.max(1, markImg.naturalHeight);
+    const markW = markH * aspect;
+    const mx = cx - markW / 2;
+    const my = cy - markH / 2;
+    ctx.save();
+    // Soft wash into the zone — reads as faded paint, not a sticker
+    ctx.globalCompositeOperation = "soft-light";
+    ctx.globalAlpha = isNexus ? 0.42 + pulse * 0.12 : 0.28 + pulse * 0.08;
+    ctx.drawImage(markImg, mx, my, markW, markH);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = isNexus ? 0.1 + pulse * 0.04 : 0.07 + pulse * 0.03;
+    ctx.drawImage(markImg, mx, my, markW, markH);
+    ctx.restore();
+  }
+
   ctx.strokeStyle = isNexus
     ? `rgba(160,230,255,${0.35 + pulse})`
     : `rgba(255,255,255,${0.18 + pulse * 0.9})`;
@@ -165,7 +234,6 @@ function drawNexusGlow(dc: DrawCtx, time: number, flipped: boolean) {
   ctx.strokeRect(minX + 1.5, minY + 1.5, zone - 3, zone - 3);
 
   if (isNexus) {
-    // Inner geometric frame
     ctx.strokeStyle = `rgba(120,200,255,${0.2 + pulse * 0.4})`;
     ctx.lineWidth = 1;
     ctx.strokeRect(minX + 5, minY + 5, zone - 10, zone - 10);
@@ -407,13 +475,40 @@ export function drawHud(
       const bx = contentX + i * (bw + gap);
       const canAfford = a.id === "skip" || (a.cost !== undefined && mana >= a.cost);
       const btn: ButtonRect = { x: bx, y: btnY, w: bw, h: btnH, id: a.id };
-      const display = a.id === "skip" ? "Skip" : `${a.label}  ${a.cost}`;
+      const icon = a.id === "skip" ? null : getAbilityIcon(a.id);
+      const label =
+        a.id === "skip" ? "Skip" : compact ? String(a.cost) : `${a.label}  ${a.cost}`;
 
-      drawPremiumBtn(ctx, btn, display, {
+      drawPremiumBtn(ctx, btn, icon ? "" : label, {
         muted: !canAfford && a.id !== "skip",
         primary: a.id === "skip",
         fontSize: compact ? 11 : 12,
       });
+
+      if (icon && icon.complete) {
+        const ih = btnH - 10;
+        const iw = ih;
+        const ix = bx + (compact ? 6 : 10);
+        const iy = btnY + (btnH - ih) / 2;
+        ctx.save();
+        if (!canAfford) ctx.globalAlpha = 0.35;
+        ctx.drawImage(icon, ix, iy, iw, ih);
+        ctx.restore();
+        if (!compact) {
+          ctx.fillStyle = canAfford ? Theme.ink : Theme.inkMute;
+          ctx.font = `500 11px ${Theme.font}`;
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText(`${a.label}  ${a.cost}`, ix + iw + 6, btnY + btnH / 2 + 0.5);
+        } else {
+          ctx.fillStyle = canAfford ? Theme.inkDim : Theme.inkMute;
+          ctx.font = `500 10px ${Theme.font}`;
+          ctx.textAlign = "right";
+          ctx.textBaseline = "middle";
+          ctx.fillText(String(a.cost), bx + bw - 6, btnY + btnH / 2 + 0.5);
+        }
+      }
+
       buttons.push(btn);
     }
   }

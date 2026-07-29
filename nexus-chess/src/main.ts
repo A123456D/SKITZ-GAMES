@@ -21,6 +21,8 @@ import {
   drawHud,
   squareScreenPos,
   loadLogo,
+  loadNexusMark,
+  loadAbilityIcons,
   getLogoImage,
   type DrawCtx,
   type ButtonRect,
@@ -171,6 +173,7 @@ function finishIfWon() {
 function maybeAiTurn() {
   if (playMode !== "ai" || aiDifficulty === 0) return;
   if (state.winner || state.activeColor !== "b" || aiPending || screen !== "play") return;
+  if (moveAnim) return;
   aiPending = true;
   const difficulty = aiDifficulty;
   const delay = aiThinkDelay(difficulty);
@@ -179,15 +182,37 @@ function maybeAiTurn() {
       aiPending = false;
       return;
     }
-    const run = () => {
-      state = aiTurn(state, difficulty);
-      ui = clearUi();
-      aiPending = false;
-      finishIfWon();
-    };
-    if (difficulty >= 2) setTimeout(run, 0);
-    else run();
+    // Yield a frame so the UI stays responsive before a heavy search
+    setTimeout(() => {
+      try {
+        if (screen !== "play" || state.activeColor !== "b") return;
+        state = aiTurn(state, difficulty);
+        ui = clearUi();
+        finishIfWon();
+      } finally {
+        aiPending = false;
+      }
+    }, 16);
   }, delay);
+}
+
+function finishMoveSequence() {
+  if (animEndTimer) {
+    clearTimeout(animEndTimer);
+    animEndTimer = null;
+  }
+  const hadAnim = !!moveAnim;
+  moveAnim = null;
+  if (!hadAnim && state.turnPhase !== "resolved") return;
+  if (state.winner) {
+    finishIfWon();
+    return;
+  }
+  if (state.turnPhase === "resolved") {
+    state = endTurn(state);
+    if (state.winner) finishIfWon();
+    else maybeAiTurn();
+  }
 }
 
 function pointerToCanvas(e: PointerEvent): { px: number; py: number } {
@@ -379,18 +404,8 @@ function onPointer(e: PointerEvent) {
 
         if (animEndTimer) clearTimeout(animEndTimer);
         animEndTimer = setTimeout(() => {
-          moveAnim = null;
-          animEndTimer = null;
-          if (state.winner) {
-            finishIfWon();
-            return;
-          }
-          if (state.turnPhase === "resolved") {
-            state = endTurn(state);
-            if (state.winner) finishIfWon();
-            else maybeAiTurn();
-          }
-        }, moveMs + 40);
+          finishMoveSequence();
+        }, moveMs + 60);
       }
       break;
   }
@@ -400,7 +415,7 @@ canvas.addEventListener("pointerdown", onPointer, { passive: false });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
 function relayout() {
-  dc = layout(canvas);
+  dc = layout(canvas, dc);
 }
 
 window.addEventListener("resize", relayout);
@@ -463,7 +478,9 @@ function frame(now: number) {
         if (moveAnim.isCapture) playCapture();
         else playMoveLand();
       }
-      if (!alive) moveAnim = null;
+      if (!alive) {
+        finishMoveSequence();
+      }
     }
 
     if (captureFlash) {
@@ -481,4 +498,6 @@ requestAnimationFrame(frame);
 void loadLogo().then((img) => setMenuLogo(img ?? getLogoImage()));
 void loadNexusPieces();
 void loadThemeArt();
+void loadNexusMark();
+void loadAbilityIcons();
 document.querySelector('meta[name="theme-color"]')?.setAttribute("content", Theme.bg);

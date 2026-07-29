@@ -69,23 +69,15 @@ export function drawThemePiece(
   if (img && img.complete && img.naturalWidth > 0) {
     const size = cellSize * 0.86;
     ctx.save();
-    ctx.globalAlpha = 0.35;
+    ctx.globalAlpha = 0.28;
     ctx.fillStyle = Theme.pieceShadow;
     ctx.beginPath();
     ctx.ellipse(cx, cy + size * 0.42, size * 0.28, size * 0.08, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    ctx.save();
-    if (Theme.id === "nexus" && color === "b") {
-      ctx.shadowColor = "rgba(140,210,255,0.45)";
-      ctx.shadowBlur = Math.max(4, cellSize * 0.08);
-    } else if (Theme.id === "nexus" && color === "w") {
-      ctx.shadowColor = "rgba(200,240,255,0.25)";
-      ctx.shadowBlur = Math.max(3, cellSize * 0.05);
-    }
+    // No shadowBlur — it freezes Canvas2D when applied to every piece each frame
     ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size);
-    ctx.restore();
     return;
   }
 
