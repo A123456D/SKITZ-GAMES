@@ -9,7 +9,7 @@ let ready = false;
 let loading: Promise<void> | null = null;
 let loadedPack: string | null = null;
 
-const PIECE_CACHE_VER = 5;
+const PIECE_CACHE_VER = 6;
 
 function key(color: Color, kind: PieceKind): string {
   return color + kind;
