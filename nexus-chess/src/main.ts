@@ -37,9 +37,22 @@ import {
 import {
   drawMoveAnim,
   drawCaptureFlash,
+  createBoardFx,
+  updateBoardFx,
+  drawBoardFx,
+  spawnLandFx,
   type MoveAnim,
   type CaptureFlash,
+  type BoardFx,
 } from "./view/anim";
+import {
+  unlockAudio,
+  playMoveLift,
+  playMoveLand,
+  playCapture,
+  playUiTap,
+  playAbility,
+} from "./view/sfx";
 import {
   drawHome,
   drawHub,
@@ -74,6 +87,9 @@ let buttons: ButtonRect[] = [];
 let dc: DrawCtx = layout(canvas);
 let moveAnim: MoveAnim | null = null;
 let captureFlash: CaptureFlash | null = null;
+let boardFx: BoardFx = createBoardFx();
+let lastFrame = performance.now();
+let animEndTimer: ReturnType<typeof setTimeout> | null = null;
 let aiPending = false;
 let eloRecorded = false;
 
@@ -122,6 +138,11 @@ function startMatch(mode: PlayMode, oppElo = opponentElo) {
   ui = clearUi();
   moveAnim = null;
   captureFlash = null;
+  boardFx = createBoardFx();
+  if (animEndTimer) {
+    clearTimeout(animEndTimer);
+    animEndTimer = null;
+  }
   aiPending = false;
   eloRecorded = false;
   lastEloResult = null;
@@ -260,6 +281,7 @@ function onMenuClick(id: string) {
 }
 
 function onPointer(e: PointerEvent) {
+  unlockAudio();
   if (moveAnim || aiPending) return;
   // button is 0 for primary click; -1 can appear on some synthetic pointer events
   if (e.button !== undefined && e.button !== 0 && e.button !== -1) return;
@@ -269,7 +291,10 @@ function onPointer(e: PointerEvent) {
 
   if (screen !== "play") {
     const id = hitMenuButton(buttons, px, py);
-    if (id) onMenuClick(id);
+    if (id) {
+      playUiTap();
+      onMenuClick(id);
+    }
     return;
   }
 
@@ -284,6 +309,7 @@ function onPointer(e: PointerEvent) {
     case "skip":
       state = skipAbility(state);
       ui = clearUi();
+      playUiTap();
       break;
 
     case "selectAfterSkip":
@@ -300,6 +326,7 @@ function onPointer(e: PointerEvent) {
       if (result.ability && result.square) {
         state = doAbilityPhase(state, makeAbilityCast(result.ability, result.square));
         ui = clearUi();
+        playAbility();
       }
       break;
 
@@ -317,6 +344,7 @@ function onPointer(e: PointerEvent) {
         const [fromX, fromY] = squareScreenPos(dc, result.move.from, flipped);
         const [toX, toY] = squareScreenPos(dc, result.move.to, flipped);
         const piece = state.board.get(result.move.from);
+        const moveMs = hadPiece ? 420 : 380;
 
         if (piece) {
           moveAnim = {
@@ -325,12 +353,15 @@ function onPointer(e: PointerEvent) {
             toX,
             toY,
             startTime: performance.now(),
-            duration: 240,
+            duration: moveMs,
             piece: PIECE_CHARS[piece.color + piece.kind] || "?",
             color: piece.color,
             kind: piece.kind,
             toSq: result.move.to,
+            isCapture: hadPiece,
+            landed: false,
           };
+          playMoveLift();
         }
 
         if (hadPiece) {
@@ -338,16 +369,18 @@ function onPointer(e: PointerEvent) {
             x: toX,
             y: toY,
             size: dc.cellSize,
-            startTime: performance.now(),
-            duration: 200,
+            startTime: performance.now() + moveMs * 0.85,
+            duration: 380,
           };
         }
 
         state = doMovePhase(state, result.move);
         ui = clearUi();
 
-        setTimeout(() => {
+        if (animEndTimer) clearTimeout(animEndTimer);
+        animEndTimer = setTimeout(() => {
           moveAnim = null;
+          animEndTimer = null;
           if (state.winner) {
             finishIfWon();
             return;
@@ -357,7 +390,7 @@ function onPointer(e: PointerEvent) {
             if (state.winner) finishIfWon();
             else maybeAiTurn();
           }
-        }, 250);
+        }, moveMs + 40);
       }
       break;
   }
@@ -375,6 +408,8 @@ window.visualViewport?.addEventListener("resize", relayout);
 window.visualViewport?.addEventListener("scroll", relayout);
 
 function frame(now: number) {
+  const dt = Math.min(48, now - lastFrame);
+  lastFrame = now;
   relayout();
   const time = now / 1000;
   buttons.length = 0;
@@ -411,8 +446,23 @@ function frame(now: number) {
       hideSq,
     );
 
+    updateBoardFx(boardFx, dt, now);
+    drawBoardFx(dc.ctx, boardFx, now);
+
     if (moveAnim) {
-      const alive = drawMoveAnim(dc.ctx, moveAnim, now, dc.cellSize);
+      const { alive, justLanded } = drawMoveAnim(dc.ctx, moveAnim, now, dc.cellSize);
+      if (justLanded) {
+        spawnLandFx(
+          boardFx,
+          moveAnim.toX,
+          moveAnim.toY,
+          dc.cellSize,
+          now,
+          !!moveAnim.isCapture,
+        );
+        if (moveAnim.isCapture) playCapture();
+        else playMoveLand();
+      }
       if (!alive) moveAnim = null;
     }
 

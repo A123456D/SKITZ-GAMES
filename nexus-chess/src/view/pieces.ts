@@ -12,9 +12,15 @@ function key(color: Color, kind: PieceKind): string {
   return color + kind;
 }
 
+const PIECE_CACHE_VER = 3;
+let loadedVer = -1;
+
 export function loadNexusPieces(): Promise<void> {
-  if (ready) return Promise.resolve();
+  if (ready && loadedVer === PIECE_CACHE_VER && loading === null) return Promise.resolve();
   if (loading) return loading;
+
+  images.clear();
+  ready = false;
 
   loading = Promise.all(
     COLORS.flatMap((c) =>
@@ -27,12 +33,14 @@ export function loadNexusPieces(): Promise<void> {
               resolve();
             };
             img.onerror = () => resolve();
-            img.src = `./themes/nexus/pieces/${c}${k}.png`;
+            img.src = `./themes/nexus/pieces/${c}${k}.png?v=${PIECE_CACHE_VER}`;
           }),
       ),
     ),
   ).then(() => {
     ready = images.size > 0;
+    loadedVer = PIECE_CACHE_VER;
+    loading = null;
   });
 
   return loading;
