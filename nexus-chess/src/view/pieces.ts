@@ -9,7 +9,7 @@ let ready = false;
 let loading: Promise<void> | null = null;
 let loadedPack: string | null = null;
 
-const PIECE_CACHE_VER = 4;
+const PIECE_CACHE_VER = 5;
 
 function key(color: Color, kind: PieceKind): string {
   return color + kind;
@@ -80,9 +80,9 @@ export function drawThemePiece(
   const img = useSprite ? getPieceImage(color, kind) : null;
 
   if (img && img.complete && img.naturalWidth > 0) {
-    // Slightly smaller than forge — new Nexus pieces are denser 3D icons
-    const size = cellSize * (Theme.id === "forge" ? 0.72 : Theme.id === "nexus" ? 0.82 : 0.86);
-    const yBias = Theme.id === "forge" ? cellSize * 0.06 : Theme.id === "nexus" ? cellSize * 0.03 : 0;
+    // Forge sprites are tall 3D renders — keep smaller and sit on the square
+    const size = cellSize * (Theme.id === "forge" ? 0.72 : 0.86);
+    const yBias = Theme.id === "forge" ? cellSize * 0.06 : 0;
     ctx.save();
     ctx.globalAlpha = 0.32;
     ctx.fillStyle = Theme.pieceShadow;

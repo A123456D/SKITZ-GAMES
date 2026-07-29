@@ -170,8 +170,7 @@ function drawLogoHeader(dc: DrawCtx) {
 
 function drawNexusGlow(dc: DrawCtx, time: number, flipped: boolean) {
   const { ctx, cellSize } = dc;
-  // Soft pulse — eye-friendly, matches backdrop hairline energy (not neon bloom)
-  const pulse = 0.04 + 0.025 * (0.5 + 0.5 * Math.sin(time * 1.1));
+  const pulse = 0.1 + 0.06 * (0.5 + 0.5 * Math.sin(time * 1.4));
   const isNexus = Theme.id === "nexus";
 
   const corners = NEXUS_SQUARES.map((sq) => squareScreenPos(dc, sq, flipped));
@@ -181,36 +180,95 @@ function drawNexusGlow(dc: DrawCtx, time: number, flipped: boolean) {
   const cx = minX + zone / 2;
   const cy = minY + zone / 2;
 
-  const bloom = ctx.createRadialGradient(cx, cy, 0, cx, cy, zone * 0.85);
+  const bloom = ctx.createRadialGradient(cx, cy, 0, cx, cy, zone * 0.9);
   if (isNexus) {
-    bloom.addColorStop(0, `rgba(100,180,220,${0.05 + pulse * 0.18})`);
-    bloom.addColorStop(0.55, `rgba(60,130,180,${0.02 + pulse * 0.06})`);
-    bloom.addColorStop(1, "rgba(20,40,60,0)");
+    bloom.addColorStop(0, `rgba(140,220,255,${0.14 + pulse * 0.4})`);
+    bloom.addColorStop(0.5, `rgba(80,170,230,${0.05 + pulse * 0.15})`);
+    bloom.addColorStop(1, "rgba(40,100,160,0)");
   } else {
-    bloom.addColorStop(0, `rgba(255,255,255,${0.05 + pulse * 0.2})`);
-    bloom.addColorStop(0.55, `rgba(255,255,255,${0.015 + pulse * 0.08})`);
+    bloom.addColorStop(0, `rgba(255,255,255,${0.07 + pulse * 0.35})`);
+    bloom.addColorStop(0.55, `rgba(255,255,255,${0.025 + pulse * 0.12})`);
     bloom.addColorStop(1, "rgba(255,255,255,0)");
   }
   ctx.fillStyle = bloom;
-  ctx.fillRect(minX - cellSize * 0.2, minY - cellSize * 0.2, zone + cellSize * 0.4, zone + cellSize * 0.4);
+  ctx.fillRect(minX - cellSize * 0.35, minY - cellSize * 0.35, zone + cellSize * 0.7, zone + cellSize * 0.7);
 
   for (const sq of NEXUS_SQUARES) {
     const [x, y] = squareScreenPos(dc, sq, flipped);
     const scx = x + cellSize / 2;
     const scy = y + cellSize / 2;
-    const grad = ctx.createRadialGradient(scx, scy, 0, scx, scy, cellSize * 0.5);
+    const grad = ctx.createRadialGradient(scx, scy, 0, scx, scy, cellSize * 0.55);
     if (isNexus) {
-      grad.addColorStop(0, `rgba(130,200,230,${pulse + 0.02})`);
-      grad.addColorStop(1, "rgba(70,140,180,0)");
+      grad.addColorStop(0, `rgba(160,230,255,${pulse + 0.06})`);
+      grad.addColorStop(1, "rgba(100,180,230,0)");
     } else {
-      grad.addColorStop(0, `rgba(255,255,255,${pulse + 0.02})`);
+      grad.addColorStop(0, `rgba(255,255,255,${pulse + 0.04})`);
       grad.addColorStop(1, "rgba(255,255,255,0)");
     }
     ctx.fillStyle = grad;
     ctx.fillRect(x, y, cellSize, cellSize);
   }
 
-  // Painted logo mark — skip when the board texture already carries the etched mark
+  // Painted logo mark (crown + X) on the Nexus surface
+  if (markReady && markImg) {
+    const markH = zone * 0.82;
+    const aspect = markImg.naturalWidth / Math.max(1, markImg.naturalHeight);
+    const markW = markH * aspect;
+    const mx = cx - markW / 2;
+    const my = cy - markH / 2;
+    ctx.save();
+    // Soft wash into the zone — reads as faded paint, not a sticker
+    ctx.globalCompositeOperation = "soft-light";
+    ctx.globalAlpha = isNexus ? 0.42 + pulse * 0.12 : 0.28 + pulse * 0.08;
+    ctx.drawImage(markImg, mx, my, markW, markH);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = isNexus ? 0.1 + pulse * 0.04 : 0.07 + pulse * 0.03;
+    ctx.drawImage(markImg, mx, my, markW, markH);
+    ctx.restore();
+  }
+
+  ctx.strokeStyle = isNexus
+    ? `rgba(160,230,255,${0.35 + pulse})`
+    : `rgba(255,255,255,${0.18 + pulse * 0.9})`;
+  ctx.lineWidth = isNexus ? 1.5 : 1;
+  ctx.strokeRect(minX + 1.5, minY + 1.5, zone - 3, zone - 3);
+
+  if (isNexus) {
+    ctx.strokeStyle = `rgba(120,200,255,${0.2 + pulse * 0.4})`;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(minX + 5, minY + 5, zone - 10, zone - 10);
+  }
+}
+
+/** Forge nexus zone — soft dual cyan / crimson wash (board texture carries the mark). */
+function drawForgeNexus(dc: DrawCtx, time: number, flipped: boolean) {
+  const { ctx, cellSize } = dc;
+  const pulse = 0.05 + 0.03 * (0.5 + 0.5 * Math.sin(time * 1.2));
+  const corners = NEXUS_SQUARES.map((sq) => squareScreenPos(dc, sq, flipped));
+  const minX = Math.min(...corners.map(([x]) => x));
+  const minY = Math.min(...corners.map(([, y]) => y));
+  const zone = cellSize * 2;
+  const cx = minX + zone / 2;
+  const cy = minY + zone / 2;
+
+  const bloom = ctx.createRadialGradient(cx, cy, 0, cx, cy, zone * 0.85);
+  bloom.addColorStop(0, `rgba(255,120,130,${0.06 + pulse * 0.15})`);
+  bloom.addColorStop(0.45, `rgba(100,170,230,${0.04 + pulse * 0.1})`);
+  bloom.addColorStop(1, "rgba(20,8,12,0)");
+  ctx.fillStyle = bloom;
+  ctx.fillRect(minX - cellSize * 0.15, minY - cellSize * 0.15, zone + cellSize * 0.3, zone + cellSize * 0.3);
+
+  for (const sq of NEXUS_SQUARES) {
+    const [x, y] = squareScreenPos(dc, sq, flipped);
+    const scx = x + cellSize / 2;
+    const scy = y + cellSize / 2;
+    const grad = ctx.createRadialGradient(scx, scy, 0, scx, scy, cellSize * 0.5);
+    grad.addColorStop(0, `rgba(255,150,160,${pulse + 0.02})`);
+    grad.addColorStop(1, "rgba(80,140,200,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, cellSize, cellSize);
+  }
+
   if (markReady && markImg && !Theme.boardUrl) {
     const markH = zone * 0.78;
     const aspect = markImg.naturalWidth / Math.max(1, markImg.naturalHeight);
@@ -219,78 +277,18 @@ function drawNexusGlow(dc: DrawCtx, time: number, flipped: boolean) {
     const my = cy - markH / 2;
     ctx.save();
     ctx.globalCompositeOperation = "soft-light";
-    ctx.globalAlpha = isNexus ? 0.28 + pulse * 0.08 : 0.22 + pulse * 0.06;
+    ctx.globalAlpha = 0.28 + pulse * 0.08;
     ctx.drawImage(markImg, mx, my, markW, markH);
     ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = isNexus ? 0.06 + pulse * 0.03 : 0.05 + pulse * 0.02;
+    ctx.globalAlpha = 0.06 + pulse * 0.03;
     ctx.drawImage(markImg, mx, my, markW, markH);
     ctx.restore();
   }
 
-  ctx.strokeStyle = isNexus
-    ? `rgba(120,190,220,${0.18 + pulse})`
-    : `rgba(255,255,255,${0.14 + pulse * 0.6})`;
+  ctx.strokeStyle = `rgba(255,140,150,${0.16 + pulse})`;
   ctx.lineWidth = 1;
   ctx.strokeRect(minX + 1.5, minY + 1.5, zone - 3, zone - 3);
-
-  if (isNexus) {
-    ctx.strokeStyle = `rgba(90,160,200,${0.1 + pulse * 0.25})`;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(minX + 5, minY + 5, zone - 10, zone - 10);
-  }
-}
-
-/** Forge nexus zone — dual cyan / crimson energy well + painted logo mark. */
-function drawForgeNexus(dc: DrawCtx, time: number, flipped: boolean) {
-  const { ctx, cellSize } = dc;
-  const pulse = 0.14 + 0.1 * (0.5 + 0.5 * Math.sin(time * 1.5));
-  const corners = NEXUS_SQUARES.map((sq) => squareScreenPos(dc, sq, flipped));
-  const minX = Math.min(...corners.map(([x]) => x));
-  const minY = Math.min(...corners.map(([, y]) => y));
-  const zone = cellSize * 2;
-  const cx = minX + zone / 2;
-  const cy = minY + zone / 2;
-
-  const bloom = ctx.createRadialGradient(cx, cy, 0, cx, cy, zone * 0.95);
-  bloom.addColorStop(0, `rgba(255,120,130,${0.22 + pulse * 0.4})`);
-  bloom.addColorStop(0.4, `rgba(100,170,230,${0.12 + pulse * 0.22})`);
-  bloom.addColorStop(1, "rgba(20,8,12,0)");
-  ctx.fillStyle = bloom;
-  ctx.fillRect(minX - cellSize * 0.25, minY - cellSize * 0.25, zone + cellSize * 0.5, zone + cellSize * 0.5);
-
-  for (const sq of NEXUS_SQUARES) {
-    const [x, y] = squareScreenPos(dc, sq, flipped);
-    const scx = x + cellSize / 2;
-    const scy = y + cellSize / 2;
-    const grad = ctx.createRadialGradient(scx, scy, 0, scx, scy, cellSize * 0.55);
-    grad.addColorStop(0, `rgba(255,150,160,${pulse + 0.08})`);
-    grad.addColorStop(1, "rgba(80,140,200,0)");
-    ctx.fillStyle = grad;
-    ctx.fillRect(x, y, cellSize, cellSize);
-  }
-
-  // Painted logo mark (crown + X) — same as Nexus theme
-  if (markReady && markImg) {
-    const markH = zone * 0.78;
-    const aspect = markImg.naturalWidth / Math.max(1, markImg.naturalHeight);
-    const markW = markH * aspect;
-    const mx = cx - markW / 2;
-    const my = cy - markH / 2;
-    ctx.save();
-    ctx.globalCompositeOperation = "soft-light";
-    ctx.globalAlpha = 0.48 + pulse * 0.14;
-    ctx.drawImage(markImg, mx, my, markW, markH);
-    ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = 0.14 + pulse * 0.05;
-    ctx.drawImage(markImg, mx, my, markW, markH);
-    ctx.restore();
-  }
-
-  ctx.strokeStyle = `rgba(255,150,160,${0.55 + pulse})`;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(minX + 1.5, minY + 1.5, zone - 3, zone - 3);
-  ctx.strokeStyle = `rgba(140,210,255,${0.4 + pulse * 0.4})`;
-  ctx.lineWidth = 1.25;
+  ctx.strokeStyle = `rgba(120,180,220,${0.12 + pulse * 0.4})`;
   ctx.strokeRect(minX + 5, minY + 5, zone - 10, zone - 10);
 }
 
