@@ -7,9 +7,12 @@
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
   />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="NEXUS" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#03050a" />
   <meta name="description" content="NEXUS — zone-control tactical chess" />
+  <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" type="image/png" href="./logo.png" />
   <link rel="apple-touch-icon" href="./logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -17,11 +20,18 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
   <title>NEXUS</title>
   <style>
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+      --sal: env(safe-area-inset-left, 0px);
+      --sar: env(safe-area-inset-right, 0px);
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
       width: 100%;
       height: 100%;
       height: 100dvh;
+      min-height: -webkit-fill-available;
       overflow: hidden;
       background: #03050a;
       touch-action: none;
@@ -30,12 +40,16 @@
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
       font-family: "Space Grotesk", system-ui, sans-serif;
+      overscroll-behavior: none;
     }
     canvas {
       display: block;
       width: 100%;
       height: 100%;
+      height: 100dvh;
       touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
   </style>
 </head>

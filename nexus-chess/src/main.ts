@@ -84,6 +84,14 @@ import {
 import { initTheme, applyTheme, Theme, nextThemeId } from "./view/theme";
 import { loadThemePieces } from "./view/pieces";
 import { loadThemeArt } from "./view/fx";
+import {
+  isTutorialCompleted,
+  setTutorialCompleted,
+  nextStepId,
+  stepById,
+  type TutorialStepId,
+} from "./core/tutorial";
+import { drawTutorialCoach, resolveCoachTarget } from "./view/tutorialDraw";
 
 initTheme();
 
@@ -113,6 +121,61 @@ let eloRecorded = false;
 let lastMove: { from: Square; to: Square } | null = null;
 let toast: { text: string; start: number; duration: number } | null = null;
 let canResume = !!loadMatch();
+
+/** First-run interactive tutorial */
+let tutorialActive = !isTutorialCompleted();
+let tutorialStep: TutorialStepId = "welcome";
+
+function finishTutorial() {
+  tutorialActive = false;
+  tutorialStep = "done";
+  setTutorialCompleted();
+  showToast("You're ready — hold the Nexus!");
+  if (screen === "play" && state.turnPhase === "resolved" && !state.winner) {
+    state = endTurn(state);
+    persistMatch();
+    if (state.winner) finishIfWon();
+    else maybeAiTurn();
+  }
+}
+
+function advanceTutorial() {
+  if (!tutorialActive) return;
+  const next = nextStepId(tutorialStep, { hasSetRating: profile.hasSetRating });
+  if (next === "done") {
+    finishTutorial();
+    return;
+  }
+  tutorialStep = next;
+  if (tutorialStep === "start") {
+    opponentElo = 400;
+    playerColor = "w";
+    persistPrefs();
+  }
+  if (tutorialStep === "color") {
+    playerColor = "w";
+    persistPrefs();
+  }
+}
+
+function tutorialAllowsMenuId(id: string): boolean {
+  if (!tutorialActive) return true;
+  if (id === "tutorial-skip" || id === "tutorial-gotit") return true;
+  const step = stepById(tutorialStep);
+  if (!step) return true;
+  // Elo screen: allow presets / ± while pointing at Continue
+  if (tutorialStep === "rating") {
+    return (
+      id === "elo-save" ||
+      id.startsWith("elo-preset-") ||
+      id === "elo-minus" ||
+      id === "elo-plus"
+    );
+  }
+  if (step.buttonId) return id === step.buttonId;
+  if (step.acknowledge) return id === "tutorial-gotit";
+  return false;
+}
 
 function showToast(text: string, duration = 1800) {
   toast = { text, start: performance.now(), duration };
@@ -211,6 +274,10 @@ function startMatch(mode: PlayMode, oppElo = opponentElo, color: Color = playerC
   lastMove = null;
   screen = "play";
   persistMatch();
+  // Tutorial: skip ability phase so the first lesson is a simple pawn move
+  if (tutorialActive && state.turnPhase === "ability") {
+    state = skipAbility(state);
+  }
   maybeAiTurn();
 }
 
@@ -274,6 +341,10 @@ function isAiSideToMove(): boolean {
 }
 
 function maybeAiTurn() {
+  if (tutorialActive && (tutorialStep === "select" || tutorialStep === "move" || tutorialStep === "nexus")) {
+    // Keep AI quiet until the lesson finishes
+    return;
+  }
   if (!isAiSideToMove() || state.winner || aiPending || screen !== "play") return;
   if (moveAnim) return;
   aiPending = true;
@@ -316,6 +387,11 @@ function finishMoveSequence() {
     return;
   }
   if (state.turnPhase === "resolved") {
+    // Hold the board for the nexus tip before AI replies
+    if (tutorialActive && tutorialStep === "nexus") {
+      persistMatch();
+      return;
+    }
     state = endTurn(state);
     persistMatch();
     if (state.winner) finishIfWon();
@@ -334,19 +410,33 @@ function pointerToCanvas(e: PointerEvent): { px: number; py: number } {
 }
 
 function onMenuClick(id: string) {
+  if (id === "tutorial-skip") {
+    finishTutorial();
+    return;
+  }
+  if (id === "tutorial-gotit") {
+    if (tutorialActive && tutorialStep === "nexus") advanceTutorial();
+    return;
+  }
+  if (tutorialActive && !tutorialAllowsMenuId(id)) return;
+
   if (id === "home-play") {
     openHub();
+    if (tutorialActive && tutorialStep === "welcome") advanceTutorial();
     return;
   }
   if (id === "hub-home") {
+    if (tutorialActive) return;
     goHome();
     return;
   }
   if (id === "hub-resume") {
+    if (tutorialActive) return;
     if (!resumeMatch()) openHub();
     return;
   }
   if (id === "hub-board" || id === "hub-theme") {
+    if (tutorialActive) return;
     const next = nextThemeId(Theme.id);
     applyTheme(next);
     void loadThemeArt();
@@ -355,6 +445,7 @@ function onMenuClick(id: string) {
     return;
   }
   if (id === "hub-setelo") {
+    if (tutorialActive) return;
     draftPlayerElo = profile.rating;
     screen = "setElo";
     return;
@@ -374,50 +465,67 @@ function onMenuClick(id: string) {
   if (id === "elo-save") {
     profile = setPlayerElo(profile, draftPlayerElo);
     screen = "hub";
+    if (tutorialActive && tutorialStep === "rating") advanceTutorial();
     return;
   }
   if (id === "menu-vsai") {
-    opponentElo = nearestOppOption(prefs.lastOpponentElo || profile.rating);
-    playerColor = prefs.playerColor;
+    opponentElo = tutorialActive
+      ? 400
+      : nearestOppOption(prefs.lastOpponentElo || profile.rating);
+    playerColor = tutorialActive ? "w" : prefs.playerColor;
     screen = "aiSelect";
+    if (tutorialActive && tutorialStep === "hub") advanceTutorial();
     return;
   }
   if (id === "menu-local") {
+    if (tutorialActive) return;
     startMatch("local");
     return;
   }
   if (id === "menu-how") {
+    if (tutorialActive) return;
     screen = "how";
     return;
   }
   if (id === "menu-back") {
+    if (tutorialActive) return;
     screen = "hub";
     return;
   }
   if (id === "color-w") {
     playerColor = "w";
     persistPrefs();
+    if (tutorialActive && tutorialStep === "color") advanceTutorial();
     return;
   }
   if (id === "color-b") {
+    if (tutorialActive) return;
     playerColor = "b";
     persistPrefs();
     return;
   }
   if (id === "opp-minus") {
+    if (tutorialActive) return;
     opponentElo = clampElo(Math.max(ELO_MIN, opponentElo - ELO_STEP));
     return;
   }
   if (id === "opp-plus") {
+    if (tutorialActive) return;
     opponentElo = clampElo(Math.min(ELO_MAX, opponentElo + ELO_STEP));
     return;
   }
   if (id.startsWith("opp-") && id !== "opp-start" && id !== "opp-minus" && id !== "opp-plus") {
+    if (tutorialActive) return;
     opponentElo = Number(id.slice(4));
     return;
   }
   if (id === "opp-start") {
+    if (tutorialActive) {
+      opponentElo = 400;
+      playerColor = "w";
+    }
     startMatch("ai", opponentElo, playerColor);
+    if (tutorialActive && tutorialStep === "start") advanceTutorial();
     return;
   }
   if (id === "result-rematch") {
@@ -447,8 +555,19 @@ function onPointer(e: PointerEvent) {
     return;
   }
 
+  // Tutorial chrome (Skip / Got it) works even during AI think
+  {
+    const tid = hitMenuButton(buttons, px, py);
+    if (tid === "tutorial-skip" || tid === "tutorial-gotit") {
+      playUiTap();
+      onMenuClick(tid);
+      return;
+    }
+  }
+
   // During AI think, only allow opening the menu (pause / change board)
   if (aiPending || isAiSideToMove()) {
+    if (tutorialActive) return;
     const flipped = boardFlipped();
     const result = handleClick(ui, state, dc, buttons, px, py, flipped);
     if (result.type === "menu") {
@@ -462,13 +581,54 @@ function onPointer(e: PointerEvent) {
   const flipped = boardFlipped();
   const result = handleClick(ui, state, dc, buttons, px, py, flipped);
 
+  // Tutorial: only the pointed square / Got it
+  if (tutorialActive) {
+    if (result.type === "menu") return;
+    if (tutorialStep === "select") {
+      if (result.type === "select" && result.square === "e2") {
+        if (state.turnPhase === "ability") state = skipAbility(state);
+        ui = applySelect(clearUi(), state, "e2");
+        persistMatch();
+        advanceTutorial();
+      } else if (result.type === "selectAfterSkip" && result.square === "e2") {
+        state = skipAbility(state);
+        ui = applySelect(clearUi(), state, "e2");
+        persistMatch();
+        advanceTutorial();
+      }
+      return;
+    }
+    if (tutorialStep === "move") {
+      if (result.type === "move" && result.move?.from === "e2" && result.move.to === "e4") {
+        // fall through to normal move handling, then advance after applying
+      } else if (result.type === "select" && result.square === "e2") {
+        ui = applySelect(ui, state, "e2");
+        return;
+      } else {
+        return;
+      }
+    }
+    if (tutorialStep === "nexus") {
+      // only Got it / Skip (handled above)
+      return;
+    }
+  }
+
   switch (result.type) {
     case "menu":
+      if (tutorialActive) return;
       persistMatch();
       openHub();
       break;
 
     case "skip":
+      if (tutorialActive && (tutorialStep === "select" || tutorialStep === "move")) {
+        state = skipAbility(state);
+        ui = clearUi();
+        persistMatch();
+        playUiTap();
+        break;
+      }
       state = skipAbility(state);
       ui = clearUi();
       persistMatch();
@@ -571,6 +731,10 @@ function onPointer(e: PointerEvent) {
         ui = clearUi();
         persistMatch();
 
+        if (tutorialActive && tutorialStep === "move" && result.move.from === "e2" && result.move.to === "e4") {
+          advanceTutorial();
+        }
+
         if (animEndTimer) clearTimeout(animEndTimer);
         animEndTimer = setTimeout(() => {
           finishMoveSequence();
@@ -581,6 +745,15 @@ function onPointer(e: PointerEvent) {
 }
 
 canvas.addEventListener("pointerdown", onPointer, { passive: false });
+// iOS Safari sometimes synthesizes only touch events in edge cases — mirror to pointer path
+canvas.addEventListener(
+  "touchstart",
+  (e) => {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+  },
+  { passive: false },
+);
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
 function relayout() {
@@ -672,6 +845,15 @@ function frame(now: number) {
 
     drawToast(dc, toast, now);
     if (toast && now - toast.start > toast.duration) toast = null;
+  }
+
+  if (tutorialActive) {
+    const step = stepById(tutorialStep);
+    if (step) {
+      const flipped = boardFlipped();
+      const target = resolveCoachTarget(dc, step, buttons, flipped);
+      drawTutorialCoach(dc, buttons, step, target, time);
+    }
   }
 
   requestAnimationFrame(frame);

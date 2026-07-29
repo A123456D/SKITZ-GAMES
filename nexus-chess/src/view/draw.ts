@@ -121,9 +121,16 @@ export function layout(canvas: HTMLCanvasElement, prev?: DrawCtx | null): DrawCt
     ctx = prev.ctx;
   }
 
-  const pad = compact ? 16 : 28;
-  const topBar = compact ? 78 : 100;
-  const bottom = hudReserve(h, compact);
+  // iOS notch / home-indicator safe padding (env() via computed style on root)
+  const cs = getComputedStyle(document.documentElement);
+  const safeTop = Math.ceil(parseFloat(cs.getPropertyValue("--sat") || "0") || 0);
+  const safeBottom = Math.ceil(parseFloat(cs.getPropertyValue("--sab") || "0") || 0);
+  const safeLeft = Math.ceil(parseFloat(cs.getPropertyValue("--sal") || "0") || 0);
+  const safeRight = Math.ceil(parseFloat(cs.getPropertyValue("--sar") || "0") || 0);
+
+  const pad = (compact ? 16 : 28) + Math.max(safeLeft, safeRight);
+  const topBar = (compact ? 78 : 100) + safeTop;
+  const bottom = hudReserve(h, compact) + safeBottom;
   const availW = w - pad * 2;
   const availH = h - topBar - bottom;
   const maxBoard = compact ? 560 : Math.min(680, Math.floor(Math.min(availW, availH)));

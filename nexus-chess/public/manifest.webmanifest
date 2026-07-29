@@ -1,0 +1,18 @@
+{
+  "name": "NEXUS",
+  "short_name": "NEXUS",
+  "description": "Zone-control tactical chess",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#03050a",
+  "theme_color": "#03050a",
+  "icons": [
+    {
+      "src": "./logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
