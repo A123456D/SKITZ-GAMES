@@ -1,39 +1,22 @@
-/** Nexus visual identity — monochrome tech + cyber accents. */
+/** Nexus visual identity — premium monochrome minimal. */
 
 export const Theme = {
-  bg: "#000000",
-  bgElevated: "#0c0c0e",
-  panel: "#111116",
-  gridLine: "rgba(255,255,255,0.04)",
+  bg: "#070708",
 
-  // Board tiles (dark monochrome, slight contrast)
-  tileDark: "#121218",
-  tileLight: "#1c1c24",
-  tileBorder: "rgba(255,255,255,0.06)",
+  tileDark: "#101012",
+  tileLight: "#17171a",
 
-  // Nexus energy
-  nexusGold: "#f0c040",
-  nexusBlue: "#4aa8ff",
-  nexusWhite: "#ffffff",
+  // Soft white energy for the Nexus (single accent)
+  nexus: "#ffffff",
 
-  // UI
-  ink: "#ffffff",
-  inkDim: "rgba(255,255,255,0.55)",
-  inkMute: "rgba(255,255,255,0.28)",
-  stroke: "rgba(255,255,255,0.85)",
-  strokeDim: "rgba(255,255,255,0.35)",
-  accent: "#4aa8ff",
-  accentHot: "#f0c040",
-  danger: "#ff4d5a",
-  success: "#3dff9a",
+  ink: "#f4f4f5",
+  inkDim: "rgba(244,244,245,0.55)",
+  inkMute: "rgba(244,244,245,0.28)",
+  hairline: "rgba(244,244,245,0.18)",
+  hairlineStrong: "rgba(244,244,245,0.45)",
 
-  // Pieces
-  whitePiece: "#ffffff",
-  blackPiece: "#0a0a0a",
-  blackOutline: "#ffffff",
+  whitePiece: "#f7f7f8",
+  blackPiece: "#8b8f98",
 
-  font: '"Orbitron", "Segoe UI", system-ui, sans-serif',
-  fontDisplay: '"Orbitron", "Segoe UI", system-ui, sans-serif',
+  font: '"Space Grotesk", "Segoe UI", system-ui, sans-serif',
 } as const;
-
-export type ThemeColors = typeof Theme;
