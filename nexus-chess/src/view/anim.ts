@@ -25,29 +25,21 @@ export interface CaptureFlash {
   duration: number;
 }
 
-export interface FxParticle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
-  size: number;
-  color: string;
-  /** streak length for hard sparks */
-  len?: number;
-}
-
 export interface BoardFx {
-  particles: FxParticle[];
-  /** Hard impact rays (not soft rings) */
-  rays: { x: number; y: number; start: number; duration: number; angles: number[]; maxLen: number; color: string }[];
-  /** Brief hard flash plates */
-  flashes: { x: number; y: number; start: number; duration: number; size: number }[];
+  /** Expanding ring pulses on land / crash */
+  pulses: {
+    x: number;
+    y: number;
+    start: number;
+    duration: number;
+    maxR: number;
+    color: string;
+    lineW: number;
+  }[];
 }
 
 export function createBoardFx(): BoardFx {
-  return { particles: [], rays: [], flashes: [] };
+  return { pulses: [] };
 }
 
 export function lerp(a: number, b: number, t: number): number {
@@ -104,109 +96,63 @@ export function jumpScale(t: number): { sx: number; sy: number } {
 
 export function spawnLandFx(fx: BoardFx, x: number, y: number, size: number, now: number, capture: boolean) {
   const cx = x + size / 2;
-  const cy = y + size / 2;
-  const accent = Theme.id === "nexus" ? "rgba(180,235,255," : "rgba(255,255,255,";
+  const cy = y + size / 2 + size * 0.08;
+  const accent = Theme.id === "nexus" ? "rgba(170,230,255," : "rgba(255,255,255,";
 
-  const rayCount = capture ? 10 : 7;
-  const angles: number[] = [];
-  for (let i = 0; i < rayCount; i++) {
-    angles.push((Math.PI * 2 * i) / rayCount + (Math.random() - 0.5) * 0.25);
-  }
-  fx.rays.push({
+  // Fast expanding pulse ring
+  fx.pulses.push({
     x: cx,
-    y: cy + size * 0.18,
+    y: cy,
     start: now,
-    duration: capture ? 220 : 160,
-    angles,
-    maxLen: size * (capture ? 0.62 : 0.42),
+    duration: capture ? 280 : 220,
+    maxR: size * (capture ? 0.72 : 0.52),
     color: accent,
+    lineW: capture ? 3.2 : 2.4,
   });
 
-  fx.flashes.push({
-    x: cx,
-    y: cy + size * 0.12,
-    start: now,
-    duration: capture ? 90 : 60,
-    size: size * (capture ? 0.55 : 0.38),
-  });
-
-  const n = capture ? 16 : 9;
-  for (let i = 0; i < n; i++) {
-    const ang = (Math.PI * 2 * i) / n + Math.random() * 0.35;
-    const spd = (capture ? 3.4 : 2.2) * (0.7 + Math.random() * 0.9) * (size / 48);
-    fx.particles.push({
-      x: cx + Math.cos(ang) * size * 0.05,
-      y: cy + size * 0.15,
-      vx: Math.cos(ang) * spd * 90,
-      vy: Math.sin(ang) * spd * 55 - 55,
-      life: 0,
-      maxLife: 140 + Math.random() * 120,
-      size: 1.2 + Math.random() * 1.6,
-      len: 6 + Math.random() * 10,
-      color: Theme.id === "nexus" ? "#c8f0ff" : "#f4f4f5",
+  // Second beat for captures
+  if (capture) {
+    fx.pulses.push({
+      x: cx,
+      y: cy,
+      start: now + 45,
+      duration: 260,
+      maxR: size * 0.95,
+      color: accent,
+      lineW: 2,
     });
   }
 }
 
-export function updateBoardFx(fx: BoardFx, dt: number, now: number) {
-  for (const p of fx.particles) {
-    p.life += dt;
-    p.x += p.vx * (dt / 1000);
-    p.y += p.vy * (dt / 1000);
-    p.vy += 680 * (dt / 1000);
-    p.vx *= 0.98;
-  }
-  fx.particles = fx.particles.filter((p) => p.life < p.maxLife);
-  fx.rays = fx.rays.filter((r) => now - r.start < r.duration);
-  fx.flashes = fx.flashes.filter((f) => now - f.start < f.duration);
+export function updateBoardFx(fx: BoardFx, _dt: number, now: number) {
+  fx.pulses = fx.pulses.filter((p) => now - p.start < p.duration && now >= p.start);
 }
 
 export function drawBoardFx(ctx: CanvasRenderingContext2D, fx: BoardFx, now: number) {
-  for (const f of fx.flashes) {
-    const t = (now - f.start) / f.duration;
+  for (const p of fx.pulses) {
+    if (now < p.start) continue;
+    const t = (now - p.start) / p.duration;
+    if (t < 0 || t > 1) continue;
+    // Ease-out expand + fade — reads as a pulse, not a soft glow fill
+    const rad = p.maxR * easeOutCubic(t);
     const a = (1 - t) * (1 - t) * 0.85;
-    ctx.fillStyle = Theme.id === "nexus" ? `rgba(220,245,255,${a})` : `rgba(255,255,255,${a})`;
-    const w = f.size * (0.55 + t * 0.35);
-    const h = f.size * 0.14 * (1 - t * 0.4);
-    // Hard plate flash, not a soft bubble
-    ctx.fillRect(f.x - w / 2, f.y - h / 2, w, h);
-    ctx.fillStyle = Theme.id === "nexus" ? `rgba(160,220,255,${a * 0.55})` : `rgba(255,255,255,${a * 0.45})`;
-    ctx.fillRect(f.x - h / 2, f.y - w * 0.35, h, w * 0.7);
-  }
+    ctx.strokeStyle = `${p.color}${a})`;
+    ctx.lineWidth = Math.max(1, p.lineW * (1 - t * 0.7));
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, Math.max(1, rad), 0, Math.PI * 2);
+    ctx.stroke();
 
-  for (const r of fx.rays) {
-    const t = (now - r.start) / r.duration;
-    const a = (1 - t) * (1 - t) * 0.9;
-    const len = r.maxLen * (0.35 + easeOutCubic(t) * 0.65);
-    ctx.strokeStyle = `${r.color}${a})`;
-    ctx.lineWidth = Math.max(1, 2.4 * (1 - t));
-    ctx.lineCap = "butt";
-    for (const ang of r.angles) {
-      const inset = r.maxLen * 0.08;
+    // Inner echo ring early in the pulse
+    if (t < 0.45) {
+      const innerT = t / 0.45;
+      const innerA = (1 - innerT) * 0.4;
+      ctx.strokeStyle = `${p.color}${innerA})`;
+      ctx.lineWidth = Math.max(1, p.lineW * 0.55);
       ctx.beginPath();
-      ctx.moveTo(r.x + Math.cos(ang) * inset, r.y + Math.sin(ang) * inset);
-      ctx.lineTo(r.x + Math.cos(ang) * len, r.y + Math.sin(ang) * len);
+      ctx.arc(p.x, p.y, Math.max(1, rad * 0.55), 0, Math.PI * 2);
       ctx.stroke();
     }
   }
-
-  for (const p of fx.particles) {
-    const t = p.life / p.maxLife;
-    const a = 1 - t;
-    ctx.globalAlpha = a;
-    ctx.strokeStyle = p.color;
-    ctx.lineWidth = Math.max(1, p.size * (1 - t * 0.5));
-    ctx.lineCap = "butt";
-    const len = (p.len ?? 8) * (1 - t * 0.35);
-    const speed = Math.hypot(p.vx, p.vy) || 1;
-    const dx = (p.vx / speed) * len;
-    const dy = (p.vy / speed) * len;
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-    ctx.lineTo(p.x - dx, p.y - dy);
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
 }
 
 export function drawMoveAnim(
@@ -278,28 +224,23 @@ export function drawCaptureFlash(
   const elapsed = now - flash.startTime;
   if (elapsed >= flash.duration) return false;
   const t = elapsed / flash.duration;
-  const alpha = (1 - t) * (1 - t) * 0.9;
+  const alpha = (1 - t) * (1 - t) * 0.75;
   const cx = flash.x + flash.size / 2;
   const cy = flash.y + flash.size / 2;
-
-  // Hard white hit plate — no soft bubble glow
-  ctx.fillStyle = Theme.id === "nexus" ? `rgba(210,240,255,${alpha * 0.55})` : `rgba(255,255,255,${alpha * 0.5})`;
-  const inset = flash.size * (0.12 + t * 0.08);
-  ctx.fillRect(flash.x + inset, flash.y + inset, flash.size - inset * 2, flash.size - inset * 2);
+  const rad = flash.size * (0.2 + easeOutCubic(t) * 0.55);
 
   ctx.strokeStyle = Theme.id === "nexus" ? `rgba(180,230,255,${alpha})` : `rgba(255,255,255,${alpha})`;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(flash.x + 3, flash.y + 3, flash.size - 6, flash.size - 6);
+  ctx.lineWidth = Math.max(1.5, 3.2 * (1 - t));
+  ctx.beginPath();
+  ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+  ctx.stroke();
 
-  // Jagged shock spokes
-  ctx.lineWidth = 1.75 * (1 - t * 0.5);
-  const r0 = flash.size * 0.12;
-  const r1 = flash.size * (0.38 + t * 0.35);
-  for (let i = 0; i < 8; i++) {
-    const ang = (i / 8) * Math.PI * 2 + t * 0.4;
+  if (t < 0.5) {
+    const a2 = (1 - t / 0.5) * 0.45;
+    ctx.strokeStyle = Theme.id === "nexus" ? `rgba(200,240,255,${a2})` : `rgba(255,255,255,${a2})`;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0);
-    ctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1);
+    ctx.arc(cx, cy, rad * 0.55, 0, Math.PI * 2);
     ctx.stroke();
   }
   return true;
