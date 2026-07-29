@@ -70,8 +70,8 @@ import {
   type Screen,
   type PlayMode,
 } from "./view/menu";
-import { initTheme, applyTheme, Theme, type ThemeId } from "./view/theme";
-import { loadNexusPieces } from "./view/pieces";
+import { initTheme, applyTheme, Theme, nextThemeId } from "./view/theme";
+import { loadThemePieces } from "./view/pieces";
 import { loadThemeArt } from "./view/fx";
 
 initTheme();
@@ -244,9 +244,10 @@ function onMenuClick(id: string) {
     return;
   }
   if (id === "hub-theme") {
-    const next: ThemeId = Theme.id === "nexus" ? "classic" : "nexus";
+    const next = nextThemeId(Theme.id);
     applyTheme(next);
     void loadThemeArt();
+    void loadThemePieces();
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", Theme.bg);
     return;
   }
@@ -531,7 +532,7 @@ function frame(now: number) {
 
 requestAnimationFrame(frame);
 void loadLogo().then((img) => setMenuLogo(img ?? getLogoImage()));
-void loadNexusPieces();
+void loadThemePieces();
 void loadThemeArt();
 void loadNexusMark();
 void loadAbilityIcons();

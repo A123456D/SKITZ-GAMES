@@ -3,7 +3,7 @@ import { squareToRC, rcToSquare, NEXUS_SQUARES } from "../core/board";
 import { ABILITY_COST, ABILITY_INFO } from "../core/abilities";
 import { activePlayer } from "../core/types";
 import { Theme } from "./theme";
-import { drawAtmosphere, drawBoardShadow, drawPremiumBtn, roundRectPath, fillTile, drawPanel } from "./fx";
+import { drawAtmosphere, drawBoardShadow, drawPremiumBtn, roundRectPath, fillTile, drawPanel, getBoardImage } from "./fx";
 import { drawThemePiece } from "./pieces";
 
 const PIECE_CHARS: Record<string, string> = {
@@ -240,6 +240,56 @@ function drawNexusGlow(dc: DrawCtx, time: number, flipped: boolean) {
   }
 }
 
+/** Forge nexus zone — dual cyan / crimson energy well. */
+function drawForgeNexus(dc: DrawCtx, time: number, flipped: boolean) {
+  const { ctx, cellSize } = dc;
+  const pulse = 0.1 + 0.07 * (0.5 + 0.5 * Math.sin(time * 1.5));
+  const corners = NEXUS_SQUARES.map((sq) => squareScreenPos(dc, sq, flipped));
+  const minX = Math.min(...corners.map(([x]) => x));
+  const minY = Math.min(...corners.map(([, y]) => y));
+  const zone = cellSize * 2;
+  const cx = minX + zone / 2;
+  const cy = minY + zone / 2;
+
+  const bloom = ctx.createRadialGradient(cx, cy, 0, cx, cy, zone * 0.95);
+  bloom.addColorStop(0, `rgba(255,120,130,${0.16 + pulse * 0.35})`);
+  bloom.addColorStop(0.45, `rgba(100,170,230,${0.08 + pulse * 0.18})`);
+  bloom.addColorStop(1, "rgba(20,8,12,0)");
+  ctx.fillStyle = bloom;
+  ctx.fillRect(minX - cellSize * 0.3, minY - cellSize * 0.3, zone + cellSize * 0.6, zone + cellSize * 0.6);
+
+  for (const sq of NEXUS_SQUARES) {
+    const [x, y] = squareScreenPos(dc, sq, flipped);
+    const scx = x + cellSize / 2;
+    const scy = y + cellSize / 2;
+    const grad = ctx.createRadialGradient(scx, scy, 0, scx, scy, cellSize * 0.5);
+    grad.addColorStop(0, `rgba(255,140,150,${pulse + 0.05})`);
+    grad.addColorStop(1, "rgba(80,140,200,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, cellSize, cellSize);
+  }
+
+  ctx.strokeStyle = `rgba(255,140,150,${0.4 + pulse})`;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(minX + 1.5, minY + 1.5, zone - 3, zone - 3);
+  ctx.strokeStyle = `rgba(140,200,255,${0.25 + pulse * 0.35})`;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(minX + 5, minY + 5, zone - 10, zone - 10);
+
+  // Etched X in the well
+  ctx.save();
+  ctx.globalAlpha = 0.18 + pulse * 0.1;
+  ctx.strokeStyle = "#ffb0b8";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx - zone * 0.22, cy - zone * 0.22);
+  ctx.lineTo(cx + zone * 0.22, cy + zone * 0.22);
+  ctx.moveTo(cx + zone * 0.22, cy - zone * 0.22);
+  ctx.lineTo(cx - zone * 0.22, cy + zone * 0.22);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawPieceGlyph(
   ctx: CanvasRenderingContext2D,
   ch: string,
@@ -274,14 +324,19 @@ export function drawBoard(
   ctx.fillStyle = Theme.bgSoft;
   ctx.fillRect(boardX - 3, boardY - 3, boardSize + 6, boardSize + 6);
 
-  for (let r = 0; r < 8; r++) {
-    for (let f = 0; f < 8; f++) {
-      const x = boardX + f * cellSize;
-      const y = boardY + (7 - r) * cellSize;
-      const br = flipped ? 7 - r : r;
-      const bf = flipped ? 7 - f : f;
-      const light = (br + bf) % 2 !== 0;
-      fillTile(ctx, x, y, cellSize, light);
+  const boardTex = getBoardImage();
+  if (boardTex && Theme.boardUrl) {
+    ctx.drawImage(boardTex, boardX, boardY, boardSize, boardSize);
+  } else {
+    for (let r = 0; r < 8; r++) {
+      for (let f = 0; f < 8; f++) {
+        const x = boardX + f * cellSize;
+        const y = boardY + (7 - r) * cellSize;
+        const br = flipped ? 7 - r : r;
+        const bf = flipped ? 7 - f : f;
+        const light = (br + bf) % 2 !== 0;
+        fillTile(ctx, x, y, cellSize, light);
+      }
     }
   }
 
@@ -289,33 +344,49 @@ export function drawBoard(
   if (lastMove) {
     for (const sq of [lastMove.from, lastMove.to]) {
       const [x, y] = squareScreenPos(dc, sq, flipped);
-      ctx.fillStyle =
-        Theme.id === "nexus" ? "rgba(120,190,230,0.22)" : "rgba(220,190,90,0.28)";
+      ctx.fillStyle = Theme.angular
+        ? Theme.id === "forge"
+          ? "rgba(200,100,110,0.22)"
+          : "rgba(120,190,230,0.22)"
+        : "rgba(220,190,90,0.28)";
       ctx.fillRect(x, y, cellSize, cellSize);
-      ctx.strokeStyle =
-        Theme.id === "nexus" ? "rgba(160,220,255,0.35)" : "rgba(230,200,100,0.4)";
+      ctx.strokeStyle = Theme.angular
+        ? Theme.id === "forge"
+          ? "rgba(255,140,150,0.35)"
+          : "rgba(160,220,255,0.35)"
+        : "rgba(230,200,100,0.4)";
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 0.5, y + 0.5, cellSize - 1, cellSize - 1);
     }
   }
 
-  // Board frame — sharper chrome on Nexus
-  ctx.strokeStyle = Theme.id === "nexus" ? Theme.hairlineBright : Theme.hairlineStrong;
-  ctx.lineWidth = Theme.id === "nexus" ? 1.5 : 1;
+  // Board frame — sharper chrome on premium themes
+  ctx.strokeStyle = Theme.angular ? Theme.hairlineBright : Theme.hairlineStrong;
+  ctx.lineWidth = Theme.angular ? 1.5 : 1;
   ctx.strokeRect(boardX - 0.5, boardY - 0.5, boardSize + 1, boardSize + 1);
-  if (Theme.id === "nexus") {
+  if (Theme.angular) {
     ctx.strokeStyle = Theme.accentDim;
     ctx.lineWidth = 1;
     ctx.strokeRect(boardX - 4.5, boardY - 4.5, boardSize + 9, boardSize + 9);
   }
 
-  drawNexusGlow(dc, time, flipped);
+  if (Theme.id === "nexus") {
+    drawNexusGlow(dc, time, flipped);
+  } else if (Theme.id === "forge") {
+    drawForgeNexus(dc, time, flipped);
+  } else {
+    drawNexusGlow(dc, time, flipped);
+  }
 
   if (selected) {
     const [sx, sy] = squareScreenPos(dc, selected, flipped);
-    ctx.fillStyle = Theme.id === "nexus" ? "rgba(140,210,255,0.12)" : "rgba(255,255,255,0.1)";
+    ctx.fillStyle = Theme.angular
+      ? Theme.id === "forge"
+        ? "rgba(255,140,150,0.12)"
+        : "rgba(140,210,255,0.12)"
+      : "rgba(255,255,255,0.1)";
     ctx.fillRect(sx, sy, cellSize, cellSize);
-    ctx.strokeStyle = Theme.id === "nexus" ? Theme.accent : "rgba(255,255,255,0.7)";
+    ctx.strokeStyle = Theme.angular ? Theme.accent : "rgba(255,255,255,0.7)";
     ctx.lineWidth = 1.25;
     ctx.strokeRect(sx + 2, sy + 2, cellSize - 4, cellSize - 4);
   }
@@ -326,13 +397,17 @@ export function drawBoard(
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
     if (state.board.has(sq)) {
-      ctx.strokeStyle = Theme.id === "nexus" ? Theme.accent : "rgba(255,255,255,0.55)";
+      ctx.strokeStyle = Theme.angular ? Theme.accent : "rgba(255,255,255,0.55)";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(cx, cy, cellSize * 0.4, 0, Math.PI * 2);
       ctx.stroke();
     } else {
-      ctx.fillStyle = Theme.id === "nexus" ? "rgba(160,230,255,0.55)" : "rgba(255,255,255,0.42)";
+      ctx.fillStyle = Theme.angular
+        ? Theme.id === "forge"
+          ? "rgba(255,140,150,0.55)"
+          : "rgba(160,230,255,0.55)"
+        : "rgba(255,255,255,0.42)";
       ctx.beginPath();
       ctx.arc(cx, cy, Math.max(2.8, cellSize * 0.08), 0, Math.PI * 2);
       ctx.fill();

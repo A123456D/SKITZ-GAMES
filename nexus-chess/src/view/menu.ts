@@ -191,7 +191,7 @@ export function drawHub(dc: DrawCtx, buttons: ButtonRect[], profile: EloProfile,
     id: "hub-theme",
   };
   drawPremiumBtn(ctx, themeBtn, `Theme · ${Theme.label}`, {
-    active: Theme.id === "nexus",
+    active: Theme.angular,
     fontSize: 12,
   });
   buttons.push(themeBtn);

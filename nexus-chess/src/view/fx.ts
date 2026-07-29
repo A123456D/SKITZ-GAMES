@@ -11,42 +11,39 @@ let backdropImg: HTMLImageElement | null = null;
 let backdropReady = false;
 let tileImg: HTMLImageElement | null = null;
 let tileReady = false;
+let boardImg: HTMLImageElement | null = null;
+let boardReady = false;
+
+function loadImg(url: string | null): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    if (!url) {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = `${url}?v=1`;
+  });
+}
 
 export function loadThemeArt(): Promise<void> {
   return Promise.all([
-    new Promise<void>((resolve) => {
-      if (!Theme.backdropUrl) {
-        backdropImg = null;
-        backdropReady = false;
-        resolve();
-        return;
-      }
-      const img = new Image();
-      img.onload = () => {
-        backdropImg = img;
-        backdropReady = true;
-        resolve();
-      };
-      img.onerror = () => resolve();
-      img.src = Theme.backdropUrl;
-    }),
-    new Promise<void>((resolve) => {
-      if (Theme.id !== "nexus") {
-        tileImg = null;
-        tileReady = false;
-        resolve();
-        return;
-      }
-      const img = new Image();
-      img.onload = () => {
-        tileImg = img;
-        tileReady = true;
-        resolve();
-      };
-      img.onerror = () => resolve();
-      img.src = "./themes/nexus/tile.png";
-    }),
-  ]).then(() => undefined);
+    loadImg(Theme.backdropUrl),
+    loadImg(Theme.tileUrl),
+    loadImg(Theme.boardUrl),
+  ]).then(([backdrop, tile, board]) => {
+    backdropImg = backdrop;
+    backdropReady = !!backdrop;
+    tileImg = tile;
+    tileReady = !!tile;
+    boardImg = board;
+    boardReady = !!board;
+  });
+}
+
+export function getBoardImage(): HTMLImageElement | null {
+  return boardReady ? boardImg : null;
 }
 
 export function roundRectPath(
@@ -88,7 +85,7 @@ export function drawAtmosphere(
     const dw = iw * scale;
     const dh = ih * scale;
     ctx.save();
-    ctx.globalAlpha = Theme.id === "nexus" ? 0.55 : 0.35;
+    ctx.globalAlpha = Theme.id === "forge" ? 0.62 : Theme.id === "nexus" ? 0.55 : 0.35;
     ctx.drawImage(backdropImg, (width - dw) / 2, (height - dh) / 2, dw, dh);
     ctx.restore();
   }
@@ -97,7 +94,11 @@ export function drawAtmosphere(
   const cx = width * 0.5;
   const cy = height * 0.38;
   const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(width, height) * 0.58);
-  if (Theme.id === "nexus") {
+  if (Theme.id === "forge") {
+    glow.addColorStop(0, `rgba(180,80,90,${0.08 * breathe})`);
+    glow.addColorStop(0.35, `rgba(80,140,200,${0.05 * breathe})`);
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+  } else if (Theme.id === "nexus") {
     glow.addColorStop(0, `rgba(120,200,255,${0.1 * breathe})`);
     glow.addColorStop(0.4, `rgba(80,160,220,${0.035 * breathe})`);
     glow.addColorStop(1, "rgba(0,0,0,0)");
@@ -109,10 +110,10 @@ export function drawAtmosphere(
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, width, height);
 
-  // Fine geometric grid for Nexus
-  if (Theme.id === "nexus") {
+  // Fine geometric grid for premium themes
+  if (Theme.angular) {
     ctx.save();
-    ctx.strokeStyle = "rgba(120,180,230,0.04)";
+    ctx.strokeStyle = Theme.id === "forge" ? "rgba(180,100,110,0.035)" : "rgba(120,180,230,0.04)";
     ctx.lineWidth = 1;
     const step = 48;
     const ox = (time * 4) % step;
@@ -140,7 +141,14 @@ export function drawAtmosphere(
     Math.max(width, height) * 0.75,
   );
   vig.addColorStop(0, "rgba(0,0,0,0)");
-  vig.addColorStop(1, Theme.id === "nexus" ? "rgba(0,4,12,0.72)" : "rgba(0,0,0,0.62)");
+  vig.addColorStop(
+    1,
+    Theme.id === "forge"
+      ? "rgba(8,2,6,0.7)"
+      : Theme.id === "nexus"
+        ? "rgba(0,4,12,0.72)"
+        : "rgba(0,0,0,0.62)",
+  );
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, width, height);
 }
@@ -160,7 +168,7 @@ export function drawBoardShadow(
     boardY + boardSize * 0.6,
     boardSize * 0.72,
   );
-  shadow.addColorStop(0, Theme.id === "nexus" ? "rgba(0,20,40,0.7)" : "rgba(0,0,0,0.55)");
+  shadow.addColorStop(0, Theme.angular ? "rgba(0,10,20,0.7)" : "rgba(0,0,0,0.55)");
   shadow.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = shadow;
   ctx.fillRect(boardX - pad, boardY - pad * 0.4, boardSize + pad * 2, boardSize + pad * 1.4);
@@ -223,7 +231,11 @@ export function drawPremiumBtn(
 
   if (opts.primary) {
     const g = ctx.createLinearGradient(x, y, x, y + h);
-    if (Theme.id === "nexus") {
+    if (Theme.id === "forge") {
+      g.addColorStop(0, "rgba(200,100,110,0.28)");
+      g.addColorStop(0.5, "rgba(120,160,220,0.12)");
+      g.addColorStop(1, "rgba(80,40,50,0.12)");
+    } else if (Theme.id === "nexus") {
       g.addColorStop(0, "rgba(140,210,255,0.28)");
       g.addColorStop(0.5, "rgba(80,160,220,0.14)");
       g.addColorStop(1, "rgba(40,100,160,0.1)");
@@ -296,7 +308,7 @@ export function fillTile(
   ctx.fillStyle = light ? Theme.tileLight : Theme.tileDark;
   ctx.fillRect(x, y, size, size);
 
-  if (tileReady && tileImg && Theme.id === "nexus") {
+  if (tileReady && tileImg && Theme.tileUrl && !Theme.boardUrl) {
     ctx.save();
     ctx.globalAlpha = light ? 0.22 : 0.14;
     ctx.drawImage(tileImg, x, y, size, size);

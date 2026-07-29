@@ -97,7 +97,7 @@ export function jumpScale(t: number): { sx: number; sy: number } {
 export function spawnLandFx(fx: BoardFx, x: number, y: number, size: number, now: number, capture: boolean) {
   const cx = x + size / 2;
   const cy = y + size / 2 + size * 0.08;
-  const accent = Theme.id === "nexus" ? "rgba(170,230,255," : "rgba(255,255,255,";
+  const accent = Theme.pulseRgba;
 
   // Fast expanding pulse ring
   fx.pulses.push({
@@ -229,7 +229,7 @@ export function drawCaptureFlash(
   const cy = flash.y + flash.size / 2;
   const rad = flash.size * (0.2 + easeOutCubic(t) * 0.55);
 
-  ctx.strokeStyle = Theme.id === "nexus" ? `rgba(180,230,255,${alpha})` : `rgba(255,255,255,${alpha})`;
+  ctx.strokeStyle = `${Theme.pulseRgba}${alpha})`;
   ctx.lineWidth = Math.max(1.5, 3.2 * (1 - t));
   ctx.beginPath();
   ctx.arc(cx, cy, rad, 0, Math.PI * 2);
@@ -237,7 +237,7 @@ export function drawCaptureFlash(
 
   if (t < 0.5) {
     const a2 = (1 - t / 0.5) * 0.45;
-    ctx.strokeStyle = Theme.id === "nexus" ? `rgba(200,240,255,${a2})` : `rgba(255,255,255,${a2})`;
+    ctx.strokeStyle = `${Theme.pulseRgba}${a2})`;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(cx, cy, rad * 0.55, 0, Math.PI * 2);
