@@ -20,6 +20,7 @@ import {
   drawBoard,
   drawHud,
   drawAbilityConfirm,
+  drawToast,
   squareScreenPos,
   loadLogo,
   loadNexusMark,
@@ -39,6 +40,8 @@ import {
   makeAbilityCast,
   type UiState,
 } from "./view/input";
+import { ABILITY_INFO } from "./core/abilities";
+import type { Ability } from "./core/types";
 import {
   drawMoveAnim,
   drawCaptureFlash,
@@ -98,6 +101,18 @@ let animEndTimer: ReturnType<typeof setTimeout> | null = null;
 let aiPending = false;
 let eloRecorded = false;
 let lastMove: { from: Square; to: Square } | null = null;
+let toast: { text: string; start: number; duration: number } | null = null;
+
+function showToast(text: string, duration = 1800) {
+  toast = { text, start: performance.now(), duration };
+}
+
+function abilityToast(ability: Ability, square: Square) {
+  const info = ABILITY_INFO[ability];
+  if (ability === "aegis") showToast(`${info.name} · ${square} shielded`);
+  else if (ability === "overdrive") showToast(`${info.name} · ${square} can move twice`);
+  else showToast(`${info.name} · king swapped with ${square}`);
+}
 
 const PIECE_CHARS: Record<string, string> = {
   wK: "\u2654", wQ: "\u2655", wR: "\u2656", wB: "\u2657", wN: "\u2658", wP: "\u2659",
@@ -364,6 +379,13 @@ function onPointer(e: PointerEvent) {
       if (ui.pendingAbility && canAffordAbility(state, ui.pendingAbility)) {
         ui = applyAbilitySelect(ui, state, ui.pendingAbility);
         playUiTap();
+        if (ui.abilityTargetSquares.length === 0) {
+          showToast("No valid targets");
+          ui = clearUi();
+        }
+      } else if (ui.pendingAbility) {
+        showToast(`Need ${ABILITY_INFO[ui.pendingAbility].cost} mana`);
+        playUiTap();
       }
       break;
 
@@ -375,8 +397,13 @@ function onPointer(e: PointerEvent) {
     case "abilityTarget":
       if (result.ability && result.square) {
         state = doAbilityPhase(state, makeAbilityCast(result.ability, result.square));
-        ui = clearUi();
+        abilityToast(result.ability, result.square);
         playAbility();
+        if (state.overdriveSquare) {
+          ui = applySelect(clearUi(), state, state.overdriveSquare);
+        } else {
+          ui = clearUi();
+        }
       }
       break;
 
@@ -525,6 +552,9 @@ function frame(now: number) {
         canAffordAbility(state, ui.pendingAbility),
       );
     }
+
+    drawToast(dc, toast, now);
+    if (toast && now - toast.start > toast.duration) toast = null;
   }
 
   requestAnimationFrame(frame);

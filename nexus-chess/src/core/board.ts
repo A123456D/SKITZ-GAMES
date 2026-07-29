@@ -52,8 +52,8 @@ export function newGame(): GameState {
   return {
     board: initialBoard(),
     players: [
-      { color: "w", mana: 0 },
-      { color: "b", mana: 0 },
+      { color: "w", mana: 2 },
+      { color: "b", mana: 2 },
     ],
     activeColor: "w",
     turnPhase: "ability",

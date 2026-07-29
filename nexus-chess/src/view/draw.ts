@@ -429,9 +429,23 @@ export function drawBoard(
   if (activeAbility) {
     for (const sq of abilityTargets) {
       const [x, y] = squareScreenPos(dc, sq, flipped);
-      ctx.strokeStyle = "rgba(255,255,255,0.45)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + 4, y + 4, cellSize - 8, cellSize - 8);
+      const pulse = 0.55 + 0.25 * (0.5 + 0.5 * Math.sin(time * 5));
+      ctx.fillStyle =
+        Theme.id === "forge" ? `rgba(255,140,150,${0.18 * pulse})` : `rgba(140,220,255,${0.18 * pulse})`;
+      ctx.fillRect(x, y, cellSize, cellSize);
+      ctx.strokeStyle = Theme.accent;
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(x + 3, y + 3, cellSize - 6, cellSize - 6);
+      // Corner ticks
+      const t = Math.max(5, cellSize * 0.14);
+      ctx.beginPath();
+      ctx.moveTo(x + 3, y + 3 + t);
+      ctx.lineTo(x + 3, y + 3);
+      ctx.lineTo(x + 3 + t, y + 3);
+      ctx.moveTo(x + cellSize - 3 - t, y + 3);
+      ctx.lineTo(x + cellSize - 3, y + 3);
+      ctx.lineTo(x + cellSize - 3, y + 3 + t);
+      ctx.stroke();
     }
   }
 
@@ -442,15 +456,27 @@ export function drawBoard(
     const cy = y + cellSize / 2;
 
     if (piece.isShielded) {
-      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      const pulse = 0.55 + 0.35 * (0.5 + 0.5 * Math.sin(time * 3.2));
+      ctx.strokeStyle =
+        Theme.id === "forge" ? `rgba(255,160,170,${0.55 + pulse * 0.35})` : `rgba(160,230,255,${0.55 + pulse * 0.35})`;
+      ctx.lineWidth = 2.5;
+      roundRectPath(ctx, x + 4, y + 4, cellSize - 8, cellSize - 8, 3);
+      ctx.stroke();
+      ctx.strokeStyle =
+        Theme.id === "forge" ? `rgba(255,200,210,${0.25 + pulse * 0.2})` : `rgba(200,240,255,${0.25 + pulse * 0.2})`;
       ctx.lineWidth = 1;
-      roundRectPath(ctx, x + 5, y + 5, cellSize - 10, cellSize - 10, 2);
+      roundRectPath(ctx, x + 8, y + 8, cellSize - 16, cellSize - 16, 2);
       ctx.stroke();
     }
 
     if (state.overdriveSquare === sq) {
-      ctx.fillStyle = "rgba(255,255,255,0.07)";
+      const pulse = 0.5 + 0.4 * (0.5 + 0.5 * Math.sin(time * 4));
+      ctx.fillStyle =
+        Theme.id === "forge" ? `rgba(255,120,90,${0.14 + pulse * 0.1})` : `rgba(120,200,255,${0.14 + pulse * 0.1})`;
       ctx.fillRect(x, y, cellSize, cellSize);
+      ctx.strokeStyle = Theme.id === "forge" ? `rgba(255,180,100,${0.7 + pulse * 0.25})` : `rgba(180,230,255,${0.7 + pulse * 0.25})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
     }
 
     const ch = PIECE_CHARS[piece.color + piece.kind];
@@ -526,7 +552,7 @@ export function drawHud(
     ctx.fillText(label, contentX, barY + rowH / 2);
 
     const trackX = contentX + labelW;
-    const trackW = contentW - labelW;
+    const trackW = contentW - labelW - (compact ? 22 : 36);
     const trackY = barY + (rowH - trackH) / 2;
 
     ctx.fillStyle = "rgba(255,255,255,0.06)";
@@ -542,6 +568,11 @@ export function drawHud(
       roundRectPath(ctx, trackX, trackY, Math.max(fillW, trackH), trackH, 1.5);
       ctx.fill();
     }
+
+    ctx.fillStyle = Theme.inkMute;
+    ctx.font = `500 ${fontSm}px ${Theme.font}`;
+    ctx.textAlign = "right";
+    ctx.fillText(String(p.mana), contentX + contentW, barY + rowH / 2);
   }
 
   const infoY = hudTop + rowH * 2 + (compact ? 10 : 14);
@@ -561,7 +592,27 @@ export function drawHud(
   ctx.textBaseline = "alphabetic";
   ctx.fillText(`Turn ${state.turnNumber}  ·  ${turnLabel}  ·  ${phaseLabel}`, contentX, infoY);
 
-  if (state.turnPhase === "ability" && !state.winner) {
+  const targeting = highlightAbility && state.turnPhase === "ability" && !state.winner;
+
+  if (targeting) {
+    const info = ABILITY_INFO[highlightAbility!];
+    const promptY = infoY + (compact ? 16 : 20);
+    ctx.fillStyle = Theme.accent;
+    ctx.font = `500 ${compact ? 12 : 13}px ${Theme.font}`;
+    ctx.textAlign = "left";
+    ctx.fillText(`Select a piece for ${info.name}`, contentX, promptY);
+
+    const cancelW = compact ? 72 : 88;
+    const cancel: ButtonRect = {
+      x: contentX + contentW - cancelW,
+      y: promptY - 16,
+      w: cancelW,
+      h: 28,
+      id: "ability-cancel",
+    };
+    drawPremiumBtn(ctx, cancel, "Cancel", { fontSize: 12 });
+    buttons.push(cancel);
+  } else if (state.turnPhase === "ability" && !state.winner) {
     const btnY = infoY + (compact ? 12 : 16);
     const abilities: { id: Ability | "skip"; label: string; cost?: number }[] = [
       { id: "aegis", label: "Aegis", cost: ABILITY_COST.aegis },
@@ -585,7 +636,7 @@ export function drawHud(
       drawPremiumBtn(ctx, btn, icon ? "" : label, {
         muted: !canAfford && a.id !== "skip",
         primary: a.id === "skip",
-        active: a.id !== "skip" && a.id === highlightAbility,
+        active: false,
         fontSize: compact ? 11 : 12,
       });
 
@@ -615,7 +666,48 @@ export function drawHud(
 
       buttons.push(btn);
     }
+  } else if (state.turnPhase === "overdrive" && state.overdriveSquare && !state.winner) {
+    ctx.fillStyle = Theme.accent;
+    ctx.font = `500 ${compact ? 12 : 13}px ${Theme.font}`;
+    ctx.textAlign = "left";
+    ctx.fillText(
+      `Overdrive · move ${state.overdriveSquare} (${state.overdriveMovesLeft} left)`,
+      contentX,
+      infoY + (compact ? 16 : 20),
+    );
   }
+}
+
+/** Floating status toast (ability cast, mana warning, etc). */
+export function drawToast(
+  dc: DrawCtx,
+  toast: { text: string; start: number; duration: number } | null,
+  now: number,
+) {
+  if (!toast) return;
+  const t = (now - toast.start) / toast.duration;
+  if (t < 0 || t >= 1) return;
+  const { ctx, width, height, compact } = dc;
+  const fade = t < 0.12 ? t / 0.12 : t > 0.75 ? (1 - t) / 0.25 : 1;
+  const w = Math.min(width - 32, compact ? 280 : 340);
+  const h = compact ? 40 : 44;
+  const x = (width - w) / 2;
+  const y = height * 0.18;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, fade);
+  ctx.fillStyle = "rgba(8,10,14,0.9)";
+  roundRectPath(ctx, x, y, w, h, 4);
+  ctx.fill();
+  ctx.strokeStyle = Theme.hairlineBright;
+  ctx.lineWidth = 1;
+  roundRectPath(ctx, x + 0.5, y + 0.5, w - 1, h - 1, 4);
+  ctx.stroke();
+  ctx.fillStyle = Theme.ink;
+  ctx.font = `500 ${compact ? 13 : 14}px ${Theme.font}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(toast.text, width / 2, y + h / 2 + 0.5);
+  ctx.restore();
 }
 
 /** Ability info + confirm overlay. Adds ability-confirm / ability-cancel buttons. */

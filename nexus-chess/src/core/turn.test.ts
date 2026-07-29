@@ -17,7 +17,7 @@ function bareKing(color: "w" | "b"): Piece {
 describe("turn", () => {
   it("beginTurn grants passive mana", () => {
     const s = beginTurn(newGame());
-    expect(s.players[0].mana).toBe(1);
+    expect(s.players[0].mana).toBe(3);
     expect(s.turnPhase).toBe("ability");
   });
 
@@ -35,7 +35,7 @@ describe("turn", () => {
     s = endTurn(s);
     expect(s.activeColor).toBe("b");
     expect(s.turnPhase).toBe("ability");
-    expect(s.players[1].mana).toBe(1); // black's passive
+    expect(s.players[1].mana).toBe(3); // black start 2 + passive
   });
 
   it("Nexus Hold: king survives 2 start-of-turns in Nexus => win", () => {
