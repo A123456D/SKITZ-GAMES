@@ -414,41 +414,100 @@ export function isValidFaceStickers(
   return true;
 }
 
+/** Legacy single-set key — migrated into the active theme slot once. */
 const FACE_STICKERS_KEY = "riotcube_face_stickers";
+/** Per-theme (and anime day/dark) sticker picks. */
+const FACE_STICKERS_BY_THEME_KEY = "riotcube_face_stickers_by_theme";
 
-export function loadSavedFaceStickers(
-  pool: readonly TileKind[],
-): FaceStickers | null {
+type StickersByTheme = Record<string, FaceStickers>;
+
+function readStickersByTheme(): StickersByTheme {
   try {
-    const raw = localStorage.getItem(FACE_STICKERS_KEY);
-    if (!raw) return null;
+    const raw = localStorage.getItem(FACE_STICKERS_BY_THEME_KEY);
+    if (!raw) return {};
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return null;
-    const map = parsed.filter((k): k is TileKind => typeof k === "string");
-    if (!isValidFaceStickers(map, pool)) return null;
-    return map as unknown as FaceStickers;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as StickersByTheme;
   } catch {
-    return null;
+    return {};
   }
 }
 
-export function saveFaceStickers(map: FaceStickers): void {
+function writeStickersByTheme(map: StickersByTheme): void {
   try {
-    localStorage.setItem(FACE_STICKERS_KEY, JSON.stringify(map));
+    localStorage.setItem(FACE_STICKERS_BY_THEME_KEY, JSON.stringify(map));
   } catch {
     /* ignore */
   }
 }
 
-/** Prefer keep → saved → stable defaults. Never random. */
+function parseStickerList(
+  raw: unknown,
+  pool: readonly TileKind[],
+): FaceStickers | null {
+  if (!Array.isArray(raw)) return null;
+  const map = raw.filter((k): k is TileKind => typeof k === "string");
+  if (!isValidFaceStickers(map, pool)) return null;
+  return map as unknown as FaceStickers;
+}
+
+export function loadSavedFaceStickers(
+  pool: readonly TileKind[],
+  themeSlot: string,
+): FaceStickers | null {
+  try {
+    const byTheme = readStickersByTheme();
+    const slotted = parseStickerList(byTheme[themeSlot], pool);
+    if (slotted) return slotted;
+
+    // Migrate legacy global pick into this theme once.
+    const legacyRaw = localStorage.getItem(FACE_STICKERS_KEY);
+    if (legacyRaw) {
+      const legacy = parseStickerList(JSON.parse(legacyRaw), pool);
+      if (legacy) {
+        byTheme[themeSlot] = legacy;
+        writeStickersByTheme(byTheme);
+        try {
+          localStorage.removeItem(FACE_STICKERS_KEY);
+        } catch {
+          /* ignore */
+        }
+        return legacy;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+export function saveFaceStickers(map: FaceStickers, themeSlot: string): void {
+  if (!themeSlot) return;
+  const byTheme = readStickersByTheme();
+  byTheme[themeSlot] = map;
+  writeStickersByTheme(byTheme);
+}
+
+/** Prefer keep → saved for theme → stable defaults. Never random. */
 export function resolveFaceStickers(
   pool: readonly TileKind[],
   keep?: readonly TileKind[] | null,
+  themeSlot: string = "",
 ): FaceStickers {
   if (keep && isValidFaceStickers(keep, pool)) return keep as FaceStickers;
-  const saved = loadSavedFaceStickers(pool);
-  if (saved) return saved;
+  if (themeSlot) {
+    const saved = loadSavedFaceStickers(pool, themeSlot);
+    if (saved) return saved;
+  }
   return defaultFaceStickers(pool);
+}
+
+/** True when this theme already has a saved six-sticker set. */
+export function hasSavedFaceStickers(
+  pool: readonly TileKind[],
+  themeSlot: string,
+): boolean {
+  return loadSavedFaceStickers(pool, themeSlot) != null;
 }
 
 export function stickerForColor(

@@ -732,7 +732,7 @@ export const HELP_PAGES = [
   {
     title: "TOOLS",
     lines: [
-      "STICKERS — pick the six face designs.",
+      "STICKERS — pick six face designs (saved per theme).",
       "SCRAMBLE — shuffle for a fresh puzzle (icons stay).",
       "HINT — draw a suggested move (Settings).",
       "Try 2\u00D72 in Settings if 3\u00D73 feels rough.",

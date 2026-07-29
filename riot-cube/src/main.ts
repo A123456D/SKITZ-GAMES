@@ -11,6 +11,7 @@ import {
   setActiveFace,
   setFaceStickers,
   setProgressSaveSuspended,
+  setProgressThemeSlot,
   sizeLabel,
   startSession,
   type FaceId,
@@ -18,7 +19,13 @@ import {
   type Session,
 } from "./core/session";
 import { suggestHintMove, type HintMove } from "./core/hint";
-import { pickFaceStickers, isValidFaceStickers, stickerPoolForTheme, type TileKind } from "./core/stickers";
+import {
+  pickFaceStickers,
+  isValidFaceStickers,
+  saveFaceStickers,
+  stickerPoolForTheme,
+  type TileKind,
+} from "./core/stickers";
 import { previewCube } from "./core/lane";
 import {
   W,
@@ -122,6 +129,7 @@ import {
   applyThemeChrome,
   getAnimeMode,
   getTheme,
+  getThemeAssetDir,
   getThemeLabel,
   setTheme,
   toggleAnimeMode,
@@ -177,45 +185,35 @@ function activeStickerPool() {
   );
 }
 
-/** Drop invalid stickers for the active theme — never auto-randomize. Opens picker. */
-function rematchStickersToActivePool(): boolean {
-  const pool = activeStickerPool();
-  if (isValidFaceStickers(session.faceStickers, pool)) {
-    if (screen === "stickers") {
-      stickerDraft = [...session.faceStickers];
-      stickerSlot = 0;
-    }
-    return false;
-  }
-  const used = new Set<string>();
-  stickerDraft = session.faceStickers.map((k) => {
-    if ((pool as readonly string[]).includes(k) && !used.has(k)) {
-      used.add(k);
-      return k;
-    }
-    return null;
-  });
-  const empty = stickerDraft.findIndex((k) => !k);
-  stickerSlot = empty >= 0 ? empty : 0;
-  stickersScroll = 0;
-  stickersScrollDrag = null;
-  stickersMustPick = true;
-  stickersFrom = screen === "themes" ? themesFrom : screen;
-  screen = "stickers";
-  sfxPaperRustle();
-  return true;
+function activeThemeSlot(): string {
+  return getThemeAssetDir();
 }
 
-function applyThemeChange(): void {
+/**
+ * Switch theme art/music and restore that theme's stickers + puzzle.
+ * Never forces the sticker picker — first visit uses defaults until the player picks.
+ */
+function applyThemeChange(prevSlot: string): void {
+  // Don't overwrite a real theme save with tutorial practice state.
+  if (!tutorial) {
+    saveProgress(session);
+    saveFaceStickers(session.faceStickers, prevSlot);
+  }
+  const nextSlot = activeThemeSlot();
+  setProgressThemeSlot(nextSlot);
   reloadThemeArt(getTheme());
   void loadStickers();
   syncMusicForTheme(getTheme());
-  rematchStickersToActivePool();
+  const pool = activeStickerPool();
+  session = resumeOrStartSession(session.size, pool, null);
+  clearHint();
+  syncActiveFace();
 }
 
 function applyAnimeModeToggle(): void {
+  const prev = activeThemeSlot();
   toggleAnimeMode();
-  applyThemeChange();
+  applyThemeChange(prev);
   sfxPaperRustle();
 }
 
@@ -323,6 +321,7 @@ function beginOnboarding(): void {
   beginTutorial("home");
 }
 
+setProgressThemeSlot(activeThemeSlot());
 let session: Session = resumeOrStartSession(loadCubeSize(), activeStickerPool());
 
 let faceTurnBtns: FaceTurnButtons | null = null;
@@ -676,8 +675,9 @@ function pickTheme(id: ThemeId): void {
     if (onboarding === "theme") sfxPaperRustle();
     return;
   }
+  const prev = activeThemeSlot();
   setTheme(id);
-  applyThemeChange();
+  applyThemeChange(prev);
   sfxPaperFlutter();
 }
 
@@ -721,7 +721,7 @@ function paint(): void {
       slot: stickerSlot,
       scroll: stickersScroll,
       banner: stickersMustPick
-        ? "New theme — pick 6 stickers (scramble won’t change them)"
+        ? "Pick 6 stickers for this theme (saved automatically)"
         : undefined,
       hideBack: stickersMustPick,
     });

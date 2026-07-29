@@ -72,7 +72,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
     title: "YOUR STICKERS",
     lines: [
       "Icons are yours — scramble never changes them.",
-      "When you open a new theme, you pick six stickers.",
+      "Each theme keeps its own stickers and puzzle progress.",
       "Open STICKERS now to see the chooser.",
     ],
     action: "stickers",
