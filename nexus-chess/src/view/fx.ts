@@ -23,7 +23,7 @@ function loadImg(url: string | null): Promise<HTMLImageElement | null> {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
-    img.src = `${url}?v=2`;
+    img.src = `${url}?v=4`;
   });
 }
 
@@ -99,8 +99,8 @@ export function drawAtmosphere(
     glow.addColorStop(0.35, `rgba(80,140,200,${0.05 * breathe})`);
     glow.addColorStop(1, "rgba(0,0,0,0)");
   } else if (Theme.id === "nexus") {
-    glow.addColorStop(0, `rgba(120,200,255,${0.1 * breathe})`);
-    glow.addColorStop(0.4, `rgba(80,160,220,${0.035 * breathe})`);
+    glow.addColorStop(0, `rgba(100,170,210,${0.055 * breathe})`);
+    glow.addColorStop(0.45, `rgba(70,140,180,${0.02 * breathe})`);
     glow.addColorStop(1, "rgba(0,0,0,0)");
   } else {
     glow.addColorStop(0, `rgba(255,255,255,${0.07 * breathe})`);
