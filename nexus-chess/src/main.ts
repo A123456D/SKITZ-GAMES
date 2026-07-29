@@ -85,13 +85,13 @@ function maybeAiTurn() {
       aiPending = false;
       return;
     }
-    // Expert search can be heavy — yield one frame then compute
+    // Search levels can be heavy — yield then compute
     const run = () => {
       state = aiTurn(state, difficulty);
       ui = clearUi();
       aiPending = false;
     };
-    if (difficulty >= 4) {
+    if (difficulty >= 2) {
       setTimeout(run, 0);
     } else {
       run();

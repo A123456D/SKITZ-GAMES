@@ -57,7 +57,7 @@ describe("ai difficulty", () => {
     expect(s.board.get(move!.from)!.color).toBe("w");
   });
 
-  it("normal prioritizes capturing king in Nexus", () => {
+  it("normal and above take assassination wins", () => {
     let s = newGame();
     s.board = new Map();
     s.board.set("d3", piece("R", "w"));
@@ -65,19 +65,7 @@ describe("ai difficulty", () => {
     s.board.set("e1", bareKing("w"));
     s.board.set("a2", piece("P", "w"));
     s = beginTurn(s);
-    const move = aiPickMove(s, 2);
-    expect(move!.from).toBe("d3");
-    expect(move!.to).toBe("d4");
-  });
-
-  it("hard and expert also take assassination wins", () => {
-    let s = newGame();
-    s.board = new Map();
-    s.board.set("d3", piece("R", "w"));
-    s.board.set("d4", bareKing("b"));
-    s.board.set("e1", bareKing("w"));
-    s.board.set("a2", piece("P", "w"));
-    s = beginTurn(s);
+    expect(aiPickMove(s, 2)!.to).toBe("d4");
     expect(aiPickMove(s, 3)!.to).toBe("d4");
     expect(aiPickMove(s, 4)!.to).toBe("d4");
   });
@@ -86,24 +74,25 @@ describe("ai difficulty", () => {
     let s = newGame();
     s.board = new Map();
     s.board.set("d3", bareKing("w"));
-    s.board.set("a4", piece("Q", "b"));
-    s.board.set("a3", piece("R", "w"));
-    s.board.set("h8", bareKing("b"));
+    // Tempting free queen that does NOT cover the Nexus
+    s.board.set("h7", piece("Q", "b"));
+    s.board.set("h2", piece("R", "w"));
+    s.board.set("a8", bareKing("b"));
     s = beginTurn(s);
     const move = aiPickMove(s, 2);
     expect(move!.from).toBe("d3");
     expect(move!.to === "d4" || move!.to === "e4").toBe(true);
   });
 
-  it("hard marches king closer to Nexus", () => {
+  it("normal marches king closer to Nexus", () => {
     let s = newGame();
     s.board = new Map();
-    s.board.set("e1", bareKing("w"));
-    s.board.set("e8", bareKing("b"));
+    s.board.set("e2", bareKing("w"));
+    s.board.set("a8", bareKing("b"));
     s = beginTurn(s);
-    const before = distToNexus("e1");
-    const move = aiPickMove(s, 3);
-    expect(move!.from).toBe("e1");
+    const before = distToNexus("e2");
+    const move = aiPickMove(s, 2);
+    expect(move!.from).toBe("e2");
     expect(distToNexus(move!.to)).toBeLessThan(before);
   });
 
