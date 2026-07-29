@@ -3,7 +3,8 @@ import { squareToRC, rcToSquare, NEXUS_SQUARES } from "../core/board";
 import { ABILITY_COST } from "../core/abilities";
 import { activePlayer } from "../core/types";
 import { Theme } from "./theme";
-import { drawAtmosphere, drawBoardShadow, drawPremiumBtn, roundRectPath } from "./fx";
+import { drawAtmosphere, drawBoardShadow, drawPremiumBtn, roundRectPath, fillTile } from "./fx";
+import { drawThemePiece } from "./pieces";
 
 const PIECE_CHARS: Record<string, string> = {
   wK: "\u2654", wQ: "\u2655", wR: "\u2656", wB: "\u2657", wN: "\u2658", wP: "\u2659",
@@ -119,8 +120,8 @@ function drawLogoHeader(dc: DrawCtx) {
 function drawNexusGlow(dc: DrawCtx, time: number, flipped: boolean) {
   const { ctx, cellSize } = dc;
   const pulse = 0.1 + 0.06 * (0.5 + 0.5 * Math.sin(time * 1.4));
+  const isNexus = Theme.id === "nexus";
 
-  // Soft bloom covering the whole Nexus block
   const corners = NEXUS_SQUARES.map((sq) => squareScreenPos(dc, sq, flipped));
   const minX = Math.min(...corners.map(([x]) => x));
   const minY = Math.min(...corners.map(([, y]) => y));
@@ -128,28 +129,47 @@ function drawNexusGlow(dc: DrawCtx, time: number, flipped: boolean) {
   const cx = minX + zone / 2;
   const cy = minY + zone / 2;
 
-  const bloom = ctx.createRadialGradient(cx, cy, 0, cx, cy, zone * 0.85);
-  bloom.addColorStop(0, `rgba(255,255,255,${0.07 + pulse * 0.35})`);
-  bloom.addColorStop(0.55, `rgba(255,255,255,${0.025 + pulse * 0.12})`);
-  bloom.addColorStop(1, "rgba(255,255,255,0)");
+  const bloom = ctx.createRadialGradient(cx, cy, 0, cx, cy, zone * 0.9);
+  if (isNexus) {
+    bloom.addColorStop(0, `rgba(140,220,255,${0.14 + pulse * 0.4})`);
+    bloom.addColorStop(0.5, `rgba(80,170,230,${0.05 + pulse * 0.15})`);
+    bloom.addColorStop(1, "rgba(40,100,160,0)");
+  } else {
+    bloom.addColorStop(0, `rgba(255,255,255,${0.07 + pulse * 0.35})`);
+    bloom.addColorStop(0.55, `rgba(255,255,255,${0.025 + pulse * 0.12})`);
+    bloom.addColorStop(1, "rgba(255,255,255,0)");
+  }
   ctx.fillStyle = bloom;
-  ctx.fillRect(minX - cellSize * 0.3, minY - cellSize * 0.3, zone + cellSize * 0.6, zone + cellSize * 0.6);
+  ctx.fillRect(minX - cellSize * 0.35, minY - cellSize * 0.35, zone + cellSize * 0.7, zone + cellSize * 0.7);
 
   for (const sq of NEXUS_SQUARES) {
     const [x, y] = squareScreenPos(dc, sq, flipped);
     const scx = x + cellSize / 2;
     const scy = y + cellSize / 2;
-
     const grad = ctx.createRadialGradient(scx, scy, 0, scx, scy, cellSize * 0.55);
-    grad.addColorStop(0, `rgba(255,255,255,${pulse + 0.04})`);
-    grad.addColorStop(1, "rgba(255,255,255,0)");
+    if (isNexus) {
+      grad.addColorStop(0, `rgba(160,230,255,${pulse + 0.06})`);
+      grad.addColorStop(1, "rgba(100,180,230,0)");
+    } else {
+      grad.addColorStop(0, `rgba(255,255,255,${pulse + 0.04})`);
+      grad.addColorStop(1, "rgba(255,255,255,0)");
+    }
     ctx.fillStyle = grad;
     ctx.fillRect(x, y, cellSize, cellSize);
   }
 
-  ctx.strokeStyle = `rgba(255,255,255,${0.18 + pulse * 0.9})`;
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = isNexus
+    ? `rgba(160,230,255,${0.35 + pulse})`
+    : `rgba(255,255,255,${0.18 + pulse * 0.9})`;
+  ctx.lineWidth = isNexus ? 1.5 : 1;
   ctx.strokeRect(minX + 1.5, minY + 1.5, zone - 3, zone - 3);
+
+  if (isNexus) {
+    // Inner geometric frame
+    ctx.strokeStyle = `rgba(120,200,255,${0.2 + pulse * 0.4})`;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(minX + 5, minY + 5, zone - 10, zone - 10);
+  }
 }
 
 function drawPieceGlyph(
@@ -159,25 +179,9 @@ function drawPieceGlyph(
   cy: number,
   cellSize: number,
   color: "w" | "b",
+  kind: import("../core/types").PieceKind,
 ) {
-  ctx.font = `${cellSize * 0.68}px Georgia, "Times New Roman", serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  // Soft contact shadow
-  ctx.fillStyle = Theme.pieceShadow;
-  ctx.fillText(ch, cx + 0.5, cy + cellSize * 0.04);
-
-  if (color === "w") {
-    ctx.fillStyle = Theme.whitePiece;
-    ctx.fillText(ch, cx, cy);
-  } else {
-    ctx.fillStyle = Theme.blackPiece;
-    ctx.fillText(ch, cx, cy);
-    ctx.strokeStyle = "rgba(255,255,255,0.28)";
-    ctx.lineWidth = 0.8;
-    ctx.strokeText(ch, cx, cy);
-  }
+  drawThemePiece(ctx, color, kind, cx, cy, cellSize, ch);
 }
 
 export function drawBoard(
@@ -208,27 +212,27 @@ export function drawBoard(
       const br = flipped ? 7 - r : r;
       const bf = flipped ? 7 - f : f;
       const light = (br + bf) % 2 !== 0;
-      ctx.fillStyle = light ? Theme.tileLight : Theme.tileDark;
-      ctx.fillRect(x, y, cellSize, cellSize);
-
-      if (light) {
-        ctx.fillStyle = Theme.tileSheen;
-        ctx.fillRect(x, y, cellSize, 1);
-      }
+      fillTile(ctx, x, y, cellSize, light);
     }
   }
 
-  ctx.strokeStyle = Theme.hairlineStrong;
-  ctx.lineWidth = 1;
+  // Board frame — sharper chrome on Nexus
+  ctx.strokeStyle = Theme.id === "nexus" ? Theme.hairlineBright : Theme.hairlineStrong;
+  ctx.lineWidth = Theme.id === "nexus" ? 1.5 : 1;
   ctx.strokeRect(boardX - 0.5, boardY - 0.5, boardSize + 1, boardSize + 1);
+  if (Theme.id === "nexus") {
+    ctx.strokeStyle = Theme.accentDim;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(boardX - 4.5, boardY - 4.5, boardSize + 9, boardSize + 9);
+  }
 
   drawNexusGlow(dc, time, flipped);
 
   if (selected) {
     const [sx, sy] = squareScreenPos(dc, selected, flipped);
-    ctx.fillStyle = "rgba(255,255,255,0.1)";
+    ctx.fillStyle = Theme.id === "nexus" ? "rgba(140,210,255,0.12)" : "rgba(255,255,255,0.1)";
     ctx.fillRect(sx, sy, cellSize, cellSize);
-    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+    ctx.strokeStyle = Theme.id === "nexus" ? Theme.accent : "rgba(255,255,255,0.7)";
     ctx.lineWidth = 1.25;
     ctx.strokeRect(sx + 2, sy + 2, cellSize - 4, cellSize - 4);
   }
@@ -239,13 +243,13 @@ export function drawBoard(
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
     if (state.board.has(sq)) {
-      ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.strokeStyle = Theme.id === "nexus" ? Theme.accent : "rgba(255,255,255,0.55)";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(cx, cy, cellSize * 0.4, 0, Math.PI * 2);
       ctx.stroke();
     } else {
-      ctx.fillStyle = "rgba(255,255,255,0.42)";
+      ctx.fillStyle = Theme.id === "nexus" ? "rgba(160,230,255,0.55)" : "rgba(255,255,255,0.42)";
       ctx.beginPath();
       ctx.arc(cx, cy, Math.max(2.8, cellSize * 0.08), 0, Math.PI * 2);
       ctx.fill();
@@ -280,7 +284,7 @@ export function drawBoard(
     }
 
     const ch = PIECE_CHARS[piece.color + piece.kind];
-    drawPieceGlyph(ctx, ch, cx, cy, cellSize, piece.color);
+    drawPieceGlyph(ctx, ch, cx, cy, cellSize, piece.color, piece.kind);
   }
 
   if (!compact || cellSize >= 40) {

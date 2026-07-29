@@ -1,4 +1,6 @@
 import { Theme } from "./theme";
+import { drawThemePiece } from "./pieces";
+import type { PieceKind } from "../core/types";
 
 export interface MoveAnim {
   fromX: number;
@@ -9,6 +11,7 @@ export interface MoveAnim {
   duration: number;
   piece: string;
   color: "w" | "b";
+  kind: PieceKind;
   toSq?: string;
 }
 
@@ -43,23 +46,7 @@ export function drawMoveAnim(
   const cy = y + cellSize / 2;
   const lift = Math.sin(t * Math.PI) * cellSize * 0.06;
 
-  ctx.font = `${cellSize * 0.68}px Georgia, "Times New Roman", serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  ctx.fillStyle = Theme.pieceShadow;
-  ctx.fillText(anim.piece, cx + 0.5, cy + cellSize * 0.04 - lift * 0.3);
-
-  if (anim.color === "w") {
-    ctx.fillStyle = Theme.whitePiece;
-    ctx.fillText(anim.piece, cx, cy - lift);
-  } else {
-    ctx.fillStyle = Theme.blackPiece;
-    ctx.fillText(anim.piece, cx, cy - lift);
-    ctx.strokeStyle = "rgba(255,255,255,0.28)";
-    ctx.lineWidth = 0.8;
-    ctx.strokeText(anim.piece, cx, cy - lift);
-  }
+  drawThemePiece(ctx, anim.color, anim.kind, cx, cy - lift, cellSize, anim.piece);
   return true;
 }
 
@@ -77,8 +64,13 @@ export function drawCaptureFlash(
   const r = flash.size * (0.35 + t * 0.45);
 
   const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-  g.addColorStop(0, `rgba(255,255,255,${alpha})`);
-  g.addColorStop(1, "rgba(255,255,255,0)");
+  if (Theme.id === "nexus") {
+    g.addColorStop(0, `rgba(160,230,255,${alpha})`);
+    g.addColorStop(1, "rgba(80,160,220,0)");
+  } else {
+    g.addColorStop(0, `rgba(255,255,255,${alpha})`);
+    g.addColorStop(1, "rgba(255,255,255,0)");
+  }
   ctx.fillStyle = g;
   ctx.fillRect(flash.x - flash.size * 0.2, flash.y - flash.size * 0.2, flash.size * 1.4, flash.size * 1.4);
   return true;

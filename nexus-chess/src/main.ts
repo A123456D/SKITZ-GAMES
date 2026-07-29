@@ -52,6 +52,11 @@ import {
   type Screen,
   type PlayMode,
 } from "./view/menu";
+import { initTheme, applyTheme, Theme, type ThemeId } from "./view/theme";
+import { loadNexusPieces } from "./view/pieces";
+import { loadThemeArt } from "./view/fx";
+
+initTheme();
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 
@@ -181,6 +186,13 @@ function onMenuClick(id: string) {
   }
   if (id === "hub-home") {
     goHome();
+    return;
+  }
+  if (id === "hub-theme") {
+    const next: ThemeId = Theme.id === "nexus" ? "classic" : "nexus";
+    applyTheme(next);
+    void loadThemeArt();
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", Theme.bg);
     return;
   }
   if (id === "hub-setelo") {
@@ -316,6 +328,7 @@ function onPointer(e: PointerEvent) {
             duration: 240,
             piece: PIECE_CHARS[piece.color + piece.kind] || "?",
             color: piece.color,
+            kind: piece.kind,
             toSq: result.move.to,
           };
         }
@@ -416,3 +429,6 @@ function frame(now: number) {
 
 requestAnimationFrame(frame);
 void loadLogo().then((img) => setMenuLogo(img ?? getLogoImage()));
+void loadNexusPieces();
+void loadThemeArt();
+document.querySelector('meta[name="theme-color"]')?.setAttribute("content", Theme.bg);

@@ -8,6 +8,7 @@ import {
   eloToDifficulty,
 } from "../core/elo";
 import type { AiDifficulty } from "../core/ai";
+import { getPieceImage } from "./pieces";
 
 export type Screen =
   | "home"
@@ -76,10 +77,25 @@ export function drawHome(dc: DrawCtx, buttons: ButtonRect[], time = 0) {
   ctx.fillText("ZONE-CONTROL CHESS", width / 2, logoY + logoH / 2 + (compact ? 30 : 40));
   ctx.letterSpacing = "0px";
 
+  // Showcase piece lineup on Nexus
+  if (Theme.pieceMode === "sprites") {
+    const kinds = ["K", "Q", "B", "N", "R", "P"] as const;
+    const size = compact ? 36 : 48;
+    const gap = compact ? 10 : 14;
+    const total = kinds.length * size + (kinds.length - 1) * gap;
+    let px = (width - total) / 2;
+    const py = logoY + logoH / 2 + (compact ? 56 : 72);
+    for (const k of kinds) {
+      const img = getPieceImage("w", k);
+      if (img) ctx.drawImage(img, px, py, size, size);
+      px += size + gap;
+    }
+  }
+
   const btnW = Math.min(260, width - pad * 2);
   const play: ButtonRect = {
     x: (width - btnW) / 2,
-    y: height * 0.64,
+    y: height * 0.68,
     w: btnW,
     h: compact ? 52 : 56,
     id: "home-play",
@@ -157,6 +173,21 @@ export function drawHub(dc: DrawCtx, buttons: ButtonRect[], profile: EloProfile,
   };
   drawPremiumBtn(ctx, back, "Home", { fontSize: 12 });
   buttons.push(back);
+
+  // Theme toggle
+  const themeW = Math.min(200, btnW);
+  const themeBtn: ButtonRect = {
+    x: (width - themeW) / 2,
+    y: back.y - 48,
+    w: themeW,
+    h: 34,
+    id: "hub-theme",
+  };
+  drawPremiumBtn(ctx, themeBtn, `Theme · ${Theme.label}`, {
+    active: Theme.id === "nexus",
+    fontSize: 12,
+  });
+  buttons.push(themeBtn);
 }
 
 /** Chess.com-style: choose your rating. */
