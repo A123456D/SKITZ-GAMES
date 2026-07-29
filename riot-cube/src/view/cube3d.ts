@@ -270,6 +270,8 @@ export type CubeMotion = {
   hovering: boolean;
   /** Radians; rotates active-face stickers around face center in UV. */
   faceSpin?: number;
+  /** 0..1 settle pulse after a twist lands (0 = just dropped). */
+  dropT?: number;
 };
 
 /** Rotate UV around face center. +angle = screen CW with V-down (matches faceTurn CW). */
@@ -608,6 +610,9 @@ function drawFace(
       ? motion.index
       : -1;
   const hoverT = performance.now() / 1000;
+  const dropT = motion.dropT ?? 0;
+  const dropLift =
+    dropT > 0 && dropT < 1 ? 0.028 * Math.exp(-dropT * 4.5) * (1 - dropT) : 0;
   const liftPulse =
     quality.hoverAnim && (movingRow >= 0 || movingCol >= 0)
       ? 0.038 + 0.01 * Math.sin(hoverT * 3.4)
@@ -615,7 +620,7 @@ function drawFace(
         ? 0.04
         : spinning
           ? 0.032
-          : 0;
+          : 0.012 + dropLift;
 
   const paintSticker = (
     colorId: ColorId,
@@ -641,7 +646,7 @@ function drawFace(
             { u: u1, v: v1 },
             { u: u0, v: v1 },
           ];
-    const lift = hovering || spinning ? liftPulse : 0;
+    const lift = hovering || spinning ? liftPulse : 0.012 + dropLift;
     const s0 = facePointLifted(geom, corners[0]!.u, corners[0]!.v, lift, layout);
     const s1 = facePointLifted(geom, corners[1]!.u, corners[1]!.v, lift, layout);
     const s2 = facePointLifted(geom, corners[2]!.u, corners[2]!.v, lift, layout);
@@ -658,6 +663,7 @@ function drawFace(
       hovering || spinning,
       hoverT,
       quality.stickerShadows,
+      dropT,
     );
   };
 
@@ -744,6 +750,7 @@ function drawStickerOnQuad(
   hovering: boolean,
   hoverT: number,
   shadows: boolean,
+  dropT = 0,
 ): void {
   const cx = (tl.x + tr.x + br.x + bl.x) / 4;
   const cy = (tl.y + tr.y + br.y + bl.y) / 4;
@@ -761,7 +768,23 @@ function drawStickerOnQuad(
     ? 1.04 + Math.sin(phase * 0.7) * 0.025
     : hovering
       ? 1.03
-      : 1;
+      : 1.015;
+
+  // Soft drop: fall from a slight raise, then a tiny squash bounce.
+  let dropY = 0;
+  let dropScaleX = 1;
+  let dropScaleY = 1;
+  let dropShadow = 0;
+  if (dropT > 0 && dropT < 1 && !hovering) {
+    const damp = Math.exp(-3.4 * dropT);
+    dropY = -Math.cos(dropT * Math.PI * 1.15) * 5.2 * damp;
+    const impact =
+      Math.sin(Math.min(1, dropT * 1.8) * Math.PI) * Math.exp(-dropT * 2.2);
+    dropScaleX = 1 + impact * 0.07;
+    dropScaleY = 1 - impact * 0.1;
+    dropShadow = impact;
+  }
+
   const s = Math.min(bw, bh) * breathe;
 
   ctx.save();
@@ -774,28 +797,53 @@ function drawStickerOnQuad(
   ctx.clip();
 
   if (anim) {
-    ctx.translate(cx, cy + bob);
+    ctx.translate(cx, cy + bob + dropY);
     ctx.rotate(wobble);
-    ctx.translate(-cx, -cy - bob);
+    ctx.translate(-cx, -cy - bob - dropY);
   }
 
   const img = stickerImage(kind);
-  if (shadows) {
-    ctx.shadowColor = hovering ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.2)";
-    ctx.shadowBlur = hovering ? 12 : 6;
-    ctx.shadowOffsetY = hovering ? 6 : 3;
+  const drawY = cy - (s * dropScaleY) / 2 + bob + dropY;
+  const drawX = cx - (s * dropScaleX) / 2;
+  const drawW = s * dropScaleX;
+  const drawH = s * dropScaleY;
+
+  // Soft ground blob — reads as lift even with light canvas shadows.
+  if (shadows || dropShadow > 0) {
+    const shadowAlpha = hovering ? 0.28 : 0.16 + dropShadow * 0.14;
+    ctx.save();
+    ctx.fillStyle = `rgba(0,0,0,${shadowAlpha * 0.55})`;
+    ctx.beginPath();
+    ctx.ellipse(
+      cx,
+      cy + s * 0.4 + Math.max(0, -dropY) * 0.2,
+      drawW * 0.4,
+      Math.max(3, drawH * 0.11),
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    ctx.restore();
+    ctx.shadowColor = hovering
+      ? "rgba(0,0,0,0.38)"
+      : `rgba(0,0,0,${0.2 + dropShadow * 0.12})`;
+    ctx.shadowBlur = hovering ? 10 : 5 + dropShadow * 4;
+    ctx.shadowOffsetY = hovering ? 5 : 2.5 + Math.max(0, -dropY) * 0.35;
   }
   if (img && img.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, cx - s / 2, cy - s / 2 + bob, s, s);
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
   } else {
     const p = getPalette();
     ctx.fillStyle = p.paper;
-    ctx.fillRect(cx - s / 2, cy - s / 2 + bob, s, s);
+    ctx.fillRect(drawX, drawY, drawW, drawH);
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
     ctx.fillStyle = p.ink;
     ctx.font = `800 ${Math.floor(s * 0.22)}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(kind.slice(0, 3).toUpperCase(), cx, cy + bob);
+    ctx.fillText(kind.slice(0, 3).toUpperCase(), cx, cy + bob + dropY);
   }
   ctx.restore();
 }

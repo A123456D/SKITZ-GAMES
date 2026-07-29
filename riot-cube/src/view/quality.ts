@@ -25,7 +25,8 @@ export function detectQuality(): RenderQuality {
   quality = lowEnd
     ? {
         dprCap: 1.5,
-        stickerShadows: false,
+        // Soft lift shadows still read well on phones.
+        stickerShadows: true,
         hoverAnim: true,
       }
     : {

@@ -385,6 +385,9 @@ type TurnAnim =
     };
 let turnAnim: TurnAnim | null = null;
 let lastFrameTs = 0;
+/** Settle pulse after a twist/face-turn lands. */
+let stickerDropStarted = 0;
+const STICKER_DROP_MS = 320;
 
 function easeOutCubic(t: number): number {
   const x = Math.min(1, Math.max(0, t));
@@ -443,7 +446,22 @@ function syncActiveFace(): void {
   }
 }
 
+function triggerStickerDrop(): void {
+  stickerDropStarted = performance.now();
+}
+
+function stickerDropT(now = performance.now()): number {
+  if (!stickerDropStarted) return 0;
+  const t = (now - stickerDropStarted) / STICKER_DROP_MS;
+  if (t >= 1) {
+    stickerDropStarted = 0;
+    return 0;
+  }
+  return Math.max(0, t);
+}
+
 function activeMotion(): CubeMotion {
+  const dropT = stickerDropT();
   if (turnAnim?.kind === "face") {
     const e = easeOutCubic(turnAnim.t);
     return {
@@ -477,9 +495,10 @@ function activeMotion(): CubeMotion {
       index: springIndex,
       offset: springUv,
       hovering: Math.abs(springUv) > 0.01,
+      dropT,
     };
   }
-  return { axis: null, index: -1, offset: 0, hovering: false };
+  return { axis: null, index: -1, offset: 0, hovering: false, dropT };
 }
 
 function resetPlayVisuals(): void {
@@ -488,6 +507,7 @@ function resetPlayVisuals(): void {
   springAxis = null;
   springIndex = -1;
   turnAnim = null;
+  stickerDropStarted = 0;
   orbitDrag = null;
   orbitFinger = null;
   hintMove = null;
@@ -509,6 +529,7 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
   if (sameDir && Math.abs(fromUv) >= Math.abs(toUv) * 0.92) {
     session = applyTwist(session, { ...twist, amount });
     noteTutorial("swipe");
+    triggerStickerDrop();
     sfxPaperSlide();
     return;
   }
@@ -826,6 +847,7 @@ function tick(ts: number): void {
           noteTutorial("swipe");
         }
         turnAnim = null;
+        triggerStickerDrop();
       }
     }
     if (springAxis) {
