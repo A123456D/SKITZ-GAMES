@@ -639,6 +639,8 @@ function drawFace(
     v1: number,
     hovering: boolean,
     artSpin = 0,
+    /** Soft drop-shadow only while a row/col lane is lifted. */
+    castShadow = false,
   ) => {
     if (u1 <= 0 || u0 >= 1 || v1 <= 0 || v0 >= 1) return;
     const corners =
@@ -673,6 +675,7 @@ function drawFace(
       hoverT,
       dropT,
       celebrateT,
+      castShadow,
     );
   };
 
@@ -698,6 +701,7 @@ function drawFace(
           v0 + cell,
           true,
           isCenter ? faceSpin : 0,
+          false,
         );
       }
     }
@@ -725,7 +729,7 @@ function drawFace(
         const u1 = u0 + cell;
         const v0 = r * stride + pad;
         const v1 = v0 + cell;
-        paintSticker(color, u0, v0, u1, v1, true);
+        paintSticker(color, u0, v0, u1, v1, true, 0, true);
       }
     } else if (movingCol >= 0) {
       const c = movingCol;
@@ -735,7 +739,7 @@ function drawFace(
         const u1 = u0 + cell;
         const v0 = (pos - 0.5) * stride + pad;
         const v1 = v0 + cell;
-        paintSticker(color, u0, v0, u1, v1, true);
+        paintSticker(color, u0, v0, u1, v1, true, 0, true);
       }
     }
   }
@@ -760,6 +764,7 @@ function drawStickerOnQuad(
   hoverT: number,
   dropT = 0,
   celebrateT = 0,
+  castShadow = false,
 ): void {
   const cx = (tl.x + tr.x + br.x + bl.x) / 4;
   const cy = (tl.y + tr.y + br.y + bl.y) / 4;
@@ -818,6 +823,27 @@ function drawStickerOnQuad(
   const drawX = cx - (s * dropScaleX) / 2;
   const drawW = s * dropScaleX;
   const drawH = s * dropScaleY;
+
+  // Soft shaped shadow behind the sticker (lane lift only) — not a ground oval.
+  if (castShadow) {
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.42)";
+    ctx.shadowBlur = Math.max(8, s * 0.18);
+    ctx.shadowOffsetX = s * 0.04;
+    ctx.shadowOffsetY = s * 0.1;
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+    } else {
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(drawX, drawY, drawW, drawH);
+    }
+    ctx.restore();
+    // Clear shadow state, redraw crisp sticker on top.
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+  }
 
   if (img && img.complete && img.naturalWidth > 0) {
     ctx.drawImage(img, drawX, drawY, drawW, drawH);
