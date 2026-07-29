@@ -272,6 +272,10 @@ export type CubeMotion = {
   faceSpin?: number;
   /** 0..1 settle pulse after a twist lands (0 = just dropped). */
   dropT?: number;
+  /** Which stickers settle — only the lane/face that just landed. */
+  dropFace?: FaceId;
+  dropKind?: "row" | "col" | "face";
+  dropIndex?: number;
 };
 
 /** Rotate UV around face center. +angle = screen CW with V-down (matches faceTurn CW). */
@@ -619,9 +623,19 @@ function drawFace(
       ? motion.index
       : -1;
   const hoverT = performance.now() / 1000;
-  const dropT = motion.dropT ?? 0;
-  const dropLift =
-    dropT > 0 && dropT < 1 ? 0.028 * Math.exp(-dropT * 4.5) * (1 - dropT) : 0;
+  const dropTAll = motion.dropT ?? 0;
+  const dropOnFace =
+    dropTAll > 0 &&
+    dropTAll < 1 &&
+    motion.dropFace === faceIndex &&
+    motion.dropKind != null;
+  const cellDrops = (r: number, c: number): number => {
+    if (!dropOnFace) return 0;
+    if (motion.dropKind === "face") return dropTAll;
+    if (motion.dropKind === "row" && r === motion.dropIndex) return dropTAll;
+    if (motion.dropKind === "col" && c === motion.dropIndex) return dropTAll;
+    return 0;
+  };
   const liftPulse =
     quality.hoverAnim && (movingRow >= 0 || movingCol >= 0)
       ? 0.038 + 0.01 * Math.sin(hoverT * 3.4)
@@ -629,7 +643,7 @@ function drawFace(
         ? 0.04
         : spinning
           ? 0.032
-          : 0.012 + dropLift;
+          : 0.012;
 
   const paintSticker = (
     colorId: ColorId,
@@ -641,6 +655,7 @@ function drawFace(
     artSpin = 0,
     /** Soft drop-shadow only while a row/col lane is lifted. */
     castShadow = false,
+    dropT = 0,
   ) => {
     if (u1 <= 0 || u0 >= 1 || v1 <= 0 || v0 >= 1) return;
     const corners =
@@ -657,6 +672,8 @@ function drawFace(
             { u: u1, v: v1 },
             { u: u0, v: v1 },
           ];
+    const dropLift =
+      dropT > 0 && dropT < 1 ? 0.028 * Math.exp(-dropT * 4.5) * (1 - dropT) : 0;
     const lift = hovering || spinning ? liftPulse : 0.012 + dropLift;
     const s0 = facePointLifted(geom, corners[0]!.u, corners[0]!.v, lift, layout);
     const s1 = facePointLifted(geom, corners[1]!.u, corners[1]!.v, lift, layout);
@@ -702,6 +719,7 @@ function drawFace(
           true,
           isCenter ? faceSpin : 0,
           false,
+          cellDrops(r, c),
         );
       }
     }
@@ -717,6 +735,9 @@ function drawFace(
           c * stride + pad + cell,
           r * stride + pad + cell,
           false,
+          0,
+          false,
+          cellDrops(r, c),
         );
       }
     }
@@ -729,7 +750,8 @@ function drawFace(
         const u1 = u0 + cell;
         const v0 = r * stride + pad;
         const v1 = v0 + cell;
-        paintSticker(color, u0, v0, u1, v1, true, 0, true);
+        // Moving lane stickers are mid-air — no settle yet.
+        paintSticker(color, u0, v0, u1, v1, true, 0, true, 0);
       }
     } else if (movingCol >= 0) {
       const c = movingCol;
@@ -739,7 +761,7 @@ function drawFace(
         const u1 = u0 + cell;
         const v0 = (pos - 0.5) * stride + pad;
         const v1 = v0 + cell;
-        paintSticker(color, u0, v0, u1, v1, true, 0, true);
+        paintSticker(color, u0, v0, u1, v1, true, 0, true, 0);
       }
     }
   }

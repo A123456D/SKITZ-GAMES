@@ -332,6 +332,11 @@ function beginOnboarding(): void {
 /** Settle pulse after a twist/face-turn lands. */
 let stickerDropStarted = 0;
 const STICKER_DROP_MS = 320;
+let stickerDropTarget: {
+  face: FaceId;
+  kind: "row" | "col" | "face";
+  index: number;
+} | null = null;
 /** Face-complete celebration. */
 let faceCelebrate: { face: FaceId; started: number } | null = null;
 const FACE_CELEBRATE_MS = 720;
@@ -460,8 +465,19 @@ function syncActiveFace(): void {
   }
 }
 
-function triggerStickerDrop(): void {
+function triggerStickerDrop(
+  target: {
+    face: FaceId;
+    kind: "row" | "col" | "face";
+    index?: number;
+  },
+): void {
   stickerDropStarted = performance.now();
+  stickerDropTarget = {
+    face: target.face,
+    kind: target.kind,
+    index: target.index ?? 0,
+  };
 }
 
 function noteNewlySolvedFaces(prevBits: number, cube = session.cube): void {
@@ -494,6 +510,7 @@ function stickerDropT(now = performance.now()): number {
   const t = (now - stickerDropStarted) / STICKER_DROP_MS;
   if (t >= 1) {
     stickerDropStarted = 0;
+    stickerDropTarget = null;
     return 0;
   }
   return Math.max(0, t);
@@ -501,6 +518,15 @@ function stickerDropT(now = performance.now()): number {
 
 function activeMotion(): CubeMotion {
   const dropT = stickerDropT();
+  const drop =
+    dropT > 0 && stickerDropTarget
+      ? {
+          dropT,
+          dropFace: stickerDropTarget.face,
+          dropKind: stickerDropTarget.kind,
+          dropIndex: stickerDropTarget.index,
+        }
+      : {};
   if (turnAnim?.kind === "face") {
     const e = easeOutCubic(turnAnim.t);
     return {
@@ -534,10 +560,10 @@ function activeMotion(): CubeMotion {
       index: springIndex,
       offset: springUv,
       hovering: Math.abs(springUv) > 0.01,
-      dropT,
+      ...drop,
     };
   }
-  return { axis: null, index: -1, offset: 0, hovering: false, dropT };
+  return { axis: null, index: -1, offset: 0, hovering: false, ...drop };
 }
 
 function resetPlayVisuals(): void {
@@ -547,6 +573,7 @@ function resetPlayVisuals(): void {
   springIndex = -1;
   turnAnim = null;
   stickerDropStarted = 0;
+  stickerDropTarget = null;
   faceCelebrate = null;
   orbitDrag = null;
   orbitFinger = null;
@@ -571,7 +598,11 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
     session = applyTwist(session, { ...twist, amount });
     noteNewlySolvedFaces(prevBits);
     noteTutorial("swipe");
-    triggerStickerDrop();
+    triggerStickerDrop({
+      face: session.face,
+      kind: twist.axis,
+      index: twist.index,
+    });
     sfxPaperSlide();
     return;
   }
@@ -898,8 +929,17 @@ function tick(ts: number): void {
           noteTutorial("swipe");
         }
         noteNewlySolvedFaces(prevBits);
+        const landed = turnAnim;
         turnAnim = null;
-        triggerStickerDrop();
+        if (landed.kind === "face") {
+          triggerStickerDrop({ face: landed.face, kind: "face" });
+        } else {
+          triggerStickerDrop({
+            face: landed.face,
+            kind: landed.axis,
+            index: landed.index,
+          });
+        }
       }
     }
     if (springAxis) {
