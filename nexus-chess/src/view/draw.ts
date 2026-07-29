@@ -59,7 +59,7 @@ export function loadNexusMark(): Promise<void> {
       resolve();
     };
     img.onerror = () => resolve();
-    img.src = "./themes/nexus/nexus-mark.png?v=2";
+    img.src = "./themes/nexus/nexus-mark.png?v=3";
   });
 }
 
