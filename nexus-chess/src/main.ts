@@ -1,15 +1,17 @@
 import { newGame } from "./core/board";
 import type { GameState } from "./core/types";
 import { beginTurn, doAbilityPhase, doMovePhase, endTurn, skipAbility } from "./core/turn";
-import {
-  aiTurn,
-  aiThinkDelay,
-  AI_DIFFICULTY_LABELS,
-  type AiDifficulty,
-} from "./core/ai";
+import { aiTurn, aiThinkDelay, type AiDifficulty } from "./core/ai";
 import {
   loadProfile,
   recordAiGame,
+  setPlayerElo,
+  clampElo,
+  eloToDifficulty,
+  OPPONENT_ELO_OPTIONS,
+  ELO_STEP,
+  ELO_MIN,
+  ELO_MAX,
   type EloProfile,
   type EloResult,
 } from "./core/elo";
@@ -40,6 +42,8 @@ import {
 } from "./view/anim";
 import {
   drawHome,
+  drawHub,
+  drawSetElo,
   drawAiSelect,
   drawHowTo,
   drawResult,
@@ -54,6 +58,8 @@ const canvas = document.getElementById("game") as HTMLCanvasElement;
 let screen: Screen = "home";
 let playMode: PlayMode = "ai";
 let aiDifficulty: AiDifficulty = 2;
+let opponentElo = 1200;
+let draftPlayerElo = 1200;
 let profile: EloProfile = loadProfile();
 let lastEloResult: EloResult | null = null;
 
@@ -64,7 +70,6 @@ let dc: DrawCtx = layout(canvas);
 let moveAnim: MoveAnim | null = null;
 let captureFlash: CaptureFlash | null = null;
 let aiPending = false;
-let lastLayoutKey = "";
 let eloRecorded = false;
 
 const PIECE_CHARS: Record<string, string> = {
@@ -78,12 +83,36 @@ function boardFlipped(): boolean {
 
 function modeLabel(): string {
   if (playMode === "local") return "Local";
-  return `vs ${AI_DIFFICULTY_LABELS[aiDifficulty as Exclude<AiDifficulty, 0>] ?? "AI"}`;
+  return `vs ${opponentElo}`;
 }
 
-function startMatch(mode: PlayMode, difficulty: AiDifficulty = 2) {
+function nearestOppOption(elo: number): number {
+  let best: number = OPPONENT_ELO_OPTIONS[0];
+  let bestDist = Math.abs(elo - best);
+  for (const o of OPPONENT_ELO_OPTIONS) {
+    const d = Math.abs(elo - o);
+    if (d < bestDist) {
+      best = o;
+      bestDist = d;
+    }
+  }
+  return best;
+}
+
+function openHub() {
+  profile = loadProfile();
+  if (!profile.hasSetRating) {
+    draftPlayerElo = profile.rating;
+    screen = "setElo";
+    return;
+  }
+  screen = "hub";
+}
+
+function startMatch(mode: PlayMode, oppElo = opponentElo) {
   playMode = mode;
-  aiDifficulty = mode === "ai" ? difficulty : 0;
+  opponentElo = clampElo(oppElo);
+  aiDifficulty = mode === "ai" ? eloToDifficulty(opponentElo) : 0;
   state = beginTurn(newGame());
   ui = clearUi();
   moveAnim = null;
@@ -104,12 +133,8 @@ function goHome() {
 
 function finishIfWon() {
   if (!state.winner || screen !== "play") return;
-  if (!eloRecorded && playMode === "ai" && aiDifficulty >= 1 && aiDifficulty <= 4) {
-    const { profile: next, result } = recordAiGame(
-      profile,
-      aiDifficulty as Exclude<AiDifficulty, 0>,
-      state.winner,
-    );
+  if (!eloRecorded && playMode === "ai") {
+    const { profile: next, result } = recordAiGame(profile, opponentElo, state.winner);
     profile = next;
     lastEloResult = result;
     eloRecorded = true;
@@ -150,7 +175,38 @@ function pointerToCanvas(e: PointerEvent): { px: number; py: number } {
 }
 
 function onMenuClick(id: string) {
+  if (id === "home-play") {
+    openHub();
+    return;
+  }
+  if (id === "hub-home") {
+    goHome();
+    return;
+  }
+  if (id === "hub-setelo") {
+    draftPlayerElo = profile.rating;
+    screen = "setElo";
+    return;
+  }
+  if (id.startsWith("elo-preset-")) {
+    draftPlayerElo = Number(id.slice("elo-preset-".length));
+    return;
+  }
+  if (id === "elo-minus") {
+    draftPlayerElo = clampElo(draftPlayerElo - ELO_STEP);
+    return;
+  }
+  if (id === "elo-plus") {
+    draftPlayerElo = clampElo(draftPlayerElo + ELO_STEP);
+    return;
+  }
+  if (id === "elo-save") {
+    profile = setPlayerElo(profile, draftPlayerElo);
+    screen = "hub";
+    return;
+  }
   if (id === "menu-vsai") {
+    opponentElo = nearestOppOption(profile.rating);
     screen = "aiSelect";
     return;
   }
@@ -163,43 +219,54 @@ function onMenuClick(id: string) {
     return;
   }
   if (id === "menu-back") {
-    screen = "home";
+    screen = "hub";
     return;
   }
-  if (id.startsWith("ai-")) {
-    const d = Number(id.slice(3)) as AiDifficulty;
-    if (d >= 1 && d <= 4) startMatch("ai", d);
+  if (id === "opp-minus") {
+    opponentElo = clampElo(Math.max(ELO_MIN, opponentElo - ELO_STEP));
+    return;
+  }
+  if (id === "opp-plus") {
+    opponentElo = clampElo(Math.min(ELO_MAX, opponentElo + ELO_STEP));
+    return;
+  }
+  if (id.startsWith("opp-") && id !== "opp-start" && id !== "opp-minus" && id !== "opp-plus") {
+    opponentElo = Number(id.slice(4));
+    return;
+  }
+  if (id === "opp-start") {
+    startMatch("ai", opponentElo);
     return;
   }
   if (id === "result-rematch") {
-    startMatch(playMode, playMode === "ai" ? aiDifficulty : 2);
+    startMatch(playMode, opponentElo);
     return;
   }
   if (id === "result-menu") {
-    goHome();
+    openHub();
   }
 }
 
 function onPointer(e: PointerEvent) {
   if (moveAnim || aiPending) return;
-  if (e.button !== undefined && e.button !== 0) return;
+  // button is 0 for primary click; -1 can appear on some synthetic pointer events
+  if (e.button !== undefined && e.button !== 0 && e.button !== -1) return;
   e.preventDefault();
 
   const { px, py } = pointerToCanvas(e);
 
-  if (screen === "home" || screen === "aiSelect" || screen === "how" || screen === "result") {
+  if (screen !== "play") {
     const id = hitMenuButton(buttons, px, py);
     if (id) onMenuClick(id);
     return;
   }
 
-  // play
   const flipped = boardFlipped();
   const result = handleClick(ui, state, dc, buttons, px, py, flipped);
 
   switch (result.type) {
     case "menu":
-      goHome();
+      openHub();
       break;
 
     case "skip":
@@ -285,10 +352,7 @@ canvas.addEventListener("pointerdown", onPointer, { passive: false });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
 function relayout() {
-  const next = layout(canvas);
-  const key = `${next.width}x${next.height}@${window.devicePixelRatio}`;
-  lastLayoutKey = key;
-  dc = next;
+  dc = layout(canvas);
 }
 
 window.addEventListener("resize", relayout);
@@ -301,9 +365,13 @@ function frame(now: number) {
   buttons.length = 0;
 
   if (screen === "home") {
-    drawHome(dc, buttons, profile);
+    drawHome(dc, buttons);
+  } else if (screen === "hub") {
+    drawHub(dc, buttons, profile);
+  } else if (screen === "setElo") {
+    drawSetElo(dc, buttons, profile, draftPlayerElo);
   } else if (screen === "aiSelect") {
-    drawAiSelect(dc, buttons, profile);
+    drawAiSelect(dc, buttons, profile, opponentElo);
   } else if (screen === "how") {
     drawHowTo(dc, buttons);
   } else if (screen === "result") {
@@ -311,7 +379,7 @@ function frame(now: number) {
       winner: state.winner ?? "w",
       mode: playMode,
       elo: lastEloResult,
-      difficulty: aiDifficulty,
+      opponentElo,
     });
   } else {
     const flipped = boardFlipped();
