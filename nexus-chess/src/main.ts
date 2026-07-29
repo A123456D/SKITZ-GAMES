@@ -1,5 +1,5 @@
 import { newGame } from "./core/board";
-import type { GameState, Square } from "./core/types";
+import type { Color, GameState, Square } from "./core/types";
 import { beginTurn, doAbilityPhase, doMovePhase, endTurn, skipAbility } from "./core/turn";
 import { aiPlay, aiThinkDelay, type AiDifficulty } from "./core/ai";
 import {
@@ -15,6 +15,14 @@ import {
   type EloProfile,
   type EloResult,
 } from "./core/elo";
+import {
+  loadMatch,
+  saveMatch,
+  clearMatch,
+  loadPrefs,
+  savePrefs,
+  type PlayerPrefs,
+} from "./core/save";
 import {
   layout,
   drawBoard,
@@ -84,7 +92,9 @@ const canvas = document.getElementById("game") as HTMLCanvasElement;
 let screen: Screen = "home";
 let playMode: PlayMode = "ai";
 let aiDifficulty: AiDifficulty = 2;
-let opponentElo = 1200;
+let prefs: PlayerPrefs = loadPrefs();
+let opponentElo = prefs.lastOpponentElo;
+let playerColor: Color = prefs.playerColor;
 let draftPlayerElo = 1200;
 let profile: EloProfile = loadProfile();
 let lastEloResult: EloResult | null = null;
@@ -102,6 +112,7 @@ let aiPending = false;
 let eloRecorded = false;
 let lastMove: { from: Square; to: Square } | null = null;
 let toast: { text: string; start: number; duration: number } | null = null;
+let canResume = !!loadMatch();
 
 function showToast(text: string, duration = 1800) {
   toast = { text, start: performance.now(), duration };
@@ -120,12 +131,14 @@ const PIECE_CHARS: Record<string, string> = {
 };
 
 function boardFlipped(): boolean {
-  return playMode === "local" && state.activeColor === "b";
+  if (playMode === "ai") return playerColor === "b";
+  return state.activeColor === "b";
 }
 
 function modeLabel(): string {
   if (playMode === "local") return "Local";
-  return `vs ${opponentElo}`;
+  const side = playerColor === "w" ? "W" : "B";
+  return `${side} vs ${opponentElo}`;
 }
 
 function nearestOppOption(elo: number): number {
@@ -141,6 +154,29 @@ function nearestOppOption(elo: number): number {
   return best;
 }
 
+function persistPrefs() {
+  prefs = { playerColor, lastOpponentElo: opponentElo };
+  savePrefs(prefs);
+}
+
+function persistMatch() {
+  if (screen !== "play" && screen !== "hub") return;
+  if (state.winner) {
+    clearMatch();
+    canResume = false;
+    return;
+  }
+  saveMatch({
+    playMode,
+    opponentElo,
+    playerColor,
+    eloRecorded,
+    lastMove,
+    state,
+  });
+  canResume = true;
+}
+
 function openHub() {
   profile = loadProfile();
   if (!profile.hasSetRating) {
@@ -148,13 +184,18 @@ function openHub() {
     screen = "setElo";
     return;
   }
+  canResume = !!loadMatch();
   screen = "hub";
 }
 
-function startMatch(mode: PlayMode, oppElo = opponentElo) {
+function startMatch(mode: PlayMode, oppElo = opponentElo, color: Color = playerColor) {
   playMode = mode;
   opponentElo = clampElo(oppElo);
+  playerColor = mode === "ai" ? color : "w";
   aiDifficulty = mode === "ai" ? eloToDifficulty(opponentElo) : 0;
+  persistPrefs();
+  clearMatch();
+  canResume = false;
   state = beginTurn(newGame());
   ui = clearUi();
   moveAnim = null;
@@ -169,7 +210,38 @@ function startMatch(mode: PlayMode, oppElo = opponentElo) {
   lastEloResult = null;
   lastMove = null;
   screen = "play";
+  persistMatch();
   maybeAiTurn();
+}
+
+function resumeMatch(): boolean {
+  const saved = loadMatch();
+  if (!saved) {
+    canResume = false;
+    return false;
+  }
+  playMode = saved.playMode;
+  opponentElo = saved.opponentElo;
+  playerColor = saved.playerColor;
+  aiDifficulty = playMode === "ai" ? eloToDifficulty(opponentElo) : 0;
+  state = saved.state;
+  eloRecorded = saved.eloRecorded;
+  lastMove = saved.lastMove;
+  lastEloResult = null;
+  ui = clearUi();
+  moveAnim = null;
+  captureFlash = null;
+  boardFx = createBoardFx();
+  if (animEndTimer) {
+    clearTimeout(animEndTimer);
+    animEndTimer = null;
+  }
+  aiPending = false;
+  screen = "play";
+  canResume = true;
+  persistPrefs();
+  maybeAiTurn();
+  return true;
 }
 
 function goHome() {
@@ -182,36 +254,47 @@ function goHome() {
 function finishIfWon() {
   if (!state.winner || screen !== "play") return;
   if (!eloRecorded && playMode === "ai") {
-    const { profile: next, result } = recordAiGame(profile, opponentElo, state.winner);
+    const { profile: next, result } = recordAiGame(
+      profile,
+      opponentElo,
+      state.winner,
+      playerColor,
+    );
     profile = next;
     lastEloResult = result;
     eloRecorded = true;
   }
+  clearMatch();
+  canResume = false;
   screen = "result";
 }
 
+function isAiSideToMove(): boolean {
+  return playMode === "ai" && aiDifficulty !== 0 && state.activeColor !== playerColor;
+}
+
 function maybeAiTurn() {
-  if (playMode !== "ai" || aiDifficulty === 0) return;
-  if (state.winner || state.activeColor !== "b" || aiPending || screen !== "play") return;
+  if (!isAiSideToMove() || state.winner || aiPending || screen !== "play") return;
   if (moveAnim) return;
   aiPending = true;
   const difficulty = aiDifficulty;
   const delay = aiThinkDelay(difficulty);
   setTimeout(() => {
-    if (screen !== "play" || state.winner || state.activeColor !== "b") {
+    if (screen !== "play" || state.winner || !isAiSideToMove()) {
       aiPending = false;
       return;
     }
     // Yield a frame so the UI stays responsive before a heavy search
     setTimeout(() => {
       try {
-        if (screen !== "play" || state.activeColor !== "b") return;
+        if (screen !== "play" || !isAiSideToMove()) return;
         const result = aiPlay(state, difficulty);
         state = result.state;
         if (result.lastMove) {
           lastMove = { from: result.lastMove.from, to: result.lastMove.to };
         }
         ui = clearUi();
+        persistMatch();
         finishIfWon();
       } finally {
         aiPending = false;
@@ -234,6 +317,7 @@ function finishMoveSequence() {
   }
   if (state.turnPhase === "resolved") {
     state = endTurn(state);
+    persistMatch();
     if (state.winner) finishIfWon();
     else maybeAiTurn();
   }
@@ -258,7 +342,11 @@ function onMenuClick(id: string) {
     goHome();
     return;
   }
-  if (id === "hub-theme") {
+  if (id === "hub-resume") {
+    if (!resumeMatch()) openHub();
+    return;
+  }
+  if (id === "hub-board" || id === "hub-theme") {
     const next = nextThemeId(Theme.id);
     applyTheme(next);
     void loadThemeArt();
@@ -289,7 +377,8 @@ function onMenuClick(id: string) {
     return;
   }
   if (id === "menu-vsai") {
-    opponentElo = nearestOppOption(profile.rating);
+    opponentElo = nearestOppOption(prefs.lastOpponentElo || profile.rating);
+    playerColor = prefs.playerColor;
     screen = "aiSelect";
     return;
   }
@@ -305,6 +394,16 @@ function onMenuClick(id: string) {
     screen = "hub";
     return;
   }
+  if (id === "color-w") {
+    playerColor = "w";
+    persistPrefs();
+    return;
+  }
+  if (id === "color-b") {
+    playerColor = "b";
+    persistPrefs();
+    return;
+  }
   if (id === "opp-minus") {
     opponentElo = clampElo(Math.max(ELO_MIN, opponentElo - ELO_STEP));
     return;
@@ -318,11 +417,11 @@ function onMenuClick(id: string) {
     return;
   }
   if (id === "opp-start") {
-    startMatch("ai", opponentElo);
+    startMatch("ai", opponentElo, playerColor);
     return;
   }
   if (id === "result-rematch") {
-    startMatch(playMode, opponentElo);
+    startMatch(playMode, opponentElo, playerColor);
     return;
   }
   if (id === "result-menu") {
@@ -332,7 +431,7 @@ function onMenuClick(id: string) {
 
 function onPointer(e: PointerEvent) {
   unlockAudio();
-  if (moveAnim || aiPending) return;
+  if (moveAnim) return;
   // button is 0 for primary click; -1 can appear on some synthetic pointer events
   if (e.button !== undefined && e.button !== 0 && e.button !== -1) return;
   e.preventDefault();
@@ -348,17 +447,31 @@ function onPointer(e: PointerEvent) {
     return;
   }
 
+  // During AI think, only allow opening the menu (pause / change board)
+  if (aiPending || isAiSideToMove()) {
+    const flipped = boardFlipped();
+    const result = handleClick(ui, state, dc, buttons, px, py, flipped);
+    if (result.type === "menu") {
+      persistMatch();
+      playUiTap();
+      openHub();
+    }
+    return;
+  }
+
   const flipped = boardFlipped();
   const result = handleClick(ui, state, dc, buttons, px, py, flipped);
 
   switch (result.type) {
     case "menu":
+      persistMatch();
       openHub();
       break;
 
     case "skip":
       state = skipAbility(state);
       ui = clearUi();
+      persistMatch();
       playUiTap();
       break;
 
@@ -366,6 +479,7 @@ function onPointer(e: PointerEvent) {
       state = skipAbility(state);
       if (result.square) ui = applySelect(ui, state, result.square);
       else ui = clearUi();
+      persistMatch();
       break;
 
     case "ability":
@@ -404,6 +518,7 @@ function onPointer(e: PointerEvent) {
         } else {
           ui = clearUi();
         }
+        persistMatch();
       }
       break;
 
@@ -454,6 +569,7 @@ function onPointer(e: PointerEvent) {
 
         state = doMovePhase(state, result.move);
         ui = clearUi();
+        persistMatch();
 
         if (animEndTimer) clearTimeout(animEndTimer);
         animEndTimer = setTimeout(() => {
@@ -485,17 +601,18 @@ function frame(now: number) {
   if (screen === "home") {
     drawHome(dc, buttons, time);
   } else if (screen === "hub") {
-    drawHub(dc, buttons, profile, time);
+    drawHub(dc, buttons, profile, time, { canResume });
   } else if (screen === "setElo") {
     drawSetElo(dc, buttons, profile, draftPlayerElo, time);
   } else if (screen === "aiSelect") {
-    drawAiSelect(dc, buttons, profile, opponentElo, time);
+    drawAiSelect(dc, buttons, profile, opponentElo, playerColor, time);
   } else if (screen === "how") {
     drawHowTo(dc, buttons, time);
   } else if (screen === "result") {
     drawResult(dc, buttons, {
       winner: state.winner ?? "w",
       mode: playMode,
+      playerColor,
       elo: lastEloResult,
       opponentElo,
     }, time);

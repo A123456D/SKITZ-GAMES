@@ -111,16 +111,18 @@ export function setPlayerElo(profile: EloProfile, elo: number): EloProfile {
 /**
  * Update player Elo after a rated vs-AI game.
  * `opponentElo` is the rating the player selected for the computer.
+ * `playerColor` is the side the human played.
  */
 export function recordAiGame(
   profile: EloProfile,
   opponentElo: number,
   winner: "w" | "b" | null,
+  playerColor: "w" | "b" = "w",
 ): { profile: EloProfile; result: EloResult | null } {
   if (!winner) return { profile, result: null };
 
   const opp = clampElo(opponentElo);
-  const score = winner === "w" ? 1 : 0;
+  const score = winner === playerColor ? 1 : 0;
   const before = profile.rating;
   const after = applyElo(before, opp, score);
   const delta = after - before;
