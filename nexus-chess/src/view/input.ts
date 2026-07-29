@@ -46,6 +46,7 @@ export interface ClickResult {
     | "skip"
     | "newgame"
     | "cycleai"
+    | "menu"
     /** Piece tapped during ability phase — skip ability and select. */
     | "selectAfterSkip";
   square?: Square;
@@ -60,18 +61,20 @@ export function handleClick(
   buttons: ButtonRect[],
   px: number,
   py: number,
+  flipped = false,
 ): ClickResult {
   const btn = hitButton(buttons, px, py);
   if (btn) {
     if (btn === "skip") return { type: "skip" };
     if (btn === "newgame") return { type: "newgame" };
+    if (btn === "play-menu") return { type: "menu" };
     if (btn === "cycleai" || btn === "toggleai") return { type: "cycleai" };
     if (btn === "aegis" || btn === "overdrive" || btn === "tacticalSwap") {
       return { type: "ability", ability: btn as Ability };
     }
   }
 
-  const sq = screenToSquare(dc, px, py);
+  const sq = screenToSquare(dc, px, py, flipped);
   if (!sq) return { type: "none" };
 
   if (ui.mode === "abilityTarget" && ui.activeAbility) {

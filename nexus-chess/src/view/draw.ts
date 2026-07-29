@@ -45,6 +45,10 @@ export function loadLogo(): Promise<HTMLImageElement | null> {
   });
 }
 
+export function getLogoImage(): HTMLImageElement | null {
+  return logoReady ? logoImg : null;
+}
+
 function hudReserve(h: number, compact: boolean): number {
   if (compact) return Math.max(136, Math.min(172, h * 0.32));
   return 168;
@@ -78,15 +82,19 @@ export function layout(canvas: HTMLCanvasElement): DrawCtx {
   return { ctx, boardX, boardY, cellSize, boardSize, width: w, height: h, compact, pad };
 }
 
-export function squareScreenPos(dc: DrawCtx, sq: Square): [number, number] {
+export function squareScreenPos(dc: DrawCtx, sq: Square, flipped = false): [number, number] {
   const [rank, file] = squareToRC(sq);
-  return [dc.boardX + file * dc.cellSize, dc.boardY + (7 - rank) * dc.cellSize];
+  const f = flipped ? 7 - file : file;
+  const r = flipped ? rank : 7 - rank;
+  return [dc.boardX + f * dc.cellSize, dc.boardY + r * dc.cellSize];
 }
 
-export function screenToSquare(dc: DrawCtx, px: number, py: number): Square | null {
-  const file = Math.floor((px - dc.boardX) / dc.cellSize);
-  const rank = 7 - Math.floor((py - dc.boardY) / dc.cellSize);
-  if (file < 0 || file > 7 || rank < 0 || rank > 7) return null;
+export function screenToSquare(dc: DrawCtx, px: number, py: number, flipped = false): Square | null {
+  const f = Math.floor((px - dc.boardX) / dc.cellSize);
+  const rDisplay = Math.floor((py - dc.boardY) / dc.cellSize);
+  if (f < 0 || f > 7 || rDisplay < 0 || rDisplay > 7) return null;
+  const file = flipped ? 7 - f : f;
+  const rank = flipped ? rDisplay : 7 - rDisplay;
   return rcToSquare(rank, file);
 }
 
@@ -136,12 +144,12 @@ function drawLogoHeader(dc: DrawCtx) {
   }
 }
 
-function drawNexusGlow(dc: DrawCtx, time: number) {
+function drawNexusGlow(dc: DrawCtx, time: number, flipped: boolean) {
   const { ctx, cellSize } = dc;
   const pulse = 0.08 + 0.07 * (0.5 + 0.5 * Math.sin(time * 1.8));
 
   for (const sq of NEXUS_SQUARES) {
-    const [x, y] = squareScreenPos(dc, sq);
+    const [x, y] = squareScreenPos(dc, sq, flipped);
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
 
@@ -165,6 +173,7 @@ export function drawBoard(
   legalMoves: Move[],
   abilityTargets: Square[],
   activeAbility: Ability | null,
+  flipped = false,
 ) {
   const { ctx, boardX, boardY, cellSize, boardSize, width, height, compact } = dc;
 
@@ -177,20 +186,22 @@ export function drawBoard(
     for (let f = 0; f < 8; f++) {
       const x = boardX + f * cellSize;
       const y = boardY + (7 - r) * cellSize;
-      ctx.fillStyle = (r + f) % 2 === 0 ? Theme.tileDark : Theme.tileLight;
+      // Checker pattern follows board coordinates, not screen — keep visual stable when flipped
+      const br = flipped ? 7 - r : r;
+      const bf = flipped ? 7 - f : f;
+      ctx.fillStyle = (br + bf) % 2 === 0 ? Theme.tileDark : Theme.tileLight;
       ctx.fillRect(x, y, cellSize, cellSize);
     }
   }
 
-  // Single thin board frame
   ctx.strokeStyle = Theme.hairlineStrong;
   ctx.lineWidth = 1;
   ctx.strokeRect(boardX - 0.5, boardY - 0.5, boardSize + 1, boardSize + 1);
 
-  drawNexusGlow(dc, time);
+  drawNexusGlow(dc, time, flipped);
 
   if (selected) {
-    const [sx, sy] = squareScreenPos(dc, selected);
+    const [sx, sy] = squareScreenPos(dc, selected, flipped);
     ctx.fillStyle = "rgba(255,255,255,0.08)";
     ctx.fillRect(sx, sy, cellSize, cellSize);
     ctx.strokeStyle = "rgba(255,255,255,0.55)";
@@ -200,7 +211,7 @@ export function drawBoard(
 
   const legalSet = new Set(legalMoves.map((m) => m.to));
   for (const sq of legalSet) {
-    const [x, y] = squareScreenPos(dc, sq);
+    const [x, y] = squareScreenPos(dc, sq, flipped);
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
     if (state.board.has(sq)) {
@@ -219,7 +230,7 @@ export function drawBoard(
 
   if (activeAbility) {
     for (const sq of abilityTargets) {
-      const [x, y] = squareScreenPos(dc, sq);
+      const [x, y] = squareScreenPos(dc, sq, flipped);
       ctx.strokeStyle = "rgba(255,255,255,0.4)";
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 3, y + 3, cellSize - 6, cellSize - 6);
@@ -230,7 +241,7 @@ export function drawBoard(
   ctx.textBaseline = "middle";
   ctx.font = `${cellSize * 0.7}px Georgia, "Times New Roman", serif`;
   for (const [sq, piece] of state.board) {
-    const [x, y] = squareScreenPos(dc, sq);
+    const [x, y] = squareScreenPos(dc, sq, flipped);
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
 
@@ -263,19 +274,13 @@ export function drawBoard(
     ctx.fillStyle = Theme.inkMute;
     ctx.textAlign = "center";
     for (let f = 0; f < 8; f++) {
-      ctx.fillText(
-        "abcdefgh"[f],
-        boardX + f * cellSize + cellSize / 2,
-        boardY + boardSize + 14,
-      );
+      const label = flipped ? "hgfedcba"[f] : "abcdefgh"[f];
+      ctx.fillText(label, boardX + f * cellSize + cellSize / 2, boardY + boardSize + 14);
     }
     ctx.textAlign = "right";
     for (let r = 0; r < 8; r++) {
-      ctx.fillText(
-        String(r + 1),
-        boardX - 8,
-        boardY + (7 - r) * cellSize + cellSize / 2,
-      );
+      const label = flipped ? String(8 - r) : String(r + 1);
+      ctx.fillText(label, boardX - 8, boardY + (7 - r) * cellSize + cellSize / 2);
     }
   }
 }
@@ -284,7 +289,7 @@ export function drawHud(
   dc: DrawCtx,
   state: GameState,
   buttons: ButtonRect[],
-  aiLabel: string,
+  modeLabel: string,
 ) {
   const { ctx, boardSize, width, compact } = dc;
   buttons.length = 0;
@@ -295,23 +300,25 @@ export function drawHud(
   const btnH = compact ? 36 : 34;
   const fontSm = compact ? 11 : 12;
 
-  // Top-right controls — quiet text buttons
+  // Top-right: mode label + Menu
   {
     const topY = compact ? 12 : 16;
-    const gap = 10;
-    const aiW = compact ? Math.min(92, (width - dc.pad * 2 - gap) * 0.55) : 110;
-    const ngW = compact ? Math.min(78, (width - dc.pad * 2 - gap) * 0.4) : 96;
-    const startX = width - dc.pad - (aiW + gap + ngW);
+    const menuW = compact ? 72 : 84;
+    const menu: ButtonRect = {
+      x: width - dc.pad - menuW,
+      y: topY,
+      w: menuW,
+      h: 30,
+      id: "play-menu",
+    };
+    drawButton(ctx, menu, "Menu", { fontSize: fontSm });
+    buttons.push(menu);
 
-    const aiBtn: ButtonRect = { x: startX, y: topY, w: aiW, h: 30, id: "cycleai" };
-    const ngBtn: ButtonRect = { x: startX + aiW + gap, y: topY, w: ngW, h: 30, id: "newgame" };
-
-    drawButton(ctx, aiBtn, aiLabel, {
-      active: aiLabel !== "AI Off",
-      fontSize: compact ? 10 : 11,
-    });
-    drawButton(ctx, ngBtn, "New Game", { fontSize: fontSm });
-    buttons.push(aiBtn, ngBtn);
+    ctx.fillStyle = Theme.inkMute;
+    ctx.font = `400 ${fontSm}px ${Theme.font}`;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText(modeLabel, menu.x - 12, topY + 15);
   }
 
   // Mana — thin continuous track
@@ -392,28 +399,13 @@ export function drawHud(
 }
 
 export function drawWinOverlay(dc: DrawCtx, winner: Color) {
+  // Kept for compatibility; result screen is preferred
   const { ctx, width, height, compact } = dc;
   ctx.fillStyle = "rgba(7,7,8,0.88)";
   ctx.fillRect(0, 0, width, height);
-
-  if (logoReady && logoImg) {
-    const logoH = compact ? 52 : 72;
-    const aspect = logoImg.naturalWidth / Math.max(1, logoImg.naturalHeight);
-    const logoW = logoH * aspect;
-    ctx.drawImage(logoImg, width / 2 - logoW / 2, height / 2 - logoH - 40, logoW, logoH);
-  }
-
   ctx.fillStyle = Theme.ink;
   ctx.font = `500 ${compact ? 24 : 32}px ${Theme.font}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(
-    `${winner === "w" ? "White" : "Black"} wins`,
-    width / 2,
-    height / 2 + 4,
-  );
-
-  ctx.font = `400 ${compact ? 13 : 14}px ${Theme.font}`;
-  ctx.fillStyle = Theme.inkMute;
-  ctx.fillText("New Game to play again", width / 2, height / 2 + 40);
+  ctx.fillText(`${winner === "w" ? "White" : "Black"} wins`, width / 2, height / 2);
 }
