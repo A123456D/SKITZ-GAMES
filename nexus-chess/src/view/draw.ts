@@ -240,10 +240,10 @@ function drawNexusGlow(dc: DrawCtx, time: number, flipped: boolean) {
   }
 }
 
-/** Forge nexus zone — dual cyan / crimson energy well. */
+/** Forge nexus zone — dual cyan / crimson energy well + painted logo mark. */
 function drawForgeNexus(dc: DrawCtx, time: number, flipped: boolean) {
   const { ctx, cellSize } = dc;
-  const pulse = 0.1 + 0.07 * (0.5 + 0.5 * Math.sin(time * 1.5));
+  const pulse = 0.14 + 0.1 * (0.5 + 0.5 * Math.sin(time * 1.5));
   const corners = NEXUS_SQUARES.map((sq) => squareScreenPos(dc, sq, flipped));
   const minX = Math.min(...corners.map(([x]) => x));
   const minY = Math.min(...corners.map(([, y]) => y));
@@ -252,42 +252,46 @@ function drawForgeNexus(dc: DrawCtx, time: number, flipped: boolean) {
   const cy = minY + zone / 2;
 
   const bloom = ctx.createRadialGradient(cx, cy, 0, cx, cy, zone * 0.95);
-  bloom.addColorStop(0, `rgba(255,120,130,${0.16 + pulse * 0.35})`);
-  bloom.addColorStop(0.45, `rgba(100,170,230,${0.08 + pulse * 0.18})`);
+  bloom.addColorStop(0, `rgba(255,120,130,${0.22 + pulse * 0.4})`);
+  bloom.addColorStop(0.4, `rgba(100,170,230,${0.12 + pulse * 0.22})`);
   bloom.addColorStop(1, "rgba(20,8,12,0)");
   ctx.fillStyle = bloom;
-  ctx.fillRect(minX - cellSize * 0.3, minY - cellSize * 0.3, zone + cellSize * 0.6, zone + cellSize * 0.6);
+  ctx.fillRect(minX - cellSize * 0.25, minY - cellSize * 0.25, zone + cellSize * 0.5, zone + cellSize * 0.5);
 
   for (const sq of NEXUS_SQUARES) {
     const [x, y] = squareScreenPos(dc, sq, flipped);
     const scx = x + cellSize / 2;
     const scy = y + cellSize / 2;
-    const grad = ctx.createRadialGradient(scx, scy, 0, scx, scy, cellSize * 0.5);
-    grad.addColorStop(0, `rgba(255,140,150,${pulse + 0.05})`);
+    const grad = ctx.createRadialGradient(scx, scy, 0, scx, scy, cellSize * 0.55);
+    grad.addColorStop(0, `rgba(255,150,160,${pulse + 0.08})`);
     grad.addColorStop(1, "rgba(80,140,200,0)");
     ctx.fillStyle = grad;
     ctx.fillRect(x, y, cellSize, cellSize);
   }
 
-  ctx.strokeStyle = `rgba(255,140,150,${0.4 + pulse})`;
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(minX + 1.5, minY + 1.5, zone - 3, zone - 3);
-  ctx.strokeStyle = `rgba(140,200,255,${0.25 + pulse * 0.35})`;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(minX + 5, minY + 5, zone - 10, zone - 10);
+  // Painted logo mark (crown + X) — same as Nexus theme
+  if (markReady && markImg) {
+    const markH = zone * 0.78;
+    const aspect = markImg.naturalWidth / Math.max(1, markImg.naturalHeight);
+    const markW = markH * aspect;
+    const mx = cx - markW / 2;
+    const my = cy - markH / 2;
+    ctx.save();
+    ctx.globalCompositeOperation = "soft-light";
+    ctx.globalAlpha = 0.48 + pulse * 0.14;
+    ctx.drawImage(markImg, mx, my, markW, markH);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 0.14 + pulse * 0.05;
+    ctx.drawImage(markImg, mx, my, markW, markH);
+    ctx.restore();
+  }
 
-  // Etched X in the well
-  ctx.save();
-  ctx.globalAlpha = 0.18 + pulse * 0.1;
-  ctx.strokeStyle = "#ffb0b8";
+  ctx.strokeStyle = `rgba(255,150,160,${0.55 + pulse})`;
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(cx - zone * 0.22, cy - zone * 0.22);
-  ctx.lineTo(cx + zone * 0.22, cy + zone * 0.22);
-  ctx.moveTo(cx + zone * 0.22, cy - zone * 0.22);
-  ctx.lineTo(cx - zone * 0.22, cy + zone * 0.22);
-  ctx.stroke();
-  ctx.restore();
+  ctx.strokeRect(minX + 1.5, minY + 1.5, zone - 3, zone - 3);
+  ctx.strokeStyle = `rgba(140,210,255,${0.4 + pulse * 0.4})`;
+  ctx.lineWidth = 1.25;
+  ctx.strokeRect(minX + 5, minY + 5, zone - 10, zone - 10);
 }
 
 function drawPieceGlyph(
@@ -326,7 +330,15 @@ export function drawBoard(
 
   const boardTex = getBoardImage();
   if (boardTex && Theme.boardUrl) {
-    ctx.drawImage(boardTex, boardX, boardY, boardSize, boardSize);
+    ctx.save();
+    if (flipped) {
+      ctx.translate(boardX + boardSize, boardY + boardSize);
+      ctx.scale(-1, -1);
+      ctx.drawImage(boardTex, 0, 0, boardSize, boardSize);
+    } else {
+      ctx.drawImage(boardTex, boardX, boardY, boardSize, boardSize);
+    }
+    ctx.restore();
   } else {
     for (let r = 0; r < 8; r++) {
       for (let f = 0; f < 8; f++) {

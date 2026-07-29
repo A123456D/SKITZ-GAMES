@@ -9,7 +9,7 @@ let ready = false;
 let loading: Promise<void> | null = null;
 let loadedPack: string | null = null;
 
-const PIECE_CACHE_VER = 1;
+const PIECE_CACHE_VER = 2;
 
 function key(color: Color, kind: PieceKind): string {
   return color + kind;
@@ -80,16 +80,18 @@ export function drawThemePiece(
   const img = useSprite ? getPieceImage(color, kind) : null;
 
   if (img && img.complete && img.naturalWidth > 0) {
-    const size = cellSize * (Theme.id === "forge" ? 0.9 : 0.86);
+    // Forge sprites are tall 3D renders — keep smaller and sit on the square
+    const size = cellSize * (Theme.id === "forge" ? 0.72 : 0.86);
+    const yBias = Theme.id === "forge" ? cellSize * 0.06 : 0;
     ctx.save();
     ctx.globalAlpha = 0.32;
     ctx.fillStyle = Theme.pieceShadow;
     ctx.beginPath();
-    ctx.ellipse(cx, cy + size * 0.42, size * 0.28, size * 0.08, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + size * 0.4 + yBias, size * 0.26, size * 0.07, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size);
+    ctx.drawImage(img, cx - size / 2, cy - size / 2 + yBias, size, size);
     return;
   }
 
