@@ -1,7 +1,7 @@
 import { newGame } from "./core/board";
 import type { GameState, Square } from "./core/types";
 import { beginTurn, doAbilityPhase, doMovePhase, endTurn, skipAbility } from "./core/turn";
-import { aiTurn, aiThinkDelay, type AiDifficulty } from "./core/ai";
+import { aiPlay, aiThinkDelay, type AiDifficulty } from "./core/ai";
 import {
   loadProfile,
   recordAiGame,
@@ -19,6 +19,7 @@ import {
   layout,
   drawBoard,
   drawHud,
+  drawAbilityConfirm,
   squareScreenPos,
   loadLogo,
   loadNexusMark,
@@ -31,7 +32,9 @@ import {
   createUiState,
   handleClick,
   applySelect,
+  applyAbilityPrompt,
   applyAbilitySelect,
+  canAffordAbility,
   clearUi,
   makeAbilityCast,
   type UiState,
@@ -94,6 +97,7 @@ let lastFrame = performance.now();
 let animEndTimer: ReturnType<typeof setTimeout> | null = null;
 let aiPending = false;
 let eloRecorded = false;
+let lastMove: { from: Square; to: Square } | null = null;
 
 const PIECE_CHARS: Record<string, string> = {
   wK: "\u2654", wQ: "\u2655", wR: "\u2656", wB: "\u2657", wN: "\u2658", wP: "\u2659",
@@ -148,6 +152,7 @@ function startMatch(mode: PlayMode, oppElo = opponentElo) {
   aiPending = false;
   eloRecorded = false;
   lastEloResult = null;
+  lastMove = null;
   screen = "play";
   maybeAiTurn();
 }
@@ -186,7 +191,11 @@ function maybeAiTurn() {
     setTimeout(() => {
       try {
         if (screen !== "play" || state.activeColor !== "b") return;
-        state = aiTurn(state, difficulty);
+        const result = aiPlay(state, difficulty);
+        state = result.state;
+        if (result.lastMove) {
+          lastMove = { from: result.lastMove.from, to: result.lastMove.to };
+        }
         ui = clearUi();
         finishIfWon();
       } finally {
@@ -344,7 +353,22 @@ function onPointer(e: PointerEvent) {
       break;
 
     case "ability":
-      if (result.ability) ui = applyAbilitySelect(ui, state, result.ability);
+      if (result.ability) {
+        ui = applyAbilityPrompt(ui, result.ability);
+        playUiTap();
+      }
+      break;
+
+    case "abilityConfirm":
+      if (ui.pendingAbility && canAffordAbility(state, ui.pendingAbility)) {
+        ui = applyAbilitySelect(ui, state, ui.pendingAbility);
+        playUiTap();
+      }
+      break;
+
+    case "abilityCancel":
+      ui = clearUi();
+      playUiTap();
       break;
 
     case "abilityTarget":
@@ -369,7 +393,8 @@ function onPointer(e: PointerEvent) {
         const [fromX, fromY] = squareScreenPos(dc, result.move.from, flipped);
         const [toX, toY] = squareScreenPos(dc, result.move.to, flipped);
         const piece = state.board.get(result.move.from);
-        const moveMs = hadPiece ? 420 : 380;
+        const moveMs = hadPiece ? 400 : 360;
+        lastMove = { from: result.move.from, to: result.move.to };
 
         if (piece) {
           moveAnim = {
@@ -394,8 +419,8 @@ function onPointer(e: PointerEvent) {
             x: toX,
             y: toY,
             size: dc.cellSize,
-            startTime: performance.now() + moveMs * 0.85,
-            duration: 380,
+            startTime: performance.now() + moveMs * 0.82,
+            duration: 220,
           };
         }
 
@@ -459,6 +484,7 @@ function frame(now: number) {
       ui.activeAbility,
       flipped,
       hideSq,
+      lastMove,
     );
 
     updateBoardFx(boardFx, dt, now);
@@ -488,7 +514,16 @@ function frame(now: number) {
       if (!alive) captureFlash = null;
     }
 
-    drawHud(dc, state, buttons, modeLabel());
+    drawHud(dc, state, buttons, modeLabel(), ui.pendingAbility ?? ui.activeAbility);
+
+    if (ui.mode === "abilityConfirm" && ui.pendingAbility) {
+      drawAbilityConfirm(
+        dc,
+        buttons,
+        ui.pendingAbility,
+        canAffordAbility(state, ui.pendingAbility),
+      );
+    }
   }
 
   requestAnimationFrame(frame);

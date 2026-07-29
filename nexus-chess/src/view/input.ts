@@ -2,11 +2,13 @@ import type { Ability, GameState, Move, Square, AbilityCast } from "../core/type
 import type { ButtonRect, DrawCtx } from "./draw";
 import { screenToSquare } from "./draw";
 import { pieceMoves } from "../core/moves";
-import { abilityTargets } from "../core/abilities";
+import { abilityTargets, ABILITY_COST } from "../core/abilities";
+import { activePlayer } from "../core/types";
 
 export type UiMode =
   | "idle"
   | "selecting"
+  | "abilityConfirm"
   | "abilityTarget"
   | "overdriveSelect";
 
@@ -15,6 +17,7 @@ export interface UiState {
   selected: Square | null;
   legalMoves: Move[];
   activeAbility: Ability | null;
+  pendingAbility: Ability | null;
   abilityTargetSquares: Square[];
 }
 
@@ -24,6 +27,7 @@ export function createUiState(): UiState {
     selected: null,
     legalMoves: [],
     activeAbility: null,
+    pendingAbility: null,
     abilityTargetSquares: [],
   };
 }
@@ -42,6 +46,8 @@ export interface ClickResult {
     | "move"
     | "deselect"
     | "ability"
+    | "abilityConfirm"
+    | "abilityCancel"
     | "abilityTarget"
     | "skip"
     | "newgame"
@@ -64,7 +70,20 @@ export function handleClick(
   flipped = false,
 ): ClickResult {
   const btn = hitButton(buttons, px, py);
+
+  // Confirm dialog: only confirm / cancel / switch ability
+  if (ui.mode === "abilityConfirm") {
+    if (btn === "ability-confirm") return { type: "abilityConfirm" };
+    if (btn === "ability-cancel") return { type: "abilityCancel" };
+    if (btn === "aegis" || btn === "overdrive" || btn === "tacticalSwap") {
+      return { type: "ability", ability: btn as Ability };
+    }
+    return { type: "none" };
+  }
+
   if (btn) {
+    if (btn === "ability-confirm") return { type: "abilityConfirm" };
+    if (btn === "ability-cancel") return { type: "abilityCancel" };
     if (btn === "skip") return { type: "skip" };
     if (btn === "newgame") return { type: "newgame" };
     if (btn === "play-menu") return { type: "menu" };
@@ -129,8 +148,26 @@ export function applySelect(ui: UiState, state: GameState, sq: Square): UiState 
     selected: sq,
     legalMoves: filtered,
     activeAbility: null,
+    pendingAbility: null,
     abilityTargetSquares: [],
   };
+}
+
+/** Open ability info + confirm panel (does not enter targeting yet). */
+export function applyAbilityPrompt(ui: UiState, ability: Ability): UiState {
+  return {
+    ...ui,
+    mode: "abilityConfirm",
+    selected: null,
+    legalMoves: [],
+    activeAbility: null,
+    pendingAbility: ability,
+    abilityTargetSquares: [],
+  };
+}
+
+export function canAffordAbility(state: GameState, ability: Ability): boolean {
+  return activePlayer(state).mana >= ABILITY_COST[ability];
 }
 
 export function applyAbilitySelect(ui: UiState, state: GameState, ability: Ability): UiState {
@@ -141,6 +178,7 @@ export function applyAbilitySelect(ui: UiState, state: GameState, ability: Abili
     selected: null,
     legalMoves: [],
     activeAbility: ability,
+    pendingAbility: null,
     abilityTargetSquares: targets,
   };
 }

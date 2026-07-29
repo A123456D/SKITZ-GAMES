@@ -9,6 +9,33 @@ export const ABILITY_COST: Record<Ability, number> = {
   tacticalSwap: 5,
 };
 
+export const ABILITY_INFO: Record<
+  Ability,
+  { name: string; cost: number; summary: string; detail: string }
+> = {
+  aegis: {
+    name: "Aegis",
+    cost: ABILITY_COST.aegis,
+    summary: "Shield one of your pieces.",
+    detail:
+      "Choose a friendly piece. It cannot be captured until the start of your next turn. Kings already in the Nexus cannot be shielded.",
+  },
+  overdrive: {
+    name: "Overdrive",
+    cost: ABILITY_COST.overdrive,
+    summary: "Move a piece twice this turn.",
+    detail:
+      "Choose a non-king piece. It may move twice. The second move cannot end on the 1st or 8th rank.",
+  },
+  tacticalSwap: {
+    name: "Tactical Swap",
+    cost: ABILITY_COST.tacticalSwap,
+    summary: "Swap your king with another piece.",
+    detail:
+      "Choose a friendly non-king piece. Your king swaps places with it. The king cannot land in the Nexus via this swap.",
+  },
+};
+
 // ---------- Aegis ----------
 
 function canAegis(state: GameState, target: Square): boolean {

@@ -363,27 +363,38 @@ export function aiPickMove(state: GameState, difficulty: AiDifficulty = 2): Move
   return pickSearch(state, SEARCH_DEPTH[difficulty], BRANCH_CAP[difficulty]);
 }
 
-/** Execute a full AI turn at the given difficulty. */
-export function aiTurn(state: GameState, difficulty: AiDifficulty = 2): GameState {
-  if (difficulty === 0) return state;
+/** Execute a full AI turn; also returns the last board move played (for UI highlight). */
+export function aiPlay(
+  state: GameState,
+  difficulty: AiDifficulty = 2,
+): { state: GameState; lastMove: Move | null } {
+  if (difficulty === 0) return { state, lastMove: null };
   let s = state;
+  let lastMove: Move | null = null;
   if (s.turnPhase === "ability") s = skipAbility(s);
 
   const move = aiPickMove(s, difficulty);
-  if (!move) return s;
+  if (!move) return { state: s, lastMove: null };
 
+  lastMove = move;
   s = doMovePhase(s, move);
-  if (s.winner) return s;
+  if (s.winner) return { state: s, lastMove };
 
   while (s.turnPhase === "overdrive" && !s.winner) {
     const follow = aiPickMove(s, difficulty === 1 ? 1 : 2);
     if (!follow) break;
+    lastMove = follow;
     s = doMovePhase(s, follow);
   }
 
-  if (s.winner) return s;
-  if (s.turnPhase === "resolved") return endTurn(s);
-  return s;
+  if (s.winner) return { state: s, lastMove };
+  if (s.turnPhase === "resolved") return { state: endTurn(s), lastMove };
+  return { state: s, lastMove };
+}
+
+/** Execute a full AI turn at the given difficulty. */
+export function aiTurn(state: GameState, difficulty: AiDifficulty = 2): GameState {
+  return aiPlay(state, difficulty).state;
 }
 
 /** Suggested think delay (ms). Search already costs time on Hard/Expert. */

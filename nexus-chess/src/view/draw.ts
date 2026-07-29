@@ -1,9 +1,9 @@
 import type { GameState, Square, Color, Ability, Move } from "../core/types";
 import { squareToRC, rcToSquare, NEXUS_SQUARES } from "../core/board";
-import { ABILITY_COST } from "../core/abilities";
+import { ABILITY_COST, ABILITY_INFO } from "../core/abilities";
 import { activePlayer } from "../core/types";
 import { Theme } from "./theme";
-import { drawAtmosphere, drawBoardShadow, drawPremiumBtn, roundRectPath, fillTile } from "./fx";
+import { drawAtmosphere, drawBoardShadow, drawPremiumBtn, roundRectPath, fillTile, drawPanel } from "./fx";
 import { drawThemePiece } from "./pieces";
 
 const PIECE_CHARS: Record<string, string> = {
@@ -262,6 +262,7 @@ export function drawBoard(
   activeAbility: Ability | null,
   flipped = false,
   hideSquare: Square | null = null,
+  lastMove: { from: Square; to: Square } | null = null,
 ) {
   const { ctx, boardX, boardY, cellSize, boardSize, width, height, compact } = dc;
 
@@ -281,6 +282,20 @@ export function drawBoard(
       const bf = flipped ? 7 - f : f;
       const light = (br + bf) % 2 !== 0;
       fillTile(ctx, x, y, cellSize, light);
+    }
+  }
+
+  // Last move highlight (from + to)
+  if (lastMove) {
+    for (const sq of [lastMove.from, lastMove.to]) {
+      const [x, y] = squareScreenPos(dc, sq, flipped);
+      ctx.fillStyle =
+        Theme.id === "nexus" ? "rgba(120,190,230,0.22)" : "rgba(220,190,90,0.28)";
+      ctx.fillRect(x, y, cellSize, cellSize);
+      ctx.strokeStyle =
+        Theme.id === "nexus" ? "rgba(160,220,255,0.35)" : "rgba(230,200,100,0.4)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, cellSize - 1, cellSize - 1);
     }
   }
 
@@ -377,6 +392,7 @@ export function drawHud(
   state: GameState,
   buttons: ButtonRect[],
   modeLabel: string,
+  highlightAbility: Ability | null = null,
 ) {
   const { ctx, boardSize, width, compact } = dc;
   buttons.length = 0;
@@ -482,6 +498,7 @@ export function drawHud(
       drawPremiumBtn(ctx, btn, icon ? "" : label, {
         muted: !canAfford && a.id !== "skip",
         primary: a.id === "skip",
+        active: a.id !== "skip" && a.id === highlightAbility,
         fontSize: compact ? 11 : 12,
       });
 
@@ -512,6 +529,118 @@ export function drawHud(
       buttons.push(btn);
     }
   }
+}
+
+/** Ability info + confirm overlay. Adds ability-confirm / ability-cancel buttons. */
+export function drawAbilityConfirm(
+  dc: DrawCtx,
+  buttons: ButtonRect[],
+  ability: Ability,
+  canAfford: boolean,
+) {
+  const { ctx, width, height, compact } = dc;
+  const info = ABILITY_INFO[ability];
+  const icon = getAbilityIcon(ability);
+
+  ctx.fillStyle = "rgba(4,6,10,0.62)";
+  ctx.fillRect(0, 0, width, height);
+
+  const panelW = Math.min(compact ? width - 32 : 360, width - 32);
+  const panelH = compact ? 248 : 268;
+  const px = (width - panelW) / 2;
+  const py = (height - panelH) / 2;
+
+  drawPanel(ctx, px, py, panelW, panelH, { strong: true, fill: true });
+  ctx.fillStyle = "rgba(8,12,18,0.92)";
+  roundRectPath(ctx, px, py, panelW, panelH);
+  ctx.fill();
+  drawPanel(ctx, px, py, panelW, panelH, { strong: true, fill: false });
+
+  const pad = compact ? 16 : 22;
+  let y = py + pad;
+
+  if (icon && icon.complete) {
+    const ih = compact ? 36 : 42;
+    ctx.drawImage(icon, px + pad, y, ih, ih);
+    ctx.fillStyle = Theme.ink;
+    ctx.font = `600 ${compact ? 18 : 20}px ${Theme.font}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(info.name, px + pad + ih + 12, y + ih / 2 - 8);
+    ctx.fillStyle = Theme.inkMute;
+    ctx.font = `400 ${compact ? 12 : 13}px ${Theme.font}`;
+    ctx.fillText(`${info.cost} mana`, px + pad + ih + 12, y + ih / 2 + 12);
+    y += ih + 16;
+  } else {
+    ctx.fillStyle = Theme.ink;
+    ctx.font = `600 ${compact ? 18 : 20}px ${Theme.font}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(info.name, px + pad, y + 18);
+    ctx.fillStyle = Theme.inkMute;
+    ctx.font = `400 12px ${Theme.font}`;
+    ctx.fillText(`${info.cost} mana`, px + pad, y + 38);
+    y += 52;
+  }
+
+  ctx.fillStyle = Theme.ink;
+  ctx.font = `500 ${compact ? 14 : 15}px ${Theme.font}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(info.summary, px + pad, y);
+  y += compact ? 22 : 26;
+
+  ctx.fillStyle = Theme.inkDim;
+  ctx.font = `400 ${compact ? 12 : 13}px ${Theme.font}`;
+  const detailLines = wrapText(ctx, info.detail, panelW - pad * 2);
+  for (const line of detailLines) {
+    ctx.fillText(line, px + pad, y);
+    y += compact ? 16 : 18;
+  }
+
+  if (!canAfford) {
+    y += 6;
+    ctx.fillStyle = Theme.id === "nexus" ? "rgba(255,140,140,0.85)" : "rgba(255,160,160,0.8)";
+    ctx.font = `500 12px ${Theme.font}`;
+    ctx.fillText("Not enough mana.", px + pad, y);
+  }
+
+  const btnY = py + panelH - (compact ? 52 : 56);
+  const gap = 10;
+  const bw = (panelW - pad * 2 - gap) / 2;
+  const cancel: ButtonRect = { x: px + pad, y: btnY, w: bw, h: compact ? 36 : 38, id: "ability-cancel" };
+  const confirm: ButtonRect = {
+    x: px + pad + bw + gap,
+    y: btnY,
+    w: bw,
+    h: compact ? 36 : 38,
+    id: "ability-confirm",
+  };
+
+  drawPremiumBtn(ctx, cancel, "Cancel", { fontSize: compact ? 13 : 14 });
+  drawPremiumBtn(ctx, confirm, canAfford ? "Use Ability" : "Can't Use", {
+    primary: canAfford,
+    muted: !canAfford,
+    fontSize: compact ? 13 : 14,
+  });
+  buttons.push(cancel, confirm);
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w;
+    if (ctx.measureText(next).width > maxW && cur) {
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = next;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
 }
 
 export function drawWinOverlay(dc: DrawCtx, winner: Color) {
