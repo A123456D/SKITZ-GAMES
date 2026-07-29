@@ -51,8 +51,8 @@ describe("board", () => {
   it("newGame starts with white to move, 0 mana", () => {
     const g = newGame();
     expect(g.activeColor).toBe("w");
-    expect(g.players[0].mana).toBe(2);
-    expect(g.players[1].mana).toBe(2);
+    expect(g.players[0].mana).toBe(0);
+    expect(g.players[1].mana).toBe(0);
     expect(g.winner).toBeNull();
     expect(g.turnNumber).toBe(1);
   });

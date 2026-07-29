@@ -22,7 +22,7 @@ describe("mana", () => {
     const s = newGame();
     s.board = new Map(); // clear board so no nexus bonus
     const s2 = startTurnMana(s);
-    expect(s2.players[0].mana).toBe(3);
+    expect(s2.players[0].mana).toBe(1);
   });
 
   it("+1 per piece in Nexus", () => {
@@ -30,8 +30,8 @@ describe("mana", () => {
     s.board = new Map();
     placeInNexus(s, 3);
     const s2 = startTurnMana(s);
-    // starting 2 +1 passive + 3 nexus = 6
-    expect(s2.players[0].mana).toBe(6);
+    // +1 passive + 3 nexus = 4
+    expect(s2.players[0].mana).toBe(4);
   });
 
   it("caps at 10", () => {
