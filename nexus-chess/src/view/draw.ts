@@ -3,6 +3,7 @@ import { squareToRC, rcToSquare, NEXUS_SQUARES } from "../core/board";
 import { ABILITY_COST } from "../core/abilities";
 import { activePlayer } from "../core/types";
 import { Theme } from "./theme";
+import { drawAtmosphere, drawBoardShadow, drawPremiumBtn, roundRectPath } from "./fx";
 
 const PIECE_CHARS: Record<string, string> = {
   wK: "\u2654", wQ: "\u2655", wR: "\u2656", wB: "\u2657", wN: "\u2658", wP: "\u2659",
@@ -98,37 +99,8 @@ export function screenToSquare(dc: DrawCtx, px: number, py: number, flipped = fa
   return rcToSquare(rank, file);
 }
 
-function drawButton(
-  ctx: CanvasRenderingContext2D,
-  b: ButtonRect,
-  label: string,
-  opts: { active?: boolean; muted?: boolean; primary?: boolean; fontSize: number },
-) {
-  const { x, y, w, h } = b;
-
-  if (opts.primary) {
-    ctx.fillStyle = "rgba(244,244,245,0.08)";
-    ctx.fillRect(x, y, w, h);
-  }
-
-  ctx.strokeStyle = opts.muted
-    ? Theme.hairline
-    : opts.active || opts.primary
-      ? Theme.hairlineStrong
-      : Theme.hairline;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-
-  ctx.fillStyle = opts.muted ? Theme.inkMute : opts.active ? Theme.ink : Theme.inkDim;
-  ctx.font = `500 ${opts.fontSize}px ${Theme.font}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(label, x + w / 2, y + h / 2 + 0.5);
-}
-
 function drawLogoHeader(dc: DrawCtx) {
   const { ctx, compact, pad } = dc;
-  // Larger brand mark — still balanced with top controls
   const logoH = compact ? 52 : 76;
   if (logoReady && logoImg) {
     const aspect = logoImg.naturalWidth / Math.max(1, logoImg.naturalHeight);
@@ -146,22 +118,65 @@ function drawLogoHeader(dc: DrawCtx) {
 
 function drawNexusGlow(dc: DrawCtx, time: number, flipped: boolean) {
   const { ctx, cellSize } = dc;
-  const pulse = 0.08 + 0.07 * (0.5 + 0.5 * Math.sin(time * 1.8));
+  const pulse = 0.1 + 0.06 * (0.5 + 0.5 * Math.sin(time * 1.4));
+
+  // Soft bloom covering the whole Nexus block
+  const corners = NEXUS_SQUARES.map((sq) => squareScreenPos(dc, sq, flipped));
+  const minX = Math.min(...corners.map(([x]) => x));
+  const minY = Math.min(...corners.map(([, y]) => y));
+  const zone = cellSize * 2;
+  const cx = minX + zone / 2;
+  const cy = minY + zone / 2;
+
+  const bloom = ctx.createRadialGradient(cx, cy, 0, cx, cy, zone * 0.85);
+  bloom.addColorStop(0, `rgba(255,255,255,${0.07 + pulse * 0.35})`);
+  bloom.addColorStop(0.55, `rgba(255,255,255,${0.025 + pulse * 0.12})`);
+  bloom.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = bloom;
+  ctx.fillRect(minX - cellSize * 0.3, minY - cellSize * 0.3, zone + cellSize * 0.6, zone + cellSize * 0.6);
 
   for (const sq of NEXUS_SQUARES) {
     const [x, y] = squareScreenPos(dc, sq, flipped);
-    const cx = x + cellSize / 2;
-    const cy = y + cellSize / 2;
+    const scx = x + cellSize / 2;
+    const scy = y + cellSize / 2;
 
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cellSize * 0.62);
-    grad.addColorStop(0, `rgba(255,255,255,${pulse + 0.06})`);
+    const grad = ctx.createRadialGradient(scx, scy, 0, scx, scy, cellSize * 0.55);
+    grad.addColorStop(0, `rgba(255,255,255,${pulse + 0.04})`);
     grad.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = grad;
     ctx.fillRect(x, y, cellSize, cellSize);
+  }
 
-    ctx.strokeStyle = `rgba(255,255,255,${0.12 + pulse})`;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x + 1.5, y + 1.5, cellSize - 3, cellSize - 3);
+  ctx.strokeStyle = `rgba(255,255,255,${0.18 + pulse * 0.9})`;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(minX + 1.5, minY + 1.5, zone - 3, zone - 3);
+}
+
+function drawPieceGlyph(
+  ctx: CanvasRenderingContext2D,
+  ch: string,
+  cx: number,
+  cy: number,
+  cellSize: number,
+  color: "w" | "b",
+) {
+  ctx.font = `${cellSize * 0.68}px Georgia, "Times New Roman", serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  // Soft contact shadow
+  ctx.fillStyle = Theme.pieceShadow;
+  ctx.fillText(ch, cx + 0.5, cy + cellSize * 0.04);
+
+  if (color === "w") {
+    ctx.fillStyle = Theme.whitePiece;
+    ctx.fillText(ch, cx, cy);
+  } else {
+    ctx.fillStyle = Theme.blackPiece;
+    ctx.fillText(ch, cx, cy);
+    ctx.strokeStyle = "rgba(255,255,255,0.28)";
+    ctx.lineWidth = 0.8;
+    ctx.strokeText(ch, cx, cy);
   }
 }
 
@@ -174,23 +189,32 @@ export function drawBoard(
   abilityTargets: Square[],
   activeAbility: Ability | null,
   flipped = false,
+  hideSquare: Square | null = null,
 ) {
   const { ctx, boardX, boardY, cellSize, boardSize, width, height, compact } = dc;
 
-  ctx.fillStyle = Theme.bg;
-  ctx.fillRect(0, 0, width, height);
-
+  drawAtmosphere(ctx, width, height, time);
   drawLogoHeader(dc);
+  drawBoardShadow(ctx, boardX, boardY, boardSize);
+
+  // Board frame
+  ctx.fillStyle = Theme.bgSoft;
+  ctx.fillRect(boardX - 3, boardY - 3, boardSize + 6, boardSize + 6);
 
   for (let r = 0; r < 8; r++) {
     for (let f = 0; f < 8; f++) {
       const x = boardX + f * cellSize;
       const y = boardY + (7 - r) * cellSize;
-      // Checker pattern follows board coordinates, not screen — keep visual stable when flipped
       const br = flipped ? 7 - r : r;
       const bf = flipped ? 7 - f : f;
-      ctx.fillStyle = (br + bf) % 2 === 0 ? Theme.tileDark : Theme.tileLight;
+      const light = (br + bf) % 2 !== 0;
+      ctx.fillStyle = light ? Theme.tileLight : Theme.tileDark;
       ctx.fillRect(x, y, cellSize, cellSize);
+
+      if (light) {
+        ctx.fillStyle = Theme.tileSheen;
+        ctx.fillRect(x, y, cellSize, 1);
+      }
     }
   }
 
@@ -202,11 +226,11 @@ export function drawBoard(
 
   if (selected) {
     const [sx, sy] = squareScreenPos(dc, selected, flipped);
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.fillStyle = "rgba(255,255,255,0.1)";
     ctx.fillRect(sx, sy, cellSize, cellSize);
-    ctx.strokeStyle = "rgba(255,255,255,0.55)";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(sx + 1.5, sy + 1.5, cellSize - 3, cellSize - 3);
+    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+    ctx.lineWidth = 1.25;
+    ctx.strokeRect(sx + 2, sy + 2, cellSize - 4, cellSize - 4);
   }
 
   const legalSet = new Set(legalMoves.map((m) => m.to));
@@ -215,15 +239,15 @@ export function drawBoard(
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
     if (state.board.has(sq)) {
-      ctx.strokeStyle = "rgba(255,255,255,0.5)";
-      ctx.lineWidth = 1.25;
+      ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(cx, cy, cellSize * 0.38, 0, Math.PI * 2);
+      ctx.arc(cx, cy, cellSize * 0.4, 0, Math.PI * 2);
       ctx.stroke();
     } else {
-      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.fillStyle = "rgba(255,255,255,0.42)";
       ctx.beginPath();
-      ctx.arc(cx, cy, Math.max(2.5, cellSize * 0.07), 0, Math.PI * 2);
+      ctx.arc(cx, cy, Math.max(2.8, cellSize * 0.08), 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -231,48 +255,39 @@ export function drawBoard(
   if (activeAbility) {
     for (const sq of abilityTargets) {
       const [x, y] = squareScreenPos(dc, sq, flipped);
-      ctx.strokeStyle = "rgba(255,255,255,0.4)";
+      ctx.strokeStyle = "rgba(255,255,255,0.45)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(x + 3, y + 3, cellSize - 6, cellSize - 6);
+      ctx.strokeRect(x + 4, y + 4, cellSize - 8, cellSize - 8);
     }
   }
 
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = `${cellSize * 0.7}px Georgia, "Times New Roman", serif`;
   for (const [sq, piece] of state.board) {
+    if (hideSquare && sq === hideSquare) continue;
     const [x, y] = squareScreenPos(dc, sq, flipped);
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
 
     if (piece.isShielded) {
-      ctx.strokeStyle = "rgba(255,255,255,0.45)";
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(x + 5, y + 5, cellSize - 10, cellSize - 10);
+      roundRectPath(ctx, x + 5, y + 5, cellSize - 10, cellSize - 10, 2);
+      ctx.stroke();
     }
 
     if (state.overdriveSquare === sq) {
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
+      ctx.fillStyle = "rgba(255,255,255,0.07)";
       ctx.fillRect(x, y, cellSize, cellSize);
     }
 
     const ch = PIECE_CHARS[piece.color + piece.kind];
-    if (piece.color === "w") {
-      ctx.fillStyle = Theme.whitePiece;
-      ctx.fillText(ch, cx, cy);
-    } else {
-      ctx.fillStyle = Theme.blackPiece;
-      ctx.fillText(ch, cx, cy);
-      ctx.strokeStyle = "rgba(255,255,255,0.35)";
-      ctx.lineWidth = 0.75;
-      ctx.strokeText(ch, cx, cy);
-    }
+    drawPieceGlyph(ctx, ch, cx, cy, cellSize, piece.color);
   }
 
   if (!compact || cellSize >= 40) {
     ctx.font = `400 ${Math.max(9, Math.min(10, cellSize * 0.18))}px ${Theme.font}`;
     ctx.fillStyle = Theme.inkMute;
     ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     for (let f = 0; f < 8; f++) {
       const label = flipped ? "hgfedcba"[f] : "abcdefgh"[f];
       ctx.fillText(label, boardX + f * cellSize + cellSize / 2, boardY + boardSize + 14);
@@ -300,7 +315,6 @@ export function drawHud(
   const btnH = compact ? 36 : 34;
   const fontSm = compact ? 11 : 12;
 
-  // Top-right: mode label + Menu
   {
     const topY = compact ? 12 : 16;
     const menuW = compact ? 72 : 84;
@@ -311,7 +325,7 @@ export function drawHud(
       h: 30,
       id: "play-menu",
     };
-    drawButton(ctx, menu, "Menu", { fontSize: fontSm });
+    drawPremiumBtn(ctx, menu, "Menu", { fontSize: fontSm });
     buttons.push(menu);
 
     ctx.fillStyle = Theme.inkMute;
@@ -321,9 +335,8 @@ export function drawHud(
     ctx.fillText(modeLabel, menu.x - 12, topY + 15);
   }
 
-  // Mana — thin continuous track
   const labelW = compact ? 22 : 56;
-  const trackH = 4;
+  const trackH = 3;
   const rowH = compact ? 20 : 24;
 
   for (let i = 0; i < 2; i++) {
@@ -341,17 +354,21 @@ export function drawHud(
     const trackW = contentW - labelW;
     const trackY = barY + (rowH - trackH) / 2;
 
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
-    ctx.fillRect(trackX, trackY, trackW, trackH);
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    roundRectPath(ctx, trackX, trackY, trackW, trackH, 1.5);
+    ctx.fill();
 
     const fillW = (Math.min(10, p.mana) / 10) * trackW;
     if (fillW > 0) {
-      ctx.fillStyle = "rgba(255,255,255,0.7)";
-      ctx.fillRect(trackX, trackY, fillW, trackH);
+      const g = ctx.createLinearGradient(trackX, 0, trackX + fillW, 0);
+      g.addColorStop(0, "rgba(255,255,255,0.45)");
+      g.addColorStop(1, "rgba(255,255,255,0.85)");
+      ctx.fillStyle = g;
+      roundRectPath(ctx, trackX, trackY, Math.max(fillW, trackH), trackH, 1.5);
+      ctx.fill();
     }
   }
 
-  // Status line
   const infoY = hudTop + rowH * 2 + (compact ? 10 : 14);
   const turnLabel = state.activeColor === "w" ? "White" : "Black";
   const phaseLabel =
@@ -388,7 +405,7 @@ export function drawHud(
       const btn: ButtonRect = { x: bx, y: btnY, w: bw, h: btnH, id: a.id };
       const display = a.id === "skip" ? "Skip" : `${a.label}  ${a.cost}`;
 
-      drawButton(ctx, btn, display, {
+      drawPremiumBtn(ctx, btn, display, {
         muted: !canAfford && a.id !== "skip",
         primary: a.id === "skip",
         fontSize: compact ? 11 : 12,
@@ -399,9 +416,8 @@ export function drawHud(
 }
 
 export function drawWinOverlay(dc: DrawCtx, winner: Color) {
-  // Kept for compatibility; result screen is preferred
   const { ctx, width, height, compact } = dc;
-  ctx.fillStyle = "rgba(7,7,8,0.88)";
+  ctx.fillStyle = "rgba(5,5,6,0.9)";
   ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = Theme.ink;
   ctx.font = `500 ${compact ? 24 : 32}px ${Theme.font}`;

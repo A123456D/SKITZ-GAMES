@@ -1,5 +1,5 @@
 import { newGame } from "./core/board";
-import type { GameState } from "./core/types";
+import type { GameState, Square } from "./core/types";
 import { beginTurn, doAbilityPhase, doMovePhase, endTurn, skipAbility } from "./core/turn";
 import { aiTurn, aiThinkDelay, type AiDifficulty } from "./core/ai";
 import {
@@ -313,8 +313,10 @@ function onPointer(e: PointerEvent) {
             toX,
             toY,
             startTime: performance.now(),
-            duration: 180,
+            duration: 240,
             piece: PIECE_CHARS[piece.color + piece.kind] || "?",
+            color: piece.color,
+            toSq: result.move.to,
           };
         }
 
@@ -342,7 +344,7 @@ function onPointer(e: PointerEvent) {
             if (state.winner) finishIfWon();
             else maybeAiTurn();
           }
-        }, 200);
+        }, 250);
       }
       break;
   }
@@ -365,24 +367,25 @@ function frame(now: number) {
   buttons.length = 0;
 
   if (screen === "home") {
-    drawHome(dc, buttons);
+    drawHome(dc, buttons, time);
   } else if (screen === "hub") {
-    drawHub(dc, buttons, profile);
+    drawHub(dc, buttons, profile, time);
   } else if (screen === "setElo") {
-    drawSetElo(dc, buttons, profile, draftPlayerElo);
+    drawSetElo(dc, buttons, profile, draftPlayerElo, time);
   } else if (screen === "aiSelect") {
-    drawAiSelect(dc, buttons, profile, opponentElo);
+    drawAiSelect(dc, buttons, profile, opponentElo, time);
   } else if (screen === "how") {
-    drawHowTo(dc, buttons);
+    drawHowTo(dc, buttons, time);
   } else if (screen === "result") {
     drawResult(dc, buttons, {
       winner: state.winner ?? "w",
       mode: playMode,
       elo: lastEloResult,
       opponentElo,
-    });
+    }, time);
   } else {
     const flipped = boardFlipped();
+    const hideSq = (moveAnim?.toSq as Square | undefined) ?? null;
     drawBoard(
       dc,
       state,
@@ -392,6 +395,7 @@ function frame(now: number) {
       ui.abilityTargetSquares,
       ui.activeAbility,
       flipped,
+      hideSq,
     );
 
     if (moveAnim) {
