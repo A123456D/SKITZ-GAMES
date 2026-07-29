@@ -1048,12 +1048,7 @@ export function drawStickersScreen(
     const kind = opts.draft[i];
     const img = kind ? stickerImage(kind) : null;
     if (img && img.complete && img.naturalWidth > 0) {
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.22)";
-      ctx.shadowBlur = 6;
-      ctx.shadowOffsetY = 3;
       ctx.drawImage(img, sx + 8, sy + 8, slotW - 16, slotW - 16);
-      ctx.restore();
     } else {
       ctx.fillStyle = selected ? p.ink : p.muted;
       ctx.font = "700 14px 'Chakra Petch', sans-serif";
@@ -1096,12 +1091,7 @@ export function drawStickersScreen(
 
     const img = stickerImage(kind);
     if (img && img.complete && img.naturalWidth > 0) {
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.2)";
-      ctx.shadowBlur = 7;
-      ctx.shadowOffsetY = 3;
       ctx.drawImage(img, cx + 18, cy + 10, cell - 36, cell - 36);
-      ctx.restore();
     }
     ctx.fillStyle = p.ink;
     ctx.font = "700 12px 'Chakra Petch', sans-serif";

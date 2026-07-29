@@ -6,7 +6,7 @@ export type RenderQuality = {
 
 let quality: RenderQuality = {
   dprCap: 2,
-  stickerShadows: true,
+  stickerShadows: false,
   hoverAnim: true,
 };
 
@@ -25,13 +25,12 @@ export function detectQuality(): RenderQuality {
   quality = lowEnd
     ? {
         dprCap: 1.5,
-        // Soft lift shadows still read well on phones.
-        stickerShadows: true,
+        stickerShadows: false,
         hoverAnim: true,
       }
     : {
         dprCap: 2,
-        stickerShadows: true,
+        stickerShadows: false,
         hoverAnim: true,
       };
   return quality;

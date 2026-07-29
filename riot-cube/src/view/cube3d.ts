@@ -662,7 +662,6 @@ function drawFace(
       q,
       hovering || spinning,
       hoverT,
-      quality.stickerShadows,
       dropT,
     );
   };
@@ -749,7 +748,6 @@ function drawStickerOnQuad(
   faceQuad: Vec2[],
   hovering: boolean,
   hoverT: number,
-  shadows: boolean,
   dropT = 0,
 ): void {
   const cx = (tl.x + tr.x + br.x + bl.x) / 4;
@@ -774,7 +772,6 @@ function drawStickerOnQuad(
   let dropY = 0;
   let dropScaleX = 1;
   let dropScaleY = 1;
-  let dropShadow = 0;
   if (dropT > 0 && dropT < 1 && !hovering) {
     const damp = Math.exp(-3.4 * dropT);
     dropY = -Math.cos(dropT * Math.PI * 1.15) * 5.2 * damp;
@@ -782,7 +779,6 @@ function drawStickerOnQuad(
       Math.sin(Math.min(1, dropT * 1.8) * Math.PI) * Math.exp(-dropT * 2.2);
     dropScaleX = 1 + impact * 0.07;
     dropScaleY = 1 - impact * 0.1;
-    dropShadow = impact;
   }
 
   const s = Math.min(bw, bh) * breathe;
@@ -808,37 +804,12 @@ function drawStickerOnQuad(
   const drawW = s * dropScaleX;
   const drawH = s * dropScaleY;
 
-  // Soft ground blob — reads as lift even with light canvas shadows.
-  if (shadows || dropShadow > 0) {
-    const shadowAlpha = hovering ? 0.28 : 0.16 + dropShadow * 0.14;
-    ctx.save();
-    ctx.fillStyle = `rgba(0,0,0,${shadowAlpha * 0.55})`;
-    ctx.beginPath();
-    ctx.ellipse(
-      cx,
-      cy + s * 0.4 + Math.max(0, -dropY) * 0.2,
-      drawW * 0.4,
-      Math.max(3, drawH * 0.11),
-      0,
-      0,
-      Math.PI * 2,
-    );
-    ctx.fill();
-    ctx.restore();
-    ctx.shadowColor = hovering
-      ? "rgba(0,0,0,0.38)"
-      : `rgba(0,0,0,${0.2 + dropShadow * 0.12})`;
-    ctx.shadowBlur = hovering ? 10 : 5 + dropShadow * 4;
-    ctx.shadowOffsetY = hovering ? 5 : 2.5 + Math.max(0, -dropY) * 0.35;
-  }
   if (img && img.complete && img.naturalWidth > 0) {
     ctx.drawImage(img, drawX, drawY, drawW, drawH);
   } else {
     const p = getPalette();
     ctx.fillStyle = p.paper;
     ctx.fillRect(drawX, drawY, drawW, drawH);
-    ctx.shadowColor = "transparent";
-    ctx.shadowBlur = 0;
     ctx.fillStyle = p.ink;
     ctx.font = `800 ${Math.floor(s * 0.22)}px sans-serif`;
     ctx.textAlign = "center";
