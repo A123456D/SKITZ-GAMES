@@ -1,7 +1,13 @@
 import { newGame } from "./core/board";
 import type { GameState } from "./core/types";
 import { beginTurn, doAbilityPhase, doMovePhase, endTurn, skipAbility } from "./core/turn";
-import { aiTurn } from "./core/ai";
+import {
+  aiTurn,
+  aiThinkDelay,
+  nextAiDifficulty,
+  AI_DIFFICULTY_LABELS,
+  type AiDifficulty,
+} from "./core/ai";
 import {
   layout,
   drawBoard,
@@ -29,10 +35,22 @@ import {
 } from "./view/anim";
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
+const AI_STORAGE_KEY = "nexus-chess-ai-difficulty";
+
+function loadDifficulty(): AiDifficulty {
+  const raw = localStorage.getItem(AI_STORAGE_KEY);
+  const n = raw === null ? 2 : Number(raw);
+  if (n === 0 || n === 1 || n === 2 || n === 3 || n === 4) return n;
+  return 2;
+}
+
+function saveDifficulty(d: AiDifficulty) {
+  localStorage.setItem(AI_STORAGE_KEY, String(d));
+}
 
 let state: GameState = beginTurn(newGame());
 let ui: UiState = createUiState();
-let aiEnabled = true;
+let aiDifficulty: AiDifficulty = loadDifficulty();
 let buttons: ButtonRect[] = [];
 let dc: DrawCtx = layout(canvas);
 let moveAnim: MoveAnim | null = null;
@@ -45,6 +63,10 @@ const PIECE_CHARS: Record<string, string> = {
   bK: "\u265A", bQ: "\u265B", bR: "\u265C", bB: "\u265D", bN: "\u265E", bP: "\u265F",
 };
 
+function aiLabel(): string {
+  return AI_DIFFICULTY_LABELS[aiDifficulty];
+}
+
 function resetGame() {
   state = beginTurn(newGame());
   ui = clearUi();
@@ -54,22 +76,31 @@ function resetGame() {
 }
 
 function maybeAiTurn() {
-  if (!aiEnabled || state.winner || state.activeColor !== "b" || aiPending) return;
+  if (aiDifficulty === 0 || state.winner || state.activeColor !== "b" || aiPending) return;
   aiPending = true;
+  const difficulty = aiDifficulty;
+  const delay = aiThinkDelay(difficulty);
   setTimeout(() => {
-    if (state.winner || state.activeColor !== "b") {
+    if (state.winner || state.activeColor !== "b" || aiDifficulty === 0) {
       aiPending = false;
       return;
     }
-    state = aiTurn(state);
-    ui = clearUi();
-    aiPending = false;
-  }, 400);
+    // Expert search can be heavy — yield one frame then compute
+    const run = () => {
+      state = aiTurn(state, difficulty);
+      ui = clearUi();
+      aiPending = false;
+    };
+    if (difficulty >= 4) {
+      setTimeout(run, 0);
+    } else {
+      run();
+    }
+  }, delay);
 }
 
 function pointerToCanvas(e: PointerEvent): { px: number; py: number } {
   const rect = canvas.getBoundingClientRect();
-  // Map CSS pixels → layout CSS pixels (layout uses visualViewport / style size)
   const scaleX = dc.width / Math.max(1, rect.width);
   const scaleY = dc.height / Math.max(1, rect.height);
   return {
@@ -79,7 +110,7 @@ function pointerToCanvas(e: PointerEvent): { px: number; py: number } {
 }
 
 function onPointer(e: PointerEvent) {
-  if (moveAnim) return;
+  if (moveAnim || aiPending) return;
   if (e.button !== undefined && e.button !== 0) return;
   e.preventDefault();
 
@@ -89,11 +120,13 @@ function onPointer(e: PointerEvent) {
   switch (result.type) {
     case "newgame":
       resetGame();
+      maybeAiTurn();
       break;
 
-    case "toggleai":
-      aiEnabled = !aiEnabled;
-      if (aiEnabled) maybeAiTurn();
+    case "cycleai":
+      aiDifficulty = nextAiDifficulty(aiDifficulty);
+      saveDifficulty(aiDifficulty);
+      if (aiDifficulty > 0) maybeAiTurn();
       break;
 
     case "skip":
@@ -177,7 +210,6 @@ function onPointer(e: PointerEvent) {
 }
 
 canvas.addEventListener("pointerdown", onPointer, { passive: false });
-// Prevent long-press context menu on mobile
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
 function relayout() {
@@ -187,7 +219,6 @@ function relayout() {
     lastLayoutKey = key;
     dc = next;
   } else {
-    // Reuse sizes but refresh ctx (canvas buffer may have been cleared)
     dc = next;
   }
 }
@@ -220,7 +251,7 @@ function frame(now: number) {
     if (!alive) captureFlash = null;
   }
 
-  drawHud(dc, state, buttons, aiEnabled);
+  drawHud(dc, state, buttons, aiLabel());
 
   if (state.winner) {
     drawWinOverlay(dc, state.winner);

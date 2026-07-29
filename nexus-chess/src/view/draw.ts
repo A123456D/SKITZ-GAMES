@@ -284,7 +284,7 @@ export function drawHud(
   dc: DrawCtx,
   state: GameState,
   buttons: ButtonRect[],
-  aiEnabled: boolean,
+  aiLabel: string,
 ) {
   const { ctx, boardSize, width, compact } = dc;
   buttons.length = 0;
@@ -299,15 +299,16 @@ export function drawHud(
   {
     const topY = compact ? 12 : 16;
     const gap = 10;
-    const bw = compact ? Math.min(78, (width - dc.pad * 2 - gap) / 2) : 96;
-    const startX = width - dc.pad - (bw * 2 + gap);
+    const aiW = compact ? Math.min(92, (width - dc.pad * 2 - gap) * 0.55) : 110;
+    const ngW = compact ? Math.min(78, (width - dc.pad * 2 - gap) * 0.4) : 96;
+    const startX = width - dc.pad - (aiW + gap + ngW);
 
-    const aiBtn: ButtonRect = { x: startX, y: topY, w: bw, h: 30, id: "toggleai" };
-    const ngBtn: ButtonRect = { x: startX + bw + gap, y: topY, w: bw, h: 30, id: "newgame" };
+    const aiBtn: ButtonRect = { x: startX, y: topY, w: aiW, h: 30, id: "cycleai" };
+    const ngBtn: ButtonRect = { x: startX + aiW + gap, y: topY, w: ngW, h: 30, id: "newgame" };
 
-    drawButton(ctx, aiBtn, aiEnabled ? "AI On" : "AI Off", {
-      active: aiEnabled,
-      fontSize: fontSm,
+    drawButton(ctx, aiBtn, aiLabel, {
+      active: aiLabel !== "AI Off",
+      fontSize: compact ? 10 : 11,
     });
     drawButton(ctx, ngBtn, "New Game", { fontSize: fontSm });
     buttons.push(aiBtn, ngBtn);

@@ -45,7 +45,7 @@ export interface ClickResult {
     | "abilityTarget"
     | "skip"
     | "newgame"
-    | "toggleai"
+    | "cycleai"
     /** Piece tapped during ability phase — skip ability and select. */
     | "selectAfterSkip";
   square?: Square;
@@ -65,7 +65,7 @@ export function handleClick(
   if (btn) {
     if (btn === "skip") return { type: "skip" };
     if (btn === "newgame") return { type: "newgame" };
-    if (btn === "toggleai") return { type: "toggleai" };
+    if (btn === "cycleai" || btn === "toggleai") return { type: "cycleai" };
     if (btn === "aegis" || btn === "overdrive" || btn === "tacticalSwap") {
       return { type: "ability", ability: btn as Ability };
     }
