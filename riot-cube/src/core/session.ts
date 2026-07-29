@@ -22,13 +22,18 @@ import {
 
 export type { FaceId, CubeSize, LaneTwist };
 export { CUBE_SIZES, FACE_COUNT } from "./rubik";
-export type GameStatus = "playing" | "solved";
+export type GameStatus = "playing" | "solved" | "lost";
 
 const SIZE_KEY = "riotcube_size";
+const MOVE_LIMIT_KEY = "riotcube_move_limit";
 /** Legacy single progress blob — migrated into the active theme slot once. */
 const PROGRESS_KEY = "riotcube_progress";
 /** Per-theme puzzle progress (cube / moves / face). */
 const PROGRESS_BY_THEME_KEY = "riotcube_progress_by_theme";
+
+/** Preset move caps; 0 = unlimited. */
+export const MOVE_LIMIT_STEPS = [0, 30, 50, 80, 120] as const;
+export type MoveLimit = (typeof MOVE_LIMIT_STEPS)[number];
 
 /** When true, mutators skip localStorage writes (e.g. interactive tutorial). */
 let progressSaveSuspended = false;
@@ -56,6 +61,8 @@ export type Session = {
   status: GameStatus;
   rng: () => number;
   faceStickers: FaceStickers;
+  /** null = unlimited */
+  moveLimit: number | null;
 };
 
 /** Deep-clone cube faces so a stashed session is not mutated in place. */
@@ -79,6 +86,7 @@ type ProgressBlob = {
   face: FaceId;
   moveCount: number;
   status: GameStatus;
+  moveLimit?: number | null;
 };
 
 type ProgressByTheme = Record<string, ProgressBlob>;
@@ -110,6 +118,44 @@ export function cycleCubeSize(current: CubeSize): CubeSize {
 
 export function sizeLabel(size: number): string {
   return `${size}\u00D7${size}`;
+}
+
+export function loadMoveLimit(): MoveLimit {
+  try {
+    const v = Number(localStorage.getItem(MOVE_LIMIT_KEY));
+    if ((MOVE_LIMIT_STEPS as readonly number[]).includes(v)) {
+      return v as MoveLimit;
+    }
+  } catch {
+    /* ignore */
+  }
+  return 0;
+}
+
+export function saveMoveLimit(limit: MoveLimit): void {
+  try {
+    localStorage.setItem(MOVE_LIMIT_KEY, String(limit));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function cycleMoveLimit(
+  current: MoveLimit = loadMoveLimit(),
+): MoveLimit {
+  const i = MOVE_LIMIT_STEPS.indexOf(current);
+  const next = MOVE_LIMIT_STEPS[(i + 1) % MOVE_LIMIT_STEPS.length]!;
+  saveMoveLimit(next);
+  return next;
+}
+
+export function moveLimitLabel(limit: MoveLimit): string {
+  return limit <= 0 ? "UNLIMITED" : String(limit);
+}
+
+function limitFromPrefs(): number | null {
+  const n = loadMoveLimit();
+  return n <= 0 ? null : n;
 }
 
 function seedFrom(): number {
@@ -145,7 +191,19 @@ function parseProgressBlob(parsed: Partial<ProgressBlob>): ProgressBlob | null {
   if (face < 0 || face > 5) return null;
   const moveCount = Number(parsed.moveCount);
   if (!Number.isFinite(moveCount) || moveCount < 0) return null;
-  if (parsed.status !== "playing" && parsed.status !== "solved") return null;
+  if (
+    parsed.status !== "playing" &&
+    parsed.status !== "solved" &&
+    parsed.status !== "lost"
+  ) {
+    return null;
+  }
+  let moveLimit: number | null | undefined = parsed.moveLimit;
+  if (moveLimit === undefined) moveLimit = limitFromPrefs();
+  else if (moveLimit != null) {
+    const n = Number(moveLimit);
+    moveLimit = Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+  }
   return {
     v: 1,
     size,
@@ -153,6 +211,7 @@ function parseProgressBlob(parsed: Partial<ProgressBlob>): ProgressBlob | null {
     face: face as FaceId,
     moveCount: Math.floor(moveCount),
     status: parsed.status,
+    moveLimit: moveLimit ?? null,
   };
 }
 
@@ -184,6 +243,7 @@ function blobFromSession(session: Session): ProgressBlob {
     face: session.face,
     moveCount: session.moveCount,
     status: session.status,
+    moveLimit: session.moveLimit,
   };
 }
 
@@ -255,6 +315,7 @@ export function startSession(
     status: "playing",
     rng,
     faceStickers,
+    moveLimit: limitFromPrefs(),
   };
   saveProgress(session);
   saveFaceStickers(faceStickers, progressThemeSlot);
@@ -282,6 +343,8 @@ export function resumeOrStartSession(
       status: "playing",
       rng: mulberry32(seedFrom()),
       faceStickers,
+      moveLimit:
+        saved.moveLimit === undefined ? limitFromPrefs() : saved.moveLimit,
     };
     saveFaceStickers(faceStickers, progressThemeSlot);
     return session;
@@ -306,6 +369,7 @@ export function doScramble(session: Session): Session {
     status: "playing",
     face: 0,
     faceStickers: session.faceStickers,
+    moveLimit: limitFromPrefs(),
   };
   saveProgress(next);
   return next;
@@ -337,7 +401,11 @@ export function setActiveFace(session: Session, face: FaceId): Session {
 
 function afterMove(session: Session, cube: CubeState): Session {
   const moveCount = session.moveCount + 1;
-  const status: GameStatus = isSolved(cube) ? "solved" : "playing";
+  let status: GameStatus = "playing";
+  if (isSolved(cube)) status = "solved";
+  else if (session.moveLimit != null && moveCount >= session.moveLimit) {
+    status = "lost";
+  }
   const next: Session = {
     ...session,
     cube,

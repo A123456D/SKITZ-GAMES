@@ -2,9 +2,12 @@ import {
   applyFaceTurn,
   applyTwist,
   cycleCubeSize,
+  cycleMoveLimit,
   doScramble,
   loadCubeSize,
+  loadMoveLimit,
   cloneSession,
+  moveLimitLabel,
   resumeOrStartSession,
   saveCubeSize,
   saveProgress,
@@ -18,6 +21,7 @@ import {
   type LaneTwist,
   type Session,
 } from "./core/session";
+import { faceSolvedBits } from "./core/rubik";
 import { suggestHintMove, type HintMove } from "./core/hint";
 import {
   pickFaceStickers,
@@ -55,6 +59,7 @@ import {
   hitUiRect,
   hitVolumeButton,
   hitAnimeModeButton,
+  hitMovesChip,
   loadLogo,
   stickersGridContentHeight,
   HOME_HOW,
@@ -69,6 +74,7 @@ import {
   SETTINGS_BACK,
   SETTINGS_HINTS,
   SETTINGS_MUSIC,
+  SETTINGS_MOVES,
   SETTINGS_SIZE,
   SETTINGS_THEME,
   SETTINGS_VOL,
@@ -206,6 +212,7 @@ function applyThemeChange(prevSlot: string): void {
   syncMusicForTheme(getTheme());
   const pool = activeStickerPool();
   session = resumeOrStartSession(session.size, pool, null);
+  solvedFaceBits = faceSolvedBits(session.cube);
   clearHint();
   syncActiveFace();
 }
@@ -258,6 +265,7 @@ function beginTutorial(from: Screen): void {
   resetPlayVisuals();
   // Fresh scramble for practice — does not overwrite saved progress.
   session = startSession(session.size, activeStickerPool(), session.faceStickers);
+  solvedFaceBits = faceSolvedBits(session.cube);
   syncActiveFace();
   screen = "play";
   sfxPaperRustle();
@@ -321,8 +329,17 @@ function beginOnboarding(): void {
   beginTutorial("home");
 }
 
+/** Settle pulse after a twist/face-turn lands. */
+let stickerDropStarted = 0;
+const STICKER_DROP_MS = 320;
+/** Face-complete celebration. */
+let faceCelebrate: { face: FaceId; started: number } | null = null;
+const FACE_CELEBRATE_MS = 720;
+let solvedFaceBits = 0;
+
 setProgressThemeSlot(activeThemeSlot());
 let session: Session = resumeOrStartSession(loadCubeSize(), activeStickerPool());
+solvedFaceBits = faceSolvedBits(session.cube);
 
 let faceTurnBtns: FaceTurnButtons | null = null;
 
@@ -385,9 +402,6 @@ type TurnAnim =
     };
 let turnAnim: TurnAnim | null = null;
 let lastFrameTs = 0;
-/** Settle pulse after a twist/face-turn lands. */
-let stickerDropStarted = 0;
-const STICKER_DROP_MS = 320;
 
 function easeOutCubic(t: number): number {
   const x = Math.min(1, Math.max(0, t));
@@ -450,6 +464,31 @@ function triggerStickerDrop(): void {
   stickerDropStarted = performance.now();
 }
 
+function noteNewlySolvedFaces(prevBits: number, cube = session.cube): void {
+  const nextBits = faceSolvedBits(cube);
+  const gained = nextBits & ~prevBits;
+  solvedFaceBits = nextBits;
+  if (!gained) return;
+  // Celebrate the lowest newly completed face id.
+  for (let i = 0; i < 6; i++) {
+    if (gained & (1 << i)) {
+      faceCelebrate = { face: i as FaceId, started: performance.now() };
+      sfxPaperFlutter();
+      break;
+    }
+  }
+}
+
+function faceCelebrateT(now = performance.now()): number {
+  if (!faceCelebrate) return 0;
+  const t = (now - faceCelebrate.started) / FACE_CELEBRATE_MS;
+  if (t >= 1) {
+    faceCelebrate = null;
+    return 0;
+  }
+  return Math.max(0, t);
+}
+
 function stickerDropT(now = performance.now()): number {
   if (!stickerDropStarted) return 0;
   const t = (now - stickerDropStarted) / STICKER_DROP_MS;
@@ -508,6 +547,7 @@ function resetPlayVisuals(): void {
   springIndex = -1;
   turnAnim = null;
   stickerDropStarted = 0;
+  faceCelebrate = null;
   orbitDrag = null;
   orbitFinger = null;
   hintMove = null;
@@ -527,7 +567,9 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
   const sameDir = fromUv === 0 || Math.sign(fromUv) === Math.sign(toUv);
   // Already dragged to (or past) the commit distance — land immediately.
   if (sameDir && Math.abs(fromUv) >= Math.abs(toUv) * 0.92) {
+    const prevBits = solvedFaceBits;
     session = applyTwist(session, { ...twist, amount });
+    noteNewlySolvedFaces(prevBits);
     noteTutorial("swipe");
     triggerStickerDrop();
     sfxPaperSlide();
@@ -715,6 +757,7 @@ function paint(): void {
       musicVol: getMusicVolume(),
       themeLabel: getThemeLabel(),
       sizeLabel: sizeLabel(session.size),
+      moveLimitLabel: moveLimitLabel(loadMoveLimit()),
       hintsOn: getHintsEnabled(),
     });
     return;
@@ -779,9 +822,11 @@ function paint(): void {
   drawHud(ctx, {
     sfxVol: getSfxVolume(),
     moves: session.moveCount,
+    moveLimit: session.moveLimit,
   });
   drawMenuButton(ctx);
 
+  const celebT = faceCelebrateT();
   drawCube3D(ctx, layout, display, {
     activeFace: session.face,
     motion,
@@ -789,6 +834,10 @@ function paint(): void {
     faceStickers: session.faceStickers,
     hintMove: hintT > 0 && hintT < 1 ? hintMove : null,
     hintT,
+    faceCelebrate:
+      faceCelebrate && celebT > 0
+        ? { face: faceCelebrate.face, t: celebT }
+        : null,
   });
   orbitBtns = drawCubeOrbitButtons(ctx, layout.cx, layout.cy, layout.scale, W, H);
 
@@ -817,9 +866,10 @@ function paint(): void {
     });
   }
 
-  if (session.status === "solved") {
+  if (session.status === "solved" || session.status === "lost") {
     drawEndOverlay(ctx, {
       moves: session.moveCount,
+      outcome: session.status === "lost" ? "lost" : "solved",
     });
   }
   if (screen === "menu" && !tutorial) {
@@ -836,6 +886,7 @@ function tick(ts: number): void {
       turnAnim.t += dt / turnAnim.ms;
       if (turnAnim.t >= 1) {
         turnAnim.t = 1;
+        const prevBits = solvedFaceBits;
         if (turnAnim.kind === "face") {
           session = applyFaceTurn(session, turnAnim.face, turnAnim.dir);
           noteTutorial("faceTurn");
@@ -846,6 +897,7 @@ function tick(ts: number): void {
           session = { ...session, face };
           noteTutorial("swipe");
         }
+        noteNewlySolvedFaces(prevBits);
         turnAnim = null;
         triggerStickerDrop();
       }
@@ -890,6 +942,7 @@ function startPlay(): void {
     activeStickerPool(),
     session.faceStickers,
   );
+  solvedFaceBits = faceSolvedBits(session.cube);
   saveCubeSize(session.size);
   syncActiveFace();
   screen = "play";
@@ -966,7 +1019,20 @@ canvas.addEventListener(
       if (hitUiRect(SETTINGS_SIZE, p.x, p.y)) {
         const next = cycleCubeSize(session.size);
         session = startSession(next, activeStickerPool(), session.faceStickers);
+        solvedFaceBits = faceSolvedBits(session.cube);
         clearHint();
+        return;
+      }
+      if (hitUiRect(SETTINGS_MOVES, p.x, p.y)) {
+        cycleMoveLimit(loadMoveLimit());
+        session = startSession(
+          session.size,
+          activeStickerPool(),
+          session.faceStickers,
+        );
+        solvedFaceBits = faceSolvedBits(session.cube);
+        clearHint();
+        sfxPaperRustle();
         return;
       }
       if (hitUiRect(SETTINGS_HINTS, p.x, p.y)) {
@@ -1072,7 +1138,7 @@ canvas.addEventListener(
       return;
     }
 
-    if (session.status === "solved") {
+    if (session.status === "solved" || session.status === "lost") {
       if (hitVolumeButton(p.x, p.y)) {
         cycleHudVolume();
         return;
@@ -1087,6 +1153,7 @@ canvas.addEventListener(
       }
       if (hitRetry(p.x, p.y)) {
         session = doScramble(session);
+        solvedFaceBits = faceSolvedBits(session.cube);
         resetPlayVisuals();
         syncActiveFace();
         sfxPaperRustle();
@@ -1137,6 +1204,24 @@ canvas.addEventListener(
       return;
     }
 
+    if (
+      !tutorial &&
+      hitMovesChip(p.x, p.y, session.moveLimit != null)
+    ) {
+      cycleMoveLimit(loadMoveLimit());
+      session = startSession(
+        session.size,
+        activeStickerPool(),
+        session.faceStickers,
+      );
+      solvedFaceBits = faceSolvedBits(session.cube);
+      resetPlayVisuals();
+      syncActiveFace();
+      clearHint();
+      sfxPaperRustle();
+      return;
+    }
+
     const playHintsLayout = getHintsEnabled() && !tutorial;
     if (hitPlayHint(p.x, p.y, playHintsLayout)) {
       triggerHint();
@@ -1145,6 +1230,7 @@ canvas.addEventListener(
     if (hitPlayScramble(p.x, p.y, playHintsLayout)) {
       if (tutorial && !tutorialAllows("scramble")) return;
       session = doScramble(session);
+      solvedFaceBits = faceSolvedBits(session.cube);
       resetPlayVisuals();
       syncActiveFace();
       noteTutorial("scramble");

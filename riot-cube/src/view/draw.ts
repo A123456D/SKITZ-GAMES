@@ -93,6 +93,7 @@ export function drawHud(
   opts: {
     sfxVol?: number;
     moves?: number;
+    moveLimit?: number | null;
   },
 ): void {
   const p = getPalette();
@@ -111,7 +112,8 @@ export function drawHud(
   ctx.fillText("RIOT CUBE", 50, 58);
 
   if (opts.moves != null) {
-    const chip = movesChipRect();
+    const limited = opts.moveLimit != null;
+    const chip = movesChipRect(limited);
     ctx.fillStyle = p.hudBg;
     roundRect(ctx, chip.x, chip.y, chip.w, chip.h, 5);
     ctx.fill();
@@ -121,7 +123,16 @@ export function drawHud(
     ctx.fillStyle = p.hudInk;
     ctx.font = "700 16px 'Chakra Petch', sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(`${opts.moves} MOVES`, chip.x + 12, chip.y + 26);
+    if (limited) {
+      const left = Math.max(0, opts.moveLimit! - opts.moves);
+      ctx.fillText(
+        `${left}/${opts.moveLimit} MOVES`,
+        chip.x + 12,
+        chip.y + 26,
+      );
+    } else {
+      ctx.fillText(`${opts.moves} MOVES`, chip.x + 12, chip.y + 26);
+    }
   }
 
   if (getTheme() === "anime") {
@@ -130,13 +141,13 @@ export function drawHud(
   drawVolumeButton(ctx, opts.sfxVol ?? 0.4);
 }
 
-/** Moves chip under the title. */
-export function movesChipRect(): UiRect {
-  return { x: 36, y: 84, w: 120, h: 40 };
+/** Moves chip under the title — tap to cycle the move cap. */
+export function movesChipRect(limited = false): UiRect {
+  return { x: 36, y: 84, w: limited ? 168 : 120, h: 40 };
 }
 
-export function hitMovesChip(x: number, y: number): boolean {
-  return hitRect(movesChipRect(), x, y);
+export function hitMovesChip(x: number, y: number, limited = false): boolean {
+  return hitRect(movesChipRect(limited), x, y);
 }
 
 export const ANIME_MODE_BTN: UiRect = { x: 270, y: 28, w: 120, h: 46 };
@@ -315,9 +326,10 @@ export function drawFaceTurnButtons(ctx: CanvasRenderingContext2D): FaceTurnButt
 
 export function drawEndOverlay(
   ctx: CanvasRenderingContext2D,
-  opts: { moves: number },
+  opts: { moves: number; outcome?: "solved" | "lost" },
 ): void {
   const p = getPalette();
+  const lost = opts.outcome === "lost";
   ctx.fillStyle = "rgba(0,0,0,0.55)";
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = p.paper;
@@ -329,7 +341,7 @@ export function drawEndOverlay(
   ctx.fillStyle = p.ink;
   ctx.font = "800 40px 'Permanent Marker', sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("SOLVED!", 150, 530);
+  ctx.fillText(lost ? "OUT OF MOVES" : "SOLVED!", 150, 530);
   ctx.font = "700 20px 'Chakra Petch', sans-serif";
   ctx.fillText(`${opts.moves} moves`, 150, 575);
 
@@ -526,12 +538,13 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   });
 }
 
-export const SETTINGS_VOL: UiRect = { x: 140, y: 320, w: 440, h: 58 };
-export const SETTINGS_MUSIC: UiRect = { x: 140, y: 392, w: 440, h: 58 };
-export const SETTINGS_THEME: UiRect = { x: 140, y: 464, w: 440, h: 58 };
-export const SETTINGS_SIZE: UiRect = { x: 140, y: 536, w: 440, h: 58 };
-export const SETTINGS_HINTS: UiRect = { x: 140, y: 608, w: 440, h: 58 };
-export const SETTINGS_BACK: UiRect = { x: 140, y: 700, w: 440, h: 58 };
+export const SETTINGS_VOL: UiRect = { x: 140, y: 300, w: 440, h: 54 };
+export const SETTINGS_MUSIC: UiRect = { x: 140, y: 368, w: 440, h: 54 };
+export const SETTINGS_THEME: UiRect = { x: 140, y: 436, w: 440, h: 54 };
+export const SETTINGS_SIZE: UiRect = { x: 140, y: 504, w: 440, h: 54 };
+export const SETTINGS_MOVES: UiRect = { x: 140, y: 572, w: 440, h: 54 };
+export const SETTINGS_HINTS: UiRect = { x: 140, y: 640, w: 440, h: 54 };
+export const SETTINGS_BACK: UiRect = { x: 140, y: 728, w: 440, h: 54 };
 
 export function drawSettingsScreen(
   ctx: CanvasRenderingContext2D,
@@ -540,6 +553,7 @@ export function drawSettingsScreen(
     musicVol: number;
     themeLabel: string;
     sizeLabel: string;
+    moveLimitLabel: string;
     hintsOn: boolean;
   },
 ): void {
@@ -547,22 +561,22 @@ export function drawSettingsScreen(
   drawDesk(ctx);
 
   ctx.fillStyle = p.paper;
-  roundRect(ctx, 80, 150, 560, 660, 10);
+  roundRect(ctx, 80, 130, 560, 700, 10);
   ctx.fill();
   ctx.strokeStyle = p.ink;
   ctx.lineWidth = 4;
   ctx.stroke();
   ctx.fillStyle = p.accent;
-  ctx.fillRect(120, 138, 100, 18);
+  ctx.fillRect(120, 118, 100, 18);
 
   ctx.fillStyle = p.ink;
   ctx.font = "800 42px 'Permanent Marker', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("SETTINGS", W / 2, 230);
+  ctx.fillText("SETTINGS", W / 2, 210);
 
   ctx.font = "600 18px 'Patrick Hand', sans-serif";
   ctx.fillStyle = p.muted;
-  ctx.fillText("Sound, music, look, cube, and hints", W / 2, 275);
+  ctx.fillText("Sound, look, cube, move cap, hints", W / 2, 255);
 
   const volLabel =
     opts.sfxVol <= 0.001 ? "MUTED" : opts.sfxVol < 0.55 ? "SOFT" : "NORMAL";
@@ -585,6 +599,10 @@ export function drawSettingsScreen(
     text: p.hot,
   });
   drawPaperButton(ctx, SETTINGS_SIZE, `CUBE  \u00B7  ${opts.sizeLabel}`, {
+    fill: p.panel,
+    text: p.accent,
+  });
+  drawPaperButton(ctx, SETTINGS_MOVES, `MOVES  \u00B7  ${opts.moveLimitLabel}`, {
     fill: p.panel,
     text: p.accent,
   });
@@ -734,8 +752,8 @@ export const HELP_PAGES = [
     lines: [
       "STICKERS — pick six face designs (saved per theme).",
       "SCRAMBLE — shuffle for a fresh puzzle (icons stay).",
+      "MOVES — optional move cap in Settings (or tap the chip).",
       "HINT — draw a suggested move (Settings).",
-      "Try 2\u00D72 in Settings if 3\u00D73 feels rough.",
     ],
   },
 ] as const;

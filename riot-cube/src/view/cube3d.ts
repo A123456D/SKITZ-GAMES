@@ -500,6 +500,8 @@ export function drawCube3D(
     hintMove?: HintMove | null;
     /** 0..1 animation phase for the hint line. */
     hintT?: number;
+    /** Face just completed — satisfying flash (t 0..1). */
+    faceCelebrate?: { face: FaceId; t: number } | null;
   },
 ): void {
   type FaceDraw = { i: FaceId; depth: number };
@@ -525,6 +527,7 @@ export function drawCube3D(
     offset: 0,
     hovering: false,
   };
+  const celebrate = opts.faceCelebrate ?? null;
 
   for (const f of order) {
     drawFace(
@@ -536,7 +539,12 @@ export function drawCube3D(
       motion,
       f.i === opts.activeFace,
       opts.faceStickers,
+      celebrate && celebrate.face === f.i ? celebrate.t : 0,
     );
+  }
+
+  if (celebrate && celebrate.t > 0 && celebrate.t < 1) {
+    drawFaceCompleteFx(ctx, layout, celebrate.face, celebrate.t);
   }
 
   if (opts.hintMove && (opts.hintT ?? 0) < 1) {
@@ -553,6 +561,7 @@ function drawFace(
   motion: CubeMotion,
   isActive: boolean,
   faceStickers?: readonly TileKind[],
+  celebrateT = 0,
 ): void {
   const p = getPalette();
   const geom = FACES[faceIndex]!;
@@ -663,6 +672,7 @@ function drawFace(
       hovering || spinning,
       hoverT,
       dropT,
+      celebrateT,
     );
   };
 
@@ -749,6 +759,7 @@ function drawStickerOnQuad(
   hovering: boolean,
   hoverT: number,
   dropT = 0,
+  celebrateT = 0,
 ): void {
   const cx = (tl.x + tr.x + br.x + bl.x) / 4;
   const cy = (tl.y + tr.y + br.y + bl.y) / 4;
@@ -767,6 +778,10 @@ function drawStickerOnQuad(
     : hovering
       ? 1.03
       : 1.015;
+  const celeb =
+    celebrateT > 0 && celebrateT < 1
+      ? 1 + Math.sin(Math.min(1, celebrateT * 1.4) * Math.PI) * 0.14
+      : 1;
 
   // Soft drop: fall from a slight raise, then a tiny squash bounce.
   let dropY = 0;
@@ -781,7 +796,7 @@ function drawStickerOnQuad(
     dropScaleY = 1 - impact * 0.1;
   }
 
-  const s = Math.min(bw, bh) * breathe;
+  const s = Math.min(bw, bh) * breathe * celeb;
 
   ctx.save();
   ctx.beginPath();
@@ -816,6 +831,72 @@ function drawStickerOnQuad(
     ctx.textBaseline = "middle";
     ctx.fillText(kind.slice(0, 3).toUpperCase(), cx, cy + bob + dropY);
   }
+  ctx.restore();
+}
+
+/** Expanding rings + spark burst when a face locks in. */
+function drawFaceCompleteFx(
+  ctx: CanvasRenderingContext2D,
+  layout: CubeLayout,
+  face: FaceId,
+  t: number,
+): void {
+  const geom = FACES[face]!;
+  const nView = applyRot(geom.normal, layout.q);
+  if (nView.z <= 0.05) return;
+  const p = getPalette();
+  const c = facePointScreen(geom, 0.5, 0.5, layout);
+  const corner = facePointScreen(geom, 0.08, 0.08, layout);
+  const radius = Math.hypot(corner.x - c.x, corner.y - c.y) * 1.35;
+  const ease = 1 - Math.pow(1 - Math.min(1, t), 2);
+  const pulse = Math.sin(Math.min(1, t * 1.15) * Math.PI);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+
+  // Soft face wash
+  ctx.fillStyle = p.hot;
+  ctx.globalAlpha = 0.18 * pulse;
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const u = i === 0 || i === 3 ? 0.04 : 0.96;
+    const v = i < 2 ? 0.04 : 0.96;
+    const pt = facePointScreen(geom, u, v, layout);
+    if (i === 0) ctx.moveTo(pt.x, pt.y);
+    else ctx.lineTo(pt.x, pt.y);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // Expanding rings
+  for (let i = 0; i < 3; i++) {
+    const delay = i * 0.12;
+    const local = Math.max(0, Math.min(1, (t - delay) / 0.7));
+    if (local <= 0) continue;
+    const r = radius * (0.35 + local * 0.95);
+    ctx.strokeStyle = i % 2 === 0 ? p.hot : p.accent;
+    ctx.globalAlpha = (1 - local) * 0.85;
+    ctx.lineWidth = 4 - i;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Spark dots
+  const sparks = 12;
+  for (let i = 0; i < sparks; i++) {
+    const a = (i / sparks) * Math.PI * 2 + t * 1.2;
+    const dist = radius * (0.25 + ease * 0.9);
+    const sx = c.x + Math.cos(a) * dist;
+    const sy = c.y + Math.sin(a) * dist;
+    const size = 3 + pulse * 4;
+    ctx.fillStyle = i % 2 === 0 ? p.hot : p.accent;
+    ctx.globalAlpha = (1 - ease) * 0.95;
+    ctx.beginPath();
+    ctx.arc(sx, sy, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   ctx.restore();
 }
 

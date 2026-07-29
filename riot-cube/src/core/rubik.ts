@@ -40,12 +40,18 @@ export function cloneCube(cube: CubeState): CubeState {
 
 export function isSolved(cube: CubeState): boolean {
   for (let fi = 0; fi < FACE_COUNT; fi++) {
-    const face = cube.faces[fi]!;
-    const want = fi as ColorId;
-    for (let r = 0; r < cube.size; r++) {
-      for (let c = 0; c < cube.size; c++) {
-        if (face[r]![c] !== want) return false;
-      }
+    if (!isFaceSolved(cube, fi as FaceId)) return false;
+  }
+  return true;
+}
+
+/** True when every sticker on the face matches that face's solved color. */
+export function isFaceSolved(cube: CubeState, face: FaceId): boolean {
+  const grid = cube.faces[face]!;
+  const want = face as ColorId;
+  for (let r = 0; r < cube.size; r++) {
+    for (let c = 0; c < cube.size; c++) {
+      if (grid[r]![c] !== want) return false;
     }
   }
   return true;
@@ -61,6 +67,15 @@ export function isFaceUniform(face: FaceGrid): boolean {
     }
   }
   return true;
+}
+
+/** Bitmask of faces that are fully solved (color matches face id). */
+export function faceSolvedBits(cube: CubeState): number {
+  let bits = 0;
+  for (let fi = 0; fi < FACE_COUNT; fi++) {
+    if (isFaceSolved(cube, fi as FaceId)) bits |= 1 << fi;
+  }
+  return bits;
 }
 
 /** First face that is not uniform in its solved color, or null if solved. */
