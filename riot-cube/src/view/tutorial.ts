@@ -26,7 +26,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
       "Your puzzle progress is saved automatically.",
     ],
     action: "next",
-    hint: "Tap NEXT when you are ready",
+    hint: "Follow the pointing hand — tap NEXT",
   },
   {
     title: "THE GOAL",
@@ -36,7 +36,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
       "Coming back later? Play resumes where you left off.",
     ],
     action: "next",
-    hint: "Tap NEXT to try a swipe",
+    hint: "Hand points to NEXT — tap it",
   },
   {
     title: "SWIPE",
@@ -46,7 +46,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
       "Try it now — swipe any row or column.",
     ],
     action: "swipe",
-    hint: "Swipe a row or column on the cube",
+    hint: "Swipe where the hand is moving on the cube",
   },
   {
     title: "SPIN FACE",
@@ -56,7 +56,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
       "Tap CW or CCW below the cube.",
     ],
     action: "faceTurn",
-    hint: "Tap CW or CCW",
+    hint: "Tap the button the hand is pointing at",
   },
   {
     title: "ORBIT",
@@ -66,7 +66,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
       "Turn the cube to work on another side.",
     ],
     action: "orbit",
-    hint: "Tap an arrow or drag beside the cube",
+    hint: "Tap the arrow the hand is pointing at",
   },
   {
     title: "YOUR STICKERS",
@@ -76,7 +76,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
       "Open STICKERS now to see the chooser.",
     ],
     action: "stickers",
-    hint: "Tap STICKERS",
+    hint: "Tap STICKERS — follow the hand",
   },
   {
     title: "SCRAMBLE",
@@ -86,7 +86,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
       "Tap SCRAMBLE to try it.",
     ],
     action: "scramble",
-    hint: "Tap SCRAMBLE",
+    hint: "Tap SCRAMBLE — follow the hand",
   },
   {
     title: "READY",
@@ -96,6 +96,6 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
       "You're set — go solve it.",
     ],
     action: "next",
-    hint: "Tap DONE to finish",
+    hint: "Tap DONE when the hand points to it",
   },
 ] as const;

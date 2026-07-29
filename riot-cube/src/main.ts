@@ -86,9 +86,17 @@ import {
   THEMES_BACK,
   TUTORIAL_NEXT,
   TUTORIAL_SKIP,
+  PLAY_SCRAMBLE_WIDE,
+  PLAY_STICKERS_WIDE,
   type FaceTurnButtons,
 } from "./view/draw";
 import { TUTORIAL_STEPS, type TutorialAction } from "./view/tutorial";
+import {
+  drawTutorialPointer,
+  loadTutorialHand,
+  type TutorialPointTarget,
+} from "./view/tutorialPointer";
+import { getPalette } from "./view/theme";
 import {
   drawCube3D,
   drawCubeOrbitButtons,
@@ -281,6 +289,49 @@ function tutorialAllows(action: TutorialAction): boolean {
   if (!step) return true;
   if (step.action === "next") return false;
   return step.action === action;
+}
+
+function rectCenter(r: { x: number; y: number; w: number; h: number }): {
+  x: number;
+  y: number;
+} {
+  return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
+}
+
+/** Where the pointing-hand sticker should aim for the current tutorial action. */
+function tutorialPointTarget(action: TutorialAction): TutorialPointTarget | null {
+  switch (action) {
+    case "next": {
+      const c = rectCenter(TUTORIAL_NEXT);
+      return { x: c.x, y: c.y, mode: "point" };
+    }
+    case "swipe": {
+      const layout = cubeLayout();
+      return { x: layout.cx, y: layout.cy + 20, mode: "swipe" };
+    }
+    case "faceTurn": {
+      if (!faceTurnBtns) return null;
+      const c = rectCenter(faceTurnBtns.cw);
+      return { x: c.x, y: c.y, mode: "point" };
+    }
+    case "orbit": {
+      if (orbitBtns) {
+        const c = rectCenter(orbitBtns.right);
+        return { x: c.x, y: c.y, mode: "point" };
+      }
+      return { x: W * 0.72, y: 920, mode: "swipe" };
+    }
+    case "stickers": {
+      const c = rectCenter(PLAY_STICKERS_WIDE);
+      return { x: c.x, y: c.y, mode: "point" };
+    }
+    case "scramble": {
+      const c = rectCenter(PLAY_SCRAMBLE_WIDE);
+      return { x: c.x, y: c.y, mode: "point", flip: true };
+    }
+    default:
+      return null;
+  }
 }
 
 function advanceTutorial(): void {
@@ -895,6 +946,10 @@ function paint(): void {
       showSkip: onboarding !== "help",
       nextLabel: last ? "DONE" : "NEXT",
     });
+    const point = tutorialPointTarget(step.action);
+    if (point) {
+      drawTutorialPointer(ctx, point, performance.now(), getPalette().accent);
+    }
   }
 
   if (session.status === "solved" || session.status === "lost") {
@@ -1468,7 +1523,7 @@ async function boot(): Promise<void> {
   if (!hasOnboarded()) beginOnboarding();
   // First paint immediately so iPhone isn't stuck on a black shell while art loads.
   requestAnimationFrame(tick);
-  await Promise.all([loadLogo(), loadStickers()]);
+  await Promise.all([loadLogo(), loadStickers(), loadTutorialHand()]);
   ensureThemeArt("classroom");
   ensureThemeArt("edgy");
   ensureThemeArt("doodle");

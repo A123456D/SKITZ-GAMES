@@ -905,6 +905,9 @@ export function drawHelpScreen(
 export const PLAY_HINT: UiRect = { x: 36, y: 1038, w: 200, h: 50 };
 export const PLAY_SCRAMBLE: UiRect = { x: 260, y: 1038, w: 200, h: 50 };
 export const PLAY_STICKERS: UiRect = { x: 484, y: 1038, w: 200, h: 50 };
+/** Layout used when HINT is hidden (tutorial / hints off). */
+export const PLAY_SCRAMBLE_WIDE: UiRect = { x: 100, y: 1038, w: 240, h: 50 };
+export const PLAY_STICKERS_WIDE: UiRect = { x: 380, y: 1038, w: 240, h: 50 };
 
 export function drawPlayActions(
   ctx: CanvasRenderingContext2D,
@@ -928,13 +931,11 @@ export function drawPlayActions(
     });
     return;
   }
-  const scramble: UiRect = { x: 100, y: 1038, w: 240, h: 50 };
-  const stickers: UiRect = { x: 380, y: 1038, w: 240, h: 50 };
-  drawPaperButton(ctx, scramble, "SCRAMBLE", {
+  drawPaperButton(ctx, PLAY_SCRAMBLE_WIDE, "SCRAMBLE", {
     fill: p.panel,
     text: p.accent,
   });
-  drawPaperButton(ctx, stickers, "STICKERS", {
+  drawPaperButton(ctx, PLAY_STICKERS_WIDE, "STICKERS", {
     fill: p.paper,
     text: p.ink,
     tape: p.hot,
@@ -943,12 +944,12 @@ export function drawPlayActions(
 
 export function hitPlayScramble(x: number, y: number, hintsOn: boolean): boolean {
   if (hintsOn) return hitRect(PLAY_SCRAMBLE, x, y);
-  return hitRect({ x: 100, y: 1038, w: 240, h: 50 }, x, y);
+  return hitRect(PLAY_SCRAMBLE_WIDE, x, y);
 }
 
 export function hitPlayStickers(x: number, y: number, hintsOn: boolean): boolean {
   if (hintsOn) return hitRect(PLAY_STICKERS, x, y);
-  return hitRect({ x: 380, y: 1038, w: 240, h: 50 }, x, y);
+  return hitRect(PLAY_STICKERS_WIDE, x, y);
 }
 
 export function hitPlayHint(x: number, y: number, hintsOn: boolean): boolean {
