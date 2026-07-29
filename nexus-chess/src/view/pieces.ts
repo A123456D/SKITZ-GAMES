@@ -80,18 +80,22 @@ export function drawThemePiece(
   const img = useSprite ? getPieceImage(color, kind) : null;
 
   if (img && img.complete && img.naturalWidth > 0) {
-    // Forge sprites are tall 3D renders — keep smaller and sit on the square
-    const size = cellSize * (Theme.id === "forge" ? 0.72 : 0.86);
-    const yBias = Theme.id === "forge" ? cellSize * 0.06 : 0;
+    const forge = Theme.id === "forge";
+    // Forge 3D sprites are tall with the base near the bottom of the PNG —
+    // seat them on the square instead of centering (white pieces looked floated).
+    const size = cellSize * (forge ? 0.8 : 0.86);
+    const drawY = forge ? cy + cellSize * 0.48 - size : cy - size / 2;
+    const shadowY = forge ? cy + cellSize * 0.36 : cy + size * 0.4;
+
     ctx.save();
     ctx.globalAlpha = 0.32;
     ctx.fillStyle = Theme.pieceShadow;
     ctx.beginPath();
-    ctx.ellipse(cx, cy + size * 0.4 + yBias, size * 0.26, size * 0.07, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, shadowY, size * 0.26, size * 0.07, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    ctx.drawImage(img, cx - size / 2, cy - size / 2 + yBias, size, size);
+    ctx.drawImage(img, cx - size / 2, drawY, size, size);
     return;
   }
 
