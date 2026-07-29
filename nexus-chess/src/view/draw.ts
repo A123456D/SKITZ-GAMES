@@ -65,7 +65,7 @@ export function layout(canvas: HTMLCanvasElement): DrawCtx {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const pad = compact ? 16 : 28;
-  const topBar = compact ? 56 : 68;
+  const topBar = compact ? 78 : 100;
   const bottom = hudReserve(h, compact);
   const availW = w - pad * 2;
   const availH = h - topBar - bottom;
@@ -120,19 +120,19 @@ function drawButton(
 
 function drawLogoHeader(dc: DrawCtx) {
   const { ctx, compact, pad } = dc;
-  const logoH = compact ? 28 : 34;
+  // Larger brand mark — still balanced with top controls
+  const logoH = compact ? 52 : 76;
   if (logoReady && logoImg) {
     const aspect = logoImg.naturalWidth / Math.max(1, logoImg.naturalHeight);
     const logoW = logoH * aspect;
-    ctx.globalAlpha = 0.95;
-    ctx.drawImage(logoImg, pad, compact ? 14 : 18, logoW, logoH);
-    ctx.globalAlpha = 1;
+    const y = compact ? 10 : 12;
+    ctx.drawImage(logoImg, pad, y, logoW, logoH);
   } else {
     ctx.fillStyle = Theme.ink;
-    ctx.font = `500 ${compact ? 16 : 18}px ${Theme.font}`;
+    ctx.font = `500 ${compact ? 22 : 28}px ${Theme.font}`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText("NEXUS", pad, compact ? 28 : 34);
+    ctx.fillText("NEXUS", pad, compact ? 30 : 40);
   }
 }
 
@@ -396,10 +396,10 @@ export function drawWinOverlay(dc: DrawCtx, winner: Color) {
   ctx.fillRect(0, 0, width, height);
 
   if (logoReady && logoImg) {
-    const logoH = compact ? 36 : 48;
+    const logoH = compact ? 52 : 72;
     const aspect = logoImg.naturalWidth / Math.max(1, logoImg.naturalHeight);
     const logoW = logoH * aspect;
-    ctx.drawImage(logoImg, width / 2 - logoW / 2, height / 2 - logoH - 36, logoW, logoH);
+    ctx.drawImage(logoImg, width / 2 - logoW / 2, height / 2 - logoH - 40, logoW, logoH);
   }
 
   ctx.fillStyle = Theme.ink;
