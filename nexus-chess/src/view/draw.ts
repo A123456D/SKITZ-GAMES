@@ -1,5 +1,5 @@
 import type { GameState, Square, Color, Ability, Move } from "../core/types";
-import { squareToRC, rcToSquare, isInNexus, NEXUS_SQUARES } from "../core/board";
+import { squareToRC, rcToSquare, NEXUS_SQUARES } from "../core/board";
 import { ABILITY_COST } from "../core/abilities";
 import { activePlayer } from "../core/types";
 
@@ -19,26 +19,54 @@ export interface DrawCtx {
   boardX: number;
   boardY: number;
   cellSize: number;
+  boardSize: number;
   width: number;
   height: number;
+  compact: boolean;
+  pad: number;
+}
+
+export interface ButtonRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  id: string;
+}
+
+/** Vertical space reserved below the board for HUD (mana + turn + abilities). */
+function hudReserve(h: number, compact: boolean): number {
+  if (compact) return Math.max(148, Math.min(190, h * 0.34));
+  return 180;
 }
 
 export function layout(canvas: HTMLCanvasElement): DrawCtx {
   const dpr = window.devicePixelRatio || 1;
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
+  const vv = window.visualViewport;
+  const w = Math.floor(vv?.width ?? window.innerWidth);
+  const h = Math.floor(vv?.height ?? window.innerHeight);
+  const compact = w < 640 || h < 700;
+
+  canvas.width = Math.max(1, Math.floor(w * dpr));
+  canvas.height = Math.max(1, Math.floor(h * dpr));
   canvas.style.width = w + "px";
   canvas.style.height = h + "px";
   const ctx = canvas.getContext("2d")!;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  const boardSize = Math.min(w - 20, h - 200, 560);
+  const pad = compact ? 8 : 16;
+  const topBar = compact ? 44 : 50;
+  const bottom = hudReserve(h, compact);
+  const availW = w - pad * 2;
+  const availH = h - topBar - bottom;
+  // Cap grows with viewport so desktop isn't a tiny board in a sea of black
+  const maxBoard = compact ? 560 : Math.min(720, Math.floor(Math.min(availW, availH)));
+  const boardSize = Math.max(160, Math.min(availW, availH, maxBoard));
   const cellSize = boardSize / 8;
   const boardX = (w - boardSize) / 2;
-  const boardY = 50;
-  return { ctx, boardX, boardY, cellSize, width: w, height: h };
+  const boardY = topBar + Math.max(0, (availH - boardSize) / 2);
+
+  return { ctx, boardX, boardY, cellSize, boardSize, width: w, height: h, compact, pad };
 }
 
 export function squareScreenPos(dc: DrawCtx, sq: Square): [number, number] {
@@ -80,13 +108,11 @@ export function drawBoard(
   abilityTargets: Square[],
   activeAbility: Ability | null,
 ) {
-  const { ctx, boardX, boardY, cellSize, width, height } = dc;
+  const { ctx, boardX, boardY, cellSize, width, height, compact } = dc;
 
-  // Background
   ctx.fillStyle = "#0a0a0f";
   ctx.fillRect(0, 0, width, height);
 
-  // Board tiles
   for (let r = 0; r < 8; r++) {
     for (let f = 0; f < 8; f++) {
       const x = boardX + f * cellSize;
@@ -96,17 +122,14 @@ export function drawBoard(
     }
   }
 
-  // Nexus glow
   drawNexusGlow(dc, time);
 
-  // Selection highlight
   if (selected) {
     const [sx, sy] = squareScreenPos(dc, selected);
     ctx.fillStyle = SELECT_COLOR;
     ctx.fillRect(sx, sy, cellSize, cellSize);
   }
 
-  // Legal move indicators
   const legalSet = new Set(legalMoves.map((m) => m.to));
   for (const sq of legalSet) {
     const [x, y] = squareScreenPos(dc, sq);
@@ -126,7 +149,6 @@ export function drawBoard(
     }
   }
 
-  // Ability target highlights
   if (activeAbility) {
     for (const sq of abilityTargets) {
       const [x, y] = squareScreenPos(dc, sq);
@@ -136,7 +158,6 @@ export function drawBoard(
     }
   }
 
-  // Pieces
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = `${cellSize * 0.75}px serif`;
@@ -145,7 +166,6 @@ export function drawBoard(
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
 
-    // Shield indicator
     if (piece.isShielded) {
       ctx.beginPath();
       ctx.arc(cx, cy, cellSize * 0.42, 0, Math.PI * 2);
@@ -154,7 +174,6 @@ export function drawBoard(
       ctx.stroke();
     }
 
-    // Overdrive indicator
     if (state.overdriveSquare === sq) {
       ctx.fillStyle = "rgba(255,220,0,0.3)";
       ctx.fillRect(x, y, cellSize, cellSize);
@@ -168,35 +187,45 @@ export function drawBoard(
     ctx.fillText(ch, cx, cy);
   }
 
-  // File/rank labels
-  ctx.font = "12px sans-serif";
-  ctx.fillStyle = "#888";
-  ctx.textAlign = "center";
-  for (let f = 0; f < 8; f++) {
-    ctx.fillText(
-      "abcdefgh"[f],
-      boardX + f * cellSize + cellSize / 2,
-      boardY + 8 * cellSize + 14,
-    );
-  }
-  ctx.textAlign = "right";
-  for (let r = 0; r < 8; r++) {
-    ctx.fillText(
-      String(r + 1),
-      boardX - 6,
-      boardY + (7 - r) * cellSize + cellSize / 2,
-    );
+  // Labels only when there's room
+  if (!compact || cellSize >= 36) {
+    ctx.font = `${Math.max(10, Math.min(12, cellSize * 0.22))}px sans-serif`;
+    ctx.fillStyle = "#888";
+    ctx.textAlign = "center";
+    for (let f = 0; f < 8; f++) {
+      ctx.fillText(
+        "abcdefgh"[f],
+        boardX + f * cellSize + cellSize / 2,
+        boardY + 8 * cellSize + 12,
+      );
+    }
+    ctx.textAlign = "right";
+    for (let r = 0; r < 8; r++) {
+      ctx.fillText(
+        String(r + 1),
+        boardX - 4,
+        boardY + (7 - r) * cellSize + cellSize / 2,
+      );
+    }
   }
 }
 
-// ---------- HUD ----------
-
-export interface ButtonRect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  id: string;
+function drawPillButton(
+  ctx: CanvasRenderingContext2D,
+  b: ButtonRect,
+  label: string,
+  opts: { fill: string; stroke: string; text: string; font?: string },
+) {
+  ctx.fillStyle = opts.fill;
+  ctx.fillRect(b.x, b.y, b.w, b.h);
+  ctx.strokeStyle = opts.stroke;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(b.x, b.y, b.w, b.h);
+  ctx.fillStyle = opts.text;
+  ctx.font = opts.font ?? "13px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, b.x + b.w / 2, b.y + b.h / 2 + 0.5);
 }
 
 export function drawHud(
@@ -205,128 +234,157 @@ export function drawHud(
   buttons: ButtonRect[],
   aiEnabled: boolean,
 ) {
-  const { ctx, boardX, boardY, cellSize, width } = dc;
-  const hudY = boardY + 8 * cellSize + 28;
+  const { ctx, boardX, boardY, cellSize, boardSize, width, height, compact } = dc;
+  buttons.length = 0;
 
-  // Mana bars
+  const hudTop = boardY + boardSize + (compact ? 10 : 18);
+  const contentW = Math.min(boardSize, width - dc.pad * 2);
+  const contentX = (width - contentW) / 2;
+  const btnH = compact ? 40 : 36;
+
+  // Top bar: AI + New Game (fit within viewport)
+  {
+    const topY = compact ? 6 : 10;
+    const gap = 8;
+    const bw = compact ? Math.min(88, (width - dc.pad * 2 - gap) / 2) : 100;
+    const total = bw * 2 + gap;
+    const startX = width - dc.pad - total;
+
+    const aiBtn: ButtonRect = { x: startX, y: topY, w: bw, h: btnH - 4, id: "toggleai" };
+    const ngBtn: ButtonRect = { x: startX + bw + gap, y: topY, w: bw, h: btnH - 4, id: "newgame" };
+
+    drawPillButton(ctx, aiBtn, aiEnabled ? "AI: ON" : "AI: OFF", {
+      fill: aiEnabled ? "rgba(40,140,60,0.85)" : "rgba(60,60,70,0.85)",
+      stroke: "#888",
+      text: "#ddd",
+      font: compact ? "12px sans-serif" : "13px sans-serif",
+    });
+    drawPillButton(ctx, ngBtn, "New Game", {
+      fill: "rgba(60,60,70,0.85)",
+      stroke: "#888",
+      text: "#ddd",
+      font: compact ? "12px sans-serif" : "13px sans-serif",
+    });
+    buttons.push(aiBtn, ngBtn);
+  }
+
+  // Mana bars — scale segment width to content
+  const labelW = compact ? 52 : 90;
+  const segGap = 2;
+  const segAvail = contentW - labelW - 4;
+  const segW = Math.max(8, Math.floor((segAvail - segGap * 9) / 10));
+  const rowH = compact ? 22 : 28;
+
   for (let i = 0; i < 2; i++) {
     const p = state.players[i];
-    const label = p.color === "w" ? "White" : "Black";
-    const barX = boardX;
-    const barY = hudY + i * 32;
+    const label = p.color === "w" ? "W" : "B";
+    const fullLabel = p.color === "w" ? "White" : "Black";
+    const barY = hudTop + i * rowH;
     ctx.fillStyle = "#ccc";
-    ctx.font = "14px sans-serif";
+    ctx.font = compact ? "12px sans-serif" : "14px sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(`${label} Mana:`, barX, barY + 14);
+    ctx.textBaseline = "middle";
+    ctx.fillText(compact ? `${label}` : `${fullLabel}`, contentX, barY + rowH / 2);
 
     for (let m = 0; m < 10; m++) {
-      const sx = barX + 100 + m * 18;
+      const sx = contentX + labelW + m * (segW + segGap);
       ctx.fillStyle = m < p.mana ? "rgba(60,140,255,0.9)" : "rgba(60,60,80,0.5)";
-      ctx.fillRect(sx, barY + 2, 14, 16);
+      ctx.fillRect(sx, barY + 3, segW, rowH - 6);
       ctx.strokeStyle = "#456";
       ctx.lineWidth = 1;
-      ctx.strokeRect(sx, barY + 2, 14, 16);
+      ctx.strokeRect(sx, barY + 3, segW, rowH - 6);
     }
   }
 
   // Turn info
-  const infoY = hudY + 72;
+  const infoY = hudTop + rowH * 2 + (compact ? 6 : 10);
   ctx.fillStyle = "#ddd";
-  ctx.font = "bold 16px sans-serif";
+  ctx.font = compact ? "bold 13px sans-serif" : "bold 15px sans-serif";
   ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
   const turnLabel = state.activeColor === "w" ? "White" : "Black";
-  const phaseLabel = state.turnPhase === "ability"
-    ? "Ability Phase"
-    : state.turnPhase === "overdrive"
-      ? "Overdrive Move"
-      : state.turnPhase === "move"
-        ? "Move Phase"
-        : "Resolving...";
-  ctx.fillText(`Turn ${state.turnNumber} — ${turnLabel} — ${phaseLabel}`, boardX, infoY);
+  const phaseLabel =
+    state.turnPhase === "ability"
+      ? "Ability"
+      : state.turnPhase === "overdrive"
+        ? "Overdrive"
+        : state.turnPhase === "move"
+          ? "Move"
+          : "...";
+  const turnText = compact
+    ? `T${state.turnNumber} · ${turnLabel} · ${phaseLabel}`
+    : `Turn ${state.turnNumber} — ${turnLabel} — ${phaseLabel} Phase`;
+  ctx.fillText(turnText, contentX, infoY);
 
-  if (aiEnabled) {
+  if (state.turnPhase === "ability" && !state.winner) {
     ctx.fillStyle = "#888";
-    ctx.font = "12px sans-serif";
-    ctx.fillText("AI: Black", boardX + 350, infoY);
+    ctx.font = compact ? "11px sans-serif" : "12px sans-serif";
+    ctx.fillText(
+      compact ? "Tap piece to move, or use ability" : "Select an ability, or tap a piece / Skip to move",
+      contentX,
+      infoY + (compact ? 14 : 16),
+    );
   }
 
-  // Ability buttons (during ability phase)
-  buttons.length = 0;
+  // Ability buttons — always fit within content width
   if (state.turnPhase === "ability" && !state.winner) {
-    const btnY = infoY + 12;
-    const abilities: { id: Ability; label: string; cost: number }[] = [
+    const btnY = infoY + (compact ? 22 : 28);
+    const abilities: { id: Ability | "skip"; label: string; cost?: number }[] = [
       { id: "aegis", label: "Aegis", cost: ABILITY_COST.aegis },
       { id: "overdrive", label: "Overdrive", cost: ABILITY_COST.overdrive },
-      { id: "tacticalSwap", label: "Tac. Swap", cost: ABILITY_COST.tacticalSwap },
+      { id: "tacticalSwap", label: compact ? "Swap" : "Tac. Swap", cost: ABILITY_COST.tacticalSwap },
+      { id: "skip", label: "Skip" },
     ];
+    const gap = compact ? 6 : 8;
+    const bw = (contentW - gap * (abilities.length - 1)) / abilities.length;
     const mana = activePlayer(state).mana;
 
     for (let i = 0; i < abilities.length; i++) {
       const a = abilities[i];
-      const bx = boardX + i * 130;
-      const bw = 120;
-      const bh = 34;
-      const canAfford = mana >= a.cost;
-      ctx.fillStyle = canAfford ? "rgba(40,120,200,0.8)" : "rgba(40,40,50,0.6)";
-      ctx.fillRect(bx, btnY, bw, bh);
-      ctx.strokeStyle = canAfford ? "#5af" : "#444";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(bx, btnY, bw, bh);
-      ctx.fillStyle = canAfford ? "#fff" : "#666";
-      ctx.font = "13px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(`${a.label} (${a.cost})`, bx + bw / 2, btnY + bh / 2 + 4);
-      buttons.push({ x: bx, y: btnY, w: bw, h: bh, id: a.id });
-    }
+      const bx = contentX + i * (bw + gap);
+      const canAfford = a.id === "skip" || (a.cost !== undefined && mana >= a.cost);
+      const btn: ButtonRect = { x: bx, y: btnY, w: bw, h: btnH, id: a.id };
+      const display =
+        a.id === "skip"
+          ? "Skip"
+          : compact
+            ? `${a.label} ${a.cost}`
+            : `${a.label} (${a.cost})`;
 
-    // Skip button
-    const skipX = boardX + 3 * 130;
-    ctx.fillStyle = "rgba(80,80,80,0.7)";
-    ctx.fillRect(skipX, btnY, 80, 34);
-    ctx.strokeStyle = "#666";
-    ctx.strokeRect(skipX, btnY, 80, 34);
-    ctx.fillStyle = "#ccc";
-    ctx.fillText("Skip", skipX + 40, btnY + 21);
-    buttons.push({ x: skipX, y: btnY, w: 80, h: 34, id: "skip" });
+      drawPillButton(ctx, btn, display, {
+        fill:
+          a.id === "skip"
+            ? "rgba(100,100,110,0.85)"
+            : canAfford
+              ? "rgba(40,120,200,0.85)"
+              : "rgba(40,40,50,0.65)",
+        stroke: a.id === "skip" ? "#999" : canAfford ? "#5af" : "#444",
+        text: canAfford || a.id === "skip" ? "#fff" : "#666",
+        font: compact ? "11px sans-serif" : "13px sans-serif",
+      });
+      buttons.push(btn);
+    }
   }
 
-  // New Game button
-  const ngX = width - 110;
-  const ngY = 10;
-  ctx.fillStyle = "rgba(60,60,70,0.8)";
-  ctx.fillRect(ngX, ngY, 100, 30);
-  ctx.strokeStyle = "#888";
-  ctx.strokeRect(ngX, ngY, 100, 30);
-  ctx.fillStyle = "#ddd";
-  ctx.font = "13px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("New Game", ngX + 50, ngY + 19);
-  buttons.push({ x: ngX, y: ngY, w: 100, h: 30, id: "newgame" });
-
-  // AI toggle
-  const aiX = width - 220;
-  ctx.fillStyle = aiEnabled ? "rgba(40,140,60,0.8)" : "rgba(60,60,70,0.8)";
-  ctx.fillRect(aiX, ngY, 100, 30);
-  ctx.strokeStyle = "#888";
-  ctx.strokeRect(aiX, ngY, 100, 30);
-  ctx.fillStyle = "#ddd";
-  ctx.fillText(aiEnabled ? "AI: ON" : "AI: OFF", aiX + 50, ngY + 19);
-  buttons.push({ x: aiX, y: ngY, w: 100, h: 30, id: "toggleai" });
+  // Keep win overlay text readable on small screens
+  void height;
+  void cellSize;
 }
 
 export function drawWinOverlay(dc: DrawCtx, winner: Color) {
-  const { ctx, width, height } = dc;
+  const { ctx, width, height, compact } = dc;
   ctx.fillStyle = "rgba(0,0,0,0.7)";
   ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = winner === "w" ? "#fff" : "#aaa";
-  ctx.font = "bold 48px sans-serif";
+  ctx.font = compact ? "bold 32px sans-serif" : "bold 48px sans-serif";
   ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
   ctx.fillText(
     `${winner === "w" ? "White" : "Black"} Wins!`,
     width / 2,
     height / 2 - 20,
   );
-  ctx.font = "20px sans-serif";
+  ctx.font = compact ? "16px sans-serif" : "20px sans-serif";
   ctx.fillStyle = "#bbb";
-  ctx.fillText("Click New Game to play again", width / 2, height / 2 + 30);
+  ctx.fillText("Tap New Game to play again", width / 2, height / 2 + 28);
 }

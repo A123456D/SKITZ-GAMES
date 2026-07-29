@@ -1,9 +1,8 @@
-import type { Ability, GameState, Move, Square } from "../core/types";
+import type { Ability, GameState, Move, Square, AbilityCast } from "../core/types";
 import type { ButtonRect, DrawCtx } from "./draw";
 import { screenToSquare } from "./draw";
 import { pieceMoves } from "../core/moves";
-import { abilityTargets, canCastAbility } from "../core/abilities";
-import type { AbilityCast } from "../core/types";
+import { abilityTargets } from "../core/abilities";
 
 export type UiMode =
   | "idle"
@@ -46,7 +45,9 @@ export interface ClickResult {
     | "abilityTarget"
     | "skip"
     | "newgame"
-    | "toggleai";
+    | "toggleai"
+    /** Piece tapped during ability phase — skip ability and select. */
+    | "selectAfterSkip";
   square?: Square;
   move?: Move;
   ability?: Ability;
@@ -60,7 +61,6 @@ export function handleClick(
   px: number,
   py: number,
 ): ClickResult {
-  // Check buttons first
   const btn = hitButton(buttons, px, py);
   if (btn) {
     if (btn === "skip") return { type: "skip" };
@@ -74,32 +74,35 @@ export function handleClick(
   const sq = screenToSquare(dc, px, py);
   if (!sq) return { type: "none" };
 
-  // Ability targeting
   if (ui.mode === "abilityTarget" && ui.activeAbility) {
     if (ui.abilityTargetSquares.includes(sq)) {
       return { type: "abilityTarget", square: sq, ability: ui.activeAbility };
     }
-    // Cancel ability targeting
     return { type: "deselect" };
   }
 
-  // Move / select
+  // Ability phase: tapping your piece skips ability and selects it
+  if (state.turnPhase === "ability") {
+    const piece = state.board.get(sq);
+    if (piece && piece.color === state.activeColor) {
+      return { type: "selectAfterSkip", square: sq };
+    }
+    return { type: "none" };
+  }
+
   if (state.turnPhase === "move" || state.turnPhase === "overdrive") {
-    // If a piece is selected and this is a legal move dest
     if (ui.selected) {
       const move = ui.legalMoves.find((m) => m.to === sq);
       if (move) return { type: "move", move, square: sq };
-      // Clicked another of own pieces — reselect
       const piece = state.board.get(sq);
       if (piece && piece.color === state.activeColor) {
+        if (state.overdriveSquare && sq !== state.overdriveSquare) return { type: "none" };
         return { type: "select", square: sq };
       }
       return { type: "deselect" };
     }
-    // Select a piece
     const piece = state.board.get(sq);
     if (piece && piece.color === state.activeColor) {
-      // Overdrive: only the overdrive piece can be selected
       if (state.overdriveSquare && sq !== state.overdriveSquare) return { type: "none" };
       return { type: "select", square: sq };
     }
@@ -110,7 +113,6 @@ export function handleClick(
 
 export function applySelect(ui: UiState, state: GameState, sq: Square): UiState {
   const moves = pieceMoves(state, sq);
-  // During overdrive 2nd move, filter out rank 1/8 endings
   let filtered = moves;
   if (state.overdriveMovesLeft === 1) {
     filtered = moves.filter((m) => {
@@ -140,7 +142,7 @@ export function applyAbilitySelect(ui: UiState, state: GameState, ability: Abili
   };
 }
 
-export function clearUi(ui: UiState): UiState {
+export function clearUi(_ui?: UiState): UiState {
   return createUiState();
 }
 

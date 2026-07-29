@@ -7,6 +7,7 @@ import {
   drawBoard,
   drawHud,
   drawWinOverlay,
+  squareScreenPos,
   type DrawCtx,
   type ButtonRect,
 } from "./view/draw";
@@ -25,7 +26,6 @@ import {
   type MoveAnim,
   type CaptureFlash,
 } from "./view/anim";
-import { squareScreenPos } from "./view/draw";
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 
@@ -37,10 +37,16 @@ let dc: DrawCtx = layout(canvas);
 let moveAnim: MoveAnim | null = null;
 let captureFlash: CaptureFlash | null = null;
 let aiPending = false;
+let lastLayoutKey = "";
+
+const PIECE_CHARS: Record<string, string> = {
+  wK: "\u2654", wQ: "\u2655", wR: "\u2656", wB: "\u2657", wN: "\u2658", wP: "\u2659",
+  bK: "\u265A", bQ: "\u265B", bR: "\u265C", bB: "\u265D", bN: "\u265E", bP: "\u265F",
+};
 
 function resetGame() {
   state = beginTurn(newGame());
-  ui = clearUi(ui);
+  ui = clearUi();
   moveAnim = null;
   captureFlash = null;
   aiPending = false;
@@ -55,18 +61,28 @@ function maybeAiTurn() {
       return;
     }
     state = aiTurn(state);
-    ui = clearUi(ui);
+    ui = clearUi();
     aiPending = false;
   }, 400);
 }
 
-function onPointer(e: PointerEvent) {
-  if (moveAnim) return; // ignore clicks during animation
-  e.preventDefault();
+function pointerToCanvas(e: PointerEvent): { px: number; py: number } {
   const rect = canvas.getBoundingClientRect();
-  const px = e.clientX - rect.left;
-  const py = e.clientY - rect.top;
+  // Map CSS pixels → layout CSS pixels (layout uses visualViewport / style size)
+  const scaleX = dc.width / Math.max(1, rect.width);
+  const scaleY = dc.height / Math.max(1, rect.height);
+  return {
+    px: (e.clientX - rect.left) * scaleX,
+    py: (e.clientY - rect.top) * scaleY,
+  };
+}
 
+function onPointer(e: PointerEvent) {
+  if (moveAnim) return;
+  if (e.button !== undefined && e.button !== 0) return;
+  e.preventDefault();
+
+  const { px, py } = pointerToCanvas(e);
   const result = handleClick(ui, state, dc, buttons, px, py);
 
   switch (result.type) {
@@ -81,7 +97,13 @@ function onPointer(e: PointerEvent) {
 
     case "skip":
       state = skipAbility(state);
-      ui = clearUi(ui);
+      ui = clearUi();
+      break;
+
+    case "selectAfterSkip":
+      state = skipAbility(state);
+      if (result.square) ui = applySelect(ui, state, result.square);
+      else ui = clearUi();
       break;
 
     case "ability":
@@ -94,7 +116,7 @@ function onPointer(e: PointerEvent) {
       if (result.ability && result.square) {
         const cast = makeAbilityCast(result.ability, result.square);
         state = doAbilityPhase(state, cast);
-        ui = clearUi(ui);
+        ui = clearUi();
       }
       break;
 
@@ -105,7 +127,7 @@ function onPointer(e: PointerEvent) {
       break;
 
     case "deselect":
-      ui = clearUi(ui);
+      ui = clearUi();
       break;
 
     case "move":
@@ -114,14 +136,13 @@ function onPointer(e: PointerEvent) {
         const [fromX, fromY] = squareScreenPos(dc, result.move.from);
         const [toX, toY] = squareScreenPos(dc, result.move.to);
         const piece = state.board.get(result.move.from);
-        const PIECE_CHARS: Record<string, string> = {
-          wK: "\u2654", wQ: "\u2655", wR: "\u2656", wB: "\u2657", wN: "\u2658", wP: "\u2659",
-          bK: "\u265A", bQ: "\u265B", bR: "\u265C", bB: "\u265D", bN: "\u265E", bP: "\u265F",
-        };
 
         if (piece) {
           moveAnim = {
-            fromX, fromY, toX, toY,
+            fromX,
+            fromY,
+            toX,
+            toY,
             startTime: performance.now(),
             duration: 180,
             piece: PIECE_CHARS[piece.color + piece.kind] || "?",
@@ -130,24 +151,23 @@ function onPointer(e: PointerEvent) {
 
         if (hadPiece) {
           captureFlash = {
-            x: toX, y: toY, size: dc.cellSize,
+            x: toX,
+            y: toY,
+            size: dc.cellSize,
             startTime: performance.now(),
             duration: 200,
           };
         }
 
         state = doMovePhase(state, result.move);
-        ui = clearUi(ui);
+        ui = clearUi();
 
-        // After animation finishes, end turn if resolved
         setTimeout(() => {
           moveAnim = null;
           if (state.winner) return;
           if (state.turnPhase === "resolved") {
             state = endTurn(state);
             maybeAiTurn();
-          } else if (state.turnPhase === "overdrive") {
-            // Wait for 2nd overdrive move
           }
         }, 200);
       }
@@ -155,13 +175,28 @@ function onPointer(e: PointerEvent) {
   }
 }
 
-canvas.addEventListener("pointerdown", onPointer);
-window.addEventListener("resize", () => {
-  dc = layout(canvas);
-});
+canvas.addEventListener("pointerdown", onPointer, { passive: false });
+// Prevent long-press context menu on mobile
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+function relayout() {
+  const next = layout(canvas);
+  const key = `${next.width}x${next.height}@${window.devicePixelRatio}`;
+  if (key !== lastLayoutKey) {
+    lastLayoutKey = key;
+    dc = next;
+  } else {
+    // Reuse sizes but refresh ctx (canvas buffer may have been cleared)
+    dc = next;
+  }
+}
+
+window.addEventListener("resize", relayout);
+window.visualViewport?.addEventListener("resize", relayout);
+window.visualViewport?.addEventListener("scroll", relayout);
 
 function frame(now: number) {
-  dc = layout(canvas);
+  relayout();
   const time = now / 1000;
 
   drawBoard(
