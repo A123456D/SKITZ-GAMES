@@ -458,14 +458,9 @@ export function drawBoard(
     if (piece.isShielded) {
       const pulse = 0.55 + 0.35 * (0.5 + 0.5 * Math.sin(time * 3.2));
       ctx.strokeStyle =
-        Theme.id === "forge" ? `rgba(255,160,170,${0.55 + pulse * 0.35})` : `rgba(160,230,255,${0.55 + pulse * 0.35})`;
-      ctx.lineWidth = 2.5;
+        Theme.id === "forge" ? `rgba(255,160,170,${0.45 + pulse * 0.3})` : `rgba(160,230,255,${0.45 + pulse * 0.3})`;
+      ctx.lineWidth = 2;
       roundRectPath(ctx, x + 4, y + 4, cellSize - 8, cellSize - 8, 3);
-      ctx.stroke();
-      ctx.strokeStyle =
-        Theme.id === "forge" ? `rgba(255,200,210,${0.25 + pulse * 0.2})` : `rgba(200,240,255,${0.25 + pulse * 0.2})`;
-      ctx.lineWidth = 1;
-      roundRectPath(ctx, x + 8, y + 8, cellSize - 16, cellSize - 16, 2);
       ctx.stroke();
     }
 
@@ -481,6 +476,31 @@ export function drawBoard(
 
     const ch = PIECE_CHARS[piece.color + piece.kind];
     drawPieceGlyph(ctx, ch, cx, cy, cellSize, piece.color, piece.kind);
+
+    // Aegis badge on shielded pieces
+    if (piece.isShielded) {
+      const icon = getAbilityIcon("aegis");
+      const badge = Math.max(14, cellSize * 0.34);
+      const bx = x + cellSize - badge - 2;
+      const by = y + 2;
+      ctx.save();
+      ctx.globalAlpha = 0.92;
+      if (icon && icon.complete && icon.naturalWidth > 0) {
+        ctx.drawImage(icon, bx, by, badge, badge);
+      } else {
+        // Fallback shield glyph
+        ctx.fillStyle = Theme.id === "forge" ? "rgba(255,150,160,0.95)" : "rgba(160,230,255,0.95)";
+        ctx.beginPath();
+        ctx.moveTo(bx + badge * 0.5, by + badge * 0.12);
+        ctx.lineTo(bx + badge * 0.88, by + badge * 0.28);
+        ctx.lineTo(bx + badge * 0.88, by + badge * 0.55);
+        ctx.quadraticCurveTo(bx + badge * 0.5, by + badge * 1.02, bx + badge * 0.12, by + badge * 0.55);
+        ctx.lineTo(bx + badge * 0.12, by + badge * 0.28);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
   }
 
   if (!compact || cellSize >= 40) {
