@@ -198,14 +198,16 @@ export function drawMoveAnim(
     const tt = Math.max(0, t - 0.05);
     const tx = lerp(anim.fromX, anim.toX, easeInOutQuad(tt)) + cellSize / 2;
     const ty = lerp(anim.fromY, anim.toY, easeInOutQuad(tt)) + cellSize / 2 - jumpLift(tt, cellSize);
+    ctx.save();
     ctx.globalAlpha = 0.18;
-    drawThemePiece(ctx, anim.color, anim.kind, tx, ty, cellSize * 0.92, anim.piece);
-    ctx.globalAlpha = 1;
+    drawThemePiece(ctx, anim.color, anim.kind, tx, ty, cellSize, anim.piece);
+    ctx.restore();
   }
 
   ctx.save();
   ctx.translate(cx, cy);
   ctx.scale(sx, sy);
+  // Draw at origin — piece helper centers on (cx, cy); avoid stacking seating with scale
   drawThemePiece(ctx, anim.color, anim.kind, 0, 0, cellSize, anim.piece);
   ctx.restore();
 

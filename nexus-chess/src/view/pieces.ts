@@ -81,21 +81,22 @@ export function drawThemePiece(
 
   if (img && img.complete && img.naturalWidth > 0) {
     const forge = Theme.id === "forge";
-    // Forge 3D sprites are tall with the base near the bottom of the PNG —
-    // seat them on the square instead of centering (white pieces looked floated).
-    const size = cellSize * (forge ? 0.8 : 0.86);
-    const drawY = forge ? cy + cellSize * 0.48 - size : cy - size / 2;
-    const shadowY = forge ? cy + cellSize * 0.36 : cy + size * 0.4;
+    // Forge sprites already fill most of the PNG — keep them centered in the cell.
+    // (Bottom-anchoring overflowed the board edge and broke move anim under scale transforms.)
+    const size = cellSize * (forge ? 0.7 : 0.86);
+    const yBias = forge ? cellSize * 0.02 : 0;
+    const drawX = cx - size / 2;
+    const drawY = cy - size / 2 + yBias;
 
     ctx.save();
-    ctx.globalAlpha = 0.32;
+    ctx.globalAlpha = 0.28;
     ctx.fillStyle = Theme.pieceShadow;
     ctx.beginPath();
-    ctx.ellipse(cx, shadowY, size * 0.26, size * 0.07, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + size * 0.38 + yBias, size * 0.24, size * 0.065, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    ctx.drawImage(img, cx - size / 2, drawY, size, size);
+    ctx.drawImage(img, drawX, drawY, size, size);
     return;
   }
 
