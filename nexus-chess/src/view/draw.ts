@@ -306,6 +306,67 @@ function drawPieceGlyph(
   drawThemePiece(ctx, color, kind, cx, cy, cellSize, ch);
 }
 
+function drawAbilityBadge(
+  ctx: CanvasRenderingContext2D,
+  icon: HTMLImageElement | null,
+  bx: number,
+  by: number,
+  size: number,
+  kind: "aegis" | "overdrive" | "swap",
+) {
+  ctx.save();
+  ctx.globalAlpha = 0.95;
+  // Soft plate behind icon for contrast on busy boards
+  ctx.fillStyle = "rgba(6,8,12,0.55)";
+  ctx.beginPath();
+  ctx.arc(bx + size / 2, by + size / 2, size * 0.52, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (icon && icon.complete && icon.naturalWidth > 0) {
+    ctx.drawImage(icon, bx, by, size, size);
+  } else if (kind === "aegis") {
+    ctx.fillStyle = Theme.id === "forge" ? "rgba(255,150,160,0.95)" : "rgba(160,230,255,0.95)";
+    ctx.beginPath();
+    ctx.moveTo(bx + size * 0.5, by + size * 0.12);
+    ctx.lineTo(bx + size * 0.88, by + size * 0.28);
+    ctx.lineTo(bx + size * 0.88, by + size * 0.55);
+    ctx.quadraticCurveTo(bx + size * 0.5, by + size * 1.02, bx + size * 0.12, by + size * 0.55);
+    ctx.lineTo(bx + size * 0.12, by + size * 0.28);
+    ctx.closePath();
+    ctx.fill();
+  } else if (kind === "overdrive") {
+    ctx.fillStyle = Theme.id === "forge" ? "rgba(255,180,100,0.95)" : "rgba(160,230,255,0.95)";
+    ctx.beginPath();
+    ctx.moveTo(bx + size * 0.58, by + size * 0.12);
+    ctx.lineTo(bx + size * 0.28, by + size * 0.52);
+    ctx.lineTo(bx + size * 0.48, by + size * 0.52);
+    ctx.lineTo(bx + size * 0.38, by + size * 0.88);
+    ctx.lineTo(bx + size * 0.72, by + size * 0.42);
+    ctx.lineTo(bx + size * 0.52, by + size * 0.42);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    // Swap arrows fallback
+    ctx.strokeStyle = Theme.id === "forge" ? "rgba(255,180,100,0.95)" : "rgba(160,230,255,0.95)";
+    ctx.lineWidth = Math.max(1.5, size * 0.1);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(bx + size * 0.22, by + size * 0.38);
+    ctx.lineTo(bx + size * 0.78, by + size * 0.38);
+    ctx.lineTo(bx + size * 0.62, by + size * 0.24);
+    ctx.moveTo(bx + size * 0.78, by + size * 0.38);
+    ctx.lineTo(bx + size * 0.62, by + size * 0.52);
+    ctx.moveTo(bx + size * 0.78, by + size * 0.62);
+    ctx.lineTo(bx + size * 0.22, by + size * 0.62);
+    ctx.lineTo(bx + size * 0.38, by + size * 0.48);
+    ctx.moveTo(bx + size * 0.22, by + size * 0.62);
+    ctx.lineTo(bx + size * 0.38, by + size * 0.76);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export function drawBoard(
   dc: DrawCtx,
   state: GameState,
@@ -427,6 +488,7 @@ export function drawBoard(
   }
 
   if (activeAbility) {
+    const targetIcon = getAbilityIcon(activeAbility);
     for (const sq of abilityTargets) {
       const [x, y] = squareScreenPos(dc, sq, flipped);
       const pulse = 0.55 + 0.25 * (0.5 + 0.5 * Math.sin(time * 5));
@@ -436,7 +498,6 @@ export function drawBoard(
       ctx.strokeStyle = Theme.accent;
       ctx.lineWidth = 2.5;
       ctx.strokeRect(x + 3, y + 3, cellSize - 6, cellSize - 6);
-      // Corner ticks
       const t = Math.max(5, cellSize * 0.14);
       ctx.beginPath();
       ctx.moveTo(x + 3, y + 3 + t);
@@ -446,6 +507,16 @@ export function drawBoard(
       ctx.lineTo(x + cellSize - 3, y + 3);
       ctx.lineTo(x + cellSize - 3, y + 3 + t);
       ctx.stroke();
+
+      const badge = Math.max(12, cellSize * 0.3);
+      drawAbilityBadge(
+        ctx,
+        targetIcon,
+        x + (cellSize - badge) / 2,
+        y + cellSize - badge - 3,
+        badge,
+        activeAbility === "tacticalSwap" ? "swap" : activeAbility,
+      );
     }
   }
 
@@ -477,29 +548,13 @@ export function drawBoard(
     const ch = PIECE_CHARS[piece.color + piece.kind];
     drawPieceGlyph(ctx, ch, cx, cy, cellSize, piece.color, piece.kind);
 
-    // Aegis badge on shielded pieces
+    // Ability status badges on the piece
+    const badge = Math.max(14, cellSize * 0.34);
     if (piece.isShielded) {
-      const icon = getAbilityIcon("aegis");
-      const badge = Math.max(14, cellSize * 0.34);
-      const bx = x + cellSize - badge - 2;
-      const by = y + 2;
-      ctx.save();
-      ctx.globalAlpha = 0.92;
-      if (icon && icon.complete && icon.naturalWidth > 0) {
-        ctx.drawImage(icon, bx, by, badge, badge);
-      } else {
-        // Fallback shield glyph
-        ctx.fillStyle = Theme.id === "forge" ? "rgba(255,150,160,0.95)" : "rgba(160,230,255,0.95)";
-        ctx.beginPath();
-        ctx.moveTo(bx + badge * 0.5, by + badge * 0.12);
-        ctx.lineTo(bx + badge * 0.88, by + badge * 0.28);
-        ctx.lineTo(bx + badge * 0.88, by + badge * 0.55);
-        ctx.quadraticCurveTo(bx + badge * 0.5, by + badge * 1.02, bx + badge * 0.12, by + badge * 0.55);
-        ctx.lineTo(bx + badge * 0.12, by + badge * 0.28);
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.restore();
+      drawAbilityBadge(ctx, getAbilityIcon("aegis"), x + cellSize - badge - 2, y + 2, badge, "aegis");
+    }
+    if (state.overdriveSquare === sq) {
+      drawAbilityBadge(ctx, getAbilityIcon("overdrive"), x + 2, y + 2, badge, "overdrive");
     }
   }
 
