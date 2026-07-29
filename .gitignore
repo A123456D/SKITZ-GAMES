@@ -26,6 +26,7 @@ tools/_*.txt
 node_modules/
 web/dist/
 riot-cube/dist/
+nexus-chess/dist/
 website/node_modules/
 website/dist/
 website/.astro/
