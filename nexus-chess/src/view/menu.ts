@@ -77,17 +77,24 @@ export function drawHome(dc: DrawCtx, buttons: ButtonRect[], time = 0) {
   ctx.fillText("ZONE-CONTROL CHESS", width / 2, logoY + logoH / 2 + (compact ? 30 : 40));
   ctx.letterSpacing = "0px";
 
-  // Showcase piece lineup on Nexus
+  // Showcase both armies so white vs black reads clearly
   if (Theme.pieceMode === "sprites") {
     const kinds = ["K", "Q", "B", "N", "R", "P"] as const;
-    const size = compact ? 36 : 48;
-    const gap = compact ? 10 : 14;
+    const size = compact ? 32 : 42;
+    const gap = compact ? 8 : 12;
     const total = kinds.length * size + (kinds.length - 1) * gap;
+    const py = logoY + logoH / 2 + (compact ? 52 : 68);
     let px = (width - total) / 2;
-    const py = logoY + logoH / 2 + (compact ? 56 : 72);
     for (const k of kinds) {
       const img = getPieceImage("w", k);
       if (img) ctx.drawImage(img, px, py, size, size);
+      px += size + gap;
+    }
+    const py2 = py + size + (compact ? 8 : 10);
+    px = (width - total) / 2;
+    for (const k of kinds) {
+      const img = getPieceImage("b", k);
+      if (img) ctx.drawImage(img, px, py2, size, size);
       px += size + gap;
     }
   }
@@ -95,7 +102,7 @@ export function drawHome(dc: DrawCtx, buttons: ButtonRect[], time = 0) {
   const btnW = Math.min(260, width - pad * 2);
   const play: ButtonRect = {
     x: (width - btnW) / 2,
-    y: height * 0.68,
+    y: height * 0.72,
     w: btnW,
     h: compact ? 52 : 56,
     id: "home-play",
