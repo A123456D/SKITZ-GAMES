@@ -2,17 +2,12 @@ import type { GameState, Square, Color, Ability, Move } from "../core/types";
 import { squareToRC, rcToSquare, NEXUS_SQUARES } from "../core/board";
 import { ABILITY_COST } from "../core/abilities";
 import { activePlayer } from "../core/types";
+import { Theme } from "./theme";
 
 const PIECE_CHARS: Record<string, string> = {
   wK: "\u2654", wQ: "\u2655", wR: "\u2656", wB: "\u2657", wN: "\u2658", wP: "\u2659",
   bK: "\u265A", bQ: "\u265B", bR: "\u265C", bB: "\u265D", bN: "\u265E", bP: "\u265F",
 };
-
-const LIGHT = "#e8d5b5";
-const DARK = "#b58863";
-const SELECT_COLOR = "rgba(255,255,100,0.5)";
-const MOVE_DOT = "rgba(0,0,0,0.25)";
-const CAPTURE_RING = "rgba(200,0,0,0.45)";
 
 export interface DrawCtx {
   ctx: CanvasRenderingContext2D;
@@ -34,7 +29,22 @@ export interface ButtonRect {
   id: string;
 }
 
-/** Vertical space reserved below the board for HUD (mana + turn + abilities). */
+let logoImg: HTMLImageElement | null = null;
+let logoReady = false;
+
+export function loadLogo(): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      logoImg = img;
+      logoReady = true;
+      resolve(img);
+    };
+    img.onerror = () => resolve(null);
+    img.src = "./logo.png";
+  });
+}
+
 function hudReserve(h: number, compact: boolean): number {
   if (compact) return Math.max(148, Math.min(190, h * 0.34));
   return 180;
@@ -55,11 +65,10 @@ export function layout(canvas: HTMLCanvasElement): DrawCtx {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const pad = compact ? 8 : 16;
-  const topBar = compact ? 44 : 50;
+  const topBar = compact ? 58 : 72;
   const bottom = hudReserve(h, compact);
   const availW = w - pad * 2;
   const availH = h - topBar - bottom;
-  // Cap grows with viewport so desktop isn't a tiny board in a sea of black
   const maxBoard = compact ? 560 : Math.min(720, Math.floor(Math.min(availW, availH)));
   const boardSize = Math.max(160, Math.min(availW, availH, maxBoard));
   const cellSize = boardSize / 8;
@@ -83,19 +92,189 @@ export function screenToSquare(dc: DrawCtx, px: number, py: number): Square | nu
   return rcToSquare(rank, file);
 }
 
+/** Sharp angular button (no rounded corners). */
+function drawAngularButton(
+  ctx: CanvasRenderingContext2D,
+  b: ButtonRect,
+  label: string,
+  opts: { fill: string; stroke: string; text: string; font?: string; glow?: string },
+) {
+  const { x, y, w, h } = b;
+  const cut = Math.min(8, h * 0.28);
+
+  ctx.beginPath();
+  ctx.moveTo(x + cut, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w, y + h - cut);
+  ctx.lineTo(x + w - cut, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.lineTo(x, y + cut);
+  ctx.closePath();
+
+  if (opts.glow) {
+    ctx.shadowColor = opts.glow;
+    ctx.shadowBlur = 12;
+  }
+  ctx.fillStyle = opts.fill;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.strokeStyle = opts.stroke;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.fillStyle = opts.text;
+  ctx.font = opts.font ?? `600 12px ${Theme.font}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  if (opts.glow) {
+    ctx.shadowColor = opts.glow;
+    ctx.shadowBlur = 8;
+  }
+  ctx.fillText(label, x + w / 2, y + h / 2 + 0.5);
+  ctx.shadowBlur = 0;
+}
+
+function drawBackground(dc: DrawCtx) {
+  const { ctx, width, height } = dc;
+  ctx.fillStyle = Theme.bg;
+  ctx.fillRect(0, 0, width, height);
+
+  // Subtle tech grid
+  ctx.strokeStyle = Theme.gridLine;
+  ctx.lineWidth = 1;
+  const step = 40;
+  for (let x = 0; x < width; x += step) {
+    ctx.beginPath();
+    ctx.moveTo(x + 0.5, 0);
+    ctx.lineTo(x + 0.5, height);
+    ctx.stroke();
+  }
+  for (let y = 0; y < height; y += step) {
+    ctx.beginPath();
+    ctx.moveTo(0, y + 0.5);
+    ctx.lineTo(width, y + 0.5);
+    ctx.stroke();
+  }
+
+  // Soft vignette
+  const g = ctx.createRadialGradient(
+    width / 2,
+    height * 0.4,
+    Math.min(width, height) * 0.15,
+    width / 2,
+    height * 0.45,
+    Math.max(width, height) * 0.7,
+  );
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(1, "rgba(0,0,0,0.55)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, width, height);
+}
+
+function drawBoardFrame(dc: DrawCtx) {
+  const { ctx, boardX, boardY, boardSize } = dc;
+  const m = 3;
+  ctx.strokeStyle = Theme.stroke;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(boardX - m, boardY - m, boardSize + m * 2, boardSize + m * 2);
+
+  // Corner ticks (logo angular language)
+  const tick = 12;
+  ctx.strokeStyle = Theme.accentHot;
+  ctx.lineWidth = 2;
+  // TL
+  ctx.beginPath();
+  ctx.moveTo(boardX - m, boardY - m + tick);
+  ctx.lineTo(boardX - m, boardY - m);
+  ctx.lineTo(boardX - m + tick, boardY - m);
+  ctx.stroke();
+  // TR
+  ctx.beginPath();
+  ctx.moveTo(boardX + boardSize + m - tick, boardY - m);
+  ctx.lineTo(boardX + boardSize + m, boardY - m);
+  ctx.lineTo(boardX + boardSize + m, boardY - m + tick);
+  ctx.stroke();
+  // BL
+  ctx.beginPath();
+  ctx.moveTo(boardX - m, boardY + boardSize + m - tick);
+  ctx.lineTo(boardX - m, boardY + boardSize + m);
+  ctx.lineTo(boardX - m + tick, boardY + boardSize + m);
+  ctx.stroke();
+  // BR
+  ctx.beginPath();
+  ctx.moveTo(boardX + boardSize + m - tick, boardY + boardSize + m);
+  ctx.lineTo(boardX + boardSize + m, boardY + boardSize + m);
+  ctx.lineTo(boardX + boardSize + m, boardY + boardSize + m - tick);
+  ctx.stroke();
+}
+
 function drawNexusGlow(dc: DrawCtx, time: number) {
   const { ctx, cellSize } = dc;
-  const pulse = 0.3 + 0.4 * (0.5 + 0.5 * Math.sin(time * 3));
+  const pulse = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(time * 2.6));
+  const beam = 0.25 + 0.4 * (0.5 + 0.5 * Math.sin(time * 4.2));
+
   for (const sq of NEXUS_SQUARES) {
     const [x, y] = squareScreenPos(dc, sq);
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cellSize * 0.7);
-    grad.addColorStop(0, `rgba(255,200,50,${pulse})`);
-    grad.addColorStop(0.5, `rgba(100,160,255,${pulse * 0.5})`);
+
+    // Base tile energy wash
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cellSize * 0.72);
+    grad.addColorStop(0, `rgba(240,192,64,${pulse * 0.85})`);
+    grad.addColorStop(0.45, `rgba(74,168,255,${pulse * 0.45})`);
     grad.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = grad;
-    ctx.fillRect(x - cellSize * 0.2, y - cellSize * 0.2, cellSize * 1.4, cellSize * 1.4);
+    ctx.fillRect(x, y, cellSize, cellSize);
+
+    // Sharp inner border
+    ctx.strokeStyle = `rgba(255,255,255,${0.25 + pulse * 0.35})`;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
+
+    // Vertical laser bisector (from logo)
+    ctx.strokeStyle = `rgba(255,255,255,${beam})`;
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    ctx.moveTo(cx, y + 3);
+    ctx.lineTo(cx, y + cellSize - 3);
+    ctx.stroke();
+
+    // Tiny crown tick at top of cell
+    ctx.fillStyle = `rgba(240,192,64,${0.5 + pulse * 0.5})`;
+    const t = cellSize * 0.08;
+    ctx.beginPath();
+    ctx.moveTo(cx - t * 1.6, y + 5 + t);
+    ctx.lineTo(cx - t * 0.5, y + 5);
+    ctx.lineTo(cx, y + 5 + t * 0.7);
+    ctx.lineTo(cx + t * 0.5, y + 5);
+    ctx.lineTo(cx + t * 1.6, y + 5 + t);
+    ctx.lineTo(cx - t * 1.6, y + 5 + t);
+    ctx.fill();
+  }
+}
+
+function drawLogoHeader(dc: DrawCtx) {
+  const { ctx, compact, pad } = dc;
+  const logoH = compact ? 42 : 56;
+  if (logoReady && logoImg) {
+    const aspect = logoImg.naturalWidth / Math.max(1, logoImg.naturalHeight);
+    const logoW = logoH * aspect;
+    const x = pad;
+    const y = compact ? 4 : 6;
+    ctx.shadowColor = "rgba(255,255,255,0.4)";
+    ctx.shadowBlur = 20;
+    ctx.drawImage(logoImg, x, y, logoW, logoH);
+    ctx.shadowBlur = 0;
+  } else {
+    ctx.fillStyle = Theme.ink;
+    ctx.font = `700 ${compact ? 20 : 26}px ${Theme.fontDisplay}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(255,255,255,0.4)";
+    ctx.shadowBlur = 12;
+    ctx.fillText("NEXUS", pad, compact ? 26 : 32);
+    ctx.shadowBlur = 0;
   }
 }
 
@@ -108,26 +287,31 @@ export function drawBoard(
   abilityTargets: Square[],
   activeAbility: Ability | null,
 ) {
-  const { ctx, boardX, boardY, cellSize, width, height, compact } = dc;
+  const { ctx, boardX, boardY, cellSize, compact } = dc;
 
-  ctx.fillStyle = "#0a0a0f";
-  ctx.fillRect(0, 0, width, height);
+  drawBackground(dc);
+  drawLogoHeader(dc);
 
+  // Board tiles
   for (let r = 0; r < 8; r++) {
     for (let f = 0; f < 8; f++) {
       const x = boardX + f * cellSize;
       const y = boardY + (7 - r) * cellSize;
-      ctx.fillStyle = (r + f) % 2 === 0 ? DARK : LIGHT;
+      ctx.fillStyle = (r + f) % 2 === 0 ? Theme.tileDark : Theme.tileLight;
       ctx.fillRect(x, y, cellSize, cellSize);
     }
   }
 
+  drawBoardFrame(dc);
   drawNexusGlow(dc, time);
 
   if (selected) {
     const [sx, sy] = squareScreenPos(dc, selected);
-    ctx.fillStyle = SELECT_COLOR;
+    ctx.fillStyle = "rgba(240,192,64,0.28)";
     ctx.fillRect(sx, sy, cellSize, cellSize);
+    ctx.strokeStyle = Theme.accentHot;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(sx + 1.5, sy + 1.5, cellSize - 3, cellSize - 3);
   }
 
   const legalSet = new Set(legalMoves.map((m) => m.to));
@@ -136,15 +320,27 @@ export function drawBoard(
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
     if (state.board.has(sq)) {
+      // Angular capture diamond
+      const s = cellSize * 0.38;
+      ctx.strokeStyle = Theme.danger;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(cx, cy, cellSize * 0.45, 0, Math.PI * 2);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = CAPTURE_RING;
+      ctx.moveTo(cx, cy - s);
+      ctx.lineTo(cx + s, cy);
+      ctx.lineTo(cx, cy + s);
+      ctx.lineTo(cx - s, cy);
+      ctx.closePath();
       ctx.stroke();
     } else {
+      // Sharp move marker
+      const s = cellSize * 0.1;
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
       ctx.beginPath();
-      ctx.arc(cx, cy, cellSize * 0.15, 0, Math.PI * 2);
-      ctx.fillStyle = MOVE_DOT;
+      ctx.moveTo(cx, cy - s);
+      ctx.lineTo(cx + s, cy);
+      ctx.lineTo(cx, cy + s);
+      ctx.lineTo(cx - s, cy);
+      ctx.closePath();
       ctx.fill();
     }
   }
@@ -152,80 +348,72 @@ export function drawBoard(
   if (activeAbility) {
     for (const sq of abilityTargets) {
       const [x, y] = squareScreenPos(dc, sq);
-      ctx.strokeStyle = "rgba(0,255,200,0.7)";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
+      ctx.strokeStyle = Theme.accent;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 3, y + 3, cellSize - 6, cellSize - 6);
     }
   }
 
+  // Pieces
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `${cellSize * 0.75}px serif`;
+  ctx.font = `${cellSize * 0.72}px serif`;
   for (const [sq, piece] of state.board) {
     const [x, y] = squareScreenPos(dc, sq);
     const cx = x + cellSize / 2;
     const cy = y + cellSize / 2;
 
     if (piece.isShielded) {
-      ctx.beginPath();
-      ctx.arc(cx, cy, cellSize * 0.42, 0, Math.PI * 2);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(0,220,255,0.8)";
-      ctx.stroke();
+      ctx.strokeStyle = Theme.accent;
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(x + 4, y + 4, cellSize - 8, cellSize - 8);
     }
 
     if (state.overdriveSquare === sq) {
-      ctx.fillStyle = "rgba(255,220,0,0.3)";
+      ctx.fillStyle = "rgba(240,192,64,0.22)";
       ctx.fillRect(x, y, cellSize, cellSize);
     }
 
     const ch = PIECE_CHARS[piece.color + piece.kind];
-    ctx.fillStyle = piece.color === "w" ? "#fff" : "#111";
-    ctx.strokeStyle = piece.color === "w" ? "#333" : "#ccc";
-    ctx.lineWidth = 1;
-    ctx.strokeText(ch, cx, cy);
-    ctx.fillText(ch, cx, cy);
+    if (piece.color === "w") {
+      ctx.shadowColor = "rgba(255,255,255,0.65)";
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = Theme.whitePiece;
+      ctx.fillText(ch, cx, cy);
+      ctx.shadowBlur = 0;
+    } else {
+      // Silver fill so black side stays readable on dark tiles
+      ctx.shadowColor = "rgba(74,168,255,0.25)";
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = "#a8b0bc";
+      ctx.fillText(ch, cx, cy);
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.lineWidth = Math.max(1.25, cellSize * 0.025);
+      ctx.strokeText(ch, cx, cy);
+    }
   }
 
-  // Labels only when there's room
   if (!compact || cellSize >= 36) {
-    ctx.font = `${Math.max(10, Math.min(12, cellSize * 0.22))}px sans-serif`;
-    ctx.fillStyle = "#888";
+    ctx.font = `500 ${Math.max(9, Math.min(11, cellSize * 0.2))}px ${Theme.font}`;
+    ctx.fillStyle = Theme.inkMute;
     ctx.textAlign = "center";
     for (let f = 0; f < 8; f++) {
       ctx.fillText(
-        "abcdefgh"[f],
+        "ABCDEFGH"[f],
         boardX + f * cellSize + cellSize / 2,
-        boardY + 8 * cellSize + 12,
+        boardY + 8 * cellSize + 11,
       );
     }
     ctx.textAlign = "right";
     for (let r = 0; r < 8; r++) {
       ctx.fillText(
         String(r + 1),
-        boardX - 4,
+        boardX - 5,
         boardY + (7 - r) * cellSize + cellSize / 2,
       );
     }
   }
-}
-
-function drawPillButton(
-  ctx: CanvasRenderingContext2D,
-  b: ButtonRect,
-  label: string,
-  opts: { fill: string; stroke: string; text: string; font?: string },
-) {
-  ctx.fillStyle = opts.fill;
-  ctx.fillRect(b.x, b.y, b.w, b.h);
-  ctx.strokeStyle = opts.stroke;
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(b.x, b.y, b.w, b.h);
-  ctx.fillStyle = opts.text;
-  ctx.font = opts.font ?? "13px sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(label, b.x + b.w / 2, b.y + b.h / 2 + 0.5);
 }
 
 export function drawHud(
@@ -234,106 +422,121 @@ export function drawHud(
   buttons: ButtonRect[],
   aiEnabled: boolean,
 ) {
-  const { ctx, boardX, boardY, cellSize, boardSize, width, height, compact } = dc;
+  const { ctx, boardSize, width, compact } = dc;
   buttons.length = 0;
 
-  const hudTop = boardY + boardSize + (compact ? 10 : 18);
+  const hudTop = dc.boardY + boardSize + (compact ? 10 : 16);
   const contentW = Math.min(boardSize, width - dc.pad * 2);
   const contentX = (width - contentW) / 2;
   const btnH = compact ? 40 : 36;
 
-  // Top bar: AI + New Game (fit within viewport)
+  // Top-right controls
   {
-    const topY = compact ? 6 : 10;
+    const topY = compact ? 8 : 12;
     const gap = 8;
-    const bw = compact ? Math.min(88, (width - dc.pad * 2 - gap) / 2) : 100;
+    const bw = compact ? Math.min(84, (width - dc.pad * 2 - gap) / 2) : 104;
     const total = bw * 2 + gap;
     const startX = width - dc.pad - total;
 
     const aiBtn: ButtonRect = { x: startX, y: topY, w: bw, h: btnH - 4, id: "toggleai" };
     const ngBtn: ButtonRect = { x: startX + bw + gap, y: topY, w: bw, h: btnH - 4, id: "newgame" };
 
-    drawPillButton(ctx, aiBtn, aiEnabled ? "AI: ON" : "AI: OFF", {
-      fill: aiEnabled ? "rgba(40,140,60,0.85)" : "rgba(60,60,70,0.85)",
-      stroke: "#888",
-      text: "#ddd",
-      font: compact ? "12px sans-serif" : "13px sans-serif",
+    drawAngularButton(ctx, aiBtn, aiEnabled ? "AI ON" : "AI OFF", {
+      fill: aiEnabled ? "rgba(61,255,154,0.12)" : "rgba(255,255,255,0.04)",
+      stroke: aiEnabled ? Theme.success : Theme.strokeDim,
+      text: aiEnabled ? Theme.success : Theme.inkDim,
+      font: `600 ${compact ? 11 : 12}px ${Theme.font}`,
+      glow: aiEnabled ? "rgba(61,255,154,0.35)" : undefined,
     });
-    drawPillButton(ctx, ngBtn, "New Game", {
-      fill: "rgba(60,60,70,0.85)",
-      stroke: "#888",
-      text: "#ddd",
-      font: compact ? "12px sans-serif" : "13px sans-serif",
+    drawAngularButton(ctx, ngBtn, "NEW GAME", {
+      fill: "rgba(255,255,255,0.04)",
+      stroke: Theme.strokeDim,
+      text: Theme.ink,
+      font: `600 ${compact ? 11 : 12}px ${Theme.font}`,
     });
     buttons.push(aiBtn, ngBtn);
   }
 
-  // Mana bars — scale segment width to content
-  const labelW = compact ? 52 : 90;
+  // Mana
+  const labelW = compact ? 28 : 72;
   const segGap = 2;
   const segAvail = contentW - labelW - 4;
   const segW = Math.max(8, Math.floor((segAvail - segGap * 9) / 10));
-  const rowH = compact ? 22 : 28;
+  const rowH = compact ? 22 : 26;
 
   for (let i = 0; i < 2; i++) {
     const p = state.players[i];
-    const label = p.color === "w" ? "W" : "B";
-    const fullLabel = p.color === "w" ? "White" : "Black";
+    const label = compact ? (p.color === "w" ? "W" : "B") : p.color === "w" ? "WHITE" : "BLACK";
     const barY = hudTop + i * rowH;
-    ctx.fillStyle = "#ccc";
-    ctx.font = compact ? "12px sans-serif" : "14px sans-serif";
+    ctx.fillStyle = Theme.inkDim;
+    ctx.font = `600 ${compact ? 11 : 12}px ${Theme.font}`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(compact ? `${label}` : `${fullLabel}`, contentX, barY + rowH / 2);
+    ctx.fillText(label, contentX, barY + rowH / 2);
 
     for (let m = 0; m < 10; m++) {
       const sx = contentX + labelW + m * (segW + segGap);
-      ctx.fillStyle = m < p.mana ? "rgba(60,140,255,0.9)" : "rgba(60,60,80,0.5)";
-      ctx.fillRect(sx, barY + 3, segW, rowH - 6);
-      ctx.strokeStyle = "#456";
+      const filled = m < p.mana;
+      ctx.fillStyle = filled ? Theme.accent : "rgba(255,255,255,0.06)";
+      ctx.fillRect(sx, barY + 4, segW, rowH - 8);
+      if (filled) {
+        ctx.shadowColor = Theme.accent;
+        ctx.shadowBlur = 6;
+        ctx.fillRect(sx, barY + 4, segW, rowH - 8);
+        ctx.shadowBlur = 0;
+      }
+      ctx.strokeStyle = filled ? Theme.accent : Theme.strokeDim;
       ctx.lineWidth = 1;
-      ctx.strokeRect(sx, barY + 3, segW, rowH - 6);
+      ctx.strokeRect(sx + 0.5, barY + 4.5, segW - 1, rowH - 9);
     }
   }
 
-  // Turn info
+  // Turn / phase
   const infoY = hudTop + rowH * 2 + (compact ? 6 : 10);
-  ctx.fillStyle = "#ddd";
-  ctx.font = compact ? "bold 13px sans-serif" : "bold 15px sans-serif";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  const turnLabel = state.activeColor === "w" ? "White" : "Black";
+  const turnLabel = state.activeColor === "w" ? "WHITE" : "BLACK";
   const phaseLabel =
     state.turnPhase === "ability"
-      ? "Ability"
+      ? "ABILITY"
       : state.turnPhase === "overdrive"
-        ? "Overdrive"
+        ? "OVERDRIVE"
         : state.turnPhase === "move"
-          ? "Move"
+          ? "MOVE"
           : "...";
+
+  ctx.fillStyle = Theme.ink;
+  ctx.font = `700 ${compact ? 12 : 14}px ${Theme.font}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
   const turnText = compact
-    ? `T${state.turnNumber} · ${turnLabel} · ${phaseLabel}`
-    : `Turn ${state.turnNumber} — ${turnLabel} — ${phaseLabel} Phase`;
+    ? `T${state.turnNumber}  ${turnLabel}  ${phaseLabel}`
+    : `TURN ${state.turnNumber}  ·  ${turnLabel}  ·  ${phaseLabel}`;
   ctx.fillText(turnText, contentX, infoY);
 
+  // Gold accent underline
+  ctx.strokeStyle = Theme.accentHot;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(contentX, infoY + 4);
+  ctx.lineTo(contentX + Math.min(120, contentW * 0.35), infoY + 4);
+  ctx.stroke();
+
   if (state.turnPhase === "ability" && !state.winner) {
-    ctx.fillStyle = "#888";
-    ctx.font = compact ? "11px sans-serif" : "12px sans-serif";
+    ctx.fillStyle = Theme.inkMute;
+    ctx.font = `500 ${compact ? 10 : 11}px ${Theme.font}`;
     ctx.fillText(
-      compact ? "Tap piece to move, or use ability" : "Select an ability, or tap a piece / Skip to move",
+      compact ? "TAP PIECE TO MOVE  ·  OR CAST" : "SELECT ABILITY  ·  OR TAP A PIECE / SKIP TO MOVE",
       contentX,
-      infoY + (compact ? 14 : 16),
+      infoY + (compact ? 16 : 18),
     );
   }
 
-  // Ability buttons — always fit within content width
   if (state.turnPhase === "ability" && !state.winner) {
-    const btnY = infoY + (compact ? 22 : 28);
+    const btnY = infoY + (compact ? 24 : 30);
     const abilities: { id: Ability | "skip"; label: string; cost?: number }[] = [
-      { id: "aegis", label: "Aegis", cost: ABILITY_COST.aegis },
-      { id: "overdrive", label: "Overdrive", cost: ABILITY_COST.overdrive },
-      { id: "tacticalSwap", label: compact ? "Swap" : "Tac. Swap", cost: ABILITY_COST.tacticalSwap },
-      { id: "skip", label: "Skip" },
+      { id: "aegis", label: "AEGIS", cost: ABILITY_COST.aegis },
+      { id: "overdrive", label: compact ? "DRIVE" : "OVERDRIVE", cost: ABILITY_COST.overdrive },
+      { id: "tacticalSwap", label: "SWAP", cost: ABILITY_COST.tacticalSwap },
+      { id: "skip", label: "SKIP" },
     ];
     const gap = compact ? 6 : 8;
     const bw = (contentW - gap * (abilities.length - 1)) / abilities.length;
@@ -345,46 +548,67 @@ export function drawHud(
       const canAfford = a.id === "skip" || (a.cost !== undefined && mana >= a.cost);
       const btn: ButtonRect = { x: bx, y: btnY, w: bw, h: btnH, id: a.id };
       const display =
-        a.id === "skip"
-          ? "Skip"
-          : compact
-            ? `${a.label} ${a.cost}`
-            : `${a.label} (${a.cost})`;
+        a.id === "skip" ? "SKIP" : `${a.label} ${a.cost}`;
 
-      drawPillButton(ctx, btn, display, {
+      drawAngularButton(ctx, btn, display, {
         fill:
           a.id === "skip"
-            ? "rgba(100,100,110,0.85)"
+            ? "rgba(255,255,255,0.06)"
             : canAfford
-              ? "rgba(40,120,200,0.85)"
-              : "rgba(40,40,50,0.65)",
-        stroke: a.id === "skip" ? "#999" : canAfford ? "#5af" : "#444",
-        text: canAfford || a.id === "skip" ? "#fff" : "#666",
-        font: compact ? "11px sans-serif" : "13px sans-serif",
+              ? "rgba(74,168,255,0.14)"
+              : "rgba(255,255,255,0.03)",
+        stroke:
+          a.id === "skip"
+            ? Theme.stroke
+            : canAfford
+              ? Theme.accent
+              : Theme.strokeDim,
+        text: canAfford || a.id === "skip" ? Theme.ink : Theme.inkMute,
+        font: `600 ${compact ? 10 : 11}px ${Theme.font}`,
+        glow: canAfford && a.id !== "skip" ? "rgba(74,168,255,0.35)" : undefined,
       });
       buttons.push(btn);
     }
   }
-
-  // Keep win overlay text readable on small screens
-  void height;
-  void cellSize;
 }
 
 export function drawWinOverlay(dc: DrawCtx, winner: Color) {
   const { ctx, width, height, compact } = dc;
-  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillStyle = "rgba(0,0,0,0.82)";
   ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = winner === "w" ? "#fff" : "#aaa";
-  ctx.font = compact ? "bold 32px sans-serif" : "bold 48px sans-serif";
+
+  if (logoReady && logoImg) {
+    const logoH = compact ? 48 : 72;
+    const aspect = logoImg.naturalWidth / Math.max(1, logoImg.naturalHeight);
+    const logoW = logoH * aspect;
+    ctx.shadowColor = "rgba(255,255,255,0.45)";
+    ctx.shadowBlur = 24;
+    ctx.drawImage(logoImg, width / 2 - logoW / 2, height / 2 - logoH - 48, logoW, logoH);
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.fillStyle = Theme.ink;
+  ctx.font = `700 ${compact ? 28 : 42}px ${Theme.fontDisplay}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  ctx.shadowColor = winner === "w" ? "rgba(255,255,255,0.5)" : "rgba(240,192,64,0.45)";
+  ctx.shadowBlur = 16;
   ctx.fillText(
-    `${winner === "w" ? "White" : "Black"} Wins!`,
+    `${winner === "w" ? "WHITE" : "BLACK"} WINS`,
     width / 2,
-    height / 2 - 20,
+    height / 2 + 8,
   );
-  ctx.font = compact ? "16px sans-serif" : "20px sans-serif";
-  ctx.fillStyle = "#bbb";
-  ctx.fillText("Tap New Game to play again", width / 2, height / 2 + 28);
+  ctx.shadowBlur = 0;
+
+  ctx.strokeStyle = Theme.accentHot;
+  ctx.lineWidth = 1.5;
+  const lineW = compact ? 80 : 120;
+  ctx.beginPath();
+  ctx.moveTo(width / 2 - lineW, height / 2 + 36);
+  ctx.lineTo(width / 2 + lineW, height / 2 + 36);
+  ctx.stroke();
+
+  ctx.font = `500 ${compact ? 13 : 16}px ${Theme.font}`;
+  ctx.fillStyle = Theme.inkDim;
+  ctx.fillText("TAP NEW GAME TO PLAY AGAIN", width / 2, height / 2 + 58);
 }

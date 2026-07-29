@@ -8,6 +8,7 @@ import {
   drawHud,
   drawWinOverlay,
   squareScreenPos,
+  loadLogo,
   type DrawCtx,
   type ButtonRect,
 } from "./view/draw";
@@ -229,4 +230,5 @@ function frame(now: number) {
 }
 
 requestAnimationFrame(frame);
+void loadLogo();
 maybeAiTurn();
