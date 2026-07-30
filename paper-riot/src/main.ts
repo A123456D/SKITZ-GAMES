@@ -16,8 +16,9 @@ import {
   HOME_PLAY,
   HOME_MAP,
   HOME_THEME,
-  HOME_SETTINGS,
+  HOME_SOUND,
   PAUSE_BTN,
+  PLAY_SOUND_BTN,
   MAP_BACK,
   MAP_PLAY,
   boardLayout,
@@ -49,20 +50,29 @@ import {
 } from "./view/particles";
 import { loadGameArt, reloadThemeArt } from "./view/stickers";
 import {
-  isMuted,
   loadSfx,
   playSfx,
   powerSfx,
-  toggleMute,
   unlockAudio,
 } from "./view/audio";
 import {
-  setMusicMuted,
   syncMusicForTheme,
   unlockMusic,
 } from "./view/music";
+import {
+  cycleAudioMode,
+  getAudioMode,
+  initAudioMode,
+} from "./view/audioMode";
 import { countObstacles } from "./core/obstacles";
 import { cycleTheme, getTheme, initTheme } from "./view/theme";
+
+function handleAudioCycle(): void {
+  if (getAudioMode() === "full") playSfx("mute-on", { vary: false });
+  const next = cycleAudioMode();
+  if (next !== "off") playSfx("ui-tap");
+  markDirty();
+}
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
@@ -381,18 +391,9 @@ function onTap(x: number, y: number): void {
       markDirty();
       return;
     }
-    if (hitUi(HOME_SETTINGS, x, y)) {
-      if (!isMuted()) {
-        playSfx("mute-on", { vary: false });
-        toggleMute();
-        setMusicMuted(true);
-      } else {
-        toggleMute();
-        setMusicMuted(false);
-        unlockMusic();
-        playSfx("ui-tap");
-      }
-      markDirty();
+    if (hitUi(HOME_SOUND, x, y)) {
+      handleAudioCycle();
+      return;
     }
     return;
   }
@@ -442,6 +443,11 @@ function onTap(x: number, y: number): void {
     screen = "map";
     armedPower = null;
     markDirty();
+    return;
+  }
+
+  if (hitUi(PLAY_SOUND_BTN, x, y)) {
+    handleAudioCycle();
     return;
   }
 
@@ -499,7 +505,7 @@ canvas.addEventListener(
   (e) => {
     e.preventDefault();
     void unlockAudio().then(() => {
-      if (!isMuted()) {
+      if (getAudioMode() === "full") {
         syncMusicForTheme(getTheme());
         unlockMusic();
       }
@@ -562,6 +568,7 @@ window.addEventListener("orientationchange", resize);
 
 async function boot(): Promise<void> {
   initTheme();
+  initAudioMode();
   syncMusicForTheme(getTheme());
   progress = loadProgress();
   saveProgress(progress);

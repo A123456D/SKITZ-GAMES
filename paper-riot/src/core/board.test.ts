@@ -336,7 +336,7 @@ describe("session", () => {
 });
 
 describe("theme", () => {
-  it("cycles between classroom and edgy themes", async () => {
+  it("cycles between scrap and edgy themes", async () => {
     const { cycleTheme, getTheme, initTheme, Palette, THEME_PALETTES } =
       await import("../view/theme");
     initTheme();

@@ -1,11 +1,11 @@
-/** Paper Riot visual themes — classroom (default) + edgy (Riot Cube pack). */
+/** Paper Riot visual themes — scrap (default collage) + edgy (Riot Cube pack). */
 
-export type ThemeId = "classroom" | "edgy";
+export type ThemeId = "scrap" | "edgy";
 
-export const THEME_IDS: readonly ThemeId[] = ["classroom", "edgy"] as const;
+export const THEME_IDS: readonly ThemeId[] = ["scrap", "edgy"] as const;
 
 export const THEME_LABELS: Record<ThemeId, string> = {
-  classroom: "CLASSROOM",
+  scrap: "SCRAP",
   edgy: "EDGY",
 };
 
@@ -24,7 +24,7 @@ export type ThemePalette = {
   shadow: string;
 };
 
-const CLASSROOM: ThemePalette = {
+const SCRAP: ThemePalette = {
   bg: "#0a0a0a",
   paper: "#f4f0e6",
   paperDim: "#e8e0d0",
@@ -56,25 +56,27 @@ const EDGY: ThemePalette = {
 };
 
 export const THEME_PALETTES: Record<ThemeId, ThemePalette> = {
-  classroom: CLASSROOM,
+  scrap: SCRAP,
   edgy: EDGY,
 };
 
 const THEME_KEY = "paper-riot-theme";
 
 /** Mutable current palette — draw code keeps using `Palette.x`. */
-export const Palette: ThemePalette = { ...CLASSROOM };
+export const Palette: ThemePalette = { ...SCRAP };
 
 let themeId: ThemeId = readStoredTheme();
 
 function readStoredTheme(): ThemeId {
   try {
     const raw = localStorage.getItem(THEME_KEY);
-    if (raw === "edgy" || raw === "classroom") return raw;
+    // Migrate old "classroom" id → scrap.
+    if (raw === "classroom" || raw === "scrap") return "scrap";
+    if (raw === "edgy") return "edgy";
   } catch {
     /* ignore */
   }
-  return "classroom";
+  return "scrap";
 }
 
 export function getTheme(): ThemeId {

@@ -19,7 +19,7 @@ import {
 import { Palette, THEME_LABELS, getTheme } from "./theme";
 import { drawParticles } from "./particles";
 import { floatPose, getVisual } from "./motion";
-import { isMuted } from "./audio";
+import { audioModeLabel, getAudioMode } from "./audioMode";
 
 export const W = 720;
 export const H = 1280;
@@ -29,8 +29,11 @@ export type UiRect = { x: number; y: number; w: number; h: number };
 export const HOME_PLAY: UiRect = { x: 70, y: 470, w: 580, h: 120 };
 export const HOME_MAP: UiRect = { x: 90, y: 610, w: 540, h: 100 };
 export const HOME_THEME: UiRect = { x: 90, y: 730, w: 540, h: 100 };
-export const HOME_SETTINGS: UiRect = { x: 90, y: 850, w: 540, h: 100 };
+export const HOME_SOUND: UiRect = { x: 90, y: 850, w: 540, h: 100 };
+/** @deprecated alias — home sound control */
+export const HOME_SETTINGS = HOME_SOUND;
 export const PAUSE_BTN: UiRect = { x: 620, y: 36, w: 64, h: 64 };
+export const PLAY_SOUND_BTN: UiRect = { x: 536, y: 36, w: 64, h: 64 };
 export const MAP_BACK: UiRect = { x: 36, y: 36, w: 120, h: 56 };
 export const MAP_PLAY: UiRect = { x: 200, y: 1160, w: 320, h: 72 };
 
@@ -331,11 +334,11 @@ export function drawHome(
     hover: ui.hover === "home-theme",
     pressed: ui.pressed === "home-theme",
   });
-  paperBtn(ctx, HOME_SETTINGS, isMuted() ? "SOUND OFF" : "SOUND ON", {
+  paperBtn(ctx, HOME_SOUND, `AUDIO · ${audioModeLabel()}`, {
     time: ui.time,
     phase: 2.0,
-    hover: ui.hover === "home-settings",
-    pressed: ui.pressed === "home-settings",
+    hover: ui.hover === "home-sound",
+    pressed: ui.pressed === "home-sound",
   });
 
   ctx.fillStyle = Palette.white;
@@ -557,12 +560,13 @@ export function hitButtonId(
     if (hitUi(HOME_PLAY, x, y)) return "home-play";
     if (hitUi(HOME_MAP, x, y)) return "home-map";
     if (hitUi(HOME_THEME, x, y)) return "home-theme";
-    if (hitUi(HOME_SETTINGS, x, y)) return "home-settings";
+    if (hitUi(HOME_SOUND, x, y)) return "home-sound";
   } else if (screen === "map") {
     if (hitUi(MAP_BACK, x, y)) return "map-back";
     if (hitUi(MAP_PLAY, x, y)) return "map-play";
-  } else if (hitUi(PAUSE_BTN, x, y)) {
-    return "pause";
+  } else {
+    if (hitUi(PLAY_SOUND_BTN, x, y)) return "play-sound";
+    if (hitUi(PAUSE_BTN, x, y)) return "pause";
   }
   return null;
 }
@@ -603,7 +607,39 @@ export function drawPlay(
   ctx.textAlign = "center";
   ctx.fillText(`LEVEL ${session.level.id}`, 370, 72);
 
-  // Pause button with lift
+  // Sound + pause buttons
+  {
+    const mode = getAudioMode();
+    const lift = 6 + Math.sin(opts.time * 2.4 + 1) * 2;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 10 + lift;
+    ctx.shadowOffsetY = 4 + lift * 0.5;
+    ctx.translate(0, -lift);
+    ctx.fillStyle = Palette.paper;
+    roundRect(
+      ctx,
+      PLAY_SOUND_BTN.x,
+      PLAY_SOUND_BTN.y,
+      PLAY_SOUND_BTN.w,
+      PLAY_SOUND_BTN.h,
+      8,
+    );
+    ctx.fill();
+    ctx.fillStyle = Palette.ink;
+    ctx.font = "800 22px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const glyph =
+      mode === "off" ? "✕" : mode === "sfx" ? "♪" : "♫";
+    ctx.fillText(
+      glyph,
+      PLAY_SOUND_BTN.x + PLAY_SOUND_BTN.w / 2,
+      PLAY_SOUND_BTN.y + PLAY_SOUND_BTN.h / 2 + 1,
+    );
+    ctx.restore();
+  }
+
   {
     const lift = 6 + Math.sin(opts.time * 2.4) * 2;
     ctx.save();

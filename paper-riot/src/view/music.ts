@@ -21,7 +21,7 @@ let started = false;
 let allTracks: string[] = [];
 let beds: Partial<Record<ThemeId, string[]>> = {};
 let tracks: string[] = [];
-let bed: ThemeId = "classroom";
+let bed: ThemeId = "scrap";
 let crossfadeMs = 2800;
 let bag: string[] = [];
 let lastTrack: string | null = null;
@@ -282,7 +282,7 @@ async function ensureManifest(): Promise<void> {
   if (manifestPromise) return manifestPromise;
   manifestPromise = (async () => {
     try {
-      const res = await fetch("./music/playlist.json?v=1");
+      const res = await fetch("./music/playlist.json?v=2");
       if (!res.ok) return;
       const data = (await res.json()) as PlaylistManifest;
       allTracks = (data.tracks ?? []).filter(Boolean);

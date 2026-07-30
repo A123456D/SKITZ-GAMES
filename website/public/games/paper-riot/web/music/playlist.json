@@ -7,7 +7,7 @@
     "tape-deck-heart-b.mp3"
   ],
   "beds": {
-    "classroom": ["basement-replay.mp3", "basement-replay-b.mp3"],
+    "scrap": ["basement-replay.mp3", "basement-replay-b.mp3"],
     "edgy": ["tape-deck-heart.mp3", "tape-deck-heart-b.mp3"]
   }
 }
