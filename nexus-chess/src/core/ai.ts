@@ -1,9 +1,17 @@
-import type { AbilityCast, Color, GameState, Move, PieceKind, Square } from "./types";
+import type { AbilityCast, Color, GameState, Move, Square } from "./types";
 import { activePlayer, opponent } from "./types";
-import { NEXUS_SQUARES, isInNexus, findKing, squareToRC, rcToSquare } from "./board";
+import { NEXUS_SQUARES, isInNexus, findKing, squareToRC } from "./board";
 import { allMoves } from "./moves";
 import { skipAbility, doAbilityPhase, doMovePhase, endTurn } from "./turn";
 import { ABILITY_COST, abilityTargets } from "./abilities";
+import {
+  PIECE_VALUE,
+  pieceAttacksSquare,
+  squareAttackedBy,
+  attackCount,
+  seeGain,
+  classicalPositional,
+} from "./chessStrat";
 
 /** 0 = off (hotseat), 1–4 = Easy → Expert */
 export type AiDifficulty = 0 | 1 | 2 | 3 | 4;
@@ -69,15 +77,6 @@ function timeUp(clock: SearchClock): boolean {
   return false;
 }
 
-const PIECE_VALUE: Record<PieceKind, number> = {
-  P: 100,
-  N: 320,
-  B: 330,
-  R: 500,
-  Q: 900,
-  K: 0,
-};
-
 function manhattan(a: Square, b: Square): number {
   const [r1, f1] = squareToRC(a);
   const [r2, f2] = squareToRC(b);
@@ -106,79 +105,6 @@ function proximityDanger(state: GameState, sq: Square, byColor: Color): number {
     danger += weight / (md + 0.5);
   }
   return danger;
-}
-
-/** Cheap geometric attack test — no move generation (safe for eval leaves). */
-function pieceAttacksSquare(
-  board: GameState["board"],
-  from: Square,
-  to: Square,
-  kind: PieceKind,
-  color: Color,
-): boolean {
-  if (from === to) return false;
-  const [r0, f0] = squareToRC(from);
-  const [r1, f1] = squareToRC(to);
-  const dr = r1 - r0;
-  const df = f1 - f0;
-  const adr = Math.abs(dr);
-  const adf = Math.abs(df);
-
-  const clearRay = () => {
-    const sr = Math.sign(dr);
-    const sf = Math.sign(df);
-    let r = r0 + sr;
-    let f = f0 + sf;
-    while (r !== r1 || f !== f1) {
-      if (board.has(rcToSquare(r, f))) return false;
-      r += sr;
-      f += sf;
-    }
-    return true;
-  };
-
-  switch (kind) {
-    case "P": {
-      const dir = color === "w" ? 1 : -1;
-      return dr === dir && adf === 1;
-    }
-    case "N":
-      return (adr === 2 && adf === 1) || (adr === 1 && adf === 2);
-    case "B":
-      return adr === adf && adr > 0 && clearRay();
-    case "R":
-      return (dr === 0 || df === 0) && adr + adf > 0 && clearRay();
-    case "Q":
-      return ((dr === 0 || df === 0) || adr === adf) && adr + adf > 0 && clearRay();
-    case "K":
-      return adr <= 1 && adf <= 1 && adr + adf > 0;
-    default:
-      return false;
-  }
-}
-
-function squareAttackedBy(state: GameState, sq: Square, by: Color): boolean {
-  const target = state.board.get(sq);
-  // Kings only capturable inside Nexus; shields block
-  if (target?.kind === "K") {
-    if (!isInNexus(sq)) return false;
-    if (target.isShielded) return false;
-  }
-  for (const [from, p] of state.board) {
-    if (p.color !== by) continue;
-    if (pieceAttacksSquare(state.board, from, sq, p.kind, p.color)) return true;
-  }
-  return false;
-}
-
-/** How many of `by`'s pieces attack `sq`. */
-function attackCount(state: GameState, sq: Square, by: Color): number {
-  let n = 0;
-  for (const [from, p] of state.board) {
-    if (p.color !== by) continue;
-    if (pieceAttacksSquare(state.board, from, sq, p.kind, p.color)) n++;
-  }
-  return n;
 }
 
 function kingAssassinable(state: GameState, kingColor: Color): boolean {
@@ -233,7 +159,7 @@ function boardAfterMove(state: GameState, move: Move): GameState["board"] {
 
 /**
  * Static evaluation from `perspective`'s point of view (higher = better for them).
- * Priority: win now (assassinate / hold) → don't lose the king → fight for the Nexus with pieces.
+ * Classical chess (PST / mobility / structure / hanging) + Nexus Hold/Assassination as north star.
  */
 export function evaluatePosition(state: GameState, perspective: Color): number {
   if (state.winner === perspective) return 1_000_000;
@@ -255,12 +181,6 @@ export function evaluatePosition(state: GameState, perspective: Color): number {
     if (p.color === perspective) {
       myMaterial += val;
       if (isInNexus(sq) && p.kind !== "K") myNexusPieces++;
-      if (p.kind !== "K" && p.kind !== "P") {
-        score += (4 - Math.min(4, d)) * 8;
-        const [r] = squareToRC(sq);
-        if (perspective === "w" && r > 0) score += 12;
-        if (perspective === "b" && r < 7) score += 12;
-      }
       if (p.kind !== "K" && d <= 2) myNearNexus++;
     } else {
       oppMaterial += val;
@@ -269,6 +189,9 @@ export function evaluatePosition(state: GameState, perspective: Color): number {
     }
   }
   score += myMaterial - oppMaterial;
+  // Classical midgame strategy layer
+  score += classicalPositional(state, perspective);
+
   score += (myNexusPieces - oppNexusPieces) * 80;
   score += (myNearNexus - oppNearNexus) * 55;
 
@@ -281,7 +204,6 @@ export function evaluatePosition(state: GameState, perspective: Color): number {
     if (d === 0) {
       const underFire = kingAssassinable(state, perspective);
       if (underFire) {
-        // Standing in a kill zone is almost losing — flee or clear attackers
         score -= 12_000 + king.nexusTurnCount * 800;
       } else {
         const support = myNearNexus + myNexusPieces;
@@ -302,10 +224,9 @@ export function evaluatePosition(state: GameState, perspective: Color): number {
     const d = distToNexus(oppKing);
     const king = state.board.get(oppKing)!;
     if (d === 0) {
-      // Hunting their Nexus king is the main plan
       score -= 200 + king.nexusTurnCount * 2_800;
       if (kingAssassinable(state, opp)) {
-        score += 15_000; // one capture from winning
+        score += 15_000;
       } else {
         const pressure = attackCount(state, oppKing, perspective);
         score += pressure * 420;
@@ -336,8 +257,13 @@ function scoreMove(state: GameState, move: Move, perspective: Color): number {
   // Instant win
   if (target && target.kind === "K" && isInNexus(move.to)) return 1_000_000;
 
+  // Classical MVV-LVA + SEE — avoid obviously losing captures
   if (target && target.kind !== "K") {
-    score += PIECE_VALUE[target.kind] * 12 - PIECE_VALUE[piece.kind];
+    const see = seeGain(state, move);
+    score += see * 8 + PIECE_VALUE[target.kind] * 4 - PIECE_VALUE[piece.kind];
+    if (see < 0) score -= 600; // deprioritize poisoned captures
+  } else if (!target) {
+    // Quiet move: slight preference for developing / PST-improving squares via nexus pull
   }
 
   // Deliver or prepare assassination on their Nexus king
@@ -544,7 +470,16 @@ function quiesce(
   }
 
   const s = toMovePhase(state);
-  const moves = orderedMoves(s, 12).filter((m) => isTacticalMove(s, m));
+  const moves = orderedMoves(s, 12).filter((m) => {
+    if (!isTacticalMove(s, m)) return false;
+    // Skip clearly losing exchanges in quiescence (keep assassination / checks-to-nexus)
+    if (s.board.has(m.to)) {
+      const t = s.board.get(m.to)!;
+      if (t.kind === "K" && isInNexus(m.to)) return true;
+      if (seeGain(s, m) < -50) return false;
+    }
+    return true;
+  });
   if (moves.length === 0) return standPat;
 
   if (maximizing) {
