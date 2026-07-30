@@ -117,4 +117,16 @@ export const SFX_CATALOG = [
     duration: 1.2,
     text: "Clear close-mic recording of an adult woman laughing: bright playful giggle hee-hee, teasing and warm, mature female voice, loud and distinct, short natural laugh, no words, no music, no ambience, dry studio",
   },
+  {
+    id: "hell-yeah",
+    file: "hell-yeah.mp3",
+    duration: 1.4,
+    text: "Adult woman excitedly shouting the words Hell yeah, clear spoken English, triumphant hype celebration, close microphone, energetic and punchy, no music no ambience, dry studio",
+  },
+  {
+    id: "noice",
+    file: "noice.mp3",
+    duration: 0.9,
+    text: "Adult woman saying the word Noice in a cool satisfied voice, clear spoken English slang for nice, playful and chill, close microphone, short, no music no ambience, dry studio",
+  },
 ];

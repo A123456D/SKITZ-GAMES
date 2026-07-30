@@ -604,6 +604,8 @@ export function drawPlay(
     planeFrom?: { c: number; r: number } | null;
     popFx: { x: number; y: number; t: number } | null;
     oopsFx?: { x: number; y: number; t: number } | null;
+    noiceFx?: { x: number; y: number; t: number } | null;
+    winFx?: { t: number } | null;
     time: number;
   },
 ): void {
@@ -889,6 +891,25 @@ export function drawPlay(
     ctx.restore();
   }
 
+  if (opts.noiceFx && opts.noiceFx.t < 1) {
+    const t = opts.noiceFx.t;
+    const alpha = t < 0.12 ? t / 0.12 : t > 0.7 ? Math.max(0, (1 - t) / 0.3) : 1;
+    const pop = 1 + Math.sin(Math.min(1, t * 4) * Math.PI) * 0.18;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(opts.noiceFx.x, opts.noiceFx.y - t * 64);
+    ctx.scale(pop, pop);
+    ctx.fillStyle = Palette.lime;
+    ctx.strokeStyle = Palette.ink;
+    ctx.lineWidth = 6;
+    ctx.font = "800 52px 'Permanent Marker', cursive";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeText("noice!", 0, 0);
+    ctx.fillText("noice!", 0, 0);
+    ctx.restore();
+  }
+
   if (opts.popFx && opts.popFx.t < 1) {
     // stamp handled by particle stampFx; keep a light radial ink rip
     const t = opts.popFx.t;
@@ -978,8 +999,44 @@ export function drawPlay(
   if (session.status === "won" || session.status === "lost") {
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.fillRect(0, 0, W, H);
+
+    if (session.status === "won" && opts.winFx) {
+      const t = Math.min(1, opts.winFx.t);
+      const pulse = 1 + Math.sin(t * Math.PI * 6) * 0.06;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, t * 3) * (t > 0.75 ? (1 - t) / 0.25 : 1);
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2 + t * 4;
+        const rad = 80 + t * 220 + (i % 3) * 28;
+        ctx.fillStyle = i % 2 === 0 ? Palette.hot : Palette.lime;
+        ctx.beginPath();
+        ctx.arc(
+          W / 2 + Math.cos(a) * rad,
+          520 + Math.sin(a) * rad * 0.55,
+          10 + (i % 4) * 3,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(W / 2, 430);
+      ctx.scale(pulse, pulse);
+      ctx.fillStyle = Palette.hot;
+      ctx.strokeStyle = Palette.ink;
+      ctx.lineWidth = 7;
+      ctx.font = "800 56px 'Permanent Marker', cursive";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.strokeText("HELL YEAH!", 0, 0);
+      ctx.fillText("HELL YEAH!", 0, 0);
+      ctx.restore();
+    }
+
     ctx.fillStyle = Palette.paper;
-    roundRect(ctx, 110, 480, 500, 240, 12);
+    roundRect(ctx, 110, session.status === "won" ? 500 : 480, 500, 240, 12);
     ctx.fill();
     ctx.fillStyle = Palette.ink;
     ctx.font = "800 48px 'Permanent Marker', cursive";
@@ -987,10 +1044,10 @@ export function drawPlay(
     ctx.fillText(
       session.status === "won" ? "CLEARED!" : "OUT OF MOVES",
       W / 2,
-      560,
+      session.status === "won" ? 580 : 560,
     );
     ctx.font = "800 26px 'Chakra Petch', sans-serif";
-    ctx.fillText("TAP FOR MAP", W / 2, 640);
+    ctx.fillText("TAP FOR MAP", W / 2, session.status === "won" ? 660 : 640);
   }
 }
 

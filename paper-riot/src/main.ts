@@ -108,6 +108,8 @@ let needsPaint = true;
 let burstResolve: (() => void) | null = null;
 let popFx: { x: number; y: number; t: number; started: number } | null = null;
 let oopsFx: { x: number; y: number; t: number; started: number } | null = null;
+let noiceFx: { x: number; y: number; t: number; started: number } | null = null;
+let winFx: { t: number; started: number } | null = null;
 let lastTs = 0;
 let animTime = 0;
 let hoverBtn: string | null = null;
@@ -186,6 +188,8 @@ function paint(): void {
     planeFrom,
     popFx: popFx ? { x: popFx.x, y: popFx.y, t: popFx.t } : null,
     oopsFx: oopsFx ? { x: oopsFx.x, y: oopsFx.y, t: oopsFx.t } : null,
+    noiceFx: noiceFx ? { x: noiceFx.x, y: noiceFx.y, t: noiceFx.t } : null,
+    winFx: winFx ? { t: winFx.t } : null,
     time: animTime,
   });
 }
@@ -201,7 +205,9 @@ function isAnimating(): boolean {
     hasParticles() ||
     motionBusy() ||
     (popFx != null && popFx.t < 1) ||
-    (oopsFx != null && oopsFx.t < 1)
+    (oopsFx != null && oopsFx.t < 1) ||
+    (noiceFx != null && noiceFx.t < 1) ||
+    (winFx != null && winFx.t < 1)
   );
 }
 
@@ -242,6 +248,14 @@ function tick(ts: number): void {
   if (oopsFx) {
     oopsFx.t = (ts - oopsFx.started) / 700;
     if (oopsFx.t >= 1) oopsFx = null;
+  }
+  if (noiceFx) {
+    noiceFx.t = (ts - noiceFx.started) / 900;
+    if (noiceFx.t >= 1) noiceFx = null;
+  }
+  if (winFx) {
+    winFx.t = (ts - winFx.started) / 1600;
+    if (winFx.t >= 1) winFx = null;
   }
   if (updateParticles(dt)) markDirty();
   if (updateMotion(dt)) markDirty();
@@ -304,8 +318,29 @@ function countAllObstacles(): number {
 }
 
 function playEndSting(): void {
-  if (session.status === "won") playSfx("win", { vary: false });
-  else if (session.status === "lost") playSfx("lose", { vary: false });
+  if (session.status === "won") {
+    playSfx("win", { vary: false, volume: 0.75 });
+    void ensureSfx("hell-yeah").then((ok) => {
+      if (ok) playSfx("hell-yeah", { vary: false, volume: 1.25 });
+    });
+    winFx = { t: 0, started: performance.now() };
+    const layout = boardLayout();
+    for (let i = 0; i < 8; i++) {
+      const c = 1 + (i % 5);
+      const r = 2 + Math.floor(i / 5) * 3;
+      const mid = cellCenter(layout, c, r);
+      burstAt(mid.x, mid.y, 10, i % 2 === 0 ? "star" : "confetti");
+      stampFx(mid.x, mid.y, i % 2 === 0 ? "star" : "bomb");
+    }
+    popFx = {
+      x: W / 2,
+      y: H * 0.42,
+      t: 0,
+      started: performance.now(),
+    };
+  } else if (session.status === "lost") {
+    playSfx("lose", { vary: false });
+  }
 }
 
 function recordWinIfCleared(): void {
@@ -364,7 +399,30 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
     if (!groups.length) break;
     const keys = groups.flatMap((g) => g.cells.map((p) => `${p.c},${p.r}`));
     const hint = groups[0]?.kind;
-    playSfx(wave === 0 ? "match" : "cascade");
+    if (wave === 0) {
+      playSfx("match");
+    } else {
+      playSfx("cascade");
+      const layout = boardLayout();
+      let sx = 0;
+      let sy = 0;
+      for (const key of keys) {
+        const [c, r] = key.split(",").map(Number);
+        const mid = cellCenter(layout, c!, r!);
+        sx += mid.x;
+        sy += mid.y;
+      }
+      const n = Math.max(1, keys.length);
+      noiceFx = {
+        x: sx / n,
+        y: sy / n - 24,
+        t: 0,
+        started: performance.now(),
+      };
+      void ensureSfx("noice").then((ok) => {
+        if (ok) playSfx("noice", { vary: false, volume: 1.2 });
+      });
+    }
     const beforeObs = countAllObstacles();
     await playMatchBurst(keys, hint);
     crushWave(session, groups);

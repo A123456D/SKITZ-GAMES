@@ -19,7 +19,9 @@ export type SfxId =
   | "win"
   | "lose"
   | "mute-on"
-  | "oops";
+  | "oops"
+  | "hell-yeah"
+  | "noice";
 
 const FILES: Record<SfxId, string> = {
   "ui-tap": "ui-tap.mp3",
@@ -41,11 +43,13 @@ const FILES: Record<SfxId, string> = {
   lose: "lose.mp3",
   "mute-on": "mute-on.mp3",
   oops: "oops.mp3",
+  "hell-yeah": "hell-yeah.mp3",
+  noice: "noice.mp3",
 };
 
 const MUTE_KEY = "paper-riot-muted";
 /** Bump when regenerating mp3s so clients skip stale cache. */
-const SFX_VERSION = 7;
+const SFX_VERSION = 8;
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
