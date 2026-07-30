@@ -55,7 +55,6 @@ export function shapeMask(id: BoardShapeId): BoardMask {
     }
     case "heart": {
       const m = full(false);
-      // Rough heart using two lobes + point
       for (let c = 0; c < COLS; c++) {
         for (let r = 0; r < ROWS; r++) {
           const x = (c - 3) / 3;
@@ -94,6 +93,56 @@ export function shapeMask(id: BoardShapeId): BoardMask {
       }
       for (let c = 0; c < 2; c++) {
         for (let r = ROWS - 3; r < ROWS; r++) m[c]![r] = false;
+      }
+      return m;
+    }
+    case "lanes": {
+      // Three vertical lanes — hallway lockers feel
+      const m = full(false);
+      for (const c of [1, 3, 5]) {
+        for (let r = 0; r < ROWS; r++) m[c]![r] = true;
+      }
+      for (let c = 0; c < COLS; c++) {
+        m[c]![2] = true;
+        m[c]![6] = true;
+      }
+      return m;
+    }
+    case "corners": {
+      const m = full(false);
+      for (let c = 0; c < 3; c++) {
+        for (let r = 0; r < 3; r++) {
+          m[c]![r] = true;
+          m[COLS - 1 - c]![r] = true;
+          m[c]![ROWS - 1 - r] = true;
+          m[COLS - 1 - c]![ROWS - 1 - r] = true;
+        }
+      }
+      for (let c = 2; c <= 4; c++) {
+        for (let r = 3; r <= 5; r++) m[c]![r] = true;
+      }
+      return m;
+    }
+    case "hourglass": {
+      const m = full(false);
+      for (let r = 0; r < ROWS; r++) {
+        const t = r / (ROWS - 1);
+        const half = t < 0.5 ? 3 - Math.floor(t * 4) : Math.floor((t - 0.5) * 4) + 1;
+        const c0 = Math.floor((COLS - (half * 2 + 1)) / 2);
+        for (let c = c0; c < c0 + half * 2 + 1; c++) {
+          if (c >= 0 && c < COLS) m[c]![r] = true;
+        }
+      }
+      return m;
+    }
+    case "rift": {
+      // Torn middle gap — yard fence gap
+      const m = rect(7, 9);
+      for (let r = 3; r <= 5; r++) {
+        m[3]![r] = false;
+      }
+      for (let c = 2; c <= 4; c++) {
+        m[c]![4] = false;
       }
       return m;
     }

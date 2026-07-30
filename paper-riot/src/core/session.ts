@@ -6,69 +6,105 @@ import {
   crushAndRefill,
   damageAdjacentObstacles,
   findMatches,
-  inBounds,
   isPlayable,
   swapCells,
   swapCreatesMatch,
   canSwapCell,
 } from "./board";
+import { countObstacles } from "./obstacles";
 import { getLevel } from "./levels";
 import type {
-  Board,
-  BoardMask,
   Goal,
+  GoalDef,
   LevelDef,
   MatchGroup,
   Pos,
   PowerInventory,
   PowerUpKind,
 } from "./types";
-import { COLS, ROWS } from "./types";
+import { COLS, ROWS, POWERUP_KINDS } from "./types";
 
 export type SessionStatus = "playing" | "won" | "lost";
 
 export type Session = {
   level: LevelDef;
-  board: Board;
-  mask: BoardMask;
+  board: ReturnType<typeof createBoard>["board"];
+  mask: ReturnType<typeof createBoard>["mask"];
   movesLeft: number;
   goals: Goal[];
   status: SessionStatus;
   score: number;
   powers: PowerInventory;
+  /** Snapshot of obstacle counts at level start for clear goals. */
+  obstacleBaseline: Record<string, number>;
 };
 
 export function emptyPowers(): PowerInventory {
   return {
-    bomb: 2,
-    plane: 2,
-    magnet: 1,
-    rocket: 2,
-    stapler: 1,
-    disco: 1,
+    bomb: 0,
+    plane: 0,
+    magnet: 0,
+    rocket: 0,
+    stapler: 0,
+    disco: 0,
   };
+}
+
+function hydrateGoals(defs: GoalDef[]): Goal[] {
+  return defs.map((g) =>
+    g.type === "collect"
+      ? { type: "collect", kind: g.kind, need: g.need, have: 0 }
+      : { type: "clear", obstacle: g.obstacle, need: g.need, have: 0 },
+  );
+}
+
+function powersFromLevel(def: LevelDef): PowerInventory {
+  const p = emptyPowers();
+  for (const k of POWERUP_KINDS) {
+    p[k] = def.powers[k] ?? 0;
+  }
+  return p;
 }
 
 export function startSession(level: LevelDef | number = 1): Session {
   const def = typeof level === "number" ? getLevel(level) : level;
   const { board, mask } = createBoard(def.shape, {
     colors: def.colors,
-    obstacles: def.obstacles,
+    obstaclePlan: def.obstaclePlan,
   });
+  const baseline: Record<string, number> = {
+    any: countObstacles(board, mask, "any"),
+  };
+  for (const g of def.goals) {
+    if (g.type === "clear" && g.obstacle !== "any") {
+      baseline[g.obstacle] = countObstacles(board, mask, g.obstacle);
+    }
+  }
   return {
     level: def,
     board,
     mask,
     movesLeft: def.moves,
-    goals: def.goals.map((g) => ({ ...g, have: 0 })),
+    goals: hydrateGoals(def.goals),
     status: "playing",
     score: 0,
-    powers: emptyPowers(),
+    powers: powersFromLevel(def),
+    obstacleBaseline: baseline,
   };
+}
+
+function syncClearGoals(session: Session): void {
+  for (const goal of session.goals) {
+    if (goal.type !== "clear") continue;
+    const start = session.obstacleBaseline[goal.obstacle] ?? goal.need;
+    const left = countObstacles(session.board, session.mask, goal.obstacle);
+    goal.have = Math.min(goal.need, Math.max(0, start - left));
+  }
 }
 
 function applyGoalProgress(session: Session, groups: MatchGroup[]): void {
   for (const goal of session.goals) {
+    if (goal.type !== "collect") continue;
     goal.have = Math.min(goal.need, goal.have + countKind(groups, goal.kind));
   }
 }
@@ -78,7 +114,7 @@ function applyGoalTiles(session: Session, positions: Pos[]): void {
     const cell = session.board[p.c]?.[p.r];
     if (!cell) continue;
     for (const goal of session.goals) {
-      if (goal.kind === cell.kind) {
+      if (goal.type === "collect" && goal.kind === cell.kind) {
         goal.have = Math.min(goal.need, goal.have + 1);
       }
     }
@@ -86,6 +122,7 @@ function applyGoalTiles(session: Session, positions: Pos[]): void {
 }
 
 function checkEnd(session: Session): void {
+  syncClearGoals(session);
   if (session.goals.every((g) => g.have >= g.need)) {
     session.status = "won";
     return;
@@ -182,7 +219,7 @@ export function usePower(
     add(target.c, target.r);
     let n = 0;
     let guard = 0;
-    while (n < 8 && guard++ < 80) {
+    while (n < 10 && guard++ < 100) {
       const c = Math.floor(Math.random() * COLS);
       const r = Math.floor(Math.random() * ROWS);
       const before = cleared.length;
@@ -205,6 +242,7 @@ export function usePower(
     }
     session.powers[kind] -= 1;
     session.movesLeft -= 1;
+    syncClearGoals(session);
     resolveCascades(session);
     return { ok: true, cleared };
   }
@@ -226,6 +264,7 @@ export function usePower(
   session.score += n * 15;
   session.powers[kind] -= 1;
   session.movesLeft -= 1;
+  syncClearGoals(session);
   resolveCascades(session);
   return { ok: true, cleared };
 }

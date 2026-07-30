@@ -1,4 +1,4 @@
-const VERSION = 6;
+const VERSION = 7;
 const cache = new Map<string, HTMLImageElement>();
 let loadPromise: Promise<void> | null = null;
 
@@ -68,6 +68,7 @@ export function loadGameArt(): Promise<void> {
     ["bg-map.png", "ui:bg-map"],
     ["btn-play.png", "ui:btn-play"],
     ["btn-paper.png", "ui:btn-paper"],
+    ["board-plate.png", "ui:board-plate"],
   ] as const) {
     jobs.push(loadOne(`./ui/${file}`, key));
   }

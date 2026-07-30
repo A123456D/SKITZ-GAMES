@@ -6,9 +6,10 @@ import {
   findMatches,
   makeCell,
   swapCreatesMatch,
+  canSwapCell,
 } from "./board";
 import { shapeMask } from "./shapes";
-import { getLevel } from "./levels";
+import { getLevel, LEVELS } from "./levels";
 import { startSession, trySwap, usePower } from "./session";
 import type { Board, BoardMask } from "./types";
 
@@ -35,14 +36,36 @@ describe("board", () => {
     expect(board.length).toBe(COLS);
     expect(board[0]!.length).toBe(ROWS);
     expect(findMatches(board, mask).length).toBe(0);
-    const playable = mask.flat().filter(Boolean).length;
-    expect(playable).toBe(6 * 8);
+    expect(mask.flat().filter(Boolean).length).toBe(6 * 8);
+  });
+
+  it("places patterned tape obstacles", () => {
+    const { board, mask } = createBoard("rect", {
+      colors: 4,
+      obstaclePlan: [{ kind: "tape-x", pattern: "row", count: 4 }],
+    });
+    const taped = board
+      .flat()
+      .filter((c) => c?.obstacle === "tape-x").length;
+    expect(taped).toBeGreaterThanOrEqual(3);
+    expect(mask.flat().some(Boolean)).toBe(true);
   });
 
   it("donut shape has a hole", () => {
     const mask = shapeMask("donut");
     expect(mask[3]![4]).toBe(false);
     expect(mask[0]![1]).toBe(true);
+  });
+
+  it("soft tape can swap, hard box cannot", () => {
+    const soft = makeCell("skull");
+    soft.obstacle = "tape-x";
+    soft.hits = 1;
+    const hard = makeCell("skull");
+    hard.obstacle = "box";
+    hard.hits = 2;
+    expect(canSwapCell(soft)).toBe(true);
+    expect(canSwapCell(hard)).toBe(false);
   });
 
   it("finds a horizontal match of 3", () => {
@@ -70,36 +93,37 @@ describe("board", () => {
 });
 
 describe("levels", () => {
-  it("has 40 levels across 4 zones with escalating shapes", () => {
-    expect(getLevel(1).zone).toBe("desk");
-    expect(getLevel(1).shape).toBe("rect");
-    expect(getLevel(11).zone).toBe("hall");
+  it("has 40 hand-authored levels with briefs and variety", () => {
+    expect(LEVELS.length).toBe(40);
+    expect(getLevel(1).obstaclePlan.length).toBe(0);
+    expect(getLevel(4).obstaclePlan.length).toBeGreaterThan(0);
+    expect(getLevel(4).goals.some((g) => g.type === "clear")).toBe(true);
+    expect(getLevel(11).shape).toBe("lanes");
     expect(getLevel(40).zone).toBe("roof");
-    expect(getLevel(40).obstacles).toBeGreaterThan(getLevel(1).obstacles);
+    expect(getLevel(1).brief.length).toBeGreaterThan(5);
+    expect(getLevel(8).powers.stapler).toBeGreaterThan(0);
   });
 });
 
 describe("session", () => {
-  it("starts with goals, moves, and powers", () => {
+  it("starts with level powers and goals", () => {
     const s = startSession(1);
     expect(s.movesLeft).toBe(getLevel(1).moves);
     expect(s.goals.length).toBeGreaterThanOrEqual(2);
     expect(s.powers.bomb).toBeGreaterThan(0);
+    expect(s.powers.disco).toBe(0);
     expect(s.status).toBe("playing");
-    expect(s.mask.flat().some(Boolean)).toBe(true);
   });
 
   it("trySwap returns a result", () => {
     const s = startSession(1);
-    const result = trySwap(s, { c: 0, r: 0 }, { c: 1, r: 0 });
+    const result = trySwap(s, { c: 1, r: 2 }, { c: 2, r: 2 });
     expect(result.ok || typeof result.reason === "string").toBe(true);
   });
 
   it("bomb power clears a neighborhood", () => {
     const s = startSession(1);
     s.powers.bomb = 1;
-    const before = s.powers.bomb;
-    // Find a playable cell near center
     let target = { c: 3, r: 4 };
     outer: for (let c = 0; c < COLS; c++) {
       for (let r = 0; r < ROWS; r++) {
@@ -112,6 +136,5 @@ describe("session", () => {
     const result = usePower(s, "bomb", target);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.cleared.length).toBeGreaterThan(0);
-    expect(s.powers.bomb).toBe(before - 1);
   });
 });

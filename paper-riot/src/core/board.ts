@@ -1,20 +1,20 @@
 import { shapeMask } from "./shapes";
+import { canSwapCell, placeObstaclePlan } from "./obstacles";
 import {
   COLS,
   ROWS,
   TILE_KINDS,
-  OBSTACLE_HITS,
   type Board,
   type BoardMask,
   type BoardShapeId,
   type Cell,
   type MatchGroup,
-  type ObstacleKind,
+  type ObstacleSpec,
   type Pos,
   type TileKind,
 } from "./types";
 
-export { COLS, ROWS, TILE_KINDS };
+export { COLS, ROWS, TILE_KINDS, canSwapCell };
 
 let nextId = 1;
 
@@ -52,7 +52,7 @@ export function cloneBoard(board: Board): Board {
 
 export function createBoard(
   shape: BoardShapeId,
-  opts: { colors?: number; obstacles?: number } = {},
+  opts: { colors?: number; obstaclePlan?: ObstacleSpec[] } = {},
 ): { board: Board; mask: BoardMask } {
   const colors = opts.colors ?? 5;
   const mask = shapeMask(shape);
@@ -78,51 +78,14 @@ export function createBoard(
     }
   }
 
-  if ((opts.obstacles ?? 0) > 0) {
-    sprinkleObstacles(board, mask, opts.obstacles!);
+  if (opts.obstaclePlan?.length) {
+    placeObstaclePlan(board, mask, opts.obstaclePlan);
   }
   return { board, mask };
 }
 
-const SPAWN_OBSTACLES: ObstacleKind[] = [
-  "tape-x",
-  "tape-black",
-  "box",
-  "tar",
-  "glue",
-  "lock",
-  "wet",
-];
-
-export function sprinkleObstacles(
-  board: Board,
-  mask: BoardMask,
-  count: number,
-): void {
-  let placed = 0;
-  let guard = 0;
-  while (placed < count && guard++ < 400) {
-    const c = Math.floor(Math.random() * COLS);
-    const r = Math.floor(Math.random() * ROWS);
-    if (!mask[c]![r]) continue;
-    const cell = board[c]![r];
-    if (!cell || cell.obstacle) continue;
-    if (r < 2) continue;
-    const kind = SPAWN_OBSTACLES[placed % SPAWN_OBSTACLES.length]!;
-    cell.obstacle = kind;
-    cell.hits = OBSTACLE_HITS[kind];
-    placed++;
-  }
-}
-
 export function areAdjacent(a: Pos, b: Pos): boolean {
   return Math.abs(a.c - b.c) + Math.abs(a.r - b.r) === 1;
-}
-
-export function canSwapCell(cell: Cell | null): boolean {
-  if (!cell) return false;
-  if (!cell.obstacle) return true;
-  return cell.obstacle === "glue" || cell.obstacle === "wet" || cell.obstacle === "tar";
 }
 
 export function swapCells(board: Board, a: Pos, b: Pos): void {

@@ -361,7 +361,7 @@ function onTap(x: number, y: number): void {
     return;
   }
 
-  const powerHit = hitPowerDock(x, y);
+  const powerHit = hitPowerDock(x, y, session.level.id);
   if (powerHit) {
     if ((session.powers[powerHit] ?? 0) <= 0) return;
     armedPower = armedPower === powerHit ? null : powerHit;
