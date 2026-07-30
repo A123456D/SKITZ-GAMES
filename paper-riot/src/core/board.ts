@@ -2,9 +2,11 @@ import {
   COLS,
   ROWS,
   TILE_KINDS,
+  OBSTACLE_HITS,
   type Board,
   type Cell,
   type MatchGroup,
+  type ObstacleKind,
   type Pos,
   type TileKind,
 } from "./types";
@@ -33,11 +35,14 @@ export function inBounds(c: number, r: number): boolean {
 }
 
 export function cloneBoard(board: Board): Board {
-  return board.map((col) => col.map((cell) => ({ ...cell })));
+  return board.map((col) =>
+    col.map((cell) => ({
+      ...cell,
+    })),
+  );
 }
 
-/** Board stored as columns[c][r] with r=0 at top. */
-export function createBoard(): Board {
+export function createBoard(obstacleCount = 0): Board {
   const board: Board = [];
   for (let c = 0; c < COLS; c++) {
     const col: Cell[] = [];
@@ -57,11 +62,46 @@ export function createBoard(): Board {
     }
     board.push(col);
   }
+
+  if (obstacleCount > 0) sprinkleObstacles(board, obstacleCount);
   return board;
+}
+
+const SPAWN_OBSTACLES: ObstacleKind[] = [
+  "tape-x",
+  "tape-black",
+  "box",
+  "tar",
+  "glue",
+  "lock",
+  "wet",
+];
+
+export function sprinkleObstacles(board: Board, count: number): void {
+  let placed = 0;
+  let guard = 0;
+  while (placed < count && guard++ < 200) {
+    const c = Math.floor(Math.random() * COLS);
+    const r = Math.floor(Math.random() * ROWS);
+    const cell = board[c]![r]!;
+    if (cell.obstacle) continue;
+    // Keep top rows freer for cascading readability.
+    if (r < 2) continue;
+    const kind = SPAWN_OBSTACLES[placed % SPAWN_OBSTACLES.length]!;
+    cell.obstacle = kind;
+    cell.hits = OBSTACLE_HITS[kind];
+    placed++;
+  }
 }
 
 export function areAdjacent(a: Pos, b: Pos): boolean {
   return Math.abs(a.c - b.c) + Math.abs(a.r - b.r) === 1;
+}
+
+export function canSwapCell(cell: Cell): boolean {
+  // Locked / taped / boxed tiles cannot be swapped until cleared.
+  if (!cell.obstacle) return true;
+  return cell.obstacle === "glue" || cell.obstacle === "wet" || cell.obstacle === "tar";
 }
 
 export function swapCells(board: Board, a: Pos, b: Pos): void {
@@ -77,7 +117,10 @@ export function findMatches(board: Board): MatchGroup[] {
     let run = 1;
     for (let c = 1; c <= COLS; c++) {
       const same =
-        c < COLS && board[c]![r]!.kind === board[c - 1]![r]!.kind;
+        c < COLS &&
+        board[c]![r]!.kind === board[c - 1]![r]!.kind &&
+        !board[c]![r]!.obstacle &&
+        !board[c - 1]![r]!.obstacle;
       if (same) {
         run++;
         continue;
@@ -96,7 +139,10 @@ export function findMatches(board: Board): MatchGroup[] {
     let run = 1;
     for (let r = 1; r <= ROWS; r++) {
       const same =
-        r < ROWS && board[c]![r]!.kind === board[c]![r - 1]!.kind;
+        r < ROWS &&
+        board[c]![r]!.kind === board[c]![r - 1]!.kind &&
+        !board[c]![r]!.obstacle &&
+        !board[c]![r - 1]!.obstacle;
       if (same) {
         run++;
         continue;
@@ -127,13 +173,60 @@ export function findMatches(board: Board): MatchGroup[] {
   return groups;
 }
 
-/** Remove matched cells and collapse columns; returns cleared count. */
+/** Damage obstacles neighboring matched cells. */
+export function damageAdjacentObstacles(board: Board, groups: MatchGroup[]): Pos[] {
+  const matched = new Set(groups.flatMap((g) => g.cells.map((p) => `${p.c},${p.r}`)));
+  const cleared: Pos[] = [];
+  const seen = new Set<string>();
+  for (const key of matched) {
+    const [cs, rs] = key.split(",").map(Number);
+    for (const [dc, dr] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const c = cs! + dc;
+      const r = rs! + dr;
+      if (!inBounds(c, r)) continue;
+      const k = `${c},${r}`;
+      if (seen.has(k) || matched.has(k)) continue;
+      seen.add(k);
+      const cell = board[c]![r]!;
+      if (!cell.obstacle) continue;
+      cell.hits = (cell.hits ?? 1) - 1;
+      if ((cell.hits ?? 0) <= 0) {
+        delete cell.obstacle;
+        delete cell.hits;
+        cleared.push({ c, r });
+      }
+    }
+  }
+  return cleared;
+}
+
 export function crushAndRefill(board: Board, groups: MatchGroup[]): number {
   const dead = new Set<string>();
   for (const g of groups) {
     for (const p of g.cells) dead.add(`${p.c},${p.r}`);
   }
 
+  for (let c = 0; c < COLS; c++) {
+    const kept: Cell[] = [];
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (!dead.has(`${c},${r}`)) kept.push(board[c]![r]!);
+    }
+    const missing = ROWS - kept.length;
+    const col: Cell[] = [];
+    for (let i = 0; i < missing; i++) col.push(makeCell());
+    for (let i = kept.length - 1; i >= 0; i--) col.push(kept[i]!);
+    board[c] = col;
+  }
+  return dead.size;
+}
+
+export function clearPositions(board: Board, positions: Pos[]): number {
+  const dead = new Set(positions.map((p) => `${p.c},${p.r}`));
   for (let c = 0; c < COLS; c++) {
     const kept: Cell[] = [];
     for (let r = ROWS - 1; r >= 0; r--) {
@@ -168,6 +261,9 @@ export function hasAnyMatch(board: Board): boolean {
 }
 
 export function swapCreatesMatch(board: Board, a: Pos, b: Pos): boolean {
+  const ca = board[a.c]![a.r]!;
+  const cb = board[b.c]![b.r]!;
+  if (!canSwapCell(ca) || !canSwapCell(cb)) return false;
   const copy = cloneBoard(board);
   swapCells(copy, a, b);
   return hasAnyMatch(copy);

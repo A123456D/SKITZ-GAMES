@@ -4,9 +4,10 @@ import {
   crushWave,
   currentMatches,
   startSession,
+  usePower,
   type Session,
 } from "./core/session";
-import type { Pos } from "./core/types";
+import type { Pos, PowerUpKind } from "./core/types";
 import {
   W,
   H,
@@ -14,11 +15,18 @@ import {
   PAUSE_BTN,
   boardLayout,
   cellAt,
+  cellCenter,
   drawHome,
   drawPlay,
+  hitPowerDock,
   hitUi,
 } from "./view/draw";
-import { loadStickers } from "./view/stickers";
+import {
+  burstAt,
+  hasParticles,
+  updateParticles,
+} from "./view/particles";
+import { loadGameArt } from "./view/stickers";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
@@ -27,12 +35,15 @@ type Screen = "home" | "play";
 let screen: Screen = "home";
 let session: Session = startSession();
 let selected: Pos | null = null;
+let armedPower: PowerUpKind | null = null;
 let busy = false;
 let clearing = new Set<string>();
 let burstT = 0;
 let burstStarted = 0;
 let needsPaint = true;
 let burstResolve: (() => void) | null = null;
+let popFx: { x: number; y: number; t: number; started: number } | null = null;
+let lastTs = 0;
 
 function markDirty(): void {
   needsPaint = true;
@@ -72,14 +83,25 @@ function paint(): void {
     drawHome(ctx);
     return;
   }
-  drawPlay(ctx, session, { selected, clearing, burstT });
+  drawPlay(ctx, session, {
+    selected,
+    clearing,
+    burstT,
+    armedPower,
+    popFx: popFx
+      ? { x: popFx.x, y: popFx.y, t: popFx.t }
+      : null,
+  });
 }
 
 function isAnimating(): boolean {
-  return busy || burstT > 0;
+  return busy || burstT > 0 || hasParticles() || (popFx != null && popFx.t < 1);
 }
 
 function tick(ts: number): void {
+  const dt = lastTs ? Math.min(0.05, (ts - lastTs) / 1000) : 0.016;
+  lastTs = ts;
+
   if (burstStarted) {
     burstT = (ts - burstStarted) / 280;
     if (burstT >= 1) {
@@ -91,6 +113,12 @@ function tick(ts: number): void {
       done?.();
     }
   }
+  if (popFx) {
+    popFx.t = (ts - popFx.started) / 420;
+    if (popFx.t >= 1) popFx = null;
+  }
+  if (updateParticles(dt)) markDirty();
+
   if (needsPaint || isAnimating()) {
     paint();
     needsPaint = isAnimating();
@@ -104,6 +132,17 @@ function playMatchBurst(keys: string[]): Promise<void> {
     clearing = new Set(keys);
     burstStarted = performance.now();
     burstT = 0.01;
+    const layout = boardLayout();
+    for (const key of keys) {
+      const [c, r] = key.split(",").map(Number);
+      const center = cellCenter(layout, c!, r!);
+      burstAt(center.x, center.y, 6);
+    }
+    if (keys.length) {
+      const [c0, r0] = keys[0]!.split(",").map(Number);
+      const mid = cellCenter(layout, c0!, r0!);
+      popFx = { x: mid.x, y: mid.y, t: 0, started: performance.now() };
+    }
     burstResolve = () => {
       busy = false;
       resolve();
@@ -131,11 +170,24 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
   markDirty();
 }
 
+async function handlePower(kind: PowerUpKind, target: Pos): Promise<void> {
+  if (busy) return;
+  const result = usePower(session, kind, target);
+  armedPower = null;
+  selected = null;
+  markDirty();
+  if (!result.ok) return;
+  const keys = result.cleared.map((p) => `${p.c},${p.r}`);
+  await playMatchBurst(keys);
+  markDirty();
+}
+
 function onTap(x: number, y: number): void {
   if (screen === "home") {
     if (hitUi(HOME_PLAY, x, y)) {
       session = startSession();
       selected = null;
+      armedPower = null;
       screen = "play";
       markDirty();
     }
@@ -150,6 +202,16 @@ function onTap(x: number, y: number): void {
 
   if (hitUi(PAUSE_BTN, x, y)) {
     screen = "home";
+    armedPower = null;
+    markDirty();
+    return;
+  }
+
+  const powerHit = hitPowerDock(x, y);
+  if (powerHit) {
+    if ((session.powers[powerHit] ?? 0) <= 0) return;
+    armedPower = armedPower === powerHit ? null : powerHit;
+    selected = null;
     markDirty();
     return;
   }
@@ -160,6 +222,11 @@ function onTap(x: number, y: number): void {
   if (!hit) {
     selected = null;
     markDirty();
+    return;
+  }
+
+  if (armedPower) {
+    void handlePower(armedPower, hit);
     return;
   }
 
@@ -204,7 +271,7 @@ async function boot(): Promise<void> {
   resize();
   markDirty();
   requestAnimationFrame(tick);
-  await loadStickers();
+  await loadGameArt();
   markDirty();
 }
 

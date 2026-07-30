@@ -7,8 +7,8 @@ import {
   makeCell,
   swapCreatesMatch,
 } from "./board";
-import { startSession, trySwap } from "./session";
-import type { Board, TileKind } from "./types";
+import { startSession, trySwap, usePower } from "./session";
+import type { Board } from "./types";
 
 function fillChecker(): Board {
   const board: Board = [];
@@ -50,16 +50,27 @@ describe("board", () => {
 });
 
 describe("session", () => {
-  it("starts with goals and moves", () => {
+  it("starts with goals, moves, and powers", () => {
     const s = startSession();
-    expect(s.movesLeft).toBe(24);
+    expect(s.movesLeft).toBe(28);
     expect(s.goals.length).toBe(3);
+    expect(s.powers.bomb).toBeGreaterThan(0);
     expect(s.status).toBe("playing");
   });
 
   it("trySwap returns a result", () => {
     const s = startSession();
     const result = trySwap(s, { c: 0, r: 0 }, { c: 1, r: 0 });
-    expect(result.ok || result.reason === "no-match").toBe(true);
+    expect(result.ok || typeof result.reason === "string").toBe(true);
+  });
+
+  it("bomb power clears a neighborhood", () => {
+    const s = startSession();
+    s.powers.bomb = 1;
+    const before = s.powers.bomb;
+    const result = usePower(s, "bomb", { c: 2, r: 3 });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.cleared.length).toBeGreaterThan(0);
+    expect(s.powers.bomb).toBe(before - 1);
   });
 });

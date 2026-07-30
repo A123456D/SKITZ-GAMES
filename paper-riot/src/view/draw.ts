@@ -1,7 +1,8 @@
-import { COLS, ROWS, type TileKind } from "../core/types";
+import { COLS, ROWS, POWERUP_KINDS, type PowerUpKind, type TileKind } from "../core/types";
 import type { Session } from "../core/session";
-import { stickerImage } from "./stickers";
+import { fxImage, obstacleImage, powerImage, stickerImage } from "./stickers";
 import { Palette } from "./theme";
+import { drawParticles } from "./particles";
 
 export const W = 720;
 export const H = 1280;
@@ -15,6 +16,21 @@ export const HOME_COLLECTION: UiRect = { x: 110, y: 704, w: 500, h: 72 };
 export const HOME_SETTINGS: UiRect = { x: 110, y: 792, w: 500, h: 72 };
 
 export const PAUSE_BTN: UiRect = { x: 620, y: 36, w: 64, h: 64 };
+
+/** Docked power-up slots along the bottom. */
+export const POWER_DOCK: { kind: PowerUpKind; rect: UiRect }[] = POWERUP_KINDS.map(
+  (kind, i) => ({
+    kind,
+    rect: { x: 48 + i * 112, y: 1110, w: 100, h: 100 },
+  }),
+);
+
+export function hitPowerDock(x: number, y: number): PowerUpKind | null {
+  for (const slot of POWER_DOCK) {
+    if (hitUi(slot.rect, x, y)) return slot.kind;
+  }
+  return null;
+}
 
 export type BoardLayout = {
   x: number;
@@ -265,6 +281,8 @@ export function drawPlay(
     selected: { c: number; r: number } | null;
     clearing: Set<string>;
     burstT: number;
+    armedPower: PowerUpKind | null;
+    popFx: { x: number; y: number; t: number } | null;
   },
 ): void {
   drawBackdrop(ctx);
@@ -337,7 +355,7 @@ export function drawPlay(
     ctx.stroke();
   }
 
-  // Tiles
+  // Tiles + obstacles
   for (let c = 0; c < COLS; c++) {
     for (let r = 0; r < ROWS; r++) {
       const key = `${c},${r}`;
@@ -349,10 +367,32 @@ export function drawPlay(
       drawSticker(ctx, cell.kind, center.x, center.y, layout.cell * 0.86, {
         selected,
       });
+      if (cell.obstacle) {
+        const oimg = obstacleImage(cell.obstacle);
+        const s = layout.cell * 0.92;
+        ctx.save();
+        ctx.shadowColor = Palette.shadow;
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetX = 3;
+        ctx.shadowOffsetY = 5;
+        if (oimg && oimg.complete) {
+          ctx.drawImage(oimg, center.x - s / 2, center.y - s / 2, s, s);
+        } else {
+          ctx.fillStyle = "rgba(0,0,0,0.35)";
+          ctx.fillRect(center.x - s / 2, center.y - s / 2, s, s);
+        }
+        ctx.restore();
+        if ((cell.hits ?? 1) > 1) {
+          ctx.fillStyle = Palette.hot;
+          ctx.font = "800 16px 'Chakra Petch', sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(String(cell.hits), center.x + s * 0.32, center.y - s * 0.28);
+        }
+      }
     }
   }
 
-  // Match burst
+  // Match burst spikes + pop art
   if (opts.burstT > 0 && opts.burstT < 1) {
     for (const key of opts.clearing) {
       const [cs, rs] = key.split(",").map(Number);
@@ -377,20 +417,64 @@ export function drawPlay(
     }
   }
 
-  // Power-up placeholders
-  const powers = ["✈", "💣", "🖌", "🧲"];
-  powers.forEach((p, i) => {
-    const x = 90 + i * 150;
-    const y = 1120;
-    tornPaper(ctx, x, y, 100, 90, Palette.paper);
-    ctx.fillStyle = Palette.ink;
-    ctx.font = "48px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(p, x + 50, y + 40);
+  if (opts.popFx && opts.popFx.t < 1) {
+    const img = fxImage("pop-skull") ?? fxImage("swap-star");
+    const s = 90 + 40 * (1 - opts.popFx.t);
+    ctx.save();
+    ctx.globalAlpha = 1 - opts.popFx.t;
+    ctx.shadowColor = Palette.shadow;
+    ctx.shadowBlur = 14;
+    if (img && img.complete) {
+      ctx.drawImage(
+        img,
+        opts.popFx.x - s / 2,
+        opts.popFx.y - s / 2,
+        s,
+        s,
+      );
+    }
+    ctx.restore();
+  }
+
+  drawParticles(ctx);
+
+  // Power-up dock
+  for (const slot of POWER_DOCK) {
+    const armed = opts.armedPower === slot.kind;
+    tornPaper(
+      ctx,
+      slot.rect.x,
+      slot.rect.y,
+      slot.rect.w,
+      slot.rect.h,
+      armed ? Palette.hot : Palette.paper,
+      { rotate: armed ? -0.02 : 0.01 },
+    );
+    const img = powerImage(slot.kind);
+    const cx = slot.rect.x + slot.rect.w / 2;
+    const cy = slot.rect.y + slot.rect.h / 2 - 4;
+    ctx.save();
+    ctx.shadowColor = Palette.shadow;
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 3;
+    if (img && img.complete) {
+      ctx.drawImage(img, cx - 32, cy - 32, 64, 64);
+    }
+    ctx.restore();
+    const count = session.powers[slot.kind] ?? 0;
+    ctx.fillStyle = armed ? Palette.white : Palette.ink;
     ctx.font = "800 18px 'Chakra Petch', sans-serif";
-    ctx.fillText("2", x + 78, y + 72);
-  });
+    ctx.textAlign = "right";
+    ctx.fillText(String(count), slot.rect.x + slot.rect.w - 12, slot.rect.y + slot.rect.h - 14);
+  }
+
+  if (opts.armedPower) {
+    ctx.fillStyle = Palette.lime;
+    ctx.font = "700 22px 'Patrick Hand', cursive";
+    ctx.textAlign = "center";
+    ctx.fillText("TAP A TILE TO BLAST", W / 2, 1090);
+  }
 
   if (session.status === "won" || session.status === "lost") {
     ctx.fillStyle = "rgba(0,0,0,0.55)";
