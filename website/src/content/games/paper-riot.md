@@ -20,4 +20,4 @@ downloads: {}
 
 **Paper Riot** is a SKITZ candy-crush style match-3 built from Riot Cube’s classroom stickers: swap adjacent tiles, rip matches of 3+, cascade the board, and clear level goals before moves run out.
 
-**Free to play** online (coming soon). More power-ups and obstacles on the way.
+**Free to play** online. Climb a 40-level world map with shaped boards, obstacles, and power-ups.
