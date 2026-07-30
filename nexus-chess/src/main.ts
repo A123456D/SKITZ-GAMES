@@ -34,6 +34,7 @@ import {
   loadNexusMark,
   loadAbilityIcons,
   getLogoImage,
+  getNexusMarkImage,
   type DrawCtx,
   type ButtonRect,
 } from "./view/draw";
@@ -50,9 +51,11 @@ import {
 } from "./view/input";
 import { ABILITY_INFO } from "./core/abilities";
 import type { Ability } from "./core/types";
+import { isInNexus } from "./core/board";
 import {
   drawMoveAnim,
   drawCaptureFlash,
+  drawWinCinematic,
   createBoardFx,
   updateBoardFx,
   drawBoardFx,
@@ -60,6 +63,7 @@ import {
   type MoveAnim,
   type CaptureFlash,
   type BoardFx,
+  type WinFx,
 } from "./view/anim";
 import {
   unlockAudio,
@@ -116,11 +120,13 @@ let captureFlash: CaptureFlash | null = null;
 let boardFx: BoardFx = createBoardFx();
 let lastFrame = performance.now();
 let animEndTimer: ReturnType<typeof setTimeout> | null = null;
+let moveSeqLock = false;
 let aiPending = false;
 let eloRecorded = false;
 let lastMove: { from: Square; to: Square } | null = null;
 let toast: { text: string; start: number; duration: number } | null = null;
 let canResume = !!loadMatch();
+let winFx: WinFx | null = null;
 
 /** First-run interactive tutorial */
 let tutorialActive = !isTutorialCompleted();
@@ -263,11 +269,13 @@ function startMatch(mode: PlayMode, oppElo = opponentElo, color: Color = playerC
   ui = clearUi();
   moveAnim = null;
   captureFlash = null;
+  winFx = null;
   boardFx = createBoardFx();
   if (animEndTimer) {
     clearTimeout(animEndTimer);
     animEndTimer = null;
   }
+  moveSeqLock = false;
   aiPending = false;
   eloRecorded = false;
   lastEloResult = null;
@@ -298,11 +306,13 @@ function resumeMatch(): boolean {
   ui = clearUi();
   moveAnim = null;
   captureFlash = null;
+  winFx = null;
   boardFx = createBoardFx();
   if (animEndTimer) {
     clearTimeout(animEndTimer);
     animEndTimer = null;
   }
+  moveSeqLock = false;
   aiPending = false;
   screen = "play";
   canResume = true;
@@ -318,8 +328,8 @@ function goHome() {
   profile = loadProfile();
 }
 
-function finishIfWon() {
-  if (!state.winner || screen !== "play") return;
+function goToResultScreen() {
+  if (!state.winner) return;
   if (!eloRecorded && playMode === "ai") {
     const { profile: next, result } = recordAiGame(
       profile,
@@ -336,83 +346,94 @@ function finishIfWon() {
   screen = "result";
 }
 
+function finishIfWon() {
+  if (!state.winner || screen !== "play") return;
+  if (winFx) return;
+  winFx = { start: performance.now(), duration: 2400, winner: state.winner };
+  playAbility();
+}
+
 function isAiSideToMove(): boolean {
   return playMode === "ai" && aiDifficulty !== 0 && state.activeColor !== playerColor;
 }
 
 function maybeAiTurn() {
   if (tutorialActive && (tutorialStep === "select" || tutorialStep === "move" || tutorialStep === "nexus")) {
-    // Keep AI quiet until the lesson finishes
     return;
   }
-  if (!isAiSideToMove() || state.winner || aiPending || screen !== "play") return;
+  if (!isAiSideToMove() || state.winner || aiPending || screen !== "play" || winFx) return;
   if (moveAnim) return;
   aiPending = true;
   const difficulty = aiDifficulty;
   const delay = aiThinkDelay(difficulty);
   setTimeout(() => {
-    if (screen !== "play" || state.winner || !isAiSideToMove()) {
+    if (screen !== "play" || state.winner || !isAiSideToMove() || winFx) {
       aiPending = false;
       return;
     }
-    // Yield a frame so the UI stays responsive before a heavy search
-    setTimeout(() => {
-      try {
-        if (screen !== "play" || !isAiSideToMove()) return;
-        const result = aiPlay(state, difficulty);
-        state = result.state;
-        if (result.lastMove) {
-          lastMove = { from: result.lastMove.from, to: result.lastMove.to };
-        }
-        ui = clearUi();
-        persistMatch();
-        finishIfWon();
-      } catch (err) {
-        console.error("AI turn failed", err);
-        // Fail safe: never leave the AI side soft-locked
-        if (isAiSideToMove() && !state.winner) {
-          if (state.turnPhase === "ability") state = skipAbility(state);
-          state = endTurn({
-            ...state,
-            turnPhase: "resolved",
-            overdriveSquare: null,
-            overdriveMovesLeft: 0,
-          });
+    // Yield so capture FX can paint before any search work
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        try {
+          if (screen !== "play" || !isAiSideToMove() || winFx) return;
+          const result = aiPlay(state, difficulty);
+          state = result.state;
+          if (result.lastMove) {
+            lastMove = { from: result.lastMove.from, to: result.lastMove.to };
+          }
+          ui = clearUi();
           persistMatch();
+          finishIfWon();
+        } catch (err) {
+          console.error("AI turn failed", err);
+          if (isAiSideToMove() && !state.winner) {
+            if (state.turnPhase === "ability") state = skipAbility(state);
+            state = endTurn({
+              ...state,
+              turnPhase: "resolved",
+              overdriveSquare: null,
+              overdriveMovesLeft: 0,
+            });
+            persistMatch();
+          }
+        } finally {
+          aiPending = false;
         }
-      } finally {
-        aiPending = false;
-      }
-      // If search somehow left it as AI-to-move, retry once next tick
-      if (screen === "play" && !state.winner && isAiSideToMove()) {
-        setTimeout(() => maybeAiTurn(), 0);
-      }
-    }, 16);
+        if (screen === "play" && !state.winner && !winFx && isAiSideToMove()) {
+          setTimeout(() => maybeAiTurn(), 0);
+        }
+      }, 0);
+    });
   }, delay);
 }
 
 function finishMoveSequence() {
-  if (animEndTimer) {
-    clearTimeout(animEndTimer);
-    animEndTimer = null;
-  }
-  const hadAnim = !!moveAnim;
-  moveAnim = null;
-  if (!hadAnim && state.turnPhase !== "resolved") return;
-  if (state.winner) {
-    finishIfWon();
-    return;
-  }
-  if (state.turnPhase === "resolved") {
-    // Hold the board for the nexus tip before AI replies
-    if (tutorialActive && tutorialStep === "nexus") {
-      persistMatch();
+  if (moveSeqLock) return;
+  moveSeqLock = true;
+  try {
+    if (animEndTimer) {
+      clearTimeout(animEndTimer);
+      animEndTimer = null;
+    }
+    const hadAnim = !!moveAnim;
+    moveAnim = null;
+    if (!hadAnim && state.turnPhase !== "resolved") return;
+    if (state.winner) {
+      finishIfWon();
       return;
     }
-    state = endTurn(state);
-    persistMatch();
-    if (state.winner) finishIfWon();
-    else maybeAiTurn();
+    if (state.turnPhase === "resolved") {
+      if (tutorialActive && tutorialStep === "nexus") {
+        persistMatch();
+        return;
+      }
+      state = endTurn(state);
+      persistMatch();
+      if (state.winner) finishIfWon();
+      else maybeAiTurn();
+    }
+  } finally {
+    moveSeqLock = false;
   }
 }
 
@@ -582,14 +603,15 @@ function onPointer(e: PointerEvent) {
     }
   }
 
-  // During AI think, only allow opening the menu (pause / change board)
-  if (aiPending || isAiSideToMove()) {
+  // During AI think / win cinematic, only allow opening the menu
+  if (aiPending || isAiSideToMove() || winFx) {
     if (tutorialActive) return;
     const flipped = boardFlipped();
     const result = handleClick(ui, state, dc, buttons, px, py, flipped);
     if (result.type === "menu") {
       persistMatch();
       playUiTap();
+      winFx = null;
       openHub();
     }
     return;
@@ -710,11 +732,13 @@ function onPointer(e: PointerEvent) {
     case "move":
       if (result.move) {
         const hadPiece = state.board.has(result.move.to);
+        const nexusCap = hadPiece && isInNexus(result.move.to);
         const [fromX, fromY] = squareScreenPos(dc, result.move.from, flipped);
         const [toX, toY] = squareScreenPos(dc, result.move.to, flipped);
         const piece = state.board.get(result.move.from);
-        const moveMs = hadPiece ? 400 : 360;
+        const moveMs = hadPiece ? 420 : 360;
         lastMove = { from: result.move.from, to: result.move.to };
+        moveSeqLock = false;
 
         if (piece) {
           moveAnim = {
@@ -740,7 +764,8 @@ function onPointer(e: PointerEvent) {
             y: toY,
             size: dc.cellSize,
             startTime: performance.now() + moveMs * 0.82,
-            duration: 220,
+            duration: nexusCap ? 420 : 280,
+            nexus: nexusCap,
           };
         }
 
@@ -755,7 +780,7 @@ function onPointer(e: PointerEvent) {
         if (animEndTimer) clearTimeout(animEndTimer);
         animEndTimer = setTimeout(() => {
           finishMoveSequence();
-        }, moveMs + 60);
+        }, moveMs + 80);
       }
       break;
   }
@@ -828,6 +853,7 @@ function frame(now: number) {
     if (moveAnim) {
       const { alive, justLanded } = drawMoveAnim(dc.ctx, moveAnim, now, dc.cellSize);
       if (justLanded) {
+        const nexusCap = !!(moveAnim.isCapture && moveAnim.toSq && isInNexus(moveAnim.toSq as Square));
         spawnLandFx(
           boardFx,
           moveAnim.toX,
@@ -835,6 +861,7 @@ function frame(now: number) {
           dc.cellSize,
           now,
           !!moveAnim.isCapture,
+          nexusCap,
         );
         if (moveAnim.isCapture) playCapture();
         else playMoveLand();
@@ -849,19 +876,29 @@ function frame(now: number) {
       if (!alive) captureFlash = null;
     }
 
-    drawHud(dc, state, buttons, modeLabel(), ui.pendingAbility ?? ui.activeAbility);
+    if (!winFx) {
+      drawHud(dc, state, buttons, modeLabel(), ui.pendingAbility ?? ui.activeAbility);
 
-    if (ui.mode === "abilityConfirm" && ui.pendingAbility) {
-      drawAbilityConfirm(
-        dc,
-        buttons,
-        ui.pendingAbility,
-        canAffordAbility(state, ui.pendingAbility),
-      );
+      if (ui.mode === "abilityConfirm" && ui.pendingAbility) {
+        drawAbilityConfirm(
+          dc,
+          buttons,
+          ui.pendingAbility,
+          canAffordAbility(state, ui.pendingAbility),
+        );
+      }
+
+      drawToast(dc, toast, now);
+      if (toast && now - toast.start > toast.duration) toast = null;
     }
 
-    drawToast(dc, toast, now);
-    if (toast && now - toast.start > toast.duration) toast = null;
+    if (winFx) {
+      drawWinCinematic(dc.ctx, dc.width, dc.height, winFx, now, getNexusMarkImage());
+      if (now - winFx.start >= winFx.duration) {
+        winFx = null;
+        goToResultScreen();
+      }
+    }
   }
 
   if (tutorialActive) {

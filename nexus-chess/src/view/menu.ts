@@ -462,6 +462,15 @@ export function drawResult(
         : "Defeat"
       : `${opts.winner === "w" ? "White" : "Black"} wins`;
 
+  // Soft animated pulse ring behind the title
+  const cx = width / 2;
+  const pulse = 0.5 + 0.5 * Math.sin(time * 2.4);
+  ctx.strokeStyle = `${Theme.pulseRgba}${0.12 + pulse * 0.12})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, height * 0.32, 54 + pulse * 10, 0, Math.PI * 2);
+  ctx.stroke();
+
   ctx.fillStyle = Theme.ink;
   ctx.font = `500 ${compact ? 30 : 40}px ${Theme.font}`;
   ctx.textAlign = "center";

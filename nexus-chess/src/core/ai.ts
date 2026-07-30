@@ -20,31 +20,30 @@ export function nextAiDifficulty(d: AiDifficulty): AiDifficulty {
 }
 
 /**
- * Search depths (plies = full turns).
- * Easy is greedy only; Normal+ use real alpha-beta + quiescence.
- * Kept modest — in-browser search shares the UI thread.
+ * Search depths — UI-thread search must stay shallow.
+ * 1 = greedy, 2+ = ordered 1-ply (Hard/Expert peek one opponent reply).
  */
 const SEARCH_DEPTH: Record<Exclude<AiDifficulty, 0>, number> = {
-  1: 1, // greedy / noisy 1-ply
-  2: 2, // Normal
-  3: 3, // Hard
-  4: 4, // Expert
+  1: 1,
+  2: 1,
+  3: 2,
+  4: 2,
 };
 
 /** Cap branching after move ordering to keep deep search responsive in-browser. */
 const BRANCH_CAP: Record<Exclude<AiDifficulty, 0>, number> = {
   1: 40,
-  2: 22,
-  3: 18,
-  4: 16,
+  2: 16,
+  3: 14,
+  4: 12,
 };
 
-/** Soft wall-clock budget so captures near the Nexus never freeze the tab. */
+/** Hard wall-clock budget — never block the tab after a Nexus capture. */
 const SEARCH_BUDGET_MS: Record<Exclude<AiDifficulty, 0>, number> = {
-  1: 40,
-  2: 90,
-  3: 160,
-  4: 240,
+  1: 20,
+  2: 28,
+  3: 36,
+  4: 48,
 };
 
 interface SearchClock {
@@ -342,38 +341,36 @@ function pickSearch(
   const rootMoves = orderedMoves(s, branchCap);
   if (rootMoves.length === 0) return null;
 
+  // Assassination / Nexus king takes are already sorted to the front by scoreMove.
+  if (rootMoves[0]) {
+    const t = s.board.get(rootMoves[0].to);
+    if (t && t.kind === "K" && isInNexus(rootMoves[0].to)) return rootMoves[0];
+  }
+
   const clock = makeClock(budgetMs);
   let bestMoves = [rootMoves[0]];
   let bestScore = -Infinity;
 
-  // Iterative deepening — stop early when the soft deadline hits
-  for (let depth = 1; depth <= maxDepth; depth++) {
-    if (timeUp(clock) && depth > 1) break;
-    let iterBest = -Infinity;
-    let iterMoves: Move[] = [];
-    const ordered = [
-      ...bestMoves,
-      ...rootMoves.filter(
-        (m) => !bestMoves.some((b) => b.from === m.from && b.to === m.to && b.promotion === m.promotion),
-      ),
-    ];
+  for (const m of rootMoves) {
+    if (timeUp(clock) && bestScore > -Infinity) break;
+    const child = playFullMove(s, m);
+    let sc = evaluatePosition(child, perspective);
 
-    for (const m of ordered) {
-      if (timeUp(clock) && iterMoves.length > 0) break;
-      const child = playFullMove(s, m);
-      const sc = alphabeta(child, depth - 1, -Infinity, Infinity, perspective, branchCap, clock);
-      if (sc > iterBest) {
-        iterBest = sc;
-        iterMoves = [m];
-      } else if (sc === iterBest) {
-        iterMoves.push(m);
+    // Hard/Expert: one forced opponent reply peek (still tiny).
+    if (maxDepth >= 2 && !timeUp(clock) && !child.winner) {
+      const replies = orderedMoves(child, 4);
+      if (replies.length > 0) {
+        const child2 = playFullMove(child, replies[0]);
+        sc = evaluatePosition(child2, perspective);
       }
     }
-    if (iterMoves.length > 0) {
-      bestScore = iterBest;
-      bestMoves = iterMoves;
+
+    if (sc > bestScore) {
+      bestScore = sc;
+      bestMoves = [m];
+    } else if (sc === bestScore) {
+      bestMoves.push(m);
     }
-    void bestScore;
   }
 
   return pickRandom(bestMoves);

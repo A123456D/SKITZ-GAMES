@@ -63,6 +63,10 @@ export function loadNexusMark(): Promise<void> {
   });
 }
 
+export function getNexusMarkImage(): HTMLImageElement | null {
+  return markReady ? markImg : null;
+}
+
 export function loadAbilityIcons(): Promise<void> {
   const ids = ["aegis", "overdrive", "swap"] as const;
   return Promise.all(
