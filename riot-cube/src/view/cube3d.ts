@@ -19,6 +19,78 @@ export type { Quat };
 export type { FaceId };
 export const FACE_NAMES = ["FRONT", "BACK", "RIGHT", "LEFT", "TOP", "BOTTOM"] as const;
 
+let cubePaperImg: HTMLImageElement | null = null;
+let cubePaperPromise: Promise<void> | null = null;
+
+/** Warm craft-paper grain for cube faces. */
+export function loadCubePaper(): Promise<void> {
+  if (cubePaperImg?.complete && cubePaperImg.naturalWidth > 0) {
+    return Promise.resolve();
+  }
+  if (cubePaperPromise) return cubePaperPromise;
+  cubePaperPromise = new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      cubePaperImg = img;
+      resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = "./ui/cube-paper.png?v=1";
+  });
+  return cubePaperPromise;
+}
+
+function fillFacePaper(
+  ctx: CanvasRenderingContext2D,
+  q: readonly Vec2[],
+  isActive: boolean,
+): void {
+  const p = getPalette();
+  const img = cubePaperImg;
+  const pathQuad = () => {
+    ctx.beginPath();
+    ctx.moveTo(q[0]!.x, q[0]!.y);
+    ctx.lineTo(q[1]!.x, q[1]!.y);
+    ctx.lineTo(q[2]!.x, q[2]!.y);
+    ctx.lineTo(q[3]!.x, q[3]!.y);
+    ctx.closePath();
+  };
+
+  if (img && img.complete && img.naturalWidth > 0) {
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    const a = q[0]!;
+    const b = q[1]!;
+    const d = q[3]!;
+    pathQuad();
+    ctx.save();
+    ctx.clip();
+    // Affine map the paper onto the face parallelogram (good enough for cube faces).
+    ctx.transform(
+      (b.x - a.x) / w,
+      (b.y - a.y) / w,
+      (d.x - a.x) / h,
+      (d.y - a.y) / h,
+      a.x,
+      a.y,
+    );
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+    pathQuad();
+    if (!isActive) {
+      ctx.fillStyle = "rgba(40, 28, 16, 0.16)";
+      ctx.fill();
+    } else {
+      ctx.fillStyle = "rgba(255, 250, 240, 0.08)";
+      ctx.fill();
+    }
+    return;
+  }
+  pathQuad();
+  ctx.fillStyle = isActive ? p.faceActive : p.faceSide;
+  ctx.fill();
+}
+
 type FaceGeom = {
   /** TL, TR, BR, BL in cube space (half-extent 1). U increases right, V down. */
   corners: [Vec3, Vec3, Vec3, Vec3];
@@ -580,14 +652,13 @@ function drawFace(
   });
 
   ctx.save();
+  fillFacePaper(ctx, q, isActive);
   ctx.beginPath();
   ctx.moveTo(q[0]!.x, q[0]!.y);
   ctx.lineTo(q[1]!.x, q[1]!.y);
   ctx.lineTo(q[2]!.x, q[2]!.y);
   ctx.lineTo(q[3]!.x, q[3]!.y);
   ctx.closePath();
-  ctx.fillStyle = isActive ? p.faceActive : p.faceSide;
-  ctx.fill();
   ctx.strokeStyle = isActive ? p.accent : p.faceStroke;
   ctx.lineWidth = isActive ? 4 : 2.5;
   ctx.stroke();

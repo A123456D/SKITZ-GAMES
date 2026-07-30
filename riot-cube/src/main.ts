@@ -98,7 +98,6 @@ import {
   loadTutorialHand,
   type TutorialPointTarget,
 } from "./view/tutorialPointer";
-import { getPalette } from "./view/theme";
 import {
   drawCube3D,
   drawCubeOrbitButtons,
@@ -106,10 +105,12 @@ import {
   facingFaceQuat,
   hitFrontUV,
   hitOrbitButton,
+  loadCubePaper,
   screenDeltaToFaceUV,
   type CubeLayout,
   type CubeMotion,
 } from "./view/cube3d";
+import { getPalette } from "./view/theme";
 import {
   applyOrbitDragQuat,
   orbitStepQuat,
@@ -1580,7 +1581,7 @@ async function boot(): Promise<void> {
   if (!hasOnboarded()) beginOnboarding();
   // First paint immediately so iPhone isn't stuck on a black shell while art loads.
   requestAnimationFrame(tick);
-  await Promise.all([loadLogo(), loadStickers(), loadTutorialHand()]);
+  await Promise.all([loadLogo(), loadStickers(), loadTutorialHand(), loadCubePaper()]);
   ensureThemeArt("classroom");
   ensureThemeArt("edgy");
   ensureThemeArt("doodle");
