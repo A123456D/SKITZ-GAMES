@@ -367,8 +367,25 @@ function maybeAiTurn() {
         ui = clearUi();
         persistMatch();
         finishIfWon();
+      } catch (err) {
+        console.error("AI turn failed", err);
+        // Fail safe: never leave the AI side soft-locked
+        if (isAiSideToMove() && !state.winner) {
+          if (state.turnPhase === "ability") state = skipAbility(state);
+          state = endTurn({
+            ...state,
+            turnPhase: "resolved",
+            overdriveSquare: null,
+            overdriveMovesLeft: 0,
+          });
+          persistMatch();
+        }
       } finally {
         aiPending = false;
+      }
+      // If search somehow left it as AI-to-move, retry once next tick
+      if (screen === "play" && !state.winner && isAiSideToMove()) {
+        setTimeout(() => maybeAiTurn(), 0);
       }
     }, 16);
   }, delay);
