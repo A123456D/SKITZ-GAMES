@@ -1,7 +1,7 @@
 import type { ObstacleKind, PowerUpKind, TileKind } from "../core/types";
 import { OBSTACLE_KINDS, POWERUP_KINDS, TILE_KINDS } from "../core/types";
 
-const VERSION = 2;
+const VERSION = 3;
 const stickers = new Map<string, HTMLImageElement>();
 let loadPromise: Promise<void> | null = null;
 

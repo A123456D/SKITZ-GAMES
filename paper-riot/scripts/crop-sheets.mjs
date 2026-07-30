@@ -308,6 +308,7 @@ async function main() {
   );
 
   console.log("Done cropping Paper Riot sheets.");
+  console.log("Run: node scripts/scrub-transparent.mjs");
 }
 
 main().catch((e) => {
