@@ -1,15 +1,30 @@
 /**
- * Light, crisp procedural SFX via Web Audio — no asset fetch/decode.
+ * Riot Cube SFX — ElevenLabs samples when present, procedural fallback.
  */
 
 const VOL_KEY = "riotcube_sfx_vol";
 /** Cycle: muted → soft → normal */
 const VOL_STEPS = [0, 0.4, 0.75] as const;
 
+const SAMPLE_FILES = {
+  rustle: "rustle.mp3",
+  slide: "slide.mp3",
+  flutter: "flutter.mp3",
+  crumple: "crumple.mp3",
+  win: "win.mp3",
+  lose: "lose.mp3",
+  scramble: "scramble.mp3",
+  hint: "hint.mp3",
+} as const;
+
+type SampleId = keyof typeof SAMPLE_FILES;
+
 let ctx: AudioContext | null = null;
 let unlocked = false;
 let master: GainNode | null = null;
 let sfxVol = readStoredVol();
+const buffers = new Map<SampleId, AudioBuffer>();
+let loadPromise: Promise<void> | null = null;
 
 function readStoredVol(): number {
   try {
@@ -49,7 +64,6 @@ function bus(): GainNode | null {
   return master;
 }
 
-/** iOS / Chrome: resume + silent blip so later tones actually play. */
 function primeContext(c: AudioContext): void {
   void c.resume();
   try {
@@ -63,15 +77,61 @@ function primeContext(c: AudioContext): void {
   }
 }
 
+function playSample(
+  id: SampleId,
+  opts?: { volume?: number; vary?: boolean },
+): boolean {
+  const c = ac();
+  const out = bus();
+  const buf = buffers.get(id);
+  if (!c || !out || !buf || !unlocked || sfxVol <= 0.001) return false;
+  if (c.state === "suspended") void c.resume();
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const vary = opts?.vary !== false;
+  src.playbackRate.value = vary ? 0.94 + Math.random() * 0.12 : 1;
+  const g = c.createGain();
+  g.gain.value = opts?.volume ?? 1;
+  src.connect(g);
+  g.connect(out);
+  try {
+    src.start(0);
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+export function loadSfx(): Promise<void> {
+  if (loadPromise) return loadPromise;
+  loadPromise = (async () => {
+    const c = ac();
+    if (!c) return;
+    await Promise.all(
+      (Object.keys(SAMPLE_FILES) as SampleId[]).map(async (id) => {
+        try {
+          const res = await fetch(`./sfx/${SAMPLE_FILES[id]}`);
+          if (!res.ok) return;
+          const raw = await res.arrayBuffer();
+          buffers.set(id, await c.decodeAudioData(raw.slice(0)));
+        } catch {
+          /* missing until generated */
+        }
+      }),
+    );
+  })();
+  return loadPromise;
+}
+
 export function unlockAudio(): void {
   const c = ac();
   if (!c) return;
   primeContext(c);
   unlocked = true;
   bus();
+  void loadSfx();
 }
 
-/** Shared Web Audio context for SFX + music (one context avoids Android ducking). */
 export function getSharedAudioContext(): AudioContext | null {
   return ac();
 }
@@ -95,19 +155,19 @@ export function setSfxVolume(v: number): void {
   if (g) g.gain.value = sfxVol;
 }
 
-/** Mute → soft → normal → mute */
 export function cycleSfxVolume(): number {
   const i = VOL_STEPS.findIndex((s) => Math.abs(s - sfxVol) < 0.05);
   const next = VOL_STEPS[(i + 1) % VOL_STEPS.length]!;
   setSfxVolume(next);
   if (next > 0) {
-    pluck(880, 0.05, 0.045);
-    pluck(1180, 0.06, 0.03, 0.04);
+    if (!playSample("rustle", { volume: 0.7 })) {
+      pluck(880, 0.05, 0.045);
+      pluck(1180, 0.06, 0.03, 0.04);
+    }
   }
   return next;
 }
 
-/** Soft sine pluck with a tiny high shimmer — light and crisp. */
 function pluck(freq: number, dur: number, gain: number, when = 0, slideTo?: number): void {
   const c = ac();
   const out = bus();
@@ -147,7 +207,6 @@ function pluck(freq: number, dur: number, gain: number, when = 0, slideTo?: numb
   shimmer.stop(t0 + dur + 0.02);
 }
 
-/** Brief bright air burst — paper tick, not a thud. */
 function airTick(dur: number, gain: number, when = 0): void {
   const c = ac();
   const out = bus();
@@ -184,17 +243,20 @@ function airTick(dur: number, gain: number, when = 0): void {
 }
 
 export function sfxPaperRustle(): void {
+  if (playSample("rustle")) return;
   airTick(0.028, 0.045);
   pluck(640 + Math.random() * 40, 0.035, 0.032);
 }
 
 export function sfxPaperSlide(): void {
+  if (playSample("slide")) return;
   airTick(0.04, 0.05);
   pluck(520, 0.05, 0.038, 0, 680);
   pluck(780, 0.04, 0.022, 0.02);
 }
 
 export function sfxPaperCrumple(): void {
+  if (playSample("crumple")) return;
   airTick(0.05, 0.055);
   pluck(660, 0.06, 0.04);
   pluck(880, 0.07, 0.035, 0.035, 1100);
@@ -202,7 +264,31 @@ export function sfxPaperCrumple(): void {
 }
 
 export function sfxPaperFlutter(): void {
+  if (playSample("flutter")) return;
   pluck(740, 0.045, 0.036);
   pluck(990, 0.055, 0.03, 0.03, 1180);
   airTick(0.025, 0.03, 0.015);
+}
+
+export function sfxWin(): void {
+  if (playSample("win", { vary: false })) return;
+  sfxPaperFlutter();
+  pluck(880, 0.12, 0.05, 0.05);
+  pluck(1320, 0.14, 0.04, 0.12);
+}
+
+export function sfxLose(): void {
+  if (playSample("lose", { vary: false })) return;
+  sfxPaperCrumple();
+}
+
+export function sfxScramble(): void {
+  if (playSample("scramble")) return;
+  sfxPaperRustle();
+  sfxPaperSlide();
+}
+
+export function sfxHint(): void {
+  if (playSample("hint")) return;
+  sfxPaperFlutter();
 }

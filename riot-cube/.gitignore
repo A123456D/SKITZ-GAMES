@@ -1,2 +1,7 @@
 ﻿_vid_frames/
 _vid_frames_outer/
+.env
+.env.*
+!.env.example
+node_modules/
+dist/

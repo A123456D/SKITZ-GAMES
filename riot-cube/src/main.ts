@@ -129,9 +129,14 @@ import {
 import {
   cycleSfxVolume,
   getSfxVolume,
+  loadSfx,
+  sfxHint,
+  sfxLose,
   sfxPaperFlutter,
   sfxPaperRustle,
   sfxPaperSlide,
+  sfxScramble,
+  sfxWin,
   unlockAudio,
 } from "./audio/paper";
 import {
@@ -442,6 +447,8 @@ let stickerDropTarget: {
 let faceCelebrate: { face: FaceId; started: number } | null = null;
 const FACE_CELEBRATE_MS = 720;
 let solvedFaceBits = 0;
+/** Prevents win/lose sting from repeating while the end overlay is shown. */
+let outcomeSfxPlayed: "solved" | "lost" | null = null;
 
 setProgressThemeSlot(activeThemeSlot());
 let session: Session = resumeOrStartSession(loadCubeSize(), activeStickerPool());
@@ -607,14 +614,28 @@ function noteNewlySolvedFaces(prevBits: number, cube = session.cube): void {
   const nextBits = faceSolvedBits(cube);
   const gained = nextBits & ~prevBits;
   solvedFaceBits = nextBits;
-  if (!gained) return;
-  // Celebrate the lowest newly completed face id.
-  for (let i = 0; i < 6; i++) {
-    if (gained & (1 << i)) {
-      faceCelebrate = { face: i as FaceId, started: performance.now() };
-      sfxPaperFlutter();
-      break;
+  if (gained) {
+    // Celebrate the lowest newly completed face id.
+    for (let i = 0; i < 6; i++) {
+      if (gained & (1 << i)) {
+        faceCelebrate = { face: i as FaceId, started: performance.now() };
+        sfxPaperFlutter();
+        break;
+      }
     }
+  }
+  playOutcomeSfx();
+}
+
+function playOutcomeSfx(): void {
+  if (session.status === "solved" && outcomeSfxPlayed !== "solved") {
+    outcomeSfxPlayed = "solved";
+    sfxWin();
+  } else if (session.status === "lost" && outcomeSfxPlayed !== "lost") {
+    outcomeSfxPlayed = "lost";
+    sfxLose();
+  } else if (session.status === "playing") {
+    outcomeSfxPlayed = null;
   }
 }
 
@@ -838,7 +859,7 @@ function triggerHint(): void {
   hintMove = move;
   hintStarted = performance.now();
   hintUntil = hintStarted + 1600;
-  sfxPaperFlutter();
+  sfxHint();
 }
 
 function openStickersPicker(from: Screen = "play"): void {
@@ -1338,9 +1359,10 @@ canvas.addEventListener(
       if (hitRetry(p.x, p.y)) {
         session = doScramble(session);
         solvedFaceBits = faceSolvedBits(session.cube);
+        outcomeSfxPlayed = null;
         resetPlayVisuals();
         syncActiveFace();
-        sfxPaperRustle();
+        sfxScramble();
         return;
       }
       if (hitSolvedHome(p.x, p.y)) {
@@ -1415,10 +1437,11 @@ canvas.addEventListener(
       if (tutorial && !tutorialAllows("scramble")) return;
       session = doScramble(session);
       solvedFaceBits = faceSolvedBits(session.cube);
+      outcomeSfxPlayed = null;
       resetPlayVisuals();
       syncActiveFace();
       noteTutorial("scramble");
-      sfxPaperRustle();
+      sfxScramble();
       return;
     }
     if (hitPlayStickers(p.x, p.y, playHintsLayout)) {
@@ -1617,7 +1640,13 @@ async function boot(): Promise<void> {
   // First paint immediately so iPhone isn't stuck on a black shell while art loads.
   markDirty();
   requestAnimationFrame(tick);
-  await Promise.all([loadLogo(), loadStickers(), loadTutorialHand(), loadCubePaper()]);
+  await Promise.all([
+    loadLogo(),
+    loadStickers(),
+    loadTutorialHand(),
+    loadCubePaper(),
+    loadSfx(),
+  ]);
   invalidateDeskCache();
   markDirty();
   ensureThemeArt("classroom");

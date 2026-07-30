@@ -67,11 +67,15 @@ import {
 } from "./view/anim";
 import {
   unlockAudio,
+  loadSfx,
   playMoveLift,
   playMoveLand,
   playCapture,
   playUiTap,
   playAbility,
+  playSelect,
+  playWin,
+  playLose,
 } from "./view/sfx";
 import {
   drawHome,
@@ -350,7 +354,8 @@ function finishIfWon() {
   if (!state.winner || screen !== "play") return;
   if (winFx) return;
   winFx = { start: performance.now(), duration: 2400, winner: state.winner };
-  playAbility();
+  if (playMode === "ai" && state.winner !== playerColor) playLose();
+  else playWin();
 }
 
 function isAiSideToMove(): boolean {
@@ -373,11 +378,16 @@ function maybeAiTurn() {
         return;
       }
       try {
+        const beforeCount = state.board.size;
         const result = await aiPlayAsync(state, difficulty);
         if (screen !== "play" || winFx) return;
         state = result.state;
         if (result.lastMove) {
           lastMove = { from: result.lastMove.from, to: result.lastMove.to };
+          const captured =
+            result.state.board.size < beforeCount || !!result.lastMove.isEnPassant;
+          if (captured) playCapture();
+          else playMoveLand();
         }
         ui = clearUi();
         persistMatch();
@@ -719,7 +729,10 @@ function onPointer(e: PointerEvent) {
       break;
 
     case "select":
-      if (result.square) ui = applySelect(ui, state, result.square);
+      if (result.square) {
+        ui = applySelect(ui, state, result.square);
+        playSelect();
+      }
       break;
 
     case "deselect":
@@ -916,4 +929,5 @@ void loadThemePieces();
 void loadThemeArt();
 void loadNexusMark();
 void loadAbilityIcons();
+void loadSfx();
 document.querySelector('meta[name="theme-color"]')?.setAttribute("content", Theme.bg);
