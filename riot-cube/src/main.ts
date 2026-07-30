@@ -1139,7 +1139,8 @@ function goHome(): void {
 function startPlay(): void {
   if (!hasOnboarded()) {
     beginOnboarding();
-    sfxPaperFlutter();
+    // Soft rustle — flutter was too harsh for the PLAY press.
+    sfxPaperRustle();
     return;
   }
   resetPlayVisuals();
@@ -1167,7 +1168,6 @@ canvas.addEventListener(
 
     if (screen === "home") {
       if (hitUiRect(HOME_PLAY, p.x, p.y)) {
-        sfxPaperFlutter();
         startPlay();
         return;
       }
