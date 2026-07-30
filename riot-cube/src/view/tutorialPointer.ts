@@ -14,7 +14,7 @@ export type TutorialPointTarget = {
 let handImg: HTMLImageElement | null = null;
 let handPromise: Promise<void> | null = null;
 
-const HAND_SRC = "./ui/hand-point.png?v=1";
+const HAND_SRC = "./ui/hand-point.png?v=2";
 /** Finger tip in normalized image space (points upper-right). */
 const TIP_U = 0.78;
 const TIP_V = 0.2;
