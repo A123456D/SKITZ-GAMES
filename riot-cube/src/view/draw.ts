@@ -48,7 +48,15 @@ function roundRect(
   ctx.closePath();
 }
 
-export function drawDesk(ctx: CanvasRenderingContext2D): void {
+let deskCache: HTMLCanvasElement | null = null;
+let deskCacheKey = "";
+
+export function invalidateDeskCache(): void {
+  deskCache = null;
+  deskCacheKey = "";
+}
+
+function paintDeskInto(ctx: CanvasRenderingContext2D): void {
   const p = getPalette();
   const theme = getTheme();
   const art = getThemeArt(theme);
@@ -86,6 +94,25 @@ export function drawDesk(ctx: CanvasRenderingContext2D): void {
   g.addColorStop(1, p.desk1);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
+}
+
+/** Desk backdrop — cached; invalidate on theme / art / anime-mode change. */
+export function drawDesk(ctx: CanvasRenderingContext2D): void {
+  const theme = getTheme();
+  const art = getThemeArt(theme);
+  const anime = theme === "anime" ? getAnimeMode() : "";
+  const bgSrc =
+    art.bg && art.bg.complete && art.bg.naturalWidth > 0 ? art.bg.src : "";
+  const key = `${theme}|${anime}|${art.loaded}|${bgSrc}`;
+  if (!deskCache || deskCacheKey !== key) {
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    paintDeskInto(c.getContext("2d")!);
+    deskCache = c;
+    deskCacheKey = key;
+  }
+  ctx.drawImage(deskCache, 0, 0);
 }
 
 export function drawHud(

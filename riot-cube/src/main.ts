@@ -35,6 +35,7 @@ import {
   W,
   H,
   drawDesk,
+  invalidateDeskCache,
   drawEndOverlay,
   drawFaceTurnButtons,
   drawHomeScreen,
@@ -219,6 +220,8 @@ function applyThemeChange(prevSlot: string): void {
   const nextSlot = activeThemeSlot();
   setProgressThemeSlot(nextSlot);
   reloadThemeArt(getTheme());
+  invalidateDeskCache();
+  markDirty();
   void loadStickers();
   syncMusicForTheme(getTheme());
   const pool = activeStickerPool();
@@ -505,6 +508,26 @@ type TurnAnim =
     };
 let turnAnim: TurnAnim | null = null;
 let lastFrameTs = 0;
+/** Skip full paints when idle — set on input / theme / resize. */
+let needsPaint = true;
+
+function markDirty(): void {
+  needsPaint = true;
+}
+
+function isAnimating(): boolean {
+  if (turnAnim) return true;
+  if (springAxis) return true;
+  if (rotating || orbitDrag) return true;
+  if (drag?.axis != null) return true;
+  if (stickersScrollDrag) return true;
+  if (stickerDropStarted > 0) return true;
+  if (faceCelebrate) return true;
+  if (hintMove != null && performance.now() < hintUntil) return true;
+  // Tutorial pointer / coach pulse continuously while active.
+  if (tutorial && screen === "play") return true;
+  return false;
+}
 
 function easeOutCubic(t: number): number {
   const x = Math.min(1, Math.max(0, t));
@@ -537,6 +560,8 @@ function cubeLayout(): CubeLayout {
 
 function resize(): void {
   detectQuality();
+  invalidateDeskCache();
+  markDirty();
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const dpr = Math.min(window.devicePixelRatio || 1, getQuality().dprCap);
@@ -1074,7 +1099,12 @@ function tick(ts: number): void {
       }
     }
   }
-  paint();
+
+  const animating = isAnimating();
+  if (needsPaint || animating) {
+    paint();
+    needsPaint = animating;
+  }
   requestAnimationFrame(tick);
 }
 
@@ -1106,6 +1136,7 @@ canvas.addEventListener(
   "pointerdown",
   (e) => {
     e.preventDefault();
+    markDirty();
     unlockAudio();
     unlockMusic();
     canvas.setPointerCapture(e.pointerId);
@@ -1440,6 +1471,7 @@ canvas.addEventListener(
   "pointermove",
   (e) => {
     e.preventDefault();
+    markDirty();
     const p = canvasPoint(e);
 
     if (screen === "stickers" && stickersScrollDrag) {
@@ -1495,6 +1527,7 @@ canvas.addEventListener(
 );
 
 function endDrag(): void {
+  markDirty();
   if (screen === "stickers") {
     if (stickersScrollDrag) {
       if (!stickersScrollDrag.moved) {
@@ -1553,6 +1586,7 @@ function endDrag(): void {
 
 canvas.addEventListener("pointerup", endDrag);
 canvas.addEventListener("pointercancel", () => {
+  markDirty();
   if (screen === "stickers") {
     stickersScrollDrag = null;
     return;
@@ -1574,14 +1608,18 @@ async function boot(): Promise<void> {
   applyThemeChrome();
   ensureThemeArt(getTheme());
   onThemeArtReady(() => {
-    /* next paint picks up art */
+    invalidateDeskCache();
+    markDirty();
   });
   resize();
   // After play-state lets exist — early onboarding used to TDZ-crash on fresh installs.
   if (!hasOnboarded()) beginOnboarding();
   // First paint immediately so iPhone isn't stuck on a black shell while art loads.
+  markDirty();
   requestAnimationFrame(tick);
   await Promise.all([loadLogo(), loadStickers(), loadTutorialHand(), loadCubePaper()]);
+  invalidateDeskCache();
+  markDirty();
   ensureThemeArt("classroom");
   ensureThemeArt("edgy");
   ensureThemeArt("doodle");

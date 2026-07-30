@@ -2,12 +2,15 @@ export type RenderQuality = {
   dprCap: number;
   stickerShadows: boolean;
   hoverAnim: boolean;
+  /** Craft-paper multiply grain on cube faces — expensive on Canvas 2D. */
+  paperGrain: boolean;
 };
 
 let quality: RenderQuality = {
   dprCap: 2,
   stickerShadows: false,
   hoverAnim: true,
+  paperGrain: true,
 };
 
 export function detectQuality(): RenderQuality {
@@ -24,14 +27,16 @@ export function detectQuality(): RenderQuality {
 
   quality = lowEnd
     ? {
-        dprCap: 1.5,
+        dprCap: 1,
         stickerShadows: false,
-        hoverAnim: true,
+        hoverAnim: false,
+        paperGrain: false,
       }
     : {
         dprCap: 2,
         stickerShadows: false,
         hoverAnim: true,
+        paperGrain: true,
       };
   return quality;
 }

@@ -66,28 +66,41 @@ function fillFacePaper(
   ctx.fillStyle = isActive ? p.faceActive : p.faceSide;
   ctx.fill();
 
-  const img = cubePaperImg;
-  if (img && img.complete && img.naturalWidth > 0) {
-    if (!cubePaperPattern) {
-      cubePaperPattern = ctx.createPattern(img, "repeat");
-    }
-    const pattern = cubePaperPattern;
-    if (pattern) {
-      pathQuad();
-      ctx.save();
-      ctx.clip();
-      // Anchor + scale so the grain reads at cube size without stretching.
-      const midX = (q[0]!.x + q[1]!.x + q[2]!.x + q[3]!.x) * 0.25;
-      const midY = (q[0]!.y + q[1]!.y + q[2]!.y + q[3]!.y) * 0.25;
-      ctx.translate(midX, midY);
-      ctx.scale(0.42, 0.42);
-      ctx.translate(-midX, -midY);
-      ctx.globalAlpha = isActive ? 0.62 : 0.48;
-      ctx.globalCompositeOperation = "multiply";
-      ctx.fillStyle = pattern;
-      // Oversize fill; clip keeps it on the face.
-      ctx.fillRect(midX - 900, midY - 900, 1800, 1800);
-      ctx.restore();
+  // Paper grain is a multiply + clip fill — skip on low-end / mobile.
+  if (getQuality().paperGrain) {
+    const img = cubePaperImg;
+    if (img && img.complete && img.naturalWidth > 0) {
+      if (!cubePaperPattern) {
+        cubePaperPattern = ctx.createPattern(img, "repeat");
+      }
+      const pattern = cubePaperPattern;
+      if (pattern) {
+        pathQuad();
+        ctx.save();
+        ctx.clip();
+        // Anchor + scale so the grain reads at cube size without stretching.
+        const midX = (q[0]!.x + q[1]!.x + q[2]!.x + q[3]!.x) * 0.25;
+        const midY = (q[0]!.y + q[1]!.y + q[2]!.y + q[3]!.y) * 0.25;
+        const minX = Math.min(q[0]!.x, q[1]!.x, q[2]!.x, q[3]!.x);
+        const maxX = Math.max(q[0]!.x, q[1]!.x, q[2]!.x, q[3]!.x);
+        const minY = Math.min(q[0]!.y, q[1]!.y, q[2]!.y, q[3]!.y);
+        const maxY = Math.max(q[0]!.y, q[1]!.y, q[2]!.y, q[3]!.y);
+        // Pad in unscaled space, then compensate for 0.42 scale so clip still covers.
+        const pad = 48;
+        ctx.translate(midX, midY);
+        ctx.scale(0.42, 0.42);
+        ctx.translate(-midX, -midY);
+        const inv = 1 / 0.42;
+        const rx = midX + (minX - pad - midX) * inv;
+        const ry = midY + (minY - pad - midY) * inv;
+        const rw = (maxX - minX + pad * 2) * inv;
+        const rh = (maxY - minY + pad * 2) * inv;
+        ctx.globalAlpha = isActive ? 0.62 : 0.48;
+        ctx.globalCompositeOperation = "multiply";
+        ctx.fillStyle = pattern;
+        ctx.fillRect(rx, ry, rw, rh);
+        ctx.restore();
+      }
     }
   }
 
@@ -437,8 +450,10 @@ function drawHintMoveLine(
   ctx.strokeStyle = p.hot;
   ctx.fillStyle = p.hot;
   ctx.lineWidth = 5;
-  ctx.shadowColor = p.hot;
-  ctx.shadowBlur = 10;
+  if (getQuality().paperGrain) {
+    ctx.shadowColor = p.hot;
+    ctx.shadowBlur = 10;
+  }
 
   if (move.kind === "face") {
     // Quarter-turn only (one sticker step on the face ring) — not a full 360°.
@@ -674,14 +689,33 @@ function drawFace(
   ctx.clip();
   ctx.strokeStyle = isActive ? p.faceRule : p.faceRuleDim;
   ctx.lineWidth = 1;
-  for (let i = 1; i < 8; i++) {
-    const t = i / 8;
-    const a = lerp2(q[0]!, q[3]!, t);
-    const b = lerp2(q[1]!, q[2]!, t);
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
+  // Desktop: decorative ruled-paper lines. Mobile: cheap cell dividers only.
+  if (quality.paperGrain) {
+    for (let i = 1; i < 8; i++) {
+      const t = i / 8;
+      const a = lerp2(q[0]!, q[3]!, t);
+      const b = lerp2(q[1]!, q[2]!, t);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+  } else {
+    for (let i = 1; i < n; i++) {
+      const t = i / n;
+      const v0 = lerp2(q[0]!, q[3]!, t);
+      const v1 = lerp2(q[1]!, q[2]!, t);
+      ctx.beginPath();
+      ctx.moveTo(v0.x, v0.y);
+      ctx.lineTo(v1.x, v1.y);
+      ctx.stroke();
+      const h0 = lerp2(q[0]!, q[1]!, t);
+      const h1 = lerp2(q[3]!, q[2]!, t);
+      ctx.beginPath();
+      ctx.moveTo(h0.x, h0.y);
+      ctx.lineTo(h1.x, h1.y);
+      ctx.stroke();
+    }
   }
 
   const gap = 0.04;
@@ -765,7 +799,6 @@ function drawFace(
       s1,
       s2,
       s3,
-      q,
       hovering || spinning,
       hoverT,
       dropT,
@@ -859,7 +892,6 @@ function drawStickerOnQuad(
   tr: Vec2,
   br: Vec2,
   bl: Vec2,
-  faceQuad: Vec2[],
   hovering: boolean,
   hoverT: number,
   dropT = 0,
@@ -874,7 +906,8 @@ function drawStickerOnQuad(
   const bh =
     (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) /
     2;
-  const anim = getQuality().hoverAnim && hovering;
+  const quality = getQuality();
+  const anim = quality.hoverAnim && hovering;
   const phase = hoverT * 4.2 + cx * 0.02 + cy * 0.015;
   const bob = anim ? Math.sin(phase) * 2.4 : 0;
   const wobble = anim ? Math.sin(phase * 0.85 + 0.6) * 0.045 : 0;
@@ -903,15 +936,8 @@ function drawStickerOnQuad(
 
   const s = Math.min(bw, bh) * breathe * celeb;
 
+  // Face clip already applied in drawFace — no per-sticker clip.
   ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(faceQuad[0]!.x, faceQuad[0]!.y);
-  ctx.lineTo(faceQuad[1]!.x, faceQuad[1]!.y);
-  ctx.lineTo(faceQuad[2]!.x, faceQuad[2]!.y);
-  ctx.lineTo(faceQuad[3]!.x, faceQuad[3]!.y);
-  ctx.closePath();
-  ctx.clip();
-
   if (anim) {
     ctx.translate(cx, cy + bob + dropY);
     ctx.rotate(wobble);
@@ -925,7 +951,7 @@ function drawStickerOnQuad(
   const drawH = s * dropScaleY;
 
   // Soft shaped shadow behind the sticker (lane lift only) — not a ground oval.
-  if (castShadow) {
+  if (castShadow && quality.stickerShadows) {
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.42)";
     ctx.shadowBlur = Math.max(8, s * 0.18);
