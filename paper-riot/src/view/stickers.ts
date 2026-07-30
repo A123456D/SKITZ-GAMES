@@ -1,15 +1,12 @@
-import type { ObstacleKind, PowerUpKind, TileKind } from "../core/types";
-import { OBSTACLE_KINDS, POWERUP_KINDS, TILE_KINDS } from "../core/types";
-
-const VERSION = 3;
-const stickers = new Map<string, HTMLImageElement>();
+const VERSION = 5;
+const cache = new Map<string, HTMLImageElement>();
 let loadPromise: Promise<void> | null = null;
 
 function loadOne(src: string, key: string): Promise<void> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
-      stickers.set(key, img);
+      cache.set(key, img);
       resolve();
     };
     img.onerror = () => resolve();
@@ -20,20 +17,26 @@ function loadOne(src: string, key: string): Promise<void> {
 export function loadGameArt(): Promise<void> {
   if (loadPromise) return loadPromise;
   const jobs: Promise<void>[] = [];
-  for (const k of TILE_KINDS) {
+
+  for (const k of ["skull", "star", "flame", "heart", "bolt", "gem"]) {
     jobs.push(loadOne(`./stickers/${k}.png`, `tile:${k}`));
   }
-  for (const k of OBSTACLE_KINDS) {
+  for (const k of [
+    "tape-x",
+    "tape-black",
+    "box",
+    "tar",
+    "glue",
+    "lock",
+    "wet",
+    "barbed",
+  ]) {
     jobs.push(loadOne(`./obstacles/${k}.png`, `obs:${k}`));
   }
-  for (const k of POWERUP_KINDS) {
+  for (const k of ["bomb", "plane", "magnet", "rocket", "stapler", "disco"]) {
     jobs.push(loadOne(`./powerups/${k}.png`, `pow:${k}`));
   }
-  for (const k of [
-    "pop-skull",
-    "swap-star",
-    "match-hearts",
-  ]) {
+  for (const k of ["pop-skull", "swap-star", "match-hearts"]) {
     jobs.push(loadOne(`./fx/${k}.png`, `fx:${k}`));
   }
   for (const k of [
@@ -50,37 +53,49 @@ export function loadGameArt(): Promise<void> {
   ]) {
     jobs.push(loadOne(`./particles/${k}.png`, `pt:${k}`));
   }
+  for (const [file, key] of [
+    ["logo.png", "ui:logo"],
+    ["bg-menu.png", "ui:bg-menu"],
+    ["bg-play.png", "ui:bg-play"],
+    ["bg-map.png", "ui:bg-map"],
+    ["btn-play.png", "ui:btn-play"],
+    ["btn-paper.png", "ui:btn-paper"],
+  ] as const) {
+    jobs.push(loadOne(`./ui/${file}`, key));
+  }
+
   loadPromise = Promise.all(jobs).then(() => {
     loadPromise = null;
   });
   return loadPromise;
 }
 
-export function tileImage(kind: TileKind): HTMLImageElement | null {
-  return stickers.get(`tile:${kind}`) ?? null;
+export function img(key: string): HTMLImageElement | null {
+  return cache.get(key) ?? null;
 }
 
-export function obstacleImage(kind: ObstacleKind): HTMLImageElement | null {
-  return stickers.get(`obs:${kind}`) ?? null;
+export function tileImage(kind: string) {
+  return img(`tile:${kind}`);
+}
+export function obstacleImage(kind: string) {
+  return img(`obs:${kind}`);
+}
+export function powerImage(kind: string) {
+  return img(`pow:${kind}`);
+}
+export function fxImage(name: string) {
+  return img(`fx:${name}`);
+}
+export function particleImage(name: string) {
+  return img(`pt:${name}`);
+}
+export function uiImage(name: string) {
+  return img(`ui:${name}`);
 }
 
-export function powerImage(kind: PowerUpKind): HTMLImageElement | null {
-  return stickers.get(`pow:${kind}`) ?? null;
-}
-
-export function fxImage(name: string): HTMLImageElement | null {
-  return stickers.get(`fx:${name}`) ?? null;
-}
-
-export function particleImage(name: string): HTMLImageElement | null {
-  return stickers.get(`pt:${name}`) ?? null;
-}
-
-/** @deprecated use loadGameArt */
-export function loadStickers(): Promise<void> {
+export function loadStickers() {
   return loadGameArt();
 }
-
-export function stickerImage(kind: TileKind): HTMLImageElement | null {
+export function stickerImage(kind: string) {
   return tileImage(kind);
 }

@@ -34,7 +34,6 @@ export const POWERUP_KINDS = [
 
 export type PowerUpKind = (typeof POWERUP_KINDS)[number];
 
-/** Hits to clear when an adjacent match pops. */
 export const OBSTACLE_HITS: Record<ObstacleKind, number> = {
   "tape-x": 1,
   "tape-black": 1,
@@ -46,8 +45,9 @@ export const OBSTACLE_HITS: Record<ObstacleKind, number> = {
   barbed: 1,
 };
 
-export const COLS = 6;
-export const ROWS = 8;
+/** Max board size (shapes carve holes inside this). */
+export const COLS = 7;
+export const ROWS = 9;
 
 export type Cell = {
   kind: TileKind;
@@ -58,21 +58,45 @@ export type Cell = {
 
 export type Pos = { c: number; r: number };
 
+/** true = playable slot. */
+export type BoardMask = boolean[][];
+
+/** null = empty playable OR unused; only read where mask is true. */
+export type Board = (Cell | null)[][];
+
 export type Goal = {
   kind: TileKind;
   need: number;
   have: number;
 };
 
+export type BoardShapeId =
+  | "rect"
+  | "square"
+  | "donut"
+  | "plus"
+  | "diamond"
+  | "heart"
+  | "stairs"
+  | "pillars"
+  | "narrow"
+  | "bite";
+
+export type ZoneId = "desk" | "hall" | "yard" | "roof";
+
 export type LevelDef = {
   id: number;
+  zone: ZoneId;
+  name: string;
   moves: number;
   goals: { kind: TileKind; need: number }[];
-  /** Extra obstacle spawns on new board. */
-  obstacles?: number;
+  shape: BoardShapeId;
+  /** How many colors in the bag (4–6). */
+  colors: number;
+  obstacles: number;
+  /** Map node position 0..1 within zone path. */
+  mapT: number;
 };
-
-export type Board = Cell[][];
 
 export type MatchGroup = {
   kind: TileKind;
@@ -80,3 +104,12 @@ export type MatchGroup = {
 };
 
 export type PowerInventory = Record<PowerUpKind, number>;
+
+export type Progress = {
+  /** Highest unlocked level id (1-based). */
+  unlocked: number;
+  /** Stars per level id (0–3). */
+  stars: Record<number, number>;
+  lives: number;
+  gems: number;
+};

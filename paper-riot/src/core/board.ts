@@ -1,9 +1,12 @@
+import { shapeMask } from "./shapes";
 import {
   COLS,
   ROWS,
   TILE_KINDS,
   OBSTACLE_HITS,
   type Board,
+  type BoardMask,
+  type BoardShapeId,
   type Cell,
   type MatchGroup,
   type ObstacleKind,
@@ -19,52 +22,66 @@ export function freshId(): number {
   return nextId++;
 }
 
-export function randomKind(exclude?: TileKind[]): TileKind {
-  const pool = exclude?.length
-    ? TILE_KINDS.filter((k) => !exclude.includes(k))
-    : [...TILE_KINDS];
-  return pool[Math.floor(Math.random() * pool.length)]!;
+export function randomKind(
+  colors: number,
+  exclude?: TileKind[],
+): TileKind {
+  const bag = TILE_KINDS.slice(0, Math.max(3, Math.min(6, colors)));
+  const pool = exclude?.length ? bag.filter((k) => !exclude.includes(k)) : bag;
+  const use = pool.length ? pool : bag;
+  return use[Math.floor(Math.random() * use.length)]!;
 }
 
-export function makeCell(kind?: TileKind): Cell {
-  return { kind: kind ?? randomKind(), id: freshId() };
+export function makeCell(kind?: TileKind, colors = 6): Cell {
+  return { kind: kind ?? randomKind(colors), id: freshId() };
 }
 
 export function inBounds(c: number, r: number): boolean {
   return c >= 0 && c < COLS && r >= 0 && r < ROWS;
 }
 
+export function isPlayable(mask: BoardMask, c: number, r: number): boolean {
+  return inBounds(c, r) && !!mask[c]![r];
+}
+
 export function cloneBoard(board: Board): Board {
   return board.map((col) =>
-    col.map((cell) => ({
-      ...cell,
-    })),
+    col.map((cell) => (cell ? { ...cell } : null)),
   );
 }
 
-export function createBoard(obstacleCount = 0): Board {
-  const board: Board = [];
+export function createBoard(
+  shape: BoardShapeId,
+  opts: { colors?: number; obstacles?: number } = {},
+): { board: Board; mask: BoardMask } {
+  const colors = opts.colors ?? 5;
+  const mask = shapeMask(shape);
+  const board: Board = Array.from({ length: COLS }, () =>
+    Array.from({ length: ROWS }, () => null),
+  );
+
   for (let c = 0; c < COLS; c++) {
-    const col: Cell[] = [];
     for (let r = 0; r < ROWS; r++) {
+      if (!mask[c]![r]) continue;
       const banned: TileKind[] = [];
-      if (r >= 2) {
-        const a = col[r - 1]!.kind;
-        const b = col[r - 2]!.kind;
-        if (a === b) banned.push(a);
+      if (r >= 2 && mask[c]![r - 1] && mask[c]![r - 2]) {
+        const a = board[c]![r - 1]?.kind;
+        const b = board[c]![r - 2]?.kind;
+        if (a && a === b) banned.push(a);
       }
-      if (c >= 2) {
-        const a = board[c - 1]![r]!.kind;
-        const b = board[c - 2]![r]!.kind;
-        if (a === b) banned.push(a);
+      if (c >= 2 && mask[c - 1]![r] && mask[c - 2]![r]) {
+        const a = board[c - 1]![r]?.kind;
+        const b = board[c - 2]![r]?.kind;
+        if (a && a === b) banned.push(a);
       }
-      col.push(makeCell(randomKind(banned)));
+      board[c]![r] = makeCell(randomKind(colors, banned), colors);
     }
-    board.push(col);
   }
 
-  if (obstacleCount > 0) sprinkleObstacles(board, obstacleCount);
-  return board;
+  if ((opts.obstacles ?? 0) > 0) {
+    sprinkleObstacles(board, mask, opts.obstacles!);
+  }
+  return { board, mask };
 }
 
 const SPAWN_OBSTACLES: ObstacleKind[] = [
@@ -77,15 +94,19 @@ const SPAWN_OBSTACLES: ObstacleKind[] = [
   "wet",
 ];
 
-export function sprinkleObstacles(board: Board, count: number): void {
+export function sprinkleObstacles(
+  board: Board,
+  mask: BoardMask,
+  count: number,
+): void {
   let placed = 0;
   let guard = 0;
-  while (placed < count && guard++ < 200) {
+  while (placed < count && guard++ < 400) {
     const c = Math.floor(Math.random() * COLS);
     const r = Math.floor(Math.random() * ROWS);
-    const cell = board[c]![r]!;
-    if (cell.obstacle) continue;
-    // Keep top rows freer for cascading readability.
+    if (!mask[c]![r]) continue;
+    const cell = board[c]![r];
+    if (!cell || cell.obstacle) continue;
     if (r < 2) continue;
     const kind = SPAWN_OBSTACLES[placed % SPAWN_OBSTACLES.length]!;
     cell.obstacle = kind;
@@ -98,8 +119,8 @@ export function areAdjacent(a: Pos, b: Pos): boolean {
   return Math.abs(a.c - b.c) + Math.abs(a.r - b.r) === 1;
 }
 
-export function canSwapCell(cell: Cell): boolean {
-  // Locked / taped / boxed tiles cannot be swapped until cleared.
+export function canSwapCell(cell: Cell | null): boolean {
+  if (!cell) return false;
   if (!cell.obstacle) return true;
   return cell.obstacle === "glue" || cell.obstacle === "wet" || cell.obstacle === "tar";
 }
@@ -110,14 +131,17 @@ export function swapCells(board: Board, a: Pos, b: Pos): void {
   board[b.c]![b.r] = tmp;
 }
 
-export function findMatches(board: Board): MatchGroup[] {
+export function findMatches(board: Board, mask: BoardMask): MatchGroup[] {
   const groups: MatchGroup[] = [];
 
   for (let r = 0; r < ROWS; r++) {
     let run = 1;
     for (let c = 1; c <= COLS; c++) {
+      const leftOk = c > 0 && mask[c - 1]?.[r] && board[c - 1]![r];
+      const curOk = c < COLS && mask[c]?.[r] && board[c]![r];
       const same =
-        c < COLS &&
+        curOk &&
+        leftOk &&
         board[c]![r]!.kind === board[c - 1]![r]!.kind &&
         !board[c]![r]!.obstacle &&
         !board[c - 1]![r]!.obstacle;
@@ -138,8 +162,11 @@ export function findMatches(board: Board): MatchGroup[] {
   for (let c = 0; c < COLS; c++) {
     let run = 1;
     for (let r = 1; r <= ROWS; r++) {
+      const upOk = r > 0 && mask[c]?.[r - 1] && board[c]![r - 1];
+      const curOk = r < ROWS && mask[c]?.[r] && board[c]![r];
       const same =
-        r < ROWS &&
+        curOk &&
+        upOk &&
         board[c]![r]!.kind === board[c]![r - 1]!.kind &&
         !board[c]![r]!.obstacle &&
         !board[c]![r - 1]!.obstacle;
@@ -173,8 +200,11 @@ export function findMatches(board: Board): MatchGroup[] {
   return groups;
 }
 
-/** Damage obstacles neighboring matched cells. */
-export function damageAdjacentObstacles(board: Board, groups: MatchGroup[]): Pos[] {
+export function damageAdjacentObstacles(
+  board: Board,
+  mask: BoardMask,
+  groups: MatchGroup[],
+): Pos[] {
   const matched = new Set(groups.flatMap((g) => g.cells.map((p) => `${p.c},${p.r}`)));
   const cleared: Pos[] = [];
   const seen = new Set<string>();
@@ -188,12 +218,12 @@ export function damageAdjacentObstacles(board: Board, groups: MatchGroup[]): Pos
     ] as const) {
       const c = cs! + dc;
       const r = rs! + dr;
-      if (!inBounds(c, r)) continue;
+      if (!isPlayable(mask, c, r)) continue;
       const k = `${c},${r}`;
       if (seen.has(k) || matched.has(k)) continue;
       seen.add(k);
-      const cell = board[c]![r]!;
-      if (!cell.obstacle) continue;
+      const cell = board[c]![r];
+      if (!cell?.obstacle) continue;
       cell.hits = (cell.hits ?? 1) - 1;
       if ((cell.hits ?? 0) <= 0) {
         delete cell.obstacle;
@@ -205,38 +235,70 @@ export function damageAdjacentObstacles(board: Board, groups: MatchGroup[]): Pos
   return cleared;
 }
 
-export function crushAndRefill(board: Board, groups: MatchGroup[]): number {
+/** Crush matches then gravity within mask; refill from top. */
+export function crushAndRefill(
+  board: Board,
+  mask: BoardMask,
+  groups: MatchGroup[],
+  colors: number,
+): number {
   const dead = new Set<string>();
   for (const g of groups) {
     for (const p of g.cells) dead.add(`${p.c},${p.r}`);
   }
+  for (const key of dead) {
+    const [c, r] = key.split(",").map(Number);
+    board[c!]![r!] = null;
+  }
 
   for (let c = 0; c < COLS; c++) {
     const kept: Cell[] = [];
     for (let r = ROWS - 1; r >= 0; r--) {
-      if (!dead.has(`${c},${r}`)) kept.push(board[c]![r]!);
+      if (!mask[c]![r]) continue;
+      const cell = board[c]![r];
+      if (cell) kept.push(cell);
+      board[c]![r] = null;
     }
-    const missing = ROWS - kept.length;
-    const col: Cell[] = [];
-    for (let i = 0; i < missing; i++) col.push(makeCell());
-    for (let i = kept.length - 1; i >= 0; i--) col.push(kept[i]!);
-    board[c] = col;
+    let ki = 0;
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (!mask[c]![r]) continue;
+      if (ki < kept.length) {
+        board[c]![r] = kept[ki++]!;
+      } else {
+        board[c]![r] = makeCell(undefined, colors);
+      }
+    }
   }
   return dead.size;
 }
 
-export function clearPositions(board: Board, positions: Pos[]): number {
-  const dead = new Set(positions.map((p) => `${p.c},${p.r}`));
+export function clearPositions(
+  board: Board,
+  mask: BoardMask,
+  positions: Pos[],
+  colors: number,
+): number {
+  const dead = new Set(
+    positions.filter((p) => isPlayable(mask, p.c, p.r)).map((p) => `${p.c},${p.r}`),
+  );
+  for (const key of dead) {
+    const [c, r] = key.split(",").map(Number);
+    board[c!]![r!] = null;
+  }
   for (let c = 0; c < COLS; c++) {
     const kept: Cell[] = [];
     for (let r = ROWS - 1; r >= 0; r--) {
-      if (!dead.has(`${c},${r}`)) kept.push(board[c]![r]!);
+      if (!mask[c]![r]) continue;
+      const cell = board[c]![r];
+      if (cell) kept.push(cell);
+      board[c]![r] = null;
     }
-    const missing = ROWS - kept.length;
-    const col: Cell[] = [];
-    for (let i = 0; i < missing; i++) col.push(makeCell());
-    for (let i = kept.length - 1; i >= 0; i--) col.push(kept[i]!);
-    board[c] = col;
+    let ki = 0;
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (!mask[c]![r]) continue;
+      if (ki < kept.length) board[c]![r] = kept[ki++]!;
+      else board[c]![r] = makeCell(undefined, colors);
+    }
   }
   return dead.size;
 }
@@ -256,15 +318,21 @@ export function countKind(groups: MatchGroup[], kind: TileKind): number {
   return n;
 }
 
-export function hasAnyMatch(board: Board): boolean {
-  return findMatches(board).length > 0;
+export function hasAnyMatch(board: Board, mask: BoardMask): boolean {
+  return findMatches(board, mask).length > 0;
 }
 
-export function swapCreatesMatch(board: Board, a: Pos, b: Pos): boolean {
-  const ca = board[a.c]![a.r]!;
-  const cb = board[b.c]![b.r]!;
+export function swapCreatesMatch(
+  board: Board,
+  mask: BoardMask,
+  a: Pos,
+  b: Pos,
+): boolean {
+  if (!isPlayable(mask, a.c, a.r) || !isPlayable(mask, b.c, b.r)) return false;
+  const ca = board[a.c]![a.r];
+  const cb = board[b.c]![b.r];
   if (!canSwapCell(ca) || !canSwapCell(cb)) return false;
   const copy = cloneBoard(board);
   swapCells(copy, a, b);
-  return hasAnyMatch(copy);
+  return hasAnyMatch(copy, mask);
 }

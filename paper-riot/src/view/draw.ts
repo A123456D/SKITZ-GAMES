@@ -1,6 +1,21 @@
-import { COLS, ROWS, POWERUP_KINDS, type PowerUpKind, type TileKind } from "../core/types";
+import {
+  COLS,
+  ROWS,
+  POWERUP_KINDS,
+  type PowerUpKind,
+  type Progress,
+  type TileKind,
+  type ZoneId,
+} from "../core/types";
 import type { Session } from "../core/session";
-import { fxImage, obstacleImage, powerImage, stickerImage } from "./stickers";
+import { LEVELS, ZONES, zoneLevels } from "../core/levels";
+import {
+  fxImage,
+  obstacleImage,
+  powerImage,
+  stickerImage,
+  uiImage,
+} from "./stickers";
 import { Palette } from "./theme";
 import { drawParticles } from "./particles";
 
@@ -9,28 +24,19 @@ export const H = 1280;
 
 export type UiRect = { x: number; y: number; w: number; h: number };
 
-export const HOME_PLAY: UiRect = { x: 110, y: 430, w: 500, h: 78 };
-export const HOME_DAILY: UiRect = { x: 110, y: 528, w: 500, h: 72 };
-export const HOME_SHOP: UiRect = { x: 110, y: 616, w: 500, h: 72 };
-export const HOME_COLLECTION: UiRect = { x: 110, y: 704, w: 500, h: 72 };
-export const HOME_SETTINGS: UiRect = { x: 110, y: 792, w: 500, h: 72 };
-
+export const HOME_PLAY: UiRect = { x: 90, y: 520, w: 540, h: 100 };
+export const HOME_MAP: UiRect = { x: 110, y: 640, w: 500, h: 80 };
+export const HOME_SETTINGS: UiRect = { x: 110, y: 740, w: 500, h: 80 };
 export const PAUSE_BTN: UiRect = { x: 620, y: 36, w: 64, h: 64 };
+export const MAP_BACK: UiRect = { x: 36, y: 36, w: 120, h: 56 };
+export const MAP_PLAY: UiRect = { x: 200, y: 1160, w: 320, h: 72 };
 
-/** Docked power-up slots along the bottom. */
 export const POWER_DOCK: { kind: PowerUpKind; rect: UiRect }[] = POWERUP_KINDS.map(
   (kind, i) => ({
     kind,
     rect: { x: 48 + i * 112, y: 1110, w: 100, h: 100 },
   }),
 );
-
-export function hitPowerDock(x: number, y: number): PowerUpKind | null {
-  for (const slot of POWER_DOCK) {
-    if (hitUi(slot.rect, x, y)) return slot.kind;
-  }
-  return null;
-}
 
 export type BoardLayout = {
   x: number;
@@ -40,13 +46,12 @@ export type BoardLayout = {
 };
 
 export function boardLayout(): BoardLayout {
-  const gap = 6;
+  const gap = 5;
   const width = 640;
   const cell = (width - gap * (COLS - 1)) / COLS;
-  const height = cell * ROWS + gap * (ROWS - 1);
   return {
     x: (W - width) / 2,
-    y: 340,
+    y: 320,
     cell,
     gap,
   };
@@ -54,6 +59,13 @@ export function boardLayout(): BoardLayout {
 
 export function hitUi(r: UiRect, x: number, y: number): boolean {
   return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+}
+
+export function hitPowerDock(x: number, y: number): PowerUpKind | null {
+  for (const slot of POWER_DOCK) {
+    if (hitUi(slot.rect, x, y)) return slot.kind;
+  }
+  return null;
 }
 
 export function cellAt(
@@ -85,6 +97,45 @@ export function cellCenter(
   };
 }
 
+function cover(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement | null,
+  fallback: string,
+): void {
+  if (image && image.complete && image.naturalWidth > 0) {
+    const iw = image.naturalWidth;
+    const ih = image.naturalHeight;
+    const scale = Math.max(W / iw, H / ih);
+    const dw = iw * scale;
+    const dh = ih * scale;
+    ctx.drawImage(image, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    return;
+  }
+  ctx.fillStyle = fallback;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawImg(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement | null,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  shadow = true,
+): void {
+  if (!image || !image.complete) return;
+  ctx.save();
+  if (shadow) {
+    ctx.shadowColor = Palette.shadow;
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetX = 3;
+    ctx.shadowOffsetY = 5;
+  }
+  ctx.drawImage(image, x, y, w, h);
+  ctx.restore();
+}
+
 function roundRect(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -103,175 +154,247 @@ function roundRect(
   ctx.closePath();
 }
 
-function tornPaper(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  fill: string,
-  opts?: { shadow?: boolean; rotate?: number },
-): void {
-  ctx.save();
-  if (opts?.rotate) {
-    ctx.translate(x + w / 2, y + h / 2);
-    ctx.rotate(opts.rotate);
-    ctx.translate(-(x + w / 2), -(y + h / 2));
-  }
-  if (opts?.shadow !== false) {
-    ctx.shadowColor = Palette.shadow;
-    ctx.shadowBlur = 12;
-    ctx.shadowOffsetX = 4;
-    ctx.shadowOffsetY = 6;
-  }
-  ctx.fillStyle = fill;
-  // Jagged torn edge
-  ctx.beginPath();
-  ctx.moveTo(x + 6, y + 2);
-  ctx.lineTo(x + w * 0.22, y);
-  ctx.lineTo(x + w * 0.48, y + 5);
-  ctx.lineTo(x + w * 0.72, y + 1);
-  ctx.lineTo(x + w - 4, y + 4);
-  ctx.lineTo(x + w, y + h * 0.35);
-  ctx.lineTo(x + w - 3, y + h * 0.7);
-  ctx.lineTo(x + w - 1, y + h - 3);
-  ctx.lineTo(x + w * 0.65, y + h);
-  ctx.lineTo(x + w * 0.35, y + h - 4);
-  ctx.lineTo(x + 5, y + h - 1);
-  ctx.lineTo(x, y + h * 0.55);
-  ctx.lineTo(x + 3, y + h * 0.22);
-  ctx.closePath();
-  ctx.fill();
-  ctx.shadowColor = "transparent";
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = Palette.ink;
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.restore();
-}
-
 function drawSticker(
   ctx: CanvasRenderingContext2D,
   kind: TileKind,
   cx: number,
   cy: number,
   size: number,
-  opts?: { selected?: boolean; squash?: number },
+  selected = false,
 ): void {
-  const squash = opts?.squash ?? 1;
-  const img = stickerImage(kind);
-  const drawW = size * squash;
-  const drawH = size / squash;
-  const x = cx - drawW / 2;
-  const y = cy - drawH / 2;
-
+  const image = stickerImage(kind);
+  const x = cx - size / 2;
+  const y = cy - size / 2;
   ctx.save();
-  // Soft drop shadow — part of the Paper Riot look
   ctx.shadowColor = Palette.shadow;
   ctx.shadowBlur = Math.max(6, size * 0.14);
-  ctx.shadowOffsetX = size * 0.06;
-  ctx.shadowOffsetY = size * 0.1;
-  if (img && img.complete && img.naturalWidth > 0) {
-    ctx.drawImage(img, x, y, drawW, drawH);
+  ctx.shadowOffsetX = size * 0.05;
+  ctx.shadowOffsetY = size * 0.09;
+  if (image && image.complete) {
+    ctx.drawImage(image, x, y, size, size);
   } else {
     ctx.fillStyle = Palette.paper;
-    roundRect(ctx, x, y, drawW, drawH, 10);
+    roundRect(ctx, x, y, size, size, 10);
     ctx.fill();
   }
-  ctx.shadowColor = "transparent";
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 0;
-
-  if (opts?.selected) {
+  ctx.restore();
+  if (selected) {
     ctx.strokeStyle = Palette.hot;
     ctx.lineWidth = 4;
-    roundRect(ctx, x - 4, y - 4, drawW + 8, drawH + 8, 12);
+    roundRect(ctx, x - 4, y - 4, size + 8, size + 8, 12);
     ctx.stroke();
   }
-  ctx.restore();
 }
 
-export function drawBackdrop(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = Palette.bg;
-  ctx.fillRect(0, 0, W, H);
-
-  // Charcoal noise strips
-  ctx.fillStyle = "#141414";
-  for (let i = 0; i < 18; i++) {
-    const y = (i * 97 + 40) % H;
-    ctx.globalAlpha = 0.35;
-    ctx.fillRect(0, y, W, 28 + (i % 5) * 6);
+function paperBtn(
+  ctx: CanvasRenderingContext2D,
+  rect: UiRect,
+  label: string,
+  opts?: { play?: boolean; hot?: boolean },
+): void {
+  const art = uiImage(opts?.play ? "btn-play" : "btn-paper");
+  if (art && art.complete) {
+    drawImg(ctx, art, rect.x, rect.y, rect.w, rect.h, true);
+  } else {
+    ctx.fillStyle = opts?.play || opts?.hot ? Palette.hot : Palette.paper;
+    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 8);
+    ctx.fill();
   }
-  ctx.globalAlpha = 1;
-
-  // Lined paper scraps
-  tornPaper(ctx, -40, 60, 320, 220, Palette.paper, { rotate: -0.08 });
-  tornPaper(ctx, 420, 880, 360, 280, Palette.paperDim, { rotate: 0.06 });
-  tornPaper(ctx, 480, 40, 280, 160, "#fff7ea", { rotate: 0.1 });
-}
-
-export function drawHome(ctx: CanvasRenderingContext2D): void {
-  drawBackdrop(ctx);
-
-  ctx.fillStyle = Palette.ink;
-  ctx.font = "800 64px 'Permanent Marker', cursive";
+  ctx.fillStyle = opts?.play || opts?.hot ? Palette.white : Palette.ink;
+  ctx.font = "800 34px 'Chakra Petch', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("PAPER", W / 2 - 40, 210);
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 2);
+}
 
-  // RIOT letter blocks (simplified)
-  const letters = [
-    { ch: "R", col: Palette.purple },
-    { ch: "I", col: Palette.ink },
-    { ch: "O", col: Palette.lime },
-    { ch: "T", col: Palette.hot },
-  ];
-  let lx = 200;
-  for (const L of letters) {
-    tornPaper(ctx, lx, 230, 78, 86, L.col, { rotate: (lx % 17) * 0.002 });
-    ctx.fillStyle = L.col === Palette.ink ? Palette.white : Palette.ink;
-    ctx.font = "800 48px 'Chakra Petch', sans-serif";
+export function drawHome(ctx: CanvasRenderingContext2D, progress: Progress): void {
+  cover(ctx, uiImage("bg-menu"), Palette.bg);
+
+  const logo = uiImage("logo");
+  if (logo && logo.complete) {
+    const lw = 560;
+    const lh = (logo.naturalHeight / logo.naturalWidth) * lw;
+    drawImg(ctx, logo, (W - lw) / 2, 120, lw, Math.min(lh, 320), true);
+  } else {
+    ctx.fillStyle = Palette.white;
+    ctx.font = "800 64px 'Permanent Marker', cursive";
     ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(L.ch, lx + 39, 275);
-    lx += 88;
+    ctx.fillText("PAPER RIOT", W / 2, 260);
   }
 
-  const buttons: { rect: UiRect; label: string; fill: string; hot?: boolean }[] =
-    [
-      { rect: HOME_PLAY, label: "PLAY", fill: Palette.hot, hot: true },
-      { rect: HOME_DAILY, label: "DAILY", fill: Palette.paper },
-      { rect: HOME_SHOP, label: "SHOP", fill: Palette.paper },
-      { rect: HOME_COLLECTION, label: "COLLECTION", fill: Palette.paper },
-      { rect: HOME_SETTINGS, label: "SETTINGS", fill: Palette.paper },
-    ];
+  paperBtn(ctx, HOME_PLAY, "PLAY", { play: true });
+  paperBtn(ctx, HOME_MAP, "WORLD MAP");
+  paperBtn(ctx, HOME_SETTINGS, "SETTINGS");
 
-  for (const b of buttons) {
-    tornPaper(ctx, b.rect.x, b.rect.y, b.rect.w, b.rect.h, b.fill, {
-      rotate: b.hot ? -0.01 : 0.008,
-    });
-    ctx.fillStyle = b.hot ? Palette.white : Palette.ink;
-    ctx.font = "800 36px 'Chakra Petch', sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(b.label, b.rect.x + 36, b.rect.y + b.rect.h / 2 + 2);
-  }
+  ctx.fillStyle = Palette.white;
+  ctx.font = "600 22px 'Patrick Hand', cursive";
+  ctx.textAlign = "center";
+  ctx.fillText(
+    `Next: Level ${Math.min(progress.unlocked, 40)}`,
+    W / 2,
+    880,
+  );
 
-  // Lives / gems scrap
-  tornPaper(ctx, 40, 980, 220, 70, Palette.ink);
+  // Lives / gems
+  ctx.fillStyle = "rgba(0,0,0,0.72)";
+  roundRect(ctx, 40, 980, 220, 70, 8);
+  ctx.fill();
   ctx.fillStyle = Palette.hot;
-  ctx.font = "800 28px 'Chakra Petch', sans-serif";
+  ctx.font = "800 26px 'Chakra Petch', sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("♥  5 FULL", 70, 1024);
+  ctx.fillText(`♥  ${progress.lives} FULL`, 60, 1024);
 
-  tornPaper(ctx, 420, 980, 260, 70, Palette.ink);
+  ctx.fillStyle = "rgba(0,0,0,0.72)";
+  roundRect(ctx, 420, 980, 260, 70, 8);
+  ctx.fill();
   ctx.fillStyle = Palette.purple;
-  ctx.fillText("◆  350  +", 450, 1024);
+  ctx.fillText(`◆  ${progress.gems}`, 440, 1024);
 
   ctx.fillStyle = Palette.white;
   ctx.font = "600 28px 'Patrick Hand', cursive";
   ctx.textAlign = "center";
   ctx.fillText("RIP. MATCH. REPEAT.", W / 2, 1180);
+}
+
+/** Candy Crush–style zigzag path through a zone (bottom → top). */
+function zonePath(zoneIndex: number): { x: number; y: number }[] {
+  const sway = [0, 1, 0, -1, 0, 1, 0, -1, 0, 1] as const;
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0; i < 10; i++) {
+    const t = i / 9;
+    const lane = sway[(i + zoneIndex) % sway.length]!;
+    const x = W / 2 + lane * 160 + Math.sin(t * Math.PI * 2 + zoneIndex) * 18;
+    const y = 1000 - t * 720;
+    pts.push({ x, y });
+  }
+  return pts;
+}
+
+export function mapNodeAt(
+  zone: ZoneId,
+  x: number,
+  y: number,
+): number | null {
+  const zi = ZONES.findIndex((z) => z.id === zone);
+  const levels = zoneLevels(zone);
+  const path = zonePath(zi);
+  for (let i = 0; i < levels.length; i++) {
+    const p = path[i]!;
+    const dx = x - p.x;
+    const dy = y - p.y;
+    if (dx * dx + dy * dy <= 40 * 40) return levels[i]!.id;
+  }
+  return null;
+}
+
+export function drawMap(
+  ctx: CanvasRenderingContext2D,
+  progress: Progress,
+  zone: ZoneId,
+  selectedLevel: number,
+): void {
+  cover(ctx, uiImage("bg-map"), "#1a1510");
+
+  const zi = ZONES.findIndex((z) => z.id === zone);
+  const zoneMeta = ZONES[zi]!;
+  const levels = zoneLevels(zone);
+  const path = zonePath(zi);
+
+  // Zone title scrap
+  ctx.fillStyle = Palette.paper;
+  roundRect(ctx, 160, 40, 400, 90, 8);
+  ctx.fill();
+  ctx.strokeStyle = Palette.ink;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillStyle = Palette.ink;
+  ctx.font = "800 32px 'Permanent Marker', cursive";
+  ctx.textAlign = "center";
+  ctx.fillText(zoneMeta.name, W / 2, 78);
+  ctx.font = "600 20px 'Patrick Hand', cursive";
+  ctx.fillText(zoneMeta.tagline, W / 2, 110);
+
+  paperBtn(ctx, MAP_BACK, "BACK");
+
+  // Zone tabs
+  ZONES.forEach((z, i) => {
+    const r = { x: 40 + i * 170, y: 150, w: 155, h: 48 };
+    const unlockedZone = progress.unlocked > i * 10;
+    ctx.fillStyle = z.id === zone ? Palette.hot : unlockedZone ? Palette.paper : "#666";
+    roundRect(ctx, r.x, r.y, r.w, r.h, 6);
+    ctx.fill();
+    ctx.fillStyle = z.id === zone ? Palette.white : Palette.ink;
+    ctx.font = "800 16px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(z.name.split(" ")[0]!, r.x + r.w / 2, r.y + 30);
+  });
+
+  // Path line
+  ctx.strokeStyle = Palette.tape;
+  ctx.lineWidth = 10;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  path.forEach((p, i) => {
+    if (i === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  });
+  ctx.stroke();
+  ctx.strokeStyle = Palette.ink;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Nodes
+  levels.forEach((lv, i) => {
+    const p = path[i]!;
+    const unlocked = lv.id <= progress.unlocked;
+    const stars = progress.stars[lv.id] ?? 0;
+    const selected = lv.id === selectedLevel;
+    ctx.save();
+    ctx.shadowColor = Palette.shadow;
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 4;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, selected ? 34 : 28, 0, Math.PI * 2);
+    ctx.fillStyle = !unlocked ? "#444" : selected ? Palette.hot : Palette.paper;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = Palette.ink;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = !unlocked ? "#aaa" : selected ? Palette.white : Palette.ink;
+    ctx.font = "800 22px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(unlocked ? String(lv.id) : "🔒", p.x, p.y);
+
+    if (stars > 0) {
+      ctx.fillStyle = Palette.lime;
+      ctx.font = "18px sans-serif";
+      ctx.fillText("★".repeat(stars), p.x, p.y + 42);
+    }
+  });
+
+  const sel = LEVELS.find((l) => l.id === selectedLevel);
+  if (sel) {
+    ctx.fillStyle = Palette.paper;
+    roundRect(ctx, 80, 1040, 560, 100, 8);
+    ctx.fill();
+    ctx.fillStyle = Palette.ink;
+    ctx.font = "800 26px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(`${sel.name}  ·  ${sel.moves} moves  ·  ${sel.shape}`, W / 2, 1080);
+  }
+
+  paperBtn(ctx, MAP_PLAY, "PLAY LEVEL", { hot: true });
+}
+
+export function hitZoneTab(x: number, y: number): ZoneId | null {
+  for (let i = 0; i < ZONES.length; i++) {
+    const r = { x: 40 + i * 170, y: 150, w: 155, h: 48 };
+    if (hitUi(r, x, y)) return ZONES[i]!.id;
+  }
+  return null;
 }
 
 export function drawPlay(
@@ -285,88 +408,80 @@ export function drawPlay(
     popFx: { x: number; y: number; t: number } | null;
   },
 ): void {
-  drawBackdrop(ctx);
+  cover(ctx, uiImage("bg-play"), Palette.paper);
+
   const layout = boardLayout();
 
-  // HUD scraps
-  tornPaper(ctx, 36, 36, 200, 70, Palette.paper);
+  // HUD
+  ctx.fillStyle = Palette.paper;
+  roundRect(ctx, 36, 36, 200, 70, 8);
+  ctx.fill();
+  ctx.strokeStyle = Palette.ink;
+  ctx.lineWidth = 3;
+  ctx.stroke();
   ctx.fillStyle = Palette.ink;
-  ctx.font = "800 28px 'Chakra Petch', sans-serif";
+  ctx.font = "800 26px 'Chakra Petch', sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText(`MOVES  ${session.movesLeft}`, 56, 72);
 
-  tornPaper(ctx, 260, 40, 200, 62, Palette.ink);
+  ctx.fillStyle = Palette.ink;
+  roundRect(ctx, 260, 40, 220, 62, 8);
+  ctx.fill();
   ctx.fillStyle = Palette.white;
   ctx.textAlign = "center";
-  ctx.fillText(`LEVEL ${session.level.id}`, 360, 72);
+  ctx.fillText(`LEVEL ${session.level.id}`, 370, 72);
 
-  tornPaper(ctx, PAUSE_BTN.x, PAUSE_BTN.y, PAUSE_BTN.w, PAUSE_BTN.h, Palette.paper);
+  ctx.fillStyle = Palette.paper;
+  roundRect(ctx, PAUSE_BTN.x, PAUSE_BTN.y, PAUSE_BTN.w, PAUSE_BTN.h, 8);
+  ctx.fill();
   ctx.fillStyle = Palette.ink;
   ctx.fillRect(PAUSE_BTN.x + 20, PAUSE_BTN.y + 18, 8, 28);
   ctx.fillRect(PAUSE_BTN.x + 36, PAUSE_BTN.y + 18, 8, 28);
 
   // Goals
-  tornPaper(ctx, 56, 130, 608, 170, Palette.paper, { rotate: -0.01 });
+  ctx.fillStyle = Palette.paper;
+  roundRect(ctx, 56, 120, 608, 160, 8);
+  ctx.fill();
+  ctx.strokeStyle = Palette.ink;
+  ctx.lineWidth = 3;
+  ctx.stroke();
   ctx.fillStyle = Palette.ink;
-  ctx.font = "800 26px 'Chakra Petch', sans-serif";
+  ctx.font = "800 24px 'Chakra Petch', sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("GOAL", 90, 170);
+  ctx.fillText("GOAL", 90, 155);
 
   session.goals.forEach((g, i) => {
     const gx = 110 + i * 180;
-    const gy = 230;
-    drawSticker(ctx, g.kind, gx, gy, 56);
+    const gy = 220;
+    drawSticker(ctx, g.kind, gx, gy, 52);
     ctx.fillStyle = Palette.ink;
     ctx.font = "800 22px 'Chakra Petch', sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(`${g.have}/${g.need}`, gx + 40, gy + 8);
+    ctx.fillText(`${g.have}/${g.need}`, gx + 38, gy + 6);
   });
 
-  // Board paper
-  const boardH =
-    layout.cell * ROWS + layout.gap * (ROWS - 1) + 24;
+  // Board paper plate
+  const boardH = layout.cell * ROWS + layout.gap * (ROWS - 1) + 24;
   const boardW = layout.cell * COLS + layout.gap * (COLS - 1) + 24;
-  tornPaper(
-    ctx,
-    layout.x - 12,
-    layout.y - 12,
-    boardW,
-    boardH,
-    "#f7f2e6",
-    { rotate: 0.005 },
-  );
+  ctx.fillStyle = "rgba(247,242,230,0.92)";
+  roundRect(ctx, layout.x - 12, layout.y - 12, boardW, boardH, 10);
+  ctx.fill();
+  ctx.strokeStyle = Palette.ink;
+  ctx.lineWidth = 3;
+  ctx.stroke();
 
-  // Grid lines
-  ctx.strokeStyle = Palette.gridLine;
-  ctx.lineWidth = 1.5;
-  for (let r = 0; r <= ROWS; r++) {
-    const y = layout.y + r * (layout.cell + layout.gap) - layout.gap / 2;
-    ctx.beginPath();
-    ctx.moveTo(layout.x, y);
-    ctx.lineTo(layout.x + boardW - 24, y);
-    ctx.stroke();
-  }
-  for (let c = 0; c <= COLS; c++) {
-    const x = layout.x + c * (layout.cell + layout.gap) - layout.gap / 2;
-    ctx.beginPath();
-    ctx.moveTo(x, layout.y);
-    ctx.lineTo(x, layout.y + boardH - 24);
-    ctx.stroke();
-  }
-
-  // Tiles + obstacles
+  // Tiles
   for (let c = 0; c < COLS; c++) {
     for (let r = 0; r < ROWS; r++) {
+      if (!session.mask[c]![r]) continue;
       const key = `${c},${r}`;
       if (opts.clearing.has(key)) continue;
-      const cell = session.board[c]![r]!;
+      const cell = session.board[c]![r];
+      if (!cell) continue;
       const center = cellCenter(layout, c, r);
-      const selected =
-        opts.selected?.c === c && opts.selected?.r === r;
-      drawSticker(ctx, cell.kind, center.x, center.y, layout.cell * 0.86, {
-        selected,
-      });
+      const selected = opts.selected?.c === c && opts.selected?.r === r;
+      drawSticker(ctx, cell.kind, center.x, center.y, layout.cell * 0.86, selected);
       if (cell.obstacle) {
         const oimg = obstacleImage(cell.obstacle);
         const s = layout.cell * 0.92;
@@ -377,9 +492,6 @@ export function drawPlay(
         ctx.shadowOffsetY = 5;
         if (oimg && oimg.complete) {
           ctx.drawImage(oimg, center.x - s / 2, center.y - s / 2, s, s);
-        } else {
-          ctx.fillStyle = "rgba(0,0,0,0.35)";
-          ctx.fillRect(center.x - s / 2, center.y - s / 2, s, s);
         }
         ctx.restore();
         if ((cell.hits ?? 1) > 1) {
@@ -392,15 +504,14 @@ export function drawPlay(
     }
   }
 
-  // Match burst spikes + pop art
   if (opts.burstT > 0 && opts.burstT < 1) {
     for (const key of opts.clearing) {
       const [cs, rs] = key.split(",").map(Number);
+      if (!session.mask[cs!]?.[rs!]) continue;
       const center = cellCenter(layout, cs!, rs!);
       const t = opts.burstT;
       ctx.save();
       ctx.translate(center.x, center.y);
-      ctx.rotate(t * 0.4);
       ctx.fillStyle = `rgba(10,10,10,${0.55 * (1 - t)})`;
       ctx.beginPath();
       for (let i = 0; i < 10; i++) {
@@ -418,55 +529,44 @@ export function drawPlay(
   }
 
   if (opts.popFx && opts.popFx.t < 1) {
-    const img = fxImage("pop-skull") ?? fxImage("swap-star");
+    const image = fxImage("pop-skull") ?? fxImage("swap-star");
     const s = 90 + 40 * (1 - opts.popFx.t);
     ctx.save();
     ctx.globalAlpha = 1 - opts.popFx.t;
     ctx.shadowColor = Palette.shadow;
     ctx.shadowBlur = 14;
-    if (img && img.complete) {
-      ctx.drawImage(
-        img,
-        opts.popFx.x - s / 2,
-        opts.popFx.y - s / 2,
-        s,
-        s,
-      );
+    if (image && image.complete) {
+      ctx.drawImage(image, opts.popFx.x - s / 2, opts.popFx.y - s / 2, s, s);
     }
     ctx.restore();
   }
 
   drawParticles(ctx);
 
-  // Power-up dock
   for (const slot of POWER_DOCK) {
     const armed = opts.armedPower === slot.kind;
-    tornPaper(
-      ctx,
-      slot.rect.x,
-      slot.rect.y,
-      slot.rect.w,
-      slot.rect.h,
-      armed ? Palette.hot : Palette.paper,
-      { rotate: armed ? -0.02 : 0.01 },
-    );
-    const img = powerImage(slot.kind);
+    ctx.fillStyle = armed ? Palette.hot : Palette.paper;
+    roundRect(ctx, slot.rect.x, slot.rect.y, slot.rect.w, slot.rect.h, 8);
+    ctx.fill();
+    ctx.strokeStyle = Palette.ink;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    const pimg = powerImage(slot.kind);
     const cx = slot.rect.x + slot.rect.w / 2;
     const cy = slot.rect.y + slot.rect.h / 2 - 4;
     ctx.save();
     ctx.shadowColor = Palette.shadow;
     ctx.shadowBlur = 8;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 3;
-    if (img && img.complete) {
-      ctx.drawImage(img, cx - 32, cy - 32, 64, 64);
-    }
+    if (pimg && pimg.complete) ctx.drawImage(pimg, cx - 32, cy - 32, 64, 64);
     ctx.restore();
-    const count = session.powers[slot.kind] ?? 0;
     ctx.fillStyle = armed ? Palette.white : Palette.ink;
     ctx.font = "800 18px 'Chakra Petch', sans-serif";
     ctx.textAlign = "right";
-    ctx.fillText(String(count), slot.rect.x + slot.rect.w - 12, slot.rect.y + slot.rect.h - 14);
+    ctx.fillText(
+      String(session.powers[slot.kind] ?? 0),
+      slot.rect.x + slot.rect.w - 12,
+      slot.rect.y + slot.rect.h - 14,
+    );
   }
 
   if (opts.armedPower) {
@@ -479,12 +579,18 @@ export function drawPlay(
   if (session.status === "won" || session.status === "lost") {
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.fillRect(0, 0, W, H);
-    tornPaper(ctx, 110, 480, 500, 220, Palette.paper);
+    ctx.fillStyle = Palette.paper;
+    roundRect(ctx, 110, 480, 500, 240, 12);
+    ctx.fill();
     ctx.fillStyle = Palette.ink;
     ctx.font = "800 48px 'Permanent Marker', cursive";
     ctx.textAlign = "center";
-    ctx.fillText(session.status === "won" ? "CLEARED!" : "OUT OF MOVES", W / 2, 560);
-    ctx.font = "800 28px 'Chakra Petch', sans-serif";
-    ctx.fillText("TAP TO CONTINUE", W / 2, 640);
+    ctx.fillText(
+      session.status === "won" ? "CLEARED!" : "OUT OF MOVES",
+      W / 2,
+      560,
+    );
+    ctx.font = "800 26px 'Chakra Petch', sans-serif";
+    ctx.fillText("TAP FOR MAP", W / 2, 640);
   }
 }
