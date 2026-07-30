@@ -317,7 +317,7 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
     crushWave(session, groups);
     const peeled = beforeObs - countAllObstacles();
     if (peeled > 0) playSfx(peeled > 2 ? "crack" : "peel");
-    else playSfx("drop", { volume: 0.55 });
+    else playSfx("select", { volume: 0.45, rate: 0.92 });
     syncVisuals(true);
     markDirty();
     await waitMotion();

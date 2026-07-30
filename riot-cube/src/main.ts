@@ -134,7 +134,6 @@ import {
   sfxLose,
   sfxPaperFlutter,
   sfxPaperRustle,
-  sfxPaperSlide,
   sfxScramble,
   sfxWin,
   unlockAudio,
@@ -747,7 +746,8 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
       kind: twist.axis,
       index: twist.index,
     });
-    sfxPaperSlide();
+    // Same soft rustle as pick-up — slide.mp3 was too harsh for place-down.
+    sfxPaperRustle();
     return;
   }
   turnAnim = {
@@ -761,14 +761,14 @@ function doTwist(twist: LaneTwist, fromUv = 0): void {
     t: 0,
     ms: TURN_MS,
   };
-  sfxPaperSlide();
+  sfxPaperRustle();
 }
 
 function doFaceTurn(dir: 1 | -1): void {
   if (session.status !== "playing" || turnAnim) return;
   if (tutorial && !tutorialAllows("faceTurn")) return;
   turnAnim = { kind: "face", face: session.face, dir, t: 0, ms: TURN_MS };
-  sfxPaperSlide();
+  sfxPaperRustle();
 }
 
 function inCubeOrbitZone(_layout: CubeLayout, x: number, y: number): boolean {
