@@ -1,10 +1,12 @@
-import { areAdjacent, canSwapCell, isPlayable } from "./core/board";
+import { areAdjacent, canSwapCell, isPlayable, swapCells } from "./core/board";
 import { ZONES } from "./core/levels";
 import { applyWin, loadProgress, saveProgress } from "./core/save";
 import {
   beginSwap,
+  chargeFailedSwap,
   crushWave,
   currentMatches,
+  peekSwap,
   startSession,
   usePlaneFerry,
   usePower,
@@ -103,10 +105,20 @@ let burstStarted = 0;
 let needsPaint = true;
 let burstResolve: (() => void) | null = null;
 let popFx: { x: number; y: number; t: number; started: number } | null = null;
+let oopsFx: { x: number; y: number; t: number; started: number } | null = null;
 let lastTs = 0;
 let animTime = 0;
 let hoverBtn: string | null = null;
 let pressedBtn: string | null = null;
+
+type BoardGesture = {
+  pointerId: number;
+  x0: number;
+  y0: number;
+  cell: Pos;
+  swiped: boolean;
+};
+let boardGesture: BoardGesture | null = null;
 
 function markDirty(): void {
   needsPaint = true;
@@ -171,6 +183,7 @@ function paint(): void {
     armedPower,
     planeFrom,
     popFx: popFx ? { x: popFx.x, y: popFx.y, t: popFx.t } : null,
+    oopsFx: oopsFx ? { x: oopsFx.x, y: oopsFx.y, t: oopsFx.t } : null,
     time: animTime,
   });
 }
@@ -185,7 +198,8 @@ function isAnimating(): boolean {
     burstT > 0 ||
     hasParticles() ||
     motionBusy() ||
-    (popFx != null && popFx.t < 1)
+    (popFx != null && popFx.t < 1) ||
+    (oopsFx != null && oopsFx.t < 1)
   );
 }
 
@@ -222,6 +236,10 @@ function tick(ts: number): void {
   if (popFx) {
     popFx.t = (ts - popFx.started) / 420;
     if (popFx.t >= 1) popFx = null;
+  }
+  if (oopsFx) {
+    oopsFx.t = (ts - oopsFx.started) / 700;
+    if (oopsFx.t >= 1) oopsFx = null;
   }
   if (updateParticles(dt)) markDirty();
   if (updateMotion(dt)) markDirty();
@@ -300,12 +318,32 @@ function recordWinIfCleared(): void {
 
 async function handleSwap(a: Pos, b: Pos): Promise<void> {
   if (busy || session.status !== "playing") return;
-  const started = beginSwap(session, a, b);
   selected = null;
+  if (!areAdjacent(a, b)) return;
+  if (
+    !isPlayable(session.mask, a.c, a.r) ||
+    !isPlayable(session.mask, b.c, b.r)
+  ) {
+    playSfx("swap-fail");
+    markDirty();
+    return;
+  }
+  const ca = session.board[a.c]![a.r];
+  const cb = session.board[b.c]![b.r];
+  if (!canSwapCell(ca) || !canSwapCell(cb)) {
+    playSfx("swap-fail");
+    markDirty();
+    return;
+  }
+
+  if (!peekSwap(session, a, b)) {
+    await playFailedSwap(a, b);
+    return;
+  }
+
+  const started = beginSwap(session, a, b);
   if (!started.ok) {
-    if (started.reason === "no-match" || started.reason === "blocked") {
-      playSfx("swap-fail");
-    }
+    playSfx("swap-fail");
     markDirty();
     return;
   }
@@ -336,6 +374,36 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
     await waitMotion();
     wave++;
   }
+  busy = false;
+  playEndSting();
+  recordWinIfCleared();
+  markDirty();
+}
+
+async function playFailedSwap(a: Pos, b: Pos): Promise<void> {
+  busy = true;
+  const layout = boardLayout();
+  const midA = cellCenter(layout, a.c, a.r);
+  const midB = cellCenter(layout, b.c, b.r);
+  oopsFx = {
+    x: (midA.x + midB.x) / 2,
+    y: (midA.y + midB.y) / 2 - layout.cell * 0.15,
+    t: 0,
+    started: performance.now(),
+  };
+
+  swapCells(session.board, a, b);
+  syncVisuals(false);
+  playSfx("swap-fail");
+  markDirty();
+  await waitMotion();
+
+  swapCells(session.board, a, b);
+  syncVisuals(false);
+  markDirty();
+  await waitMotion();
+
+  chargeFailedSwap(session);
   busy = false;
   playEndSting();
   recordWinIfCleared();
@@ -649,6 +717,33 @@ canvas.addEventListener(
     const p = canvasPoint(e);
     pressedBtn = hitButtonId(screen, p.x, p.y);
     hoverBtn = pressedBtn;
+    boardGesture = null;
+
+    const deferBoard =
+      screen === "play" &&
+      session.status === "playing" &&
+      !busy &&
+      !armedPower &&
+      !pressedBtn &&
+      !hitUi(MENU_BTN, p.x, p.y) &&
+      !hitUi(PLAY_SOUND_BTN, p.x, p.y) &&
+      !hitPowerDock(p.x, p.y, session.level.id);
+
+    if (deferBoard) {
+      const hit = cellAt(boardLayout(), p.x, p.y);
+      if (hit && isPlayable(session.mask, hit.c, hit.r)) {
+        boardGesture = {
+          pointerId: e.pointerId,
+          x0: p.x,
+          y0: p.y,
+          cell: hit,
+          swiped: false,
+        };
+        markDirty();
+        return;
+      }
+    }
+
     markDirty();
     onTap(p.x, p.y);
   },
@@ -664,17 +759,62 @@ canvas.addEventListener(
       hoverBtn = next;
       markDirty();
     }
+
+    if (
+      !boardGesture ||
+      boardGesture.pointerId !== e.pointerId ||
+      boardGesture.swiped ||
+      busy
+    ) {
+      return;
+    }
+
+    const layout = boardLayout();
+    const thresh = layout.cell * 0.28;
+    const dx = p.x - boardGesture.x0;
+    const dy = p.y - boardGesture.y0;
+    if (Math.abs(dx) < thresh && Math.abs(dy) < thresh) return;
+
+    boardGesture.swiped = true;
+    let dc = 0;
+    let dr = 0;
+    if (Math.abs(dx) >= Math.abs(dy)) dc = dx > 0 ? 1 : -1;
+    else dr = dy > 0 ? 1 : -1;
+    const to = { c: boardGesture.cell.c + dc, r: boardGesture.cell.r + dr };
+    const from = boardGesture.cell;
+    selected = null;
+    if (isPlayable(session.mask, to.c, to.r)) {
+      void handleSwap(from, to);
+    } else {
+      playSfx("swap-fail");
+      markDirty();
+    }
   },
   { passive: true },
 );
 
+function endBoardGesture(e?: PointerEvent): void {
+  if (
+    boardGesture &&
+    (!e || boardGesture.pointerId === e.pointerId) &&
+    !boardGesture.swiped
+  ) {
+    const { x0, y0 } = boardGesture;
+    boardGesture = null;
+    onTap(x0, y0);
+  } else {
+    boardGesture = null;
+  }
+  if (pressedBtn) {
+    pressedBtn = null;
+    markDirty();
+  }
+}
+
 canvas.addEventListener(
   "pointerup",
-  () => {
-    if (pressedBtn) {
-      pressedBtn = null;
-      markDirty();
-    }
+  (e) => {
+    endBoardGesture(e);
   },
   { passive: true },
 );
@@ -682,6 +822,7 @@ canvas.addEventListener(
 canvas.addEventListener(
   "pointercancel",
   () => {
+    boardGesture = null;
     pressedBtn = null;
     markDirty();
   },
@@ -692,8 +833,10 @@ canvas.addEventListener(
   "pointerleave",
   () => {
     hoverBtn = null;
-    pressedBtn = null;
-    markDirty();
+    if (!boardGesture) {
+      pressedBtn = null;
+      markDirty();
+    }
   },
   { passive: true },
 );

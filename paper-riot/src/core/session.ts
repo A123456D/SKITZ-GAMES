@@ -178,6 +178,13 @@ export function beginSwap(
   return { ok: true };
 }
 
+/** Spend a move on a no-match swap (after the bounce-back animation). */
+export function chargeFailedSwap(session: Session): void {
+  if (session.status !== "playing") return;
+  session.movesLeft -= 1;
+  checkEnd(session);
+}
+
 export function currentMatches(session: Session): MatchGroup[] {
   return findMatches(session.board, session.mask);
 }

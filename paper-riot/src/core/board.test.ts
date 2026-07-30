@@ -14,7 +14,7 @@ import {
 } from "./board";
 import { shapeMask } from "./shapes";
 import { getLevel, LEVELS } from "./levels";
-import { startSession, trySwap, usePlaneFerry, usePower } from "./session";
+import { startSession, trySwap, usePlaneFerry, usePower, chargeFailedSwap } from "./session";
 import { paletteForLevel, type Board, type BoardMask } from "./types";
 
 function fullMask(): BoardMask {
@@ -260,6 +260,18 @@ describe("session", () => {
     const s = startSession(1);
     const result = trySwap(s, { c: 1, r: 2 }, { c: 2, r: 2 });
     expect(result.ok || typeof result.reason === "string").toBe(true);
+  });
+
+  it("failed swipe charges a move and can lose", () => {
+    const s = startSession(1);
+    const before = s.movesLeft;
+    chargeFailedSwap(s);
+    expect(s.movesLeft).toBe(before - 1);
+    expect(s.status).toBe("playing");
+    s.movesLeft = 1;
+    chargeFailedSwap(s);
+    expect(s.movesLeft).toBe(0);
+    expect(s.status).toBe("lost");
   });
 
   it("bomb power clears a neighborhood", () => {

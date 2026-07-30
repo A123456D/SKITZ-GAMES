@@ -597,6 +597,7 @@ export function drawPlay(
     armedPower: PowerUpKind | null;
     planeFrom?: { c: number; r: number } | null;
     popFx: { x: number; y: number; t: number } | null;
+    oopsFx?: { x: number; y: number; t: number } | null;
     time: number;
   },
 ): void {
@@ -863,6 +864,23 @@ export function drawPlay(
       ctx.fill();
       ctx.restore();
     }
+  }
+
+  if (opts.oopsFx && opts.oopsFx.t < 1) {
+    const t = opts.oopsFx.t;
+    const alpha = t < 0.15 ? t / 0.15 : t > 0.65 ? Math.max(0, (1 - t) / 0.35) : 1;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = Palette.hot;
+    ctx.strokeStyle = Palette.ink;
+    ctx.lineWidth = 5;
+    ctx.font = "800 46px 'Permanent Marker', cursive";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const y = opts.oopsFx.y - t * 52;
+    ctx.strokeText("oops!", opts.oopsFx.x, y);
+    ctx.fillText("oops!", opts.oopsFx.x, y);
+    ctx.restore();
   }
 
   if (opts.popFx && opts.popFx.t < 1) {
