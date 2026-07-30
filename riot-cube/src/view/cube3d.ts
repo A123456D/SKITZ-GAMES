@@ -666,8 +666,8 @@ function drawFace(
   ctx.lineTo(q[2]!.x, q[2]!.y);
   ctx.lineTo(q[3]!.x, q[3]!.y);
   ctx.closePath();
-  ctx.strokeStyle = isActive ? p.accent : p.faceStroke;
-  ctx.lineWidth = isActive ? 4 : 2.5;
+  ctx.strokeStyle = "#111111";
+  ctx.lineWidth = isActive ? 2.25 : 1.5;
   ctx.stroke();
 
   ctx.save();
