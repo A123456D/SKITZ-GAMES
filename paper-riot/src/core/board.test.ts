@@ -168,4 +168,41 @@ describe("session", () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.cleared.length).toBeGreaterThan(0);
   });
+
+  it("stapler clears a 2x2 paper packet", () => {
+    const s = startSession(8);
+    s.powers.stapler = 1;
+    let target = { c: 2, r: 3 };
+    outer: for (let c = 0; c < COLS - 1; c++) {
+      for (let r = 0; r < ROWS - 1; r++) {
+        if (s.mask[c]![r] && s.mask[c + 1]![r] && s.mask[c]![r + 1]) {
+          target = { c, r };
+          break outer;
+        }
+      }
+    }
+    const before = s.movesLeft;
+    const result = usePower(s, "stapler", target);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.cleared.length).toBeGreaterThanOrEqual(2);
+    expect(s.movesLeft).toBe(before - 1);
+  });
+
+  it("disco banks +5 moves", () => {
+    const s = startSession(26);
+    s.powers.disco = 1;
+    const before = s.movesLeft;
+    let target = { c: 2, r: 3 };
+    outer: for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        if (s.mask[c]![r]) {
+          target = { c, r };
+          break outer;
+        }
+      }
+    }
+    const result = usePower(s, "disco", target);
+    expect(result.ok).toBe(true);
+    expect(s.movesLeft).toBe(before + 5);
+  });
 });

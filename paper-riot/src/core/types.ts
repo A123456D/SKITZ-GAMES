@@ -21,11 +21,11 @@ export type TileKind = (typeof TILE_KINDS)[number];
  *
  * Soft (can swap, still blocks matching until peeled):
  *   tape-x (1), tape-black (2), wet (1), glue (2)
- * Hard (cannot swap — crack with adjacent matches or stapler):
+ * Hard (cannot swap — crack with adjacent matches or blasts):
  *   box (2), lock (2), tar (2), barbed (1)
  *
  * Peel rule: match NEXT TO an obstacle to deal 1 hit.
- * Stapler: strip obstacles in a 3×3 without needing a match.
+ * Bomb / plane / rocket / stapler clear covered cells as collateral.
  */
 export const OBSTACLE_KINDS = [
   "tape-x",
@@ -58,19 +58,19 @@ export const OBSTACLE_BLURBS: Record<ObstacleKind, string> = {
   wet: "Ink smear — match beside it once",
   glue: "Sticky note — two peels, can still swap",
   box: "Blocks swaps — crack with 2 side matches",
-  lock: "Locked cell — 2 hits or stapler",
+  lock: "Locked cell — crack with 2 side matches",
   tar: "Hard goo — no swaps, 2 cracks",
   barbed: "Wire fence — hard block, 1 crack",
 };
 
 /**
- * Power-ups — each solves a different board problem.
- * bomb: 3×3 blast for stuck clusters
- * plane: clear a row (tape stripes)
- * rocket: clear a column (locker stacks)
- * magnet: clear one sticker color (collection goals)
- * stapler: rip obstacles in 3×3 (locks/boxes/tar)
- * disco: chaotic multi-clear (late game clutch)
+ * Power-ups — mechanics match the classroom tool fantasy.
+ * bomb: explode a 3×3 cluster
+ * plane: fly across a full row
+ * rocket: launch up a full column
+ * magnet: pull every sticker of the tapped type
+ * stapler: staple a 2×2 paper packet and rip it off the board
+ * disco: disco bomb party — clear a few tiles and bank +5 moves
  */
 export const POWERUP_KINDS = [
   "bomb",
@@ -84,12 +84,12 @@ export const POWERUP_KINDS = [
 export type PowerUpKind = (typeof POWERUP_KINDS)[number];
 
 export const POWER_BLURBS: Record<PowerUpKind, string> = {
-  bomb: "3×3 BLAST — break a stuck cluster",
-  plane: "ROW WIPE — shred a horizontal line",
-  rocket: "COLUMN WIPE — shred a vertical stack",
-  magnet: "COLOR PULL — clear one sticker type",
-  stapler: "RIP OBSTACLES — peel tape/locks nearby",
-  disco: "CHAOS CLEAR — random sticker riot",
+  bomb: "BOMB — explode a 3×3 cluster",
+  plane: "PLANE — fly across the whole row",
+  rocket: "ROCKET — blast up the whole column",
+  magnet: "MAGNET — pull every sticker of that type",
+  stapler: "STAPLER — staple a 2×2 packet and rip it off",
+  disco: "DISCO — party clear + bank 5 moves",
 };
 
 export const OBSTACLE_HITS: Record<ObstacleKind, number> = {

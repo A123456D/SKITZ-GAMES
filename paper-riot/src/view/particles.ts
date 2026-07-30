@@ -74,8 +74,9 @@ export function styleForTile(kind: TileKind | string): BurstStyle {
 }
 
 export function styleForPower(kind: string): BurstStyle {
-  if (kind === "bomb" || kind === "disco") return "bomb";
-  if (kind === "stapler") return "splat";
+  if (kind === "bomb") return "bomb";
+  if (kind === "disco") return "bomb";
+  if (kind === "stapler") return "bits";
   if (kind === "magnet") return "star";
   if (kind === "plane" || kind === "rocket") return "bits";
   return "puff";

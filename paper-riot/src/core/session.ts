@@ -208,10 +208,13 @@ export function usePower(
       for (let dr = -1; dr <= 1; dr++) add(target.c + dc, target.r + dr);
     }
   } else if (kind === "plane") {
+    // Paper plane flies sideways across the row.
     for (let c = 0; c < COLS; c++) add(c, target.r);
   } else if (kind === "rocket") {
+    // Rocket launches straight up the column.
     for (let r = 0; r < ROWS; r++) add(target.c, r);
   } else if (kind === "magnet") {
+    // Magnet pulls every sticker of the tapped type.
     const kindTile = session.board[target.c]![target.r]?.kind;
     if (!kindTile) return { ok: false, reason: "empty-cell" };
     for (let c = 0; c < COLS; c++) {
@@ -219,36 +222,49 @@ export function usePower(
         if (session.board[c]![r]?.kind === kindTile) add(c, r);
       }
     }
+  } else if (kind === "stapler") {
+    // Staple a 2×2 paper packet and rip the stack off the desk.
+    let c0 = Math.min(target.c, COLS - 2);
+    let r0 = Math.min(target.r, ROWS - 2);
+    c0 = Math.max(0, c0);
+    r0 = Math.max(0, r0);
+    for (let dc = 0; dc <= 1; dc++) {
+      for (let dr = 0; dr <= 1; dr++) add(c0 + dc, r0 + dr);
+    }
   } else if (kind === "disco") {
+    // Disco bomb: party pop on the board + bank +5 moves (matches the +5 badge).
     add(target.c, target.r);
     let n = 0;
     let guard = 0;
-    while (n < 10 && guard++ < 100) {
+    while (n < 5 && guard++ < 80) {
       const c = Math.floor(Math.random() * COLS);
       const r = Math.floor(Math.random() * ROWS);
       const before = cleared.length;
       add(c, r);
       if (cleared.length > before) n++;
     }
-  } else if (kind === "stapler") {
-    for (let dc = -1; dc <= 1; dc++) {
-      for (let dr = -1; dr <= 1; dr++) {
-        const c = target.c + dc;
-        const r = target.r + dr;
-        if (!isPlayable(session.mask, c, r)) continue;
-        const cell = session.board[c]![r];
-        if (cell?.obstacle) {
-          delete cell.obstacle;
-          delete cell.hits;
-          cleared.push({ c, r });
-        }
+    applyGoalTiles(session, cleared);
+    for (const p of cleared) {
+      const cell = session.board[p.c]![p.r];
+      if (cell) {
+        delete cell.obstacle;
+        delete cell.hits;
       }
     }
+    const nCleared = clearPositions(
+      session.board,
+      session.mask,
+      cleared,
+      session.palette,
+    );
+    session.score += nCleared * 15;
     session.powers[kind] -= 1;
-    session.movesLeft -= 1;
+    session.movesLeft += 5;
     syncClearGoals(session);
     resolveCascades(session);
     return { ok: true, cleared };
+  } else {
+    return { ok: false, reason: "unknown" };
   }
 
   applyGoalTiles(session, cleared);
