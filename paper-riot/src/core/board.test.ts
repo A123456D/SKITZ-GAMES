@@ -11,7 +11,7 @@ import {
 import { shapeMask } from "./shapes";
 import { getLevel, LEVELS } from "./levels";
 import { startSession, trySwap, usePower } from "./session";
-import type { Board, BoardMask } from "./types";
+import { paletteForLevel, type Board, type BoardMask } from "./types";
 
 function fullMask(): BoardMask {
   return Array.from({ length: COLS }, () =>
@@ -32,7 +32,9 @@ function fillChecker(): Board {
 
 describe("board", () => {
   it("creates a shaped board without immediate matches", () => {
-    const { board, mask } = createBoard("rect", { colors: 5 });
+    const { board, mask } = createBoard("rect", {
+      palette: ["skull", "star", "flame", "heart", "bolt"],
+    });
     expect(board.length).toBe(COLS);
     expect(board[0]!.length).toBe(ROWS);
     expect(findMatches(board, mask).length).toBe(0);
@@ -41,7 +43,7 @@ describe("board", () => {
 
   it("places patterned tape obstacles", () => {
     const { board, mask } = createBoard("rect", {
-      colors: 4,
+      palette: ["skull", "star", "flame", "heart"],
       obstaclePlan: [{ kind: "tape-x", pattern: "row", count: 4 }],
     });
     const taped = board
@@ -49,6 +51,15 @@ describe("board", () => {
       .filter((c) => c?.obstacle === "tape-x").length;
     expect(taped).toBeGreaterThanOrEqual(3);
     expect(mask.flat().some(Boolean)).toBe(true);
+  });
+
+  it("forces goal kinds into the palette", () => {
+    const bag = paletteForLevel({
+      colors: 4,
+      goals: [{ type: "collect", kind: "bolt", need: 10 }],
+    });
+    expect(bag).toContain("bolt");
+    expect(bag.length).toBeGreaterThanOrEqual(4);
   });
 
   it("donut shape has a hole", () => {

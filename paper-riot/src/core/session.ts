@@ -21,8 +21,9 @@ import type {
   Pos,
   PowerInventory,
   PowerUpKind,
+  TileKind,
 } from "./types";
-import { COLS, ROWS, POWERUP_KINDS } from "./types";
+import { COLS, ROWS, POWERUP_KINDS, paletteForLevel } from "./types";
 
 export type SessionStatus = "playing" | "won" | "lost";
 
@@ -35,6 +36,7 @@ export type Session = {
   status: SessionStatus;
   score: number;
   powers: PowerInventory;
+  palette: TileKind[];
   /** Snapshot of obstacle counts at level start for clear goals. */
   obstacleBaseline: Record<string, number>;
 };
@@ -68,8 +70,9 @@ function powersFromLevel(def: LevelDef): PowerInventory {
 
 export function startSession(level: LevelDef | number = 1): Session {
   const def = typeof level === "number" ? getLevel(level) : level;
+  const palette = paletteForLevel(def);
   const { board, mask } = createBoard(def.shape, {
-    colors: def.colors,
+    palette,
     obstaclePlan: def.obstaclePlan,
   });
   const baseline: Record<string, number> = {
@@ -89,6 +92,7 @@ export function startSession(level: LevelDef | number = 1): Session {
     status: "playing",
     score: 0,
     powers: powersFromLevel(def),
+    palette,
     obstacleBaseline: baseline,
   };
 }
@@ -162,7 +166,7 @@ export function crushWave(session: Session, groups: MatchGroup[]): void {
     session.board,
     session.mask,
     groups,
-    session.level.colors,
+    session.palette,
   );
   session.score += cleared * 10;
   checkEnd(session);
@@ -259,7 +263,7 @@ export function usePower(
     session.board,
     session.mask,
     cleared,
-    session.level.colors,
+    session.palette,
   );
   session.score += n * 15;
   session.powers[kind] -= 1;

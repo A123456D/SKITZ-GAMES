@@ -1,4 +1,6 @@
-const VERSION = 7;
+import { TILE_KINDS } from "../core/types";
+
+const VERSION = 8;
 const cache = new Map<string, HTMLImageElement>();
 let loadPromise: Promise<void> | null = null;
 
@@ -7,7 +9,6 @@ function loadOne(src: string, key: string): Promise<void> {
     const img = new Image();
     img.onload = () => {
       cache.set(key, img);
-      resolve();
     };
     img.onerror = () => resolve();
     img.src = `${src}?v=${VERSION}`;
@@ -18,7 +19,7 @@ export function loadGameArt(): Promise<void> {
   if (loadPromise) return loadPromise;
   const jobs: Promise<void>[] = [];
 
-  for (const k of ["skull", "star", "flame", "heart", "bolt", "gem"]) {
+  for (const k of TILE_KINDS) {
     jobs.push(loadOne(`./stickers/${k}.png`, `tile:${k}`));
   }
   for (const k of [
@@ -36,7 +37,15 @@ export function loadGameArt(): Promise<void> {
   for (const k of ["bomb", "plane", "magnet", "rocket", "stapler", "disco"]) {
     jobs.push(loadOne(`./powerups/${k}.png`, `pow:${k}`));
   }
-  for (const k of ["pop-skull", "swap-star", "match-hearts"]) {
+  for (const k of [
+    "pop-skull",
+    "swap-star",
+    "match-hearts",
+    "match-skulls",
+    "match-bolts",
+    "match-stars",
+    "match-bomb",
+  ]) {
     jobs.push(loadOne(`./fx/${k}.png`, `fx:${k}`));
   }
   for (const k of [

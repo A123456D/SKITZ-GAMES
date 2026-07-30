@@ -23,17 +23,18 @@ export function freshId(): number {
 }
 
 export function randomKind(
-  colors: number,
+  palette: readonly TileKind[],
   exclude?: TileKind[],
 ): TileKind {
-  const bag = TILE_KINDS.slice(0, Math.max(3, Math.min(6, colors)));
-  const pool = exclude?.length ? bag.filter((k) => !exclude.includes(k)) : bag;
-  const use = pool.length ? pool : bag;
+  const bag = palette.length ? palette : TILE_KINDS.slice(0, 6);
+  const pool = exclude?.length ? bag.filter((k) => !exclude.includes(k)) : [...bag];
+  const use = pool.length ? pool : [...bag];
   return use[Math.floor(Math.random() * use.length)]!;
 }
 
-export function makeCell(kind?: TileKind, colors = 6): Cell {
-  return { kind: kind ?? randomKind(colors), id: freshId() };
+export function makeCell(kind?: TileKind, palette?: readonly TileKind[]): Cell {
+  const bag = palette?.length ? palette : TILE_KINDS.slice(0, 6);
+  return { kind: kind ?? randomKind(bag), id: freshId() };
 }
 
 export function inBounds(c: number, r: number): boolean {
@@ -52,9 +53,14 @@ export function cloneBoard(board: Board): Board {
 
 export function createBoard(
   shape: BoardShapeId,
-  opts: { colors?: number; obstaclePlan?: ObstacleSpec[] } = {},
+  opts: {
+    palette: readonly TileKind[];
+    obstaclePlan?: ObstacleSpec[];
+  },
 ): { board: Board; mask: BoardMask } {
-  const colors = opts.colors ?? 5;
+  const palette = opts.palette.length
+    ? opts.palette
+    : (TILE_KINDS.slice(0, 5) as TileKind[]);
   const mask = shapeMask(shape);
   const board: Board = Array.from({ length: COLS }, () =>
     Array.from({ length: ROWS }, () => null),
@@ -74,7 +80,7 @@ export function createBoard(
         const b = board[c - 2]![r]?.kind;
         if (a && a === b) banned.push(a);
       }
-      board[c]![r] = makeCell(randomKind(colors, banned), colors);
+      board[c]![r] = makeCell(randomKind(palette, banned), palette);
     }
   }
 
@@ -203,7 +209,7 @@ export function crushAndRefill(
   board: Board,
   mask: BoardMask,
   groups: MatchGroup[],
-  colors: number,
+  palette: readonly TileKind[],
 ): number {
   const dead = new Set<string>();
   for (const g of groups) {
@@ -228,7 +234,7 @@ export function crushAndRefill(
       if (ki < kept.length) {
         board[c]![r] = kept[ki++]!;
       } else {
-        board[c]![r] = makeCell(undefined, colors);
+        board[c]![r] = makeCell(undefined, palette);
       }
     }
   }
@@ -239,7 +245,7 @@ export function clearPositions(
   board: Board,
   mask: BoardMask,
   positions: Pos[],
-  colors: number,
+  palette: readonly TileKind[],
 ): number {
   const dead = new Set(
     positions.filter((p) => isPlayable(mask, p.c, p.r)).map((p) => `${p.c},${p.r}`),
@@ -260,7 +266,7 @@ export function clearPositions(
     for (let r = ROWS - 1; r >= 0; r--) {
       if (!mask[c]![r]) continue;
       if (ki < kept.length) board[c]![r] = kept[ki++]!;
-      else board[c]![r] = makeCell(undefined, colors);
+      else board[c]![r] = makeCell(undefined, palette);
     }
   }
   return dead.size;

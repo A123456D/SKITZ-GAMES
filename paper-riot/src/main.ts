@@ -41,6 +41,9 @@ import {
 import {
   burstAt,
   hasParticles,
+  stampFx,
+  styleForPower,
+  styleForTile,
   updateParticles,
 } from "./view/particles";
 import { loadGameArt } from "./view/stickers";
@@ -188,7 +191,7 @@ function tick(ts: number): void {
   requestAnimationFrame(tick);
 }
 
-function playMatchBurst(keys: string[]): Promise<void> {
+function playMatchBurst(keys: string[], kindHint?: string): Promise<void> {
   return new Promise((resolve) => {
     busy = true;
     clearing = new Set(keys);
@@ -196,18 +199,33 @@ function playMatchBurst(keys: string[]): Promise<void> {
     burstT = 0.01;
     const layout = boardLayout();
     const ids: number[] = [];
+    const styles = new Map<string, number>();
     for (const key of keys) {
       const [c, r] = key.split(",").map(Number);
       if (!isPlayable(session.mask, c!, r!)) continue;
       const cell = session.board[c!]![r!];
-      if (cell) ids.push(cell.id);
+      if (cell) {
+        ids.push(cell.id);
+        const st = styleForTile(cell.kind);
+        styles.set(st, (styles.get(st) ?? 0) + 1);
+      }
       const center = cellCenter(layout, c!, r!);
-      burstAt(center.x, center.y, 8);
+      const style = cell ? styleForTile(cell.kind) : styleForTile(kindHint ?? "star");
+      burstAt(center.x, center.y, 5, style);
     }
     punchClearing(ids);
     if (keys.length) {
       const [c0, r0] = keys[0]!.split(",").map(Number);
       const mid = cellCenter(layout, c0!, r0!);
+      let best = kindHint ? styleForTile(kindHint) : "puff";
+      let bestN = 0;
+      for (const [st, n] of styles) {
+        if (n > bestN) {
+          best = st as ReturnType<typeof styleForTile>;
+          bestN = n;
+        }
+      }
+      stampFx(mid.x, mid.y, best);
       popFx = { x: mid.x, y: mid.y, t: 0, started: performance.now() };
     }
     burstResolve = () => {
@@ -248,7 +266,8 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
     const groups = currentMatches(session);
     if (!groups.length) break;
     const keys = groups.flatMap((g) => g.cells.map((p) => `${p.c},${p.r}`));
-    await playMatchBurst(keys);
+    const hint = groups[0]?.kind;
+    await playMatchBurst(keys, hint);
     crushWave(session, groups);
     syncVisuals(true);
     markDirty();
@@ -264,7 +283,8 @@ async function handlePower(kind: PowerUpKind, target: Pos): Promise<void> {
   busy = true;
   const layout = boardLayout();
   const center = cellCenter(layout, target.c, target.r);
-  burstAt(center.x, center.y, 14);
+  const pstyle = styleForPower(kind);
+  stampFx(center.x, center.y, pstyle);
   popFx = { x: center.x, y: center.y, t: 0, started: performance.now() };
 
   const result = usePower(session, kind, target);
@@ -277,7 +297,7 @@ async function handlePower(kind: PowerUpKind, target: Pos): Promise<void> {
   }
   for (const p of result.cleared) {
     const mid = cellCenter(layout, p.c, p.r);
-    burstAt(mid.x, mid.y, 5);
+    burstAt(mid.x, mid.y, 4, pstyle);
   }
   syncVisuals(true);
   markDirty();

@@ -1,4 +1,4 @@
-/** Classroom stickers used as match tiles (Riot Cube classroom pack). */
+/** Matchable classroom stickers — expanded from Riot Cube pack. */
 export const TILE_KINDS = [
   "skull",
   "star",
@@ -6,6 +6,12 @@ export const TILE_KINDS = [
   "heart",
   "bolt",
   "gem",
+  "pizza",
+  "spray",
+  "skate",
+  "soda",
+  "ghost",
+  "peace",
 ] as const;
 
 export type TileKind = (typeof TILE_KINDS)[number];
@@ -151,8 +157,13 @@ export type LevelDef = {
   moves: number;
   goals: GoalDef[];
   shape: BoardShapeId;
-  /** How many colors in the bag (4–6). */
+  /**
+   * How many sticker types in the bag (4–10).
+   * Goal collect kinds are ALWAYS forced into the bag.
+   */
   colors: number;
+  /** Optional explicit palette; otherwise first N of TILE_KINDS + goals. */
+  palette?: TileKind[];
   obstaclePlan: ObstacleSpec[];
   /** Starting power charges for this level (missing = 0). */
   powers: Partial<Record<PowerUpKind, number>>;
@@ -175,3 +186,20 @@ export type Progress = {
   lives: number;
   gems: number;
 };
+
+/** Build the spawn bag for a level — goals can never be missing. */
+export function paletteForLevel(def: {
+  colors: number;
+  goals: GoalDef[];
+  palette?: TileKind[];
+}): TileKind[] {
+  const n = Math.max(4, Math.min(TILE_KINDS.length, def.colors));
+  const base = def.palette?.length
+    ? [...def.palette]
+    : (TILE_KINDS.slice(0, n) as TileKind[]);
+  const bag = new Set<TileKind>(base);
+  for (const g of def.goals) {
+    if (g.type === "collect") bag.add(g.kind);
+  }
+  return [...bag];
+}

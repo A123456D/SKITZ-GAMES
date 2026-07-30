@@ -10,7 +10,6 @@ import {
 import type { Session } from "../core/session";
 import { LEVELS, ZONES, unlockedPowers, zoneLevels } from "../core/levels";
 import {
-  fxImage,
   obstacleImage,
   powerImage,
   stickerImage,
@@ -813,20 +812,23 @@ export function drawPlay(
   }
 
   if (opts.popFx && opts.popFx.t < 1) {
-    const frames = ["pop-skull", "swap-star", "match-hearts"] as const;
-    const fi = Math.floor(opts.popFx.t * frames.length * 3) % frames.length;
-    const image = fxImage(frames[fi]!) ?? fxImage("pop-skull");
-    const s = 90 + 50 * (1 - opts.popFx.t);
-    const spin = opts.popFx.t * Math.PI * 1.2;
+    // stamp handled by particle stampFx; keep a light radial ink rip
+    const t = opts.popFx.t;
     ctx.save();
-    ctx.globalAlpha = Math.max(0, 1 - opts.popFx.t);
     ctx.translate(opts.popFx.x, opts.popFx.y);
-    ctx.rotate(spin);
-    ctx.shadowColor = Palette.shadow;
-    ctx.shadowBlur = 14;
-    if (image && image.complete) {
-      ctx.drawImage(image, -s / 2, -s / 2, s, s);
+    ctx.globalAlpha = Math.max(0, 1 - t);
+    ctx.fillStyle = `rgba(10,10,10,${0.35 * (1 - t)})`;
+    ctx.beginPath();
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const rad = 40 + 70 * t * (i % 2 === 0 ? 1.25 : 0.7);
+      const x = Math.cos(a) * rad;
+      const y = Math.sin(a) * rad;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
   }
 
