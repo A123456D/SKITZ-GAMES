@@ -14,7 +14,7 @@ import {
 } from "./board";
 import { shapeMask } from "./shapes";
 import { getLevel, LEVELS } from "./levels";
-import { startSession, trySwap, usePower } from "./session";
+import { startSession, trySwap, usePlaneFerry, usePower } from "./session";
 import { paletteForLevel, type Board, type BoardMask } from "./types";
 
 function fullMask(): BoardMask {
@@ -316,22 +316,44 @@ describe("session", () => {
     expect(s.movesLeft).toBe(before + 5);
   });
 
-  it("plane skips line-immune boxes", () => {
+  it("plane usePower redirects to ferry", () => {
     const s = startSession(1);
     s.powers.plane = 1;
-    const row = 4;
-    let target = { c: 0, r: row };
+    const result = usePower(s, "plane", { c: 0, r: 0 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe("use-plane-ferry");
+    expect(s.powers.plane).toBe(1);
+  });
+
+  it("plane ferries a sticker beside another", () => {
+    const s = startSession(1);
+    s.powers.plane = 1;
+    const beforeMoves = s.movesLeft;
+
     for (let c = 0; c < COLS; c++) {
-      if (!s.mask[c]![row]) continue;
-      const cell = s.board[c]![row]!;
-      cell.obstacle = "box";
-      cell.hits = 2;
-      target = { c, r: row };
+      for (let r = 0; r < ROWS; r++) {
+        const cell = s.board[c]![r];
+        if (!cell) continue;
+        cell.obstacle = undefined;
+        cell.hits = 0;
+      }
     }
-    const result = usePower(s, "plane", target);
+
+    const from = { c: 0, r: 0 };
+    const beside = { c: 4, r: 4 };
+    expect(s.mask[from.c]![from.r]).toBe(true);
+    expect(s.mask[beside.c]![beside.r]).toBe(true);
+    expect(canSwapCell(s.board[from.c]![from.r]!)).toBe(true);
+
+    const result = usePlaneFerry(s, from, beside);
     expect(result.ok).toBe(true);
-    const boxesLeft = s.board.flat().filter((c) => c?.obstacle === "box").length;
-    expect(boxesLeft).toBeGreaterThan(0);
+    if (!result.ok) return;
+    expect(
+      Math.abs(result.landed.c - beside.c) +
+        Math.abs(result.landed.r - beside.r),
+    ).toBe(1);
+    expect(s.powers.plane).toBe(0);
+    expect(s.movesLeft).toBe(beforeMoves - 1);
   });
 });
 

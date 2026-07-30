@@ -21,12 +21,12 @@ export type TileKind = (typeof TILE_KINDS)[number];
  *
  * Soft (can swap, still block matching until peeled):
  *   tape-x     — 1 adjacent peel (tutorial cover)
- *   tape-black — 2 peels; immune to plane/rocket line clears
+ *   tape-black — 2 peels; immune to rocket line clears
  *   wet        — 1 peel; slips one extra cell after a swap
  *   glue       — 2 peels; pins the cell so it will not fall
  *
  * Hard (cannot swap):
- *   box    — 2 cracks; immune to plane/rocket line clears
+ *   box    — 2 cracks; immune to rocket line clears
  *   lock   — 2 cracks; only adjacent matches of size ≥4 (or powers)
  *   tar    — 2 cracks; after cascades settle, may spread to a neighbor
  *   barbed — 1 crack; adjacent matches do nothing — needs a power tool
@@ -58,10 +58,10 @@ export const OBSTACLE_LABELS: Record<ObstacleKind | "any", string> = {
 
 export const OBSTACLE_BLURBS: Record<ObstacleKind, string> = {
   "tape-x": "Soft cover — match beside it once to peel",
-  "tape-black": "Heavy tape — 2 peels; plane/rocket bounce off",
+  "tape-black": "Heavy tape — 2 peels; rockets bounce off",
   wet: "Slick smear — peels once; slips after you swap it",
   glue: "Sticky pin — 2 peels; glued stickers will not fall",
-  box: "Solid crate — 2 cracks; plane/rocket bounce off",
+  box: "Solid crate — 2 cracks; rockets bounce off",
   lock: "Combo lock — needs a match of 4+ (or a blast)",
   tar: "Creeping goo — 2 cracks; spreads if you leave it",
   barbed: "Wire fence — matches won't cut it; use a power",
@@ -84,7 +84,7 @@ export const LOCK_MIN_MATCH = 4;
 /**
  * Power-ups — mechanics match the classroom tool fantasy.
  * bomb: explode a 3×3 cluster
- * plane: fly across a full row
+ * plane: fly one sticker next to another sticker of your choice
  * rocket: launch up a full column
  * magnet: pull every sticker of the tapped type
  * stapler: staple a 2×2 paper packet and rip it off the board
@@ -103,7 +103,7 @@ export type PowerUpKind = (typeof POWERUP_KINDS)[number];
 
 export const POWER_BLURBS: Record<PowerUpKind, string> = {
   bomb: "BOMB — explode a 3×3 cluster",
-  plane: "PLANE — fly across the whole row",
+  plane: "PLANE — fly a sticker next to another",
   rocket: "ROCKET — blast up the whole column",
   magnet: "MAGNET — pull every sticker of that type",
   stapler: "STAPLER — staple a 2×2 packet and rip it off",

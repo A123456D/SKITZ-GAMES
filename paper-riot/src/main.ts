@@ -1,4 +1,4 @@
-import { areAdjacent, isPlayable } from "./core/board";
+import { areAdjacent, canSwapCell, isPlayable } from "./core/board";
 import { ZONES } from "./core/levels";
 import { applyWin, loadProgress, saveProgress } from "./core/save";
 import {
@@ -6,6 +6,7 @@ import {
   crushWave,
   currentMatches,
   startSession,
+  usePlaneFerry,
   usePower,
   type Session,
 } from "./core/session";
@@ -85,6 +86,8 @@ let selectedLevel = Math.min(progress.unlocked, 40);
 let session: Session = startSession(selectedLevel);
 let selected: Pos | null = null;
 let armedPower: PowerUpKind | null = null;
+/** First pick for the paper-plane ferry. */
+let planeFrom: Pos | null = null;
 let busy = false;
 let clearing = new Set<string>();
 let burstT = 0;
@@ -154,6 +157,7 @@ function paint(): void {
     clearing,
     burstT,
     armedPower,
+    planeFrom,
     popFx: popFx ? { x: popFx.x, y: popFx.y, t: popFx.t } : null,
     time: animTime,
   });
@@ -325,7 +329,41 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
   markDirty();
 }
 
+async function handlePlaneFerry(from: Pos, beside: Pos): Promise<void> {
+  if (busy) return;
+  busy = true;
+  const layout = boardLayout();
+  const fromMid = cellCenter(layout, from.c, from.r);
+  const besideMid = cellCenter(layout, beside.c, beside.r);
+  const pstyle = styleForPower("plane");
+  stampFx(fromMid.x, fromMid.y, pstyle);
+  stampFx(besideMid.x, besideMid.y, pstyle);
+  popFx = { x: besideMid.x, y: besideMid.y, t: 0, started: performance.now() };
+  playSfx(powerSfx("plane"), { vary: false });
+
+  const result = usePlaneFerry(session, from, beside);
+  planeFrom = null;
+  armedPower = null;
+  selected = null;
+  if (!result.ok) {
+    playSfx("swap-fail");
+    busy = false;
+    markDirty();
+    return;
+  }
+  const land = cellCenter(layout, result.landed.c, result.landed.r);
+  burstAt(land.x, land.y, 6, pstyle);
+  syncVisuals(true);
+  markDirty();
+  await waitMotion();
+  busy = false;
+  playEndSting();
+  recordWinIfCleared();
+  markDirty();
+}
+
 async function handlePower(kind: PowerUpKind, target: Pos): Promise<void> {
+  if (kind === "plane") return;
   if (busy) return;
   busy = true;
   const layout = boardLayout();
@@ -337,6 +375,7 @@ async function handlePower(kind: PowerUpKind, target: Pos): Promise<void> {
 
   const result = usePower(session, kind, target);
   armedPower = null;
+  planeFrom = null;
   selected = null;
   if (!result.ok) {
     busy = false;
@@ -364,6 +403,7 @@ function openLevel(id: number): void {
   session = startSession(id);
   selected = null;
   armedPower = null;
+  planeFrom = null;
   clearMotion();
   syncVisuals(true);
   screen = "play";
@@ -442,6 +482,7 @@ function onTap(x: number, y: number): void {
     playSfx("ui-tap");
     screen = "map";
     armedPower = null;
+    planeFrom = null;
     markDirty();
     return;
   }
@@ -455,8 +496,14 @@ function onTap(x: number, y: number): void {
   if (powerHit) {
     if ((session.powers[powerHit] ?? 0) <= 0) return;
     playSfx("select");
-    armedPower = armedPower === powerHit ? null : powerHit;
-    selected = null;
+    if (armedPower === powerHit) {
+      armedPower = null;
+      planeFrom = null;
+    } else {
+      armedPower = powerHit;
+      planeFrom = null;
+      selected = null;
+    }
     markDirty();
     return;
   }
@@ -467,6 +514,34 @@ function onTap(x: number, y: number): void {
   if (!hit || !isPlayable(session.mask, hit.c, hit.r)) {
     selected = null;
     markDirty();
+    return;
+  }
+
+  if (armedPower === "plane") {
+    const cell = session.board[hit.c]![hit.r];
+    if (!planeFrom) {
+      if (!cell || !canSwapCell(cell)) {
+        playSfx("swap-fail");
+        markDirty();
+        return;
+      }
+      playSfx("select", { volume: 0.7 });
+      planeFrom = hit;
+      selected = null;
+      markDirty();
+      return;
+    }
+    if (planeFrom.c === hit.c && planeFrom.r === hit.r) {
+      planeFrom = null;
+      markDirty();
+      return;
+    }
+    if (!cell) {
+      playSfx("swap-fail");
+      markDirty();
+      return;
+    }
+    void handlePlaneFerry(planeFrom, hit);
     return;
   }
 

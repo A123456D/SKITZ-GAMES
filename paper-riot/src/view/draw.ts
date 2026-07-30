@@ -579,6 +579,7 @@ export function drawPlay(
     clearing: Set<string>;
     burstT: number;
     armedPower: PowerUpKind | null;
+    planeFrom?: { c: number; r: number } | null;
     popFx: { x: number; y: number; t: number } | null;
     time: number;
   },
@@ -756,10 +757,15 @@ export function drawPlay(
       const clearing = opts.clearing.has(key);
       const selected =
         !!opts.selected && opts.selected.c === c && opts.selected.r === r;
+      const planePick =
+        !!opts.planeFrom &&
+        opts.planeFrom.c === c &&
+        opts.planeFrom.r === r;
+      const lifted = selected || planePick;
       const visual = getVisual(cell.id);
       const base = cellCenter(layout, c, r);
       const pose = visual
-        ? floatPose(visual, opts.time, selected)
+        ? floatPose(visual, opts.time, lifted)
         : { x: base.x, y: base.y, rot: 0, scale: 1 };
       const size = layout.cell * 0.86 * pose.scale;
       const opacity = clearing
@@ -772,7 +778,7 @@ export function drawPlay(
         pose.x,
         pose.y,
         size,
-        selected,
+        lifted,
         pose.rot,
         opacity,
       );
@@ -910,7 +916,13 @@ export function drawPlay(
     ctx.fillStyle = Palette.lime;
     ctx.font = "700 22px 'Patrick Hand', cursive";
     ctx.textAlign = "center";
-    ctx.fillText(POWER_BLURBS[opts.armedPower], W / 2, 1090);
+    const blurb =
+      opts.armedPower === "plane"
+        ? opts.planeFrom
+          ? "PLANE — tap who it lands next to"
+          : "PLANE — tap a sticker to fly"
+        : POWER_BLURBS[opts.armedPower];
+    ctx.fillText(blurb, W / 2, 1090);
   }
 
   if (session.status === "won" || session.status === "lost") {
