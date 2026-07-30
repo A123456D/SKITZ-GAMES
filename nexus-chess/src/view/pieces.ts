@@ -9,7 +9,7 @@ let ready = false;
 let loading: Promise<void> | null = null;
 let loadedPack: string | null = null;
 
-const PIECE_CACHE_VER = 6;
+const PIECE_CACHE_VER = 7;
 
 function key(color: Color, kind: PieceKind): string {
   return color + kind;
@@ -80,19 +80,16 @@ export function drawThemePiece(
   const img = useSprite ? getPieceImage(color, kind) : null;
 
   if (img && img.complete && img.naturalWidth > 0) {
-    const forge = Theme.id === "forge";
-    // Forge sprites already fill most of the PNG — keep them centered in the cell.
-    // (Bottom-anchoring overflowed the board edge and broke move anim under scale transforms.)
-    const size = cellSize * (forge ? 0.7 : 0.86);
-    const yBias = forge ? cellSize * 0.02 : 0;
+    // Keep sprites geometrically centered in the cell (no seating bias).
+    const size = cellSize * (Theme.id === "forge" ? 0.84 : 0.86);
     const drawX = cx - size / 2;
-    const drawY = cy - size / 2 + yBias;
+    const drawY = cy - size / 2;
 
     ctx.save();
     ctx.globalAlpha = 0.28;
     ctx.fillStyle = Theme.pieceShadow;
     ctx.beginPath();
-    ctx.ellipse(cx, cy + size * 0.38 + yBias, size * 0.24, size * 0.065, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + size * 0.38, size * 0.24, size * 0.065, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 

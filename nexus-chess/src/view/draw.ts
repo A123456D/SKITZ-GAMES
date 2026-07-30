@@ -91,8 +91,9 @@ export function getLogoImage(): HTMLImageElement | null {
 }
 
 function hudReserve(h: number, compact: boolean): number {
-  if (compact) return Math.max(136, Math.min(172, h * 0.32));
-  return 168;
+  // Keep mana/turn controls fully on-screen on short mobile viewports.
+  if (compact) return Math.max(152, Math.min(196, h * 0.38));
+  return 176;
 }
 
 export function layout(canvas: HTMLCanvasElement, prev?: DrawCtx | null): DrawCtx {
@@ -669,7 +670,7 @@ export function drawHud(
   ctx.fillStyle = Theme.inkDim;
   ctx.font = `400 ${fontSm}px ${Theme.font}`;
   ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
+  ctx.textBaseline = "middle";
   ctx.fillText(`Turn ${state.turnNumber}  ·  ${turnLabel}  ·  ${phaseLabel}`, contentX, infoY);
 
   const targeting = highlightAbility && state.turnPhase === "ability" && !state.winner;

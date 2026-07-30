@@ -23,7 +23,7 @@ function loadImg(url: string | null): Promise<HTMLImageElement | null> {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
-    img.src = `${url}?v=6`;
+    img.src = `${url}?v=7`;
   });
 }
 
