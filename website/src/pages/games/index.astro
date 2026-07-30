@@ -26,6 +26,7 @@ const games = (await getCollection('games')).sort((a, b) => a.data.title.localeC
 								title={game.data.title}
 								summary={game.data.summary}
 								cover={game.data.cover}
+								preview={game.data.preview}
 								genre={game.data.genre}
 							/>
 						))

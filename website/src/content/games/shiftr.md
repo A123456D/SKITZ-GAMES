@@ -3,6 +3,7 @@ title: Pulse Link
 tagline: Turn. Link. Pulse.
 summary: Turn discs to close one circuit, then pulse to check the network. Free in the browser, install on Android.
 cover: /images/pulse-link-logo.png
+preview: /images/previews/shiftr.gif
 screenshots: []
 featured: true
 released: true

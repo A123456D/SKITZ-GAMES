@@ -4,16 +4,29 @@ interface Props {
 	title: string;
 	summary: string;
 	cover: string;
+	preview?: string;
 	genre?: string;
 }
 
-const { href, title, summary, cover, genre } = Astro.props;
+const { href, title, summary, cover, preview, genre } = Astro.props;
 ---
 
 <a class="game-link" href={href}>
 	<article class="game-item">
-		<div class="game-item__media">
-			<img src={cover} alt="" width="640" height="640" loading="lazy" />
+		<div class={`game-item__media${preview ? ' game-item__media--pair' : ''}`}>
+			<img class="game-item__cover" src={cover} alt="" width="640" height="640" loading="lazy" />
+			{
+				preview && (
+					<img
+						class="game-item__preview"
+						src={preview}
+						alt={`${title} gameplay preview`}
+						width="480"
+						height="780"
+						loading="lazy"
+					/>
+				)
+			}
 		</div>
 		<div class="game-item__body">
 			{genre && <p class="eyebrow">{genre}</p>}
@@ -55,6 +68,17 @@ const { href, title, summary, cover, genre } = Astro.props;
 		transform: rotate(-1.2deg);
 	}
 
+	.game-item__media--pair {
+		max-width: 100%;
+		display: grid;
+		grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+		gap: 0.45rem;
+		align-items: center;
+		padding: 0.5rem;
+		clip-path: none;
+		border-radius: 0.2rem;
+	}
+
 	.game-link:nth-child(even) .game-item__media {
 		box-shadow: 5px 6px 0 var(--skitz-blue);
 		transform: rotate(1deg);
@@ -65,12 +89,22 @@ const { href, title, summary, cover, genre } = Astro.props;
 		transform: rotate(-0.6deg);
 	}
 
-	.game-item__media img {
+	.game-item__cover {
 		width: 100%;
 		height: auto;
 		display: block;
 		aspect-ratio: 1;
 		object-fit: cover;
+	}
+
+	.game-item__preview {
+		width: 100%;
+		height: auto;
+		display: block;
+		aspect-ratio: 9 / 16;
+		object-fit: cover;
+		object-position: top center;
+		background: #111;
 	}
 
 	.game-item__body {

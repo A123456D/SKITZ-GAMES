@@ -15,8 +15,18 @@ export async function getStaticPaths() {
 
 const { game } = Astro.props;
 const { Content } = await render(game);
-const { title, summary, tagline, cover, platforms, downloads, appStoreUrl, playStoreUrl, genre } =
-	game.data;
+const {
+	title,
+	summary,
+	tagline,
+	cover,
+	preview,
+	platforms,
+	downloads,
+	appStoreUrl,
+	playStoreUrl,
+	genre,
+} = game.data;
 ---
 
 <BaseLayout title={title} description={summary}>
@@ -40,8 +50,19 @@ const { title, summary, tagline, cover, platforms, downloads, appStoreUrl, playS
 						<a class="btn btn-ghost" href="#install">Download</a>
 					</div>
 				</div>
-				<div class="detail-hero__art">
+				<div class={`detail-hero__art${preview ? ' detail-hero__art--pair' : ''}`}>
 					<img src={cover} alt={`${title} cover art`} width="640" height="640" />
+					{
+						preview && (
+							<img
+								class="detail-hero__preview"
+								src={preview}
+								alt={`${title} gameplay preview`}
+								width="480"
+								height="780"
+							/>
+						)
+					}
 				</div>
 			</div>
 		</section>
@@ -150,10 +171,28 @@ const { title, summary, tagline, cover, platforms, downloads, appStoreUrl, playS
 		transform: rotate(1.4deg);
 	}
 
+	.detail-hero__art--pair {
+		max-width: 520px;
+		display: grid;
+		grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.05fr);
+		gap: 0.55rem;
+		align-items: center;
+		clip-path: none;
+		border-radius: 0.25rem;
+		transform: rotate(0.6deg);
+	}
+
 	.detail-hero__art img {
 		width: 100%;
 		height: auto;
 		display: block;
+	}
+
+	.detail-hero__preview {
+		aspect-ratio: 9 / 16;
+		object-fit: cover;
+		object-position: top center;
+		background: #111;
 	}
 
 	.prose :global(p) {

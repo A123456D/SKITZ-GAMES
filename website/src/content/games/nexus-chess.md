@@ -3,6 +3,7 @@ title: Nexus Chess
 tagline: Zone-control tactical chess.
 summary: Hold the Nexus with your King, spend mana on abilities, and climb the computer ladder. Free in the browser, install on Android.
 cover: /images/nexus-chess-logo.png
+preview: /images/previews/nexus-chess.gif
 screenshots: []
 featured: true
 released: true

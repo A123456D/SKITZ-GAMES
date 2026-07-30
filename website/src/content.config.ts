@@ -8,6 +8,7 @@ const games = defineCollection({
 		summary: z.string(),
 		tagline: z.string().optional(),
 		cover: z.string(),
+		preview: z.string().optional(),
 		screenshots: z.array(z.string()).default([]),
 		featured: z.boolean().default(false),
 		released: z.boolean().default(true),

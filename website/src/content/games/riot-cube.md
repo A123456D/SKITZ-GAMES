@@ -3,6 +3,7 @@ title: RIOT CUBE
 tagline: Twist. Rip. Match.
 summary: Twist cube slices, rip sticker matches of 3+, and clear level goals. Free in the browser, install on Android.
 cover: /images/logo-riot-cube-v3.png
+preview: /images/previews/riot-cube.gif
 screenshots: []
 featured: true
 released: true
