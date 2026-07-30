@@ -56,8 +56,13 @@ import {
   toggleMute,
   unlockAudio,
 } from "./view/audio";
+import {
+  setMusicMuted,
+  syncMusicForTheme,
+  unlockMusic,
+} from "./view/music";
 import { countObstacles } from "./core/obstacles";
-import { cycleTheme, initTheme } from "./view/theme";
+import { cycleTheme, getTheme, initTheme } from "./view/theme";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
@@ -371,6 +376,7 @@ function onTap(x: number, y: number): void {
     if (hitUi(HOME_THEME, x, y)) {
       playSfx("ui-tap");
       const next = cycleTheme();
+      syncMusicForTheme(next);
       void reloadThemeArt(next).then(() => markDirty());
       markDirty();
       return;
@@ -379,8 +385,11 @@ function onTap(x: number, y: number): void {
       if (!isMuted()) {
         playSfx("mute-on", { vary: false });
         toggleMute();
+        setMusicMuted(true);
       } else {
         toggleMute();
+        setMusicMuted(false);
+        unlockMusic();
         playSfx("ui-tap");
       }
       markDirty();
@@ -489,7 +498,12 @@ canvas.addEventListener(
   "pointerdown",
   (e) => {
     e.preventDefault();
-    void unlockAudio();
+    void unlockAudio().then(() => {
+      if (!isMuted()) {
+        syncMusicForTheme(getTheme());
+        unlockMusic();
+      }
+    });
     canvas.setPointerCapture(e.pointerId);
     const p = canvasPoint(e);
     pressedBtn = hitButtonId(screen, p.x, p.y);
@@ -548,6 +562,7 @@ window.addEventListener("orientationchange", resize);
 
 async function boot(): Promise<void> {
   initTheme();
+  syncMusicForTheme(getTheme());
   progress = loadProgress();
   saveProgress(progress);
   syncZoneFromLevel(selectedLevel);

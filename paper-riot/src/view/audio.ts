@@ -116,6 +116,15 @@ export async function unlockAudio(): Promise<void> {
   void loadSfx();
 }
 
+export function getSharedAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  return ensureCtx();
+}
+
+export function isAudioUnlocked(): boolean {
+  return unlocked;
+}
+
 export function isMuted(): boolean {
   return muted;
 }
