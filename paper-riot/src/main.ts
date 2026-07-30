@@ -62,6 +62,7 @@ import { loadGameArt, reloadThemeArt } from "./view/stickers";
 import {
   loadSfx,
   playSfx,
+  ensureSfx,
   powerSfx,
   unlockAudio,
 } from "./view/audio";
@@ -394,7 +395,9 @@ async function playFailedSwap(a: Pos, b: Pos): Promise<void> {
 
   swapCells(session.board, a, b);
   syncVisuals(false);
-  playSfx("oops", { vary: false, volume: 0.9 });
+  const laughReady = await ensureSfx("oops");
+  if (laughReady) playSfx("oops", { vary: false, volume: 1.35 });
+  else playSfx("swap-fail");
   markDirty();
   await waitMotion();
 

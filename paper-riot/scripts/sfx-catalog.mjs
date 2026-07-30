@@ -114,7 +114,7 @@ export const SFX_CATALOG = [
   {
     id: "oops",
     file: "oops.mp3",
-    duration: 1.1,
-    text: "Young girl short playful giggle laugh, cute teasing ha-ha, light and friendly, no words, short cartoonish laugh, clean studio, not creepy",
+    duration: 1.2,
+    text: "Clear close-mic recording of a young girl giggling: bright playful hee-hee laugh, teasing and cute, loud and distinct, short cartoon laugh, no words, no music, no ambience, dry studio",
   },
 ];

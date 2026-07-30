@@ -45,7 +45,7 @@ const FILES: Record<SfxId, string> = {
 
 const MUTE_KEY = "paper-riot-muted";
 /** Bump when regenerating mp3s so clients skip stale cache. */
-const SFX_VERSION = 4;
+const SFX_VERSION = 6;
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -80,22 +80,22 @@ function ensureCtx(): AudioContext {
   return ctx;
 }
 
-async function decodeOne(id: SfxId, audio: AudioContext): Promise<void> {
+async function decodeOne(id: SfxId, audio: AudioContext): Promise<boolean> {
   try {
     const res = await fetch(`./sfx/${FILES[id]}?v=${SFX_VERSION}`);
-    if (!res.ok) return;
+    if (!res.ok) return false;
     const raw = await res.arrayBuffer();
     const buf = await audio.decodeAudioData(raw.slice(0));
     buffers.set(id, buf);
+    return true;
   } catch {
-    /* missing asset is fine until generated */
+    return false;
   }
 }
 
 /** Preload all SFX (no-op if already loading / loaded). */
 export function loadSfx(): Promise<void> {
   if (loadPromise) return loadPromise;
-  muted = readMuted();
   loadPromise = (async () => {
     const audio = ensureCtx();
     await Promise.all(
@@ -105,9 +105,16 @@ export function loadSfx(): Promise<void> {
   return loadPromise;
 }
 
+/** Ensure a single clip is decoded (retries if the first preload missed it). */
+export async function ensureSfx(id: SfxId): Promise<boolean> {
+  if (buffers.has(id)) return true;
+  await loadSfx();
+  if (buffers.has(id)) return true;
+  return decodeOne(id, ensureCtx());
+}
+
 /** Call from first user gesture so mobile browsers allow playback. */
 export async function unlockAudio(): Promise<void> {
-  muted = readMuted();
   const audio = ensureCtx();
   if (audio.state === "suspended") {
     try {
@@ -155,7 +162,11 @@ export function playSfx(
   if (!unlocked || muted) return;
   const audio = ensureCtx();
   const buf = buffers.get(id);
-  if (!buf || !master) return;
+  if (!buf || !master) {
+    // Fallback if WebAudio decode missed this clip (cache / race).
+    void playHtmlFallback(id, opts?.volume ?? 1);
+    return;
+  }
   if (audio.state === "suspended") void audio.resume();
 
   const src = audio.createBufferSource();
@@ -172,6 +183,16 @@ export function playSfx(
   gain.connect(master);
   try {
     src.start(0);
+  } catch {
+    void playHtmlFallback(id, opts?.volume ?? 1);
+  }
+}
+
+function playHtmlFallback(id: SfxId, volume: number): void {
+  try {
+    const el = new Audio(`./sfx/${FILES[id]}?v=${SFX_VERSION}`);
+    el.volume = Math.max(0, Math.min(1, volume * 0.85));
+    void el.play();
   } catch {
     /* ignore */
   }
