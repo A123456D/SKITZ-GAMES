@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="48" fill="#0d1110"/>
+  <rect x="48" y="48" width="416" height="416" rx="24" stroke="#9dffb0" stroke-width="8" fill="#151c19"/>
+  <text x="256" y="200" text-anchor="middle" font-family="Arial Black, sans-serif" font-size="72" font-weight="800" fill="#e8f0ea">BREACH</text>
+  <text x="256" y="290" text-anchor="middle" font-family="Arial Black, sans-serif" font-size="84" font-weight="800" fill="#9dffb0">RIOT</text>
+  <text x="256" y="360" text-anchor="middle" font-family="monospace" font-size="28" font-weight="700" fill="#ff6b4a">1C 55 7A BD</text>
+  <text x="256" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="600" fill="#8a9e93">TRACE · CRACK · OVERRIDE</text>
+</svg>

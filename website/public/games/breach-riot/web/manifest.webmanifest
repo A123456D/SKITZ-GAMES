@@ -1,0 +1,9 @@
+{
+  "name": "BREACH RIOT",
+  "short_name": "BREACH RIOT",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0d1110",
+  "theme_color": "#0d1110",
+  "orientation": "portrait"
+}
