@@ -25,6 +25,7 @@ import {
   drawHome,
   drawMap,
   drawPlay,
+  hitButtonId,
   hitPowerDock,
   hitUi,
   hitZoneTab,
@@ -64,6 +65,8 @@ let burstResolve: (() => void) | null = null;
 let popFx: { x: number; y: number; t: number; started: number } | null = null;
 let lastTs = 0;
 let animTime = 0;
+let hoverBtn: string | null = null;
+let pressedBtn: string | null = null;
 
 function markDirty(): void {
   needsPaint = true;
@@ -108,12 +111,13 @@ function canvasPoint(e: PointerEvent): { x: number; y: number } {
 }
 
 function paint(): void {
+  const ui = { time: animTime, hover: hoverBtn, pressed: pressedBtn };
   if (screen === "home") {
-    drawHome(ctx, progress);
+    drawHome(ctx, progress, ui);
     return;
   }
   if (screen === "map") {
-    drawMap(ctx, progress, mapZone, selectedLevel);
+    drawMap(ctx, progress, mapZone, selectedLevel, ui);
     return;
   }
   drawPlay(ctx, session, {
@@ -128,6 +132,8 @@ function paint(): void {
 
 function isAnimating(): boolean {
   return (
+    screen === "home" ||
+    screen === "map" ||
     screen === "play" ||
     busy ||
     burstT > 0 ||
@@ -407,9 +413,55 @@ canvas.addEventListener(
     e.preventDefault();
     canvas.setPointerCapture(e.pointerId);
     const p = canvasPoint(e);
+    pressedBtn = hitButtonId(screen, p.x, p.y);
+    hoverBtn = pressedBtn;
+    markDirty();
     onTap(p.x, p.y);
   },
   { passive: false },
+);
+
+canvas.addEventListener(
+  "pointermove",
+  (e) => {
+    const p = canvasPoint(e);
+    const next = hitButtonId(screen, p.x, p.y);
+    if (next !== hoverBtn) {
+      hoverBtn = next;
+      markDirty();
+    }
+  },
+  { passive: true },
+);
+
+canvas.addEventListener(
+  "pointerup",
+  () => {
+    if (pressedBtn) {
+      pressedBtn = null;
+      markDirty();
+    }
+  },
+  { passive: true },
+);
+
+canvas.addEventListener(
+  "pointercancel",
+  () => {
+    pressedBtn = null;
+    markDirty();
+  },
+  { passive: true },
+);
+
+canvas.addEventListener(
+  "pointerleave",
+  () => {
+    hoverBtn = null;
+    pressedBtn = null;
+    markDirty();
+  },
+  { passive: true },
 );
 
 window.addEventListener("resize", resize);

@@ -197,31 +197,102 @@ function paperBtn(
   ctx: CanvasRenderingContext2D,
   rect: UiRect,
   label: string,
-  opts?: { play?: boolean; hot?: boolean },
+  opts?: {
+    play?: boolean;
+    hot?: boolean;
+    time?: number;
+    phase?: number;
+    hover?: boolean;
+    pressed?: boolean;
+  },
 ): void {
+  const time = opts?.time ?? 0;
+  const phase = opts?.phase ?? 0;
+  const hover = !!opts?.hover;
+  const pressed = !!opts?.pressed;
+
+  const bob = Math.sin(time * 2.1 + phase) * 3.2;
+  const sway = Math.sin(time * 1.25 + phase * 1.4) * 1.4;
+  const tilt = Math.sin(time * 1.55 + phase * 0.9) * 0.018;
+  const breath = 1 + Math.sin(time * 2.6 + phase) * 0.012;
+
+  let lift = 10 + bob + (hover ? 6 : 0);
+  let scale = breath * (hover ? 1.035 : 1);
+  if (pressed) {
+    lift = 2;
+    scale = 0.97;
+  }
+
+  const cx = rect.x + rect.w / 2 + sway;
+  const cy = rect.y + rect.h / 2 - lift;
+
+  // Ground shadow (detached soft pad under the scrap)
+  ctx.save();
+  ctx.translate(cx, rect.y + rect.h / 2 + 10);
+  ctx.scale(1.05 + lift * 0.012, 0.38 + lift * 0.008);
+  const shadowGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, rect.w * 0.48);
+  shadowGrad.addColorStop(0, `rgba(0,0,0,${0.38 + lift * 0.012})`);
+  shadowGrad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = shadowGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rect.w * 0.48, rect.h * 0.55, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Lifted scrap
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(tilt + (hover ? -0.012 : 0) + (pressed ? 0.01 : 0));
+  ctx.scale(scale, scale);
+
   const art = uiImage(opts?.play ? "btn-play" : "btn-paper");
-  if (art && art.complete) {
-    drawImg(ctx, art, rect.x, rect.y, rect.w, rect.h, true);
+  const drawW = rect.w;
+  const drawH = rect.h;
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = 10 + lift * 0.9;
+  ctx.shadowOffsetX = 4;
+  ctx.shadowOffsetY = 6 + lift * 0.55;
+
+  if (art && art.complete && art.naturalWidth > 0) {
+    ctx.drawImage(art, -drawW / 2, -drawH / 2, drawW, drawH);
   } else {
     ctx.fillStyle = opts?.play || opts?.hot ? Palette.hot : Palette.paper;
-    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 8);
+    roundRect(ctx, -drawW / 2, -drawH / 2, drawW, drawH, 8);
     ctx.fill();
   }
+
+  // Label sits on the scrap (no extra shadow so type stays crisp)
+  ctx.shadowColor = "transparent";
   ctx.fillStyle = opts?.play || opts?.hot ? Palette.white : Palette.ink;
-  ctx.font = "800 34px 'Chakra Petch', sans-serif";
+  ctx.font =
+    rect.h >= 90
+      ? "800 34px 'Chakra Petch', sans-serif"
+      : "800 26px 'Chakra Petch', sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 2);
+  ctx.fillText(label, 0, 2);
+  ctx.restore();
 }
 
-export function drawHome(ctx: CanvasRenderingContext2D, progress: Progress): void {
+export type BtnUiState = {
+  time: number;
+  hover: string | null;
+  pressed: string | null;
+};
+
+export function drawHome(
+  ctx: CanvasRenderingContext2D,
+  progress: Progress,
+  ui: BtnUiState = { time: 0, hover: null, pressed: null },
+): void {
   cover(ctx, uiImage("bg-menu"), Palette.bg);
 
   const logo = uiImage("logo");
   if (logo && logo.complete) {
     const lw = 560;
     const lh = (logo.naturalHeight / logo.naturalWidth) * lw;
-    drawImg(ctx, logo, (W - lw) / 2, 120, lw, Math.min(lh, 320), true);
+    const bob = Math.sin(ui.time * 1.4) * 4;
+    drawImg(ctx, logo, (W - lw) / 2, 120 + bob, lw, Math.min(lh, 320), true);
   } else {
     ctx.fillStyle = Palette.white;
     ctx.font = "800 64px 'Permanent Marker', cursive";
@@ -229,9 +300,25 @@ export function drawHome(ctx: CanvasRenderingContext2D, progress: Progress): voi
     ctx.fillText("PAPER RIOT", W / 2, 260);
   }
 
-  paperBtn(ctx, HOME_PLAY, "PLAY", { play: true });
-  paperBtn(ctx, HOME_MAP, "WORLD MAP");
-  paperBtn(ctx, HOME_SETTINGS, "SETTINGS");
+  paperBtn(ctx, HOME_PLAY, "PLAY", {
+    play: true,
+    time: ui.time,
+    phase: 0.2,
+    hover: ui.hover === "home-play",
+    pressed: ui.pressed === "home-play",
+  });
+  paperBtn(ctx, HOME_MAP, "WORLD MAP", {
+    time: ui.time,
+    phase: 1.1,
+    hover: ui.hover === "home-map",
+    pressed: ui.pressed === "home-map",
+  });
+  paperBtn(ctx, HOME_SETTINGS, "SETTINGS", {
+    time: ui.time,
+    phase: 2.0,
+    hover: ui.hover === "home-settings",
+    pressed: ui.pressed === "home-settings",
+  });
 
   ctx.fillStyle = Palette.white;
   ctx.font = "600 22px 'Patrick Hand', cursive";
@@ -299,6 +386,7 @@ export function drawMap(
   progress: Progress,
   zone: ZoneId,
   selectedLevel: number,
+  ui: BtnUiState = { time: 0, hover: null, pressed: null },
 ): void {
   cover(ctx, uiImage("bg-map"), "#1a1510");
 
@@ -308,32 +396,51 @@ export function drawMap(
   const path = zonePath(zi);
 
   // Zone title scrap
+  ctx.save();
+  ctx.shadowColor = Palette.shadow;
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 6;
   ctx.fillStyle = Palette.paper;
-  roundRect(ctx, 160, 40, 400, 90, 8);
+  roundRect(ctx, 160, 40 + Math.sin(ui.time * 1.3) * 2, 400, 90, 8);
   ctx.fill();
+  ctx.restore();
   ctx.strokeStyle = Palette.ink;
   ctx.lineWidth = 3;
+  roundRect(ctx, 160, 40 + Math.sin(ui.time * 1.3) * 2, 400, 90, 8);
   ctx.stroke();
   ctx.fillStyle = Palette.ink;
   ctx.font = "800 32px 'Permanent Marker', cursive";
   ctx.textAlign = "center";
-  ctx.fillText(zoneMeta.name, W / 2, 78);
+  ctx.fillText(zoneMeta.name, W / 2, 78 + Math.sin(ui.time * 1.3) * 2);
   ctx.font = "600 20px 'Patrick Hand', cursive";
-  ctx.fillText(zoneMeta.tagline, W / 2, 110);
+  ctx.fillText(zoneMeta.tagline, W / 2, 110 + Math.sin(ui.time * 1.3) * 2);
 
-  paperBtn(ctx, MAP_BACK, "BACK");
+  paperBtn(ctx, MAP_BACK, "BACK", {
+    time: ui.time,
+    phase: 0.4,
+    hover: ui.hover === "map-back",
+    pressed: ui.pressed === "map-back",
+  });
 
   // Zone tabs
   ZONES.forEach((z, i) => {
     const r = { x: 40 + i * 170, y: 150, w: 155, h: 48 };
-    const unlockedZone = progress.unlocked > i * 10;
-    ctx.fillStyle = z.id === zone ? Palette.hot : unlockedZone ? Palette.paper : "#666";
+    const unlockedZone = progress.unlocked > i * 10 || i === 0;
+    const active = z.id === zone;
+    const lift = active ? 5 + Math.sin(ui.time * 3 + i) * 1.5 : 2;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.4)";
+    ctx.shadowBlur = 8 + lift;
+    ctx.shadowOffsetY = 3 + lift;
+    ctx.translate(0, -lift);
+    ctx.fillStyle = active ? Palette.hot : unlockedZone ? Palette.paper : "#666";
     roundRect(ctx, r.x, r.y, r.w, r.h, 6);
     ctx.fill();
-    ctx.fillStyle = z.id === zone ? Palette.white : Palette.ink;
+    ctx.restore();
+    ctx.fillStyle = active ? Palette.white : Palette.ink;
     ctx.font = "800 16px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(z.name.split(" ")[0]!, r.x + r.w / 2, r.y + 30);
+    ctx.fillText(z.name.split(" ")[0]!, r.x + r.w / 2, r.y + 30 - lift);
   });
 
   // Path line
@@ -356,12 +463,13 @@ export function drawMap(
     const unlocked = lv.id <= progress.unlocked;
     const stars = progress.stars[lv.id] ?? 0;
     const selected = lv.id === selectedLevel;
+    const bob = unlocked ? Math.sin(ui.time * 2.2 + i * 0.7) * 3 : 0;
     ctx.save();
     ctx.shadowColor = Palette.shadow;
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
+    ctx.shadowBlur = selected ? 16 : 10;
+    ctx.shadowOffsetY = selected ? 8 : 4;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, selected ? 34 : 28, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y + bob, selected ? 34 : 28, 0, Math.PI * 2);
     ctx.fillStyle = !unlocked ? "#444" : selected ? Palette.hot : Palette.paper;
     ctx.fill();
     ctx.lineWidth = 3;
@@ -373,33 +481,67 @@ export function drawMap(
     ctx.font = "800 22px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(unlocked ? String(lv.id) : "🔒", p.x, p.y);
+    ctx.fillText(unlocked ? String(lv.id) : "🔒", p.x, p.y + bob);
 
     if (stars > 0) {
       ctx.fillStyle = Palette.lime;
       ctx.font = "18px sans-serif";
-      ctx.fillText("★".repeat(stars), p.x, p.y + 42);
+      ctx.fillText("★".repeat(stars), p.x, p.y + bob + 42);
     }
   });
 
   const sel = LEVELS.find((l) => l.id === selectedLevel);
   if (sel) {
+    ctx.save();
+    ctx.shadowColor = Palette.shadow;
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 5;
     ctx.fillStyle = Palette.paper;
     roundRect(ctx, 80, 1040, 560, 100, 8);
     ctx.fill();
+    ctx.restore();
     ctx.fillStyle = Palette.ink;
     ctx.font = "800 26px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(`${sel.name}  ·  ${sel.moves} moves  ·  ${sel.shape}`, W / 2, 1080);
+    ctx.fillText(
+      `${sel.name}  ·  ${sel.moves} moves  ·  ${sel.shape}`,
+      W / 2,
+      1080,
+    );
   }
 
-  paperBtn(ctx, MAP_PLAY, "PLAY LEVEL", { hot: true });
+  paperBtn(ctx, MAP_PLAY, "PLAY LEVEL", {
+    hot: true,
+    time: ui.time,
+    phase: 2.4,
+    hover: ui.hover === "map-play",
+    pressed: ui.pressed === "map-play",
+  });
 }
 
 export function hitZoneTab(x: number, y: number): ZoneId | null {
   for (let i = 0; i < ZONES.length; i++) {
     const r = { x: 40 + i * 170, y: 150, w: 155, h: 48 };
     if (hitUi(r, x, y)) return ZONES[i]!.id;
+  }
+  return null;
+}
+
+/** Which primary scrap button is under the pointer (for hover / press). */
+export function hitButtonId(
+  screen: "home" | "map" | "play",
+  x: number,
+  y: number,
+): string | null {
+  if (screen === "home") {
+    if (hitUi(HOME_PLAY, x, y)) return "home-play";
+    if (hitUi(HOME_MAP, x, y)) return "home-map";
+    if (hitUi(HOME_SETTINGS, x, y)) return "home-settings";
+  } else if (screen === "map") {
+    if (hitUi(MAP_BACK, x, y)) return "map-back";
+    if (hitUi(MAP_PLAY, x, y)) return "map-play";
+  } else if (hitUi(PAUSE_BTN, x, y)) {
+    return "pause";
   }
   return null;
 }
@@ -440,12 +582,22 @@ export function drawPlay(
   ctx.textAlign = "center";
   ctx.fillText(`LEVEL ${session.level.id}`, 370, 72);
 
-  ctx.fillStyle = Palette.paper;
-  roundRect(ctx, PAUSE_BTN.x, PAUSE_BTN.y, PAUSE_BTN.w, PAUSE_BTN.h, 8);
-  ctx.fill();
-  ctx.fillStyle = Palette.ink;
-  ctx.fillRect(PAUSE_BTN.x + 20, PAUSE_BTN.y + 18, 8, 28);
-  ctx.fillRect(PAUSE_BTN.x + 36, PAUSE_BTN.y + 18, 8, 28);
+  // Pause button with lift
+  {
+    const lift = 6 + Math.sin(opts.time * 2.4) * 2;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 10 + lift;
+    ctx.shadowOffsetY = 4 + lift * 0.5;
+    ctx.translate(0, -lift);
+    ctx.fillStyle = Palette.paper;
+    roundRect(ctx, PAUSE_BTN.x, PAUSE_BTN.y, PAUSE_BTN.w, PAUSE_BTN.h, 8);
+    ctx.fill();
+    ctx.fillStyle = Palette.ink;
+    ctx.fillRect(PAUSE_BTN.x + 20, PAUSE_BTN.y + 18, 8, 28);
+    ctx.fillRect(PAUSE_BTN.x + 36, PAUSE_BTN.y + 18, 8, 28);
+    ctx.restore();
+  }
 
   // Goals
   ctx.fillStyle = Palette.paper;
@@ -589,19 +741,36 @@ export function drawPlay(
 
   for (const slot of POWER_DOCK) {
     const armed = opts.armedPower === slot.kind;
+    const bob = Math.sin(opts.time * 2.8 + slot.rect.x * 0.02) * 3;
+    const lift = armed ? 10 : 5 + bob;
+    ctx.save();
+    // ground shadow
+    ctx.translate(slot.rect.x + slot.rect.w / 2, slot.rect.y + slot.rect.h / 2 + 8);
+    ctx.scale(1, 0.35);
+    ctx.fillStyle = `rgba(0,0,0,${0.28 + lift * 0.02})`;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, slot.rect.w * 0.42, slot.rect.h * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(0, -lift);
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 10 + lift;
+    ctx.shadowOffsetY = 4 + lift * 0.4;
     ctx.fillStyle = armed ? Palette.hot : Palette.paper;
     roundRect(ctx, slot.rect.x, slot.rect.y, slot.rect.w, slot.rect.h, 8);
     ctx.fill();
+    ctx.shadowColor = "transparent";
     ctx.strokeStyle = Palette.ink;
     ctx.lineWidth = 3;
     ctx.stroke();
     const pimg = powerImage(slot.kind);
     const cx = slot.rect.x + slot.rect.w / 2;
     const cy = slot.rect.y + slot.rect.h / 2 - 4;
-    const bob = Math.sin(opts.time * 2.8 + slot.rect.x * 0.02) * 3;
     const rot = Math.sin(opts.time * 1.6 + slot.rect.x * 0.01) * 0.08;
     ctx.save();
-    ctx.translate(cx, cy + bob);
+    ctx.translate(cx, cy);
     ctx.rotate(rot);
     ctx.shadowColor = Palette.shadow;
     ctx.shadowBlur = 8;
@@ -615,6 +784,7 @@ export function drawPlay(
       slot.rect.x + slot.rect.w - 12,
       slot.rect.y + slot.rect.h - 14,
     );
+    ctx.restore();
   }
 
   if (opts.armedPower) {
