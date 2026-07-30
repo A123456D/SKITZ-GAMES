@@ -19,6 +19,7 @@ import {
 import { Palette } from "./theme";
 import { drawParticles } from "./particles";
 import { floatPose, getVisual } from "./motion";
+import { isMuted } from "./audio";
 
 export const W = 720;
 export const H = 1280;
@@ -323,7 +324,7 @@ export function drawHome(
     hover: ui.hover === "home-map",
     pressed: ui.pressed === "home-map",
   });
-  paperBtn(ctx, HOME_SETTINGS, "SETTINGS", {
+  paperBtn(ctx, HOME_SETTINGS, isMuted() ? "SOUND OFF" : "SOUND ON", {
     time: ui.time,
     phase: 2.0,
     hover: ui.hover === "home-settings",

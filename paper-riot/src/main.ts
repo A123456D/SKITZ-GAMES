@@ -47,6 +47,15 @@ import {
   updateParticles,
 } from "./view/particles";
 import { loadGameArt } from "./view/stickers";
+import {
+  isMuted,
+  loadSfx,
+  playSfx,
+  powerSfx,
+  toggleMute,
+  unlockAudio,
+} from "./view/audio";
+import { countObstacles } from "./core/obstacles";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
@@ -236,6 +245,15 @@ function playMatchBurst(keys: string[], kindHint?: string): Promise<void> {
   });
 }
 
+function countAllObstacles(): number {
+  return countObstacles(session.board, session.mask, "any");
+}
+
+function playEndSting(): void {
+  if (session.status === "won") playSfx("win", { vary: false });
+  else if (session.status === "lost") playSfx("lose", { vary: false });
+}
+
 function recordWinIfCleared(): void {
   if (session.status !== "won") return;
   progress = applyWin(
@@ -251,29 +269,41 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
   const started = beginSwap(session, a, b);
   selected = null;
   if (!started.ok) {
+    if (started.reason === "no-match" || started.reason === "blocked") {
+      playSfx("swap-fail");
+    }
     markDirty();
     return;
   }
 
+  playSfx("swap");
   busy = true;
   syncVisuals(false);
   markDirty();
   await waitMotion();
 
   let guard = 0;
+  let wave = 0;
   while (guard++ < 40) {
     if (session.status !== "playing") break;
     const groups = currentMatches(session);
     if (!groups.length) break;
     const keys = groups.flatMap((g) => g.cells.map((p) => `${p.c},${p.r}`));
     const hint = groups[0]?.kind;
+    playSfx(wave === 0 ? "match" : "cascade");
+    const beforeObs = countAllObstacles();
     await playMatchBurst(keys, hint);
     crushWave(session, groups);
+    const peeled = beforeObs - countAllObstacles();
+    if (peeled > 0) playSfx(peeled > 2 ? "crack" : "peel");
+    else playSfx("drop", { volume: 0.55 });
     syncVisuals(true);
     markDirty();
     await waitMotion();
+    wave++;
   }
   busy = false;
+  playEndSting();
   recordWinIfCleared();
   markDirty();
 }
@@ -286,6 +316,7 @@ async function handlePower(kind: PowerUpKind, target: Pos): Promise<void> {
   const pstyle = styleForPower(kind);
   stampFx(center.x, center.y, pstyle);
   popFx = { x: center.x, y: center.y, t: 0, started: performance.now() };
+  playSfx(powerSfx(kind), { vary: false });
 
   const result = usePower(session, kind, target);
   armedPower = null;
@@ -303,12 +334,14 @@ async function handlePower(kind: PowerUpKind, target: Pos): Promise<void> {
   markDirty();
   await waitMotion();
   busy = false;
+  playEndSting();
   recordWinIfCleared();
   markDirty();
 }
 
 function openLevel(id: number): void {
   if (id > progress.unlocked) return;
+  playSfx("ui-tap");
   selectedLevel = id;
   syncZoneFromLevel(id);
   session = startSession(id);
@@ -327,12 +360,20 @@ function onTap(x: number, y: number): void {
       return;
     }
     if (hitUi(HOME_MAP, x, y)) {
+      playSfx("ui-tap");
       syncZoneFromLevel(selectedLevel);
       screen = "map";
       markDirty();
       return;
     }
     if (hitUi(HOME_SETTINGS, x, y)) {
+      if (!isMuted()) {
+        playSfx("mute-on", { vary: false });
+        toggleMute();
+      } else {
+        toggleMute();
+        playSfx("ui-tap");
+      }
       markDirty();
     }
     return;
@@ -340,6 +381,7 @@ function onTap(x: number, y: number): void {
 
   if (screen === "map") {
     if (hitUi(MAP_BACK, x, y)) {
+      playSfx("ui-tap");
       screen = "home";
       markDirty();
       return;
@@ -348,6 +390,7 @@ function onTap(x: number, y: number): void {
     if (tab) {
       const zi = ZONES.findIndex((z) => z.id === tab);
       if (progress.unlocked > zi * 10 || zi === 0) {
+        playSfx("ui-tap");
         mapZone = tab;
         const first = zi * 10 + 1;
         selectedLevel = Math.min(progress.unlocked, first);
@@ -357,6 +400,7 @@ function onTap(x: number, y: number): void {
     }
     const node = mapNodeAt(mapZone, x, y);
     if (node && node <= progress.unlocked) {
+      playSfx("select");
       selectedLevel = node;
       markDirty();
       return;
@@ -368,6 +412,7 @@ function onTap(x: number, y: number): void {
   }
 
   if (session.status !== "playing") {
+    playSfx("ui-tap");
     syncZoneFromLevel(session.level.id);
     screen = "map";
     markDirty();
@@ -375,6 +420,7 @@ function onTap(x: number, y: number): void {
   }
 
   if (hitUi(PAUSE_BTN, x, y)) {
+    playSfx("ui-tap");
     screen = "map";
     armedPower = null;
     markDirty();
@@ -384,6 +430,7 @@ function onTap(x: number, y: number): void {
   const powerHit = hitPowerDock(x, y, session.level.id);
   if (powerHit) {
     if ((session.powers[powerHit] ?? 0) <= 0) return;
+    playSfx("select");
     armedPower = armedPower === powerHit ? null : powerHit;
     selected = null;
     markDirty();
@@ -405,6 +452,7 @@ function onTap(x: number, y: number): void {
   }
 
   if (!selected) {
+    playSfx("select", { volume: 0.7 });
     selected = hit;
     markDirty();
     return;
@@ -423,6 +471,7 @@ function onTap(x: number, y: number): void {
     return;
   }
 
+  playSfx("select", { volume: 0.7 });
   selected = hit;
   markDirty();
 }
@@ -431,6 +480,7 @@ canvas.addEventListener(
   "pointerdown",
   (e) => {
     e.preventDefault();
+    void unlockAudio();
     canvas.setPointerCapture(e.pointerId);
     const p = canvasPoint(e);
     pressedBtn = hitButtonId(screen, p.x, p.y);
@@ -496,7 +546,7 @@ async function boot(): Promise<void> {
   resize();
   markDirty();
   requestAnimationFrame(tick);
-  await loadGameArt();
+  await Promise.all([loadGameArt(), loadSfx()]);
   markDirty();
 }
 
