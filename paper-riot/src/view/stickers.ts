@@ -1,7 +1,7 @@
 import { TILE_KINDS } from "../core/types";
 import { getTheme, type ThemeId } from "./theme";
 
-const VERSION = 13;
+const VERSION = 14;
 const cache = new Map<string, HTMLImageElement>();
 let loadPromise: Promise<void> | null = null;
 let loadedTheme: ThemeId | null = null;
