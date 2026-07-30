@@ -1,6 +1,6 @@
 {
-  "name": "NEXUS",
-  "short_name": "NEXUS",
+  "name": "Nexus Chess",
+  "short_name": "Nexus Chess",
   "description": "Zone-control tactical chess",
   "start_url": "./index.html",
   "display": "standalone",
