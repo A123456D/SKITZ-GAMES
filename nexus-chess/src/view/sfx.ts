@@ -1,6 +1,10 @@
 /**
- * Nexus Chess SFX — ElevenLabs samples when present, procedural fallback.
+ * Nexus Chess SFX — theme packs.
+ * forge → current metallic / combat samples
+ * soft  → gentle pack for Nexus + Classic
  */
+
+import { Theme } from "./theme";
 
 const SAMPLE_FILES = {
   "move-lift": "move-lift.mp3",
@@ -14,12 +18,18 @@ const SAMPLE_FILES = {
 } as const;
 
 type SampleId = keyof typeof SAMPLE_FILES;
+export type SfxPackId = "forge" | "soft";
 
 let ctx: AudioContext | null = null;
 let unlocked = false;
 let master: GainNode | null = null;
-const buffers = new Map<SampleId, AudioBuffer>();
-let loadPromise: Promise<void> | null = null;
+/** Buffers per pack so theme switches stay instant after first load. */
+const packBuffers = new Map<SfxPackId, Map<SampleId, AudioBuffer>>();
+const packLoadPromises = new Map<SfxPackId, Promise<void>>();
+
+export function activeSfxPack(): SfxPackId {
+  return Theme.id === "forge" ? "forge" : "soft";
+}
 
 function ac(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -45,21 +55,29 @@ function bus(): GainNode | null {
   return master;
 }
 
+function softMode(): boolean {
+  return activeSfxPack() === "soft";
+}
+
 function playSample(
   id: SampleId,
   opts?: { volume?: number; vary?: boolean },
 ): boolean {
   const c = ac();
   const out = bus();
-  const buf = buffers.get(id);
+  const buf = packBuffers.get(activeSfxPack())?.get(id);
   if (!c || !out || !buf || !unlocked) return false;
   if (c.state === "suspended") void c.resume();
   const src = c.createBufferSource();
   src.buffer = buf;
   const vary = opts?.vary !== false;
-  src.playbackRate.value = vary ? 0.94 + Math.random() * 0.12 : 1;
+  const softBoost = softMode() ? 1.04 : 1;
+  src.playbackRate.value = vary
+    ? softBoost * (0.94 + Math.random() * 0.12)
+    : softBoost;
   const g = c.createGain();
-  g.gain.value = opts?.volume ?? 1;
+  const volScale = softMode() ? 0.82 : 1;
+  g.gain.value = (opts?.volume ?? 1) * volScale;
   src.connect(g);
   g.connect(out);
   try {
@@ -70,25 +88,55 @@ function playSample(
   return true;
 }
 
-export function loadSfx(): Promise<void> {
-  if (loadPromise) return loadPromise;
-  loadPromise = (async () => {
-    const c = ac();
-    if (!c) return;
-    await Promise.all(
-      (Object.keys(SAMPLE_FILES) as SampleId[]).map(async (id) => {
+async function decodePack(pack: SfxPackId): Promise<void> {
+  const c = ac();
+  if (!c) return;
+  const map = packBuffers.get(pack) ?? new Map<SampleId, AudioBuffer>();
+  await Promise.all(
+    (Object.keys(SAMPLE_FILES) as SampleId[]).map(async (id) => {
+      if (map.has(id)) return;
+      const file = SAMPLE_FILES[id];
+      const urls =
+        pack === "forge"
+          ? [`./sfx/forge/${file}`, `./sfx/${file}`]
+          : [`./sfx/${pack}/${file}`];
+      for (const url of urls) {
         try {
-          const res = await fetch(`./sfx/${SAMPLE_FILES[id]}`);
-          if (!res.ok) return;
+          const res = await fetch(url);
+          if (!res.ok) continue;
           const raw = await res.arrayBuffer();
-          buffers.set(id, await c.decodeAudioData(raw.slice(0)));
+          map.set(id, await c.decodeAudioData(raw.slice(0)));
+          return;
         } catch {
-          /* missing until generated */
+          /* try next */
         }
-      }),
-    );
-  })();
-  return loadPromise;
+      }
+    }),
+  );
+  packBuffers.set(pack, map);
+}
+
+function ensurePack(pack: SfxPackId): Promise<void> {
+  let p = packLoadPromises.get(pack);
+  if (!p) {
+    p = decodePack(pack);
+    packLoadPromises.set(pack, p);
+  }
+  return p;
+}
+
+/** Preload the active theme pack (and warm the other in the background). */
+export function loadSfx(): Promise<void> {
+  const active = activeSfxPack();
+  const primary = ensurePack(active);
+  const other: SfxPackId = active === "forge" ? "soft" : "forge";
+  void ensurePack(other);
+  return primary;
+}
+
+/** Call after board theme changes so the matching pack is ready. */
+export function reloadSfxForTheme(): void {
+  void ensurePack(activeSfxPack());
 }
 
 /** Call from first pointer gesture so browsers allow audio. */
@@ -139,6 +187,18 @@ function tone(
   o.stop(start + dur + 0.05);
 }
 
+function softTone(
+  c: AudioContext,
+  freq: number,
+  start: number,
+  dur: number,
+  peak: number,
+  dest: AudioNode,
+) {
+  tone(c, freq, start, dur, "sine", peak, dest);
+  tone(c, freq * 2.01, start, dur * 0.7, "sine", peak * 0.22, dest);
+}
+
 function noiseBurst(
   c: AudioContext,
   start: number,
@@ -154,7 +214,7 @@ function noiseBurst(
   src.buffer = buf;
   const filter = c.createBiquadFilter();
   filter.type = "bandpass";
-  filter.frequency.value = 1200;
+  filter.frequency.value = softMode() ? 900 : 1200;
   filter.Q.value = 0.7;
   const g = envGain(c, start, 0.004, dur * 0.15, dur * 0.8, peak);
   src.connect(filter);
@@ -178,6 +238,11 @@ export function playMoveLift(): void {
   const dest = masterDest();
   if (!c || !dest) return;
   const t = c.currentTime;
+  if (softMode()) {
+    softTone(c, 320, t, 0.1, 0.045, dest);
+    softTone(c, 480, t + 0.02, 0.08, 0.03, dest);
+    return;
+  }
   const o = c.createOscillator();
   o.type = "sine";
   o.frequency.setValueAtTime(180, t);
@@ -195,6 +260,11 @@ export function playMoveLand(): void {
   const dest = masterDest();
   if (!c || !dest) return;
   const t = c.currentTime;
+  if (softMode()) {
+    softTone(c, 220, t, 0.08, 0.055, dest);
+    softTone(c, 330, t + 0.015, 0.06, 0.03, dest);
+    return;
+  }
   noiseBurst(c, t, 0.06, 0.12, dest);
   tone(c, 90, t, 0.1, "triangle", 0.14, dest);
   tone(c, 180, t + 0.01, 0.07, "sine", 0.06, dest);
@@ -206,6 +276,12 @@ export function playCapture(): void {
   const dest = masterDest();
   if (!c || !dest) return;
   const t = c.currentTime;
+  if (softMode()) {
+    softTone(c, 260, t, 0.09, 0.06, dest);
+    softTone(c, 390, t + 0.03, 0.1, 0.04, dest);
+    softTone(c, 520, t + 0.06, 0.08, 0.025, dest);
+    return;
+  }
   noiseBurst(c, t, 0.1, 0.18, dest);
   tone(c, 140, t, 0.12, "square", 0.08, dest);
   tone(c, 70, t, 0.16, "sawtooth", 0.1, dest);
@@ -218,6 +294,10 @@ export function playUiTap(): void {
   const dest = masterDest();
   if (!c || !dest) return;
   const t = c.currentTime;
+  if (softMode()) {
+    softTone(c, 720, t, 0.035, 0.035, dest);
+    return;
+  }
   tone(c, 660, t, 0.04, "sine", 0.05, dest);
 }
 
@@ -227,6 +307,12 @@ export function playAbility(): void {
   const dest = masterDest();
   if (!c || !dest) return;
   const t = c.currentTime;
+  if (softMode()) {
+    softTone(c, 440, t, 0.1, 0.04, dest);
+    softTone(c, 660, t + 0.05, 0.12, 0.035, dest);
+    softTone(c, 880, t + 0.1, 0.14, 0.028, dest);
+    return;
+  }
   tone(c, 440, t, 0.08, "sine", 0.06, dest);
   tone(c, 660, t + 0.04, 0.1, "sine", 0.05, dest);
   tone(c, 880, t + 0.08, 0.12, "triangle", 0.04, dest);
@@ -248,6 +334,11 @@ export function playLose(): void {
   const dest = masterDest();
   if (!c || !dest) return;
   const t = c.currentTime;
+  if (softMode()) {
+    softTone(c, 280, t, 0.22, 0.045, dest);
+    softTone(c, 210, t + 0.12, 0.28, 0.035, dest);
+    return;
+  }
   tone(c, 220, t, 0.2, "sine", 0.08, dest);
   tone(c, 160, t + 0.1, 0.25, "triangle", 0.06, dest);
 }

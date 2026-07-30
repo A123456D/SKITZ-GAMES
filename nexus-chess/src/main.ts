@@ -68,6 +68,7 @@ import {
 import {
   unlockAudio,
   loadSfx,
+  reloadSfxForTheme,
   playMoveLift,
   playMoveLand,
   playCapture,
@@ -486,6 +487,7 @@ function onMenuClick(id: string) {
     applyTheme(next);
     void loadThemeArt();
     void loadThemePieces();
+    reloadSfxForTheme();
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", Theme.bg);
     return;
   }
