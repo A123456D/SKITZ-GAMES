@@ -21,6 +21,7 @@ export const FACE_NAMES = ["FRONT", "BACK", "RIGHT", "LEFT", "TOP", "BOTTOM"] as
 
 let cubePaperImg: HTMLImageElement | null = null;
 let cubePaperPromise: Promise<void> | null = null;
+let cubePaperPattern: CanvasPattern | null = null;
 
 /** Warm craft-paper grain for cube faces. */
 export function loadCubePaper(): Promise<void> {
@@ -32,29 +33,19 @@ export function loadCubePaper(): Promise<void> {
     const img = new Image();
     img.onload = () => {
       cubePaperImg = img;
+      cubePaperPattern = null;
       resolve();
     };
     img.onerror = () => resolve();
-    img.src = "./ui/cube-paper.png?v=1";
+    img.src = "./ui/cube-paper.png?v=2";
   });
   return cubePaperPromise;
 }
 
-function lerpFace2(a: Vec2, b: Vec2, t: number): Vec2 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-}
-
-/** Bilinear sample of a screen-space face quad (TL, TR, BR, BL). */
-function bilineFace(q: readonly Vec2[], u: number, v: number): Vec2 {
-  const top = lerpFace2(q[0]!, q[1]!, u);
-  const bot = lerpFace2(q[3]!, q[2]!, u);
-  return lerpFace2(top, bot, v);
-}
-
 /**
  * Fill a projected face with craft paper.
- * Solid paper first (no holes), then a subdivided texture map so perspective
- * faces don't get the old affine "diagonal shadow" gap.
+ * Uses a clipped screen-space pattern (no affine UV map) so perspective
+ * faces never get the diagonal uncovered-gap artifact.
  */
 function fillFacePaper(
   ctx: CanvasRenderingContext2D,
@@ -76,46 +67,33 @@ function fillFacePaper(
   ctx.fill();
 
   const img = cubePaperImg;
-  if (!img || !img.complete || img.naturalWidth <= 0) return;
-
-  const w = img.naturalWidth;
-  const h = img.naturalHeight;
-  const divs = getQuality().dprCap < 2 ? 4 : 7;
-
-  pathQuad();
-  ctx.save();
-  ctx.clip();
-  for (let iv = 0; iv < divs; iv++) {
-    for (let iu = 0; iu < divs; iu++) {
-      const u0 = iu / divs;
-      const u1 = (iu + 1) / divs;
-      const v0 = iv / divs;
-      const v1 = (iv + 1) / divs;
-      const p00 = bilineFace(q, u0, v0);
-      const p10 = bilineFace(q, u1, v0);
-      const p01 = bilineFace(q, u0, v1);
-      const sx = u0 * w;
-      const sy = v0 * h;
-      const sw = (u1 - u0) * w;
-      const sh = (v1 - v0) * h;
+  if (img && img.complete && img.naturalWidth > 0) {
+    if (!cubePaperPattern) {
+      cubePaperPattern = ctx.createPattern(img, "repeat");
+    }
+    const pattern = cubePaperPattern;
+    if (pattern) {
+      pathQuad();
       ctx.save();
-      ctx.transform(
-        (p10.x - p00.x) / sw,
-        (p10.y - p00.y) / sw,
-        (p01.x - p00.x) / sh,
-        (p01.y - p00.y) / sh,
-        p00.x,
-        p00.y,
-      );
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      ctx.clip();
+      // Anchor + scale so the grain reads at cube size without stretching.
+      const midX = (q[0]!.x + q[1]!.x + q[2]!.x + q[3]!.x) * 0.25;
+      const midY = (q[0]!.y + q[1]!.y + q[2]!.y + q[3]!.y) * 0.25;
+      ctx.translate(midX, midY);
+      ctx.scale(0.42, 0.42);
+      ctx.translate(-midX, -midY);
+      ctx.globalAlpha = isActive ? 0.62 : 0.48;
+      ctx.globalCompositeOperation = "multiply";
+      ctx.fillStyle = pattern;
+      // Oversize fill; clip keeps it on the face.
+      ctx.fillRect(midX - 900, midY - 900, 1800, 1800);
       ctx.restore();
     }
   }
-  ctx.restore();
 
   if (!isActive) {
     pathQuad();
-    ctx.fillStyle = "rgba(40, 28, 16, 0.14)";
+    ctx.fillStyle = "rgba(40, 28, 16, 0.08)";
     ctx.fill();
   }
 }
