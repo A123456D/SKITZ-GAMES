@@ -1,7 +1,7 @@
 import { TILE_KINDS } from "../core/types";
 import { getTheme, type ThemeId } from "./theme";
 
-const VERSION = 10;
+const VERSION = 11;
 const cache = new Map<string, HTMLImageElement>();
 let loadPromise: Promise<void> | null = null;
 let loadedTheme: ThemeId | null = null;
@@ -28,9 +28,9 @@ function uiJobs(theme: ThemeId): Array<[string, string]> {
       ["./themes/edgy/ui/bg-menu.jpg", "ui:bg-menu"],
       ["./themes/edgy/ui/bg-play.jpg", "ui:bg-play"],
       ["./themes/edgy/ui/bg-map.jpg", "ui:bg-map"],
-      ["./themes/edgy/ui/btn-play.jpg", "ui:btn-play"],
-      ["./themes/edgy/ui/btn-paper.jpg", "ui:btn-paper"],
-      ["./themes/edgy/ui/board-plate.jpg", "ui:board-plate"],
+      ["./themes/edgy/ui/btn-play.png", "ui:btn-play"],
+      ["./themes/edgy/ui/btn-paper.png", "ui:btn-paper"],
+      ["./themes/edgy/ui/board-plate.png", "ui:board-plate"],
       // Keep shared logo; edgy falls back to stamped wordmark if missing.
       ["./ui/logo.png", "ui:logo"],
     ];
