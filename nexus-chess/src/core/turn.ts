@@ -87,17 +87,16 @@ export function doMovePhase(state: GameState, move: Move): GameState {
 
   let s = applyMove(state, move);
 
+  // Overdrive: second hop cannot end on the back ranks
+  const finishedSecondOd =
+    state.overdriveSquare != null && state.overdriveMovesLeft === 1;
+  if (finishedSecondOd) {
+    const r = move.to.charCodeAt(1) - 49;
+    if (r === 0 || r === 7) return state;
+  }
+
   // Overdrive: if moves left, stay in overdrive phase
   if (s.overdriveSquare && s.overdriveMovesLeft > 0) {
-    // Validate: 2nd overdrive move cannot end on rank 1 or 8
-    const [r] = (() => {
-      const rc = move.to.charCodeAt(1) - 49;
-      return [rc];
-    })();
-    if (s.overdriveMovesLeft === 1 && (r === 0 || r === 7)) {
-      // Invalid — revert (shouldn't reach here if UI filters properly)
-      return state;
-    }
     return { ...s, turnPhase: "overdrive" };
   }
 

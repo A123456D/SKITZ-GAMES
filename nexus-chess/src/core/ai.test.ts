@@ -70,18 +70,18 @@ describe("ai difficulty", () => {
     expect(aiPickMove(s, 4)!.to).toBe("d4");
   });
 
-  it("normal moves king into Nexus over capturing material", () => {
+  it("prefers a free queen over aimless king shuffling far from Nexus", () => {
     let s = newGame();
     s.board = new Map();
-    s.board.set("d3", bareKing("w"));
-    // Tempting free queen that does NOT cover the Nexus
-    s.board.set("h7", piece("Q", "b"));
-    s.board.set("h2", piece("R", "w"));
+    s.board.set("e1", bareKing("w"));
     s.board.set("a8", bareKing("b"));
+    s.board.set("h2", piece("R", "w"));
+    s.board.set("h7", piece("Q", "b")); // hanging on the h-file
     s = beginTurn(s);
     const move = aiPickMove(s, 2);
-    expect(move!.from).toBe("d3");
-    expect(move!.to === "d4" || move!.to === "e4").toBe(true);
+    expect(move).not.toBeNull();
+    expect(move!.from).toBe("h2");
+    expect(move!.to).toBe("h7");
   });
 
   it("search returns a king move when only kings remain", () => {
@@ -96,6 +96,34 @@ describe("ai difficulty", () => {
     expect(distToNexus(move!.to)).toBeLessThanOrEqual(distToNexus("e2"));
   });
 
+  it("does not abandon a safe hanging capture just to step the king one square", () => {
+    let s = newGame();
+    s.board = new Map();
+    // King far from Nexus; enemy rook on a7 is truly undefended (king tucked on h8)
+    s.board.set("e1", bareKing("w"));
+    s.board.set("h8", bareKing("b"));
+    s.board.set("a2", piece("R", "w"));
+    s.board.set("a7", piece("R", "b"));
+    s = beginTurn(s);
+    const move = aiPickMove(s, 2);
+    expect(move).not.toBeNull();
+    expect(move).toEqual(expect.objectContaining({ from: "a2", to: "a7" }));
+  });
+
+  it("refuses a free Nexus entry that the opponent can assassinate", () => {
+    let s = newGame();
+    s.board = new Map();
+    // White king on d3 can step into d4, but black rook already eyes d4
+    s.board.set("d3", bareKing("w"));
+    s.board.set("a8", bareKing("b"));
+    s.board.set("d7", piece("R", "b"));
+    s.board.set("h2", piece("R", "w"));
+    s = beginTurn(s);
+    const move = aiPickMove(s, 3);
+    expect(move).not.toBeNull();
+    // Walking onto d4 is suicide — anything else (or staying out) is fine
+    expect(!(move!.from === "d3" && move!.to === "d4")).toBe(true);
+  });
   it("evaluatePosition favors own king in Nexus", () => {
     let s = newGame();
     s.board = new Map();

@@ -1,8 +1,9 @@
-import type { Color, GameState, Move, PieceKind, Square } from "./types";
-import { opponent } from "./types";
-import { NEXUS_SQUARES, isInNexus, findKing, squareToRC } from "./board";
+import type { AbilityCast, Color, GameState, Move, PieceKind, Square } from "./types";
+import { activePlayer, opponent } from "./types";
+import { NEXUS_SQUARES, isInNexus, findKing, squareToRC, rcToSquare } from "./board";
 import { allMoves } from "./moves";
-import { skipAbility, doMovePhase, endTurn } from "./turn";
+import { skipAbility, doAbilityPhase, doMovePhase, endTurn } from "./turn";
+import { ABILITY_COST, abilityTargets } from "./abilities";
 
 /** 0 = off (hotseat), 1–4 = Easy → Expert */
 export type AiDifficulty = 0 | 1 | 2 | 3 | 4;
@@ -20,44 +21,48 @@ export function nextAiDifficulty(d: AiDifficulty): AiDifficulty {
 }
 
 /**
- * Search depths — UI-thread search must stay shallow.
- * 1 = greedy, 2+ = ordered 1-ply (Hard/Expert peek one opponent reply).
+ * Full-turn plies for alpha-beta.
+ * Easy is noisy greedy; Normal+ search for real.
  */
 const SEARCH_DEPTH: Record<Exclude<AiDifficulty, 0>, number> = {
   1: 1,
-  2: 1,
-  3: 2,
-  4: 2,
+  2: 3,
+  3: 4,
+  4: 5,
 };
 
-/** Cap branching after move ordering to keep deep search responsive in-browser. */
 const BRANCH_CAP: Record<Exclude<AiDifficulty, 0>, number> = {
   1: 40,
-  2: 16,
-  3: 14,
-  4: 12,
+  2: 28,
+  3: 24,
+  4: 22,
 };
 
-/** Hard wall-clock budget — never block the tab after a Nexus capture. */
+/** Soft budgets — search yields so the UI thread keeps painting. */
 const SEARCH_BUDGET_MS: Record<Exclude<AiDifficulty, 0>, number> = {
-  1: 20,
-  2: 28,
-  3: 36,
-  4: 48,
+  1: 30,
+  2: 140,
+  3: 240,
+  4: 360,
 };
 
 interface SearchClock {
   deadline: number;
   stopped: boolean;
+  nodes: number;
 }
 
 function makeClock(budgetMs: number): SearchClock {
-  return { deadline: performance.now() + budgetMs, stopped: false };
+  return { deadline: performance.now() + budgetMs, stopped: false, nodes: 0 };
 }
 
 function timeUp(clock: SearchClock): boolean {
   if (clock.stopped) return true;
-  if (performance.now() >= clock.deadline) {
+  if (clock.nodes > 100_000) {
+    clock.stopped = true;
+    return true;
+  }
+  if ((clock.nodes & 15) === 0 && performance.now() >= clock.deadline) {
     clock.stopped = true;
     return true;
   }
@@ -90,7 +95,92 @@ export function distToNexus(sq: Square): number {
   return best;
 }
 
-/** Static evaluation from `perspective`'s point of view (higher = better for them). */
+/** Cheap danger proxy — nearby enemy weight, no move generation. */
+function proximityDanger(state: GameState, sq: Square, byColor: Color): number {
+  let danger = 0;
+  for (const [esq, ep] of state.board) {
+    if (ep.color !== byColor) continue;
+    const md = manhattan(sq, esq);
+    if (md > 3) continue;
+    const weight = PIECE_VALUE[ep.kind] || 200;
+    danger += weight / (md + 0.5);
+  }
+  return danger;
+}
+
+/** Cheap geometric attack test — no move generation (safe for eval leaves). */
+function pieceAttacksSquare(
+  board: GameState["board"],
+  from: Square,
+  to: Square,
+  kind: PieceKind,
+  color: Color,
+): boolean {
+  if (from === to) return false;
+  const [r0, f0] = squareToRC(from);
+  const [r1, f1] = squareToRC(to);
+  const dr = r1 - r0;
+  const df = f1 - f0;
+  const adr = Math.abs(dr);
+  const adf = Math.abs(df);
+
+  const clearRay = () => {
+    const sr = Math.sign(dr);
+    const sf = Math.sign(df);
+    let r = r0 + sr;
+    let f = f0 + sf;
+    while (r !== r1 || f !== f1) {
+      if (board.has(rcToSquare(r, f))) return false;
+      r += sr;
+      f += sf;
+    }
+    return true;
+  };
+
+  switch (kind) {
+    case "P": {
+      const dir = color === "w" ? 1 : -1;
+      return dr === dir && adf === 1;
+    }
+    case "N":
+      return (adr === 2 && adf === 1) || (adr === 1 && adf === 2);
+    case "B":
+      return adr === adf && adr > 0 && clearRay();
+    case "R":
+      return (dr === 0 || df === 0) && adr + adf > 0 && clearRay();
+    case "Q":
+      return ((dr === 0 || df === 0) || adr === adf) && adr + adf > 0 && clearRay();
+    case "K":
+      return adr <= 1 && adf <= 1 && adr + adf > 0;
+    default:
+      return false;
+  }
+}
+
+function squareAttackedBy(state: GameState, sq: Square, by: Color): boolean {
+  const target = state.board.get(sq);
+  // Kings only capturable inside Nexus; shields block
+  if (target?.kind === "K") {
+    if (!isInNexus(sq)) return false;
+    if (target.isShielded) return false;
+  }
+  for (const [from, p] of state.board) {
+    if (p.color !== by) continue;
+    if (pieceAttacksSquare(state.board, from, sq, p.kind, p.color)) return true;
+  }
+  return false;
+}
+
+function kingAssassinable(state: GameState, kingColor: Color): boolean {
+  const ksq = findKing(state.board, kingColor);
+  if (!ksq || !isInNexus(ksq)) return false;
+  return squareAttackedBy(state, ksq, opponent(kingColor));
+}
+
+/**
+ * Static evaluation from `perspective`'s point of view (higher = better for them).
+ * Nexus Hold matters, but material, safety, and piece pressure decide most positions.
+ */
 export function evaluatePosition(state: GameState, perspective: Color): number {
   if (state.winner === perspective) return 1_000_000;
   if (state.winner && state.winner !== perspective) return -1_000_000;
@@ -102,32 +192,54 @@ export function evaluatePosition(state: GameState, perspective: Color): number {
   let oppMaterial = 0;
   let myNexusPieces = 0;
   let oppNexusPieces = 0;
+  let myNearNexus = 0;
+  let oppNearNexus = 0;
 
   for (const [sq, p] of state.board) {
     const val = PIECE_VALUE[p.kind];
+    const d = distToNexus(sq);
     if (p.color === perspective) {
       myMaterial += val;
       if (isInNexus(sq) && p.kind !== "K") myNexusPieces++;
+      if (p.kind !== "K" && p.kind !== "P") {
+        // Centralize minor/major pieces; develop off the back rank
+        score += (4 - Math.min(4, d)) * 8;
+        const [r] = squareToRC(sq);
+        if (perspective === "w" && r > 0) score += 12;
+        if (perspective === "b" && r < 7) score += 12;
+      }
+      if (p.kind !== "K" && d <= 2) myNearNexus++;
     } else {
       oppMaterial += val;
       if (isInNexus(sq) && p.kind !== "K") oppNexusPieces++;
+      if (p.kind !== "K" && d <= 2) oppNearNexus++;
     }
   }
   score += myMaterial - oppMaterial;
-  score += (myNexusPieces - oppNexusPieces) * 80;
+  // Occupying Nexus with pieces fuels mana — valuable but secondary to material
+  score += (myNexusPieces - oppNexusPieces) * 70;
+  // Contest the zone with supporting pieces (not only the king)
+  score += (myNearNexus - oppNearNexus) * 45;
 
   const myKing = findKing(state.board, perspective);
   const oppKing = findKing(state.board, opp);
 
-  // Avoid per-node allMoves() threat probes here — they freeze the UI under
-  // alpha-beta. Threat urgency is handled in move ordering (scoreMove) instead.
   if (myKing) {
     const d = distToNexus(myKing);
     const king = state.board.get(myKing)!;
     if (d === 0) {
-      score += 5_500 + king.nexusTurnCount * 4_000;
+      // Presence helps; turns held are what actually win
+      score += 520 + king.nexusTurnCount * 2_400;
+      if (kingAssassinable(state, perspective)) {
+        score -= 9_000;
+      } else {
+        score -= Math.min(1_600, proximityDanger(state, myKing, opp) * 0.35);
+      }
     } else {
-      score += (14 - d) * 220;
+      // Approach gradually — never dwarf a free rook/queen
+      score += (5 - Math.min(5, d)) * 38;
+      // Prefer approaching with support nearby
+      if (d <= 2) score += myNearNexus * 20;
     }
   } else {
     score -= 50_000;
@@ -137,20 +249,25 @@ export function evaluatePosition(state: GameState, perspective: Color): number {
     const d = distToNexus(oppKing);
     const king = state.board.get(oppKing)!;
     if (d === 0) {
-      score -= 5_500 + king.nexusTurnCount * 4_000;
+      score -= 520 + king.nexusTurnCount * 2_400;
+      if (kingAssassinable(state, opp)) {
+        score += 8_500; // we can (or could) take their Nexus king
+      } else {
+        score += Math.min(1_800, proximityDanger(state, oppKing, perspective) * 0.45);
+      }
     } else {
-      score -= (14 - d) * 220;
+      score -= (5 - Math.min(5, d)) * 38;
     }
   }
 
   const myMana = state.players[perspective === "w" ? 0 : 1].mana;
   const oppMana = state.players[opp === "w" ? 0 : 1].mana;
-  score += (myMana - oppMana) * 12;
+  score += (myMana - oppMana) * 10;
 
   return score;
 }
 
-/** One-ply tactical move score (for move ordering + greedy). */
+/** One-ply tactical move score (ordering / Easy greedy). */
 function scoreMove(state: GameState, move: Move, perspective: Color): number {
   let score = 0;
   const piece = state.board.get(move.from)!;
@@ -158,48 +275,85 @@ function scoreMove(state: GameState, move: Move, perspective: Color): number {
 
   if (target && target.kind === "K" && isInNexus(move.to)) return 100_000;
 
-  // MVV-LVA style capture ordering
   if (target && target.kind !== "K") {
-    score += PIECE_VALUE[target.kind] * 10 - PIECE_VALUE[piece.kind];
+    score += PIECE_VALUE[target.kind] * 12 - PIECE_VALUE[piece.kind];
   }
 
   if (piece.kind === "K") {
     const fromDist = distToNexus(move.from);
     const toDist = distToNexus(move.to);
-    if (toDist === 0 && fromDist > 0) score += 5_000;
-    if (fromDist === 0 && toDist === 0) score += 2_000;
-    if (fromDist === 0 && toDist > 0) score -= 4_000;
-    if (toDist < fromDist) score += (fromDist - toDist) * 400;
-    else if (toDist > fromDist) score -= (toDist - fromDist) * 250;
+    if (toDist === 0 && fromDist > 0) {
+      // Entering is good only when not a free assassination
+      if (kingWouldBeAssassinable(state, move.to, perspective, move.from)) {
+        score -= 4_000;
+      } else {
+        score += 280;
+        score -= Math.min(500, proximityDanger(state, move.to, opponent(perspective)) * 0.3);
+      }
+    }
+    if (fromDist === 0 && toDist === 0) score += 160;
+    if (fromDist === 0 && toDist > 0) score -= 700;
+    if (toDist < fromDist) score += (fromDist - toDist) * 40;
+    else if (toDist > fromDist) score -= (toDist - fromDist) * 35;
   } else {
-    if (isInNexus(move.to) && !isInNexus(move.from)) score += 120;
-    if (isInNexus(move.from) && !isInNexus(move.to)) score -= 40;
-    if (target && distToNexus(move.to) <= 2) score += 30;
+    if (isInNexus(move.to) && !isInNexus(move.from)) score += 110;
+    if (isInNexus(move.from) && !isInNexus(move.to)) score -= 20;
+    if (target && distToNexus(move.to) <= 2) score += 35;
+    if (target) score += (3 - Math.min(3, distToNexus(move.to))) * 18;
+    // Develop / advance toward the zone
+    if (!target) {
+      const fd = distToNexus(move.from);
+      const td = distToNexus(move.to);
+      if (td < fd) score += (fd - td) * 22;
+    }
   }
 
   return score;
 }
 
+/** After king steps onto `to` (vacating `from`), can the opponent capture it? */
+function kingWouldBeAssassinable(
+  state: GameState,
+  to: Square,
+  kingColor: Color,
+  from: Square,
+): boolean {
+  if (!isInNexus(to)) return false;
+  const board = new Map(state.board);
+  const king = { ...board.get(from)! };
+  if (king.isShielded) return false;
+  board.delete(from);
+  board.set(to, king);
+  return squareAttackedBy({ ...state, board }, to, opponent(kingColor));
+}
+
 function isTacticalMove(state: GameState, move: Move): boolean {
-  if (state.board.has(move.to)) return true; // capture
+  if (state.board.has(move.to)) return true;
   const piece = state.board.get(move.from);
   if (!piece) return false;
-  // King entering or shifting inside Nexus
   if (piece.kind === "K" && isInNexus(move.to)) return true;
+  if (isInNexus(move.to)) return true;
   return false;
 }
 
-/** Apply a normal move and advance to the opponent's turn (abilities skipped). */
 function playFullMove(state: GameState, move: Move): GameState {
   let s = state;
   if (s.turnPhase === "ability") s = skipAbility(s);
   s = doMovePhase(s, move);
   if (s.winner) return s;
   if (s.turnPhase === "overdrive") {
-    const follow = orderedMoves(s, 8);
+    const follow = orderedMoves(s, 10);
     if (follow.length > 0) {
-      s = doMovePhase(s, follow[0]);
+      const prevLeft = s.overdriveMovesLeft;
+      const next = doMovePhase(s, follow[0]);
+      if (next.turnPhase === "overdrive" && next.overdriveMovesLeft >= prevLeft) {
+        s = forceResolve(s);
+      } else {
+        s = next;
+      }
       if (s.winner) return s;
+    } else {
+      s = forceResolve(s);
     }
   }
   if (s.turnPhase === "resolved") s = endTurn(s);
@@ -213,7 +367,14 @@ function toMovePhase(state: GameState): GameState {
 
 function orderedMoves(state: GameState, cap = 40): Move[] {
   const s = toMovePhase(state);
-  const moves = allMoves(s);
+  let moves = allMoves(s);
+  // Filter illegal overdrive second hops (back rank)
+  if (s.turnPhase === "overdrive" && s.overdriveMovesLeft === 1) {
+    moves = moves.filter((m) => {
+      const r = m.to.charCodeAt(1) - 49;
+      return r !== 0 && r !== 7;
+    });
+  }
   const color = s.activeColor;
   return moves
     .map((m) => ({ m, sc: scoreMove(s, m, color) }))
@@ -222,7 +383,6 @@ function orderedMoves(state: GameState, cap = 40): Move[] {
     .map((x) => x.m);
 }
 
-/** Quiescence: resolve captures / Nexus king tactics before trusting the eval. */
 function quiesce(
   state: GameState,
   alpha: number,
@@ -231,13 +391,14 @@ function quiesce(
   qDepth: number,
   clock: SearchClock,
 ): number {
+  clock.nodes++;
   if (state.winner) return evaluatePosition(state, perspective);
   if (timeUp(clock)) return evaluatePosition(state, perspective);
 
   const standPat = evaluatePosition(state, perspective);
   const maximizing = state.activeColor === perspective;
 
-  if (qDepth >= 2) return standPat;
+  if (qDepth >= 3) return standPat;
 
   if (maximizing) {
     if (standPat >= beta) return beta;
@@ -248,7 +409,7 @@ function quiesce(
   }
 
   const s = toMovePhase(state);
-  const moves = orderedMoves(s, 10).filter((m) => isTacticalMove(s, m));
+  const moves = orderedMoves(s, 12).filter((m) => isTacticalMove(s, m));
   if (moves.length === 0) return standPat;
 
   if (maximizing) {
@@ -283,6 +444,7 @@ function alphabeta(
   branchCap: number,
   clock: SearchClock,
 ): number {
+  clock.nodes++;
   if (state.winner) return evaluatePosition(state, perspective);
   if (timeUp(clock)) return evaluatePosition(state, perspective);
   if (depth === 0) return quiesce(state, alpha, beta, perspective, 0, clock);
@@ -318,31 +480,103 @@ function pickRandom(moves: Move[]): Move {
   return moves[Math.floor(Math.random() * moves.length)];
 }
 
-/** Easy: coherent but soft — mostly greedy with occasional weaker picks. */
 function pickEasy(state: GameState): Move | null {
   const s = toMovePhase(state);
   const moves = orderedMoves(s, 40);
   if (moves.length === 0) return null;
-  // 60% best move, 30% top-3, 10% weaker
   const roll = Math.random();
-  if (roll < 0.6) return moves[0];
-  if (roll < 0.9) return pickRandom(moves.slice(0, Math.min(3, moves.length)));
-  return pickRandom(moves.slice(0, Math.min(8, moves.length)));
+  if (roll < 0.55) return moves[0];
+  if (roll < 0.85) return pickRandom(moves.slice(0, Math.min(4, moves.length)));
+  return pickRandom(moves.slice(0, Math.min(10, moves.length)));
 }
 
-function pickSearch(
+type YieldFn = () => Promise<void>;
+
+function defaultYield(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * Root ability ideas — AI used to always skip, which made it look brain-dead.
+ * Keep the list tiny so search stays under the freeze budget.
+ */
+function abilityCandidates(state: GameState, difficulty: AiDifficulty): (AbilityCast | null)[] {
+  const out: (AbilityCast | null)[] = [null];
+  if (difficulty < 2 || state.turnPhase !== "ability") return out;
+
+  const mana = activePlayer(state).mana;
+  const me = state.activeColor;
+  const kingSq = findKing(state.board, me);
+  const maxExtra = difficulty >= 4 ? 5 : difficulty >= 3 ? 4 : 3;
+
+  const push = (cast: AbilityCast) => {
+    if (out.length > maxExtra) return;
+    out.push(cast);
+  };
+
+  if (mana >= ABILITY_COST.aegis) {
+    // Shield king before a Nexus push when support is thin / danger is high
+    if (kingSq && !isInNexus(kingSq)) {
+      const d = distToNexus(kingSq);
+      const danger = proximityDanger(state, kingSq, opponent(me));
+      if (d <= 2 || danger > 400) {
+        push({ ability: "aegis", target: kingSq });
+      }
+    }
+    // Shield a hanging queen/rook near the fight
+    for (const [sq, p] of state.board) {
+      if (p.color !== me || p.kind === "K" || p.kind === "P") continue;
+      if (p.isShielded) continue;
+      if (PIECE_VALUE[p.kind] < 500) continue;
+      if (proximityDanger(state, sq, opponent(me)) > 350) {
+        push({ ability: "aegis", target: sq });
+      }
+    }
+  }
+
+  if (mana >= ABILITY_COST.overdrive) {
+    const targets = abilityTargets(state, "overdrive");
+    // Prefer pieces that can capture or sit near the Nexus
+    const ranked = targets
+      .map((sq) => {
+        const p = state.board.get(sq)!;
+        let sc = PIECE_VALUE[p.kind];
+        sc += (3 - Math.min(3, distToNexus(sq))) * 40;
+        sc += proximityDanger(state, sq, opponent(me)) > 200 ? 30 : 0;
+        return { sq, sc };
+      })
+      .sort((a, b) => b.sc - a.sc)
+      .slice(0, 2);
+    for (const { sq } of ranked) push({ ability: "overdrive", target: sq });
+  }
+
+  if (mana >= ABILITY_COST.tacticalSwap && kingSq && difficulty >= 3) {
+    const kd = distToNexus(kingSq);
+    const swaps = abilityTargets(state, "tacticalSwap")
+      .map((sq) => ({ sq, d: distToNexus(sq) }))
+      .filter((x) => x.d < kd && x.d > 0)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 2);
+    for (const { sq } of swaps) push({ ability: "tacticalSwap", target: sq });
+  }
+
+  return out;
+}
+
+/** Iterative deepening with async yields so the canvas keeps animating. */
+async function pickSearchAsync(
   state: GameState,
   maxDepth: number,
   branchCap: number,
   budgetMs: number,
-): Move | null {
+  yieldFn: YieldFn,
+): Promise<Move | null> {
   const s = toMovePhase(state);
   const perspective = s.activeColor;
   const rootMoves = orderedMoves(s, branchCap);
   if (rootMoves.length === 0) return null;
 
-  // Assassination / Nexus king takes are already sorted to the front by scoreMove.
-  if (rootMoves[0]) {
+  {
     const t = s.board.get(rootMoves[0].to);
     if (t && t.kind === "K" && isInNexus(rootMoves[0].to)) return rootMoves[0];
   }
@@ -351,41 +585,248 @@ function pickSearch(
   let bestMoves = [rootMoves[0]];
   let bestScore = -Infinity;
 
-  for (const m of rootMoves) {
-    if (timeUp(clock) && bestScore > -Infinity) break;
-    const child = playFullMove(s, m);
-    let sc = evaluatePosition(child, perspective);
+  for (let depth = 1; depth <= maxDepth; depth++) {
+    if (timeUp(clock) && depth > 1) break;
 
-    // Hard/Expert: one forced opponent reply peek (still tiny).
-    if (maxDepth >= 2 && !timeUp(clock) && !child.winner) {
-      const replies = orderedMoves(child, 4);
-      if (replies.length > 0) {
-        const child2 = playFullMove(child, replies[0]);
-        sc = evaluatePosition(child2, perspective);
+    let iterBest = -Infinity;
+    let iterMoves: Move[] = [];
+    const ordered = [
+      ...bestMoves,
+      ...rootMoves.filter(
+        (m) => !bestMoves.some((b) => b.from === m.from && b.to === m.to && b.promotion === m.promotion),
+      ),
+    ];
+
+    let i = 0;
+    for (const m of ordered) {
+      if (timeUp(clock) && iterMoves.length > 0) break;
+      const child = playFullMove(s, m);
+      const sc = alphabeta(child, depth - 1, -Infinity, Infinity, perspective, branchCap, clock);
+      if (sc > iterBest) {
+        iterBest = sc;
+        iterMoves = [m];
+      } else if (sc === iterBest) {
+        iterMoves.push(m);
       }
+      i++;
+      if ((i & 1) === 0) await yieldFn();
     }
 
-    if (sc > bestScore) {
-      bestScore = sc;
-      bestMoves = [m];
-    } else if (sc === bestScore) {
-      bestMoves.push(m);
+    if (iterMoves.length > 0) {
+      bestScore = iterBest;
+      bestMoves = iterMoves;
     }
+    void bestScore;
+    await yieldFn();
   }
 
   return pickRandom(bestMoves);
 }
 
-/** Pick the best move for the AI at the given difficulty. */
+/** Sync pick — used by tests and Easy. */
 export function aiPickMove(state: GameState, difficulty: AiDifficulty = 2): Move | null {
   if (difficulty === 0) return null;
   if (difficulty === 1) return pickEasy(state);
-  return pickSearch(
-    state,
-    SEARCH_DEPTH[difficulty],
-    BRANCH_CAP[difficulty],
-    SEARCH_BUDGET_MS[difficulty],
-  );
+  const s = toMovePhase(state);
+  const perspective = s.activeColor;
+  const rootMoves = orderedMoves(s, BRANCH_CAP[difficulty]);
+  if (rootMoves.length === 0) return null;
+  {
+    const t = s.board.get(rootMoves[0].to);
+    if (t && t.kind === "K" && isInNexus(rootMoves[0].to)) return rootMoves[0];
+  }
+  const clock = makeClock(SEARCH_BUDGET_MS[difficulty]);
+  let bestMoves = [rootMoves[0]];
+  let bestScore = -Infinity;
+  const maxDepth = SEARCH_DEPTH[difficulty];
+  for (let depth = 1; depth <= maxDepth; depth++) {
+    if (timeUp(clock) && depth > 1) break;
+    let iterBest = -Infinity;
+    let iterMoves: Move[] = [];
+    const ordered = [
+      ...bestMoves,
+      ...rootMoves.filter(
+        (m) => !bestMoves.some((b) => b.from === m.from && b.to === m.to && b.promotion === m.promotion),
+      ),
+    ];
+    for (const m of ordered) {
+      if (timeUp(clock) && iterMoves.length > 0) break;
+      const child = playFullMove(s, m);
+      const sc = alphabeta(
+        child,
+        depth - 1,
+        -Infinity,
+        Infinity,
+        perspective,
+        BRANCH_CAP[difficulty],
+        clock,
+      );
+      if (sc > iterBest) {
+        iterBest = sc;
+        iterMoves = [m];
+      } else if (sc === iterBest) {
+        iterMoves.push(m);
+      }
+    }
+    if (iterMoves.length > 0) {
+      bestScore = iterBest;
+      bestMoves = iterMoves;
+    }
+    void bestScore;
+  }
+  return pickRandom(bestMoves);
+}
+
+function scoreRootMove(
+  state: GameState,
+  move: Move,
+  perspective: Color,
+  depth: number,
+  branchCap: number,
+  clock: SearchClock,
+): number {
+  const child = playFullMove(state, move);
+  if (depth <= 1) return alphabeta(child, 0, -Infinity, Infinity, perspective, branchCap, clock);
+  return alphabeta(child, depth - 1, -Infinity, Infinity, perspective, branchCap, clock);
+}
+
+/** Choose ability (or skip) + move for a full turn. */
+function pickAbilityAndMove(
+  state: GameState,
+  difficulty: AiDifficulty,
+): { cast: AbilityCast | null; move: Move | null } {
+  if (difficulty === 0) return { cast: null, move: null };
+  if (difficulty === 1) {
+    const s = state.turnPhase === "ability" ? skipAbility(state) : state;
+    return { cast: null, move: pickEasy(s) };
+  }
+
+  const casts = abilityCandidates(state, difficulty);
+  const perspective = state.activeColor;
+  const budget = SEARCH_BUDGET_MS[difficulty];
+  const depth = SEARCH_DEPTH[difficulty];
+  const branchCap = BRANCH_CAP[difficulty];
+  const perCast = Math.max(40, Math.floor(budget / Math.max(1, casts.length)));
+
+  let bestCast: AbilityCast | null = null;
+  let bestMove: Move | null = null;
+  let bestScore = -Infinity;
+
+  for (const cast of casts) {
+    const clock = makeClock(perCast);
+    let s =
+      state.turnPhase === "ability"
+        ? doAbilityPhase(state, cast)
+        : cast
+          ? state
+          : toMovePhase(state);
+
+    // If we somehow aren't in a movable phase, skip
+    if (s.turnPhase !== "move" && s.turnPhase !== "overdrive") {
+      s = toMovePhase(state);
+    }
+
+    const moves = orderedMoves(s, branchCap);
+    if (moves.length === 0) continue;
+
+    // Prefer assassination immediately
+    {
+      const t = s.board.get(moves[0].to);
+      if (t && t.kind === "K" && isInNexus(moves[0].to)) {
+        return { cast, move: moves[0] };
+      }
+    }
+
+    let localBest = -Infinity;
+    let localMoves: Move[] = [];
+    // Shallow root probe for this ability line
+    const probeDepth = Math.max(1, depth - (casts.length > 1 ? 1 : 0));
+    for (const m of moves) {
+      if (timeUp(clock) && localMoves.length > 0) break;
+      const sc = scoreRootMove(s, m, perspective, probeDepth, branchCap, clock);
+      if (sc > localBest) {
+        localBest = sc;
+        localMoves = [m];
+      } else if (sc === localBest) {
+        localMoves.push(m);
+      }
+    }
+    if (localMoves.length > 0 && localBest > bestScore) {
+      bestScore = localBest;
+      bestCast = cast;
+      bestMove = pickRandom(localMoves);
+    }
+  }
+
+  if (!bestMove) {
+    const s = toMovePhase(state);
+    return { cast: null, move: aiPickMove(s, difficulty) };
+  }
+  return { cast: bestCast, move: bestMove };
+}
+
+async function pickAbilityAndMoveAsync(
+  state: GameState,
+  difficulty: AiDifficulty,
+  yieldFn: YieldFn,
+): Promise<{ cast: AbilityCast | null; move: Move | null }> {
+  if (difficulty === 0) return { cast: null, move: null };
+  if (difficulty === 1) {
+    const s = state.turnPhase === "ability" ? skipAbility(state) : state;
+    return { cast: null, move: pickEasy(s) };
+  }
+
+  const casts = abilityCandidates(state, difficulty);
+  const perspective = state.activeColor;
+  const budget = SEARCH_BUDGET_MS[difficulty];
+  const depth = SEARCH_DEPTH[difficulty];
+  const branchCap = BRANCH_CAP[difficulty];
+  const perCast = Math.max(45, Math.floor(budget / Math.max(1, casts.length)));
+
+  let bestCast: AbilityCast | null = null;
+  let bestMove: Move | null = null;
+  let bestScore = -Infinity;
+
+  for (const cast of casts) {
+    const clock = makeClock(perCast);
+    let s =
+      state.turnPhase === "ability"
+        ? doAbilityPhase(state, cast)
+        : toMovePhase(state);
+
+    if (s.turnPhase !== "move" && s.turnPhase !== "overdrive") {
+      s = toMovePhase(state);
+    }
+
+    const move = await pickSearchAsync(
+      s,
+      Math.max(1, depth - (casts.length > 2 ? 1 : 0)),
+      branchCap,
+      perCast,
+      yieldFn,
+    );
+    if (!move) {
+      await yieldFn();
+      continue;
+    }
+
+    const sc = scoreRootMove(s, move, perspective, 2, branchCap, clock);
+    if (sc > bestScore) {
+      bestScore = sc;
+      bestCast = cast;
+      bestMove = move;
+    }
+    await yieldFn();
+  }
+
+  if (!bestMove) {
+    const s = toMovePhase(state);
+    return {
+      cast: null,
+      move: await pickSearchAsync(s, depth, branchCap, budget, yieldFn),
+    };
+  }
+  return { cast: bestCast, move: bestMove };
 }
 
 function forceResolve(state: GameState): GameState {
@@ -397,58 +838,87 @@ function forceResolve(state: GameState): GameState {
   };
 }
 
-/** Execute a full AI turn; also returns the last board move played (for UI highlight). */
-export function aiPlay(
+function applyChosenMove(
   state: GameState,
-  difficulty: AiDifficulty = 2,
-): { state: GameState; lastMove: Move | null } {
-  if (difficulty === 0) return { state, lastMove: null };
-  let s = state;
-  let lastMove: Move | null = null;
-  if (s.turnPhase === "ability") s = skipAbility(s);
-
-  const move = aiPickMove(s, difficulty);
-  if (!move) {
-    // No legal move — pass rather than soft-lock the UI on the AI side
-    return { state: endTurn(forceResolve(s)), lastMove: null };
-  }
-
-  lastMove = move;
-  s = doMovePhase(s, move);
+  move: Move,
+  difficulty: AiDifficulty,
+): { state: GameState; lastMove: Move } {
+  let s = doMovePhase(state, move);
+  let lastMove = move;
   if (s.winner) return { state: s, lastMove };
 
-  while (s.turnPhase === "overdrive" && !s.winner) {
-    const follow = aiPickMove(s, difficulty === 1 ? 1 : 2);
+  let odGuard = 0;
+  while (s.turnPhase === "overdrive" && !s.winner && odGuard++ < 3) {
+    const prevLeft = s.overdriveMovesLeft;
+    const follow = aiPickMove(s, difficulty === 1 ? 1 : (Math.min(difficulty, 2) as AiDifficulty));
     if (!follow) {
       s = forceResolve(s);
       break;
     }
     lastMove = follow;
     s = doMovePhase(s, follow);
+    // No progress (illegal hop etc.) — end the turn instead of spinning
+    if (s.turnPhase === "overdrive" && s.overdriveMovesLeft >= prevLeft) {
+      s = forceResolve(s);
+      break;
+    }
   }
 
   if (s.winner) return { state: s, lastMove };
   if (s.turnPhase === "resolved") return { state: endTurn(s), lastMove };
-  // Never return mid-overdrive / mid-move — that freezes player input
   return { state: endTurn(forceResolve(s)), lastMove };
 }
 
-/** Execute a full AI turn at the given difficulty. */
+/** Execute a full AI turn (sync — prefer aiPlayAsync in the UI). */
+export function aiPlay(
+  state: GameState,
+  difficulty: AiDifficulty = 2,
+): { state: GameState; lastMove: Move | null } {
+  if (difficulty === 0) return { state, lastMove: null };
+
+  const { cast, move } = pickAbilityAndMove(state, difficulty);
+  let s = state;
+  if (s.turnPhase === "ability") {
+    s = doAbilityPhase(s, cast);
+  }
+
+  if (!move) return { state: endTurn(forceResolve(toMovePhase(s))), lastMove: null };
+  return applyChosenMove(s, move, difficulty);
+}
+
+/** Async AI turn — yields during search so captures/animations don't freeze. */
+export async function aiPlayAsync(
+  state: GameState,
+  difficulty: AiDifficulty = 2,
+  yieldFn: YieldFn = defaultYield,
+): Promise<{ state: GameState; lastMove: Move | null }> {
+  if (difficulty === 0) return { state, lastMove: null };
+
+  const { cast, move } = await pickAbilityAndMoveAsync(state, difficulty, yieldFn);
+  let s = state;
+  if (s.turnPhase === "ability") {
+    s = doAbilityPhase(s, cast);
+  }
+
+  if (!move) return { state: endTurn(forceResolve(toMovePhase(s))), lastMove: null };
+  await yieldFn();
+  return applyChosenMove(s, move, difficulty);
+}
+
 export function aiTurn(state: GameState, difficulty: AiDifficulty = 2): GameState {
   return aiPlay(state, difficulty).state;
 }
 
-/** Suggested think delay (ms). Search already costs time on Hard/Expert. */
 export function aiThinkDelay(difficulty: AiDifficulty): number {
   switch (difficulty) {
     case 1:
-      return 250;
+      return 220;
     case 2:
-      return 120;
-    case 3:
       return 80;
-    case 4:
+    case 3:
       return 40;
+    case 4:
+      return 20;
     default:
       return 0;
   }

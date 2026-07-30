@@ -1,7 +1,7 @@
 import { newGame } from "./core/board";
 import type { Color, GameState, Square } from "./core/types";
 import { beginTurn, doAbilityPhase, doMovePhase, endTurn, skipAbility } from "./core/turn";
-import { aiPlay, aiThinkDelay, type AiDifficulty } from "./core/ai";
+import { aiPlayAsync, aiThinkDelay, type AiDifficulty } from "./core/ai";
 import {
   loadProfile,
   recordAiGame,
@@ -367,43 +367,40 @@ function maybeAiTurn() {
   const difficulty = aiDifficulty;
   const delay = aiThinkDelay(difficulty);
   setTimeout(() => {
-    if (screen !== "play" || state.winner || !isAiSideToMove() || winFx) {
-      aiPending = false;
-      return;
-    }
-    // Yield so capture FX can paint before any search work
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        try {
-          if (screen !== "play" || !isAiSideToMove() || winFx) return;
-          const result = aiPlay(state, difficulty);
-          state = result.state;
-          if (result.lastMove) {
-            lastMove = { from: result.lastMove.from, to: result.lastMove.to };
-          }
-          ui = clearUi();
+    void (async () => {
+      if (screen !== "play" || state.winner || !isAiSideToMove() || winFx) {
+        aiPending = false;
+        return;
+      }
+      try {
+        const result = await aiPlayAsync(state, difficulty);
+        if (screen !== "play" || winFx) return;
+        state = result.state;
+        if (result.lastMove) {
+          lastMove = { from: result.lastMove.from, to: result.lastMove.to };
+        }
+        ui = clearUi();
+        persistMatch();
+        finishIfWon();
+      } catch (err) {
+        console.error("AI turn failed", err);
+        if (isAiSideToMove() && !state.winner) {
+          if (state.turnPhase === "ability") state = skipAbility(state);
+          state = endTurn({
+            ...state,
+            turnPhase: "resolved",
+            overdriveSquare: null,
+            overdriveMovesLeft: 0,
+          });
           persistMatch();
-          finishIfWon();
-        } catch (err) {
-          console.error("AI turn failed", err);
-          if (isAiSideToMove() && !state.winner) {
-            if (state.turnPhase === "ability") state = skipAbility(state);
-            state = endTurn({
-              ...state,
-              turnPhase: "resolved",
-              overdriveSquare: null,
-              overdriveMovesLeft: 0,
-            });
-            persistMatch();
-          }
-        } finally {
-          aiPending = false;
         }
-        if (screen === "play" && !state.winner && !winFx && isAiSideToMove()) {
-          setTimeout(() => maybeAiTurn(), 0);
-        }
-      }, 0);
-    });
+      } finally {
+        aiPending = false;
+      }
+      if (screen === "play" && !state.winner && !winFx && isAiSideToMove()) {
+        setTimeout(() => maybeAiTurn(), 0);
+      }
+    })();
   }, delay);
 }
 
