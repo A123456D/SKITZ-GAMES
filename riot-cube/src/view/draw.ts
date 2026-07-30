@@ -780,11 +780,11 @@ export function drawTutorialCoach(
   },
 ): void {
   const p = getPalette();
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
-  roundRect(ctx, 48, 78, 624, 240, 10);
+  ctx.fillStyle = "rgba(0,0,0,0.38)";
+  roundRect(ctx, 48, 78, 624, 240, 12);
   ctx.fill();
   ctx.fillStyle = p.paper;
-  roundRect(ctx, 56, 86, 608, 224, 8);
+  roundRect(ctx, 56, 86, 608, 224, 10);
   ctx.fill();
   ctx.strokeStyle = p.ink;
   ctx.lineWidth = 3;
@@ -965,6 +965,35 @@ export const ORBIT_BAND: UiRect = { x: 48, y: 880, w: 624, h: 140 };
 
 export function hitOrbitBand(x: number, y: number): boolean {
   return hitRect(ORBIT_BAND, x, y);
+}
+
+/** Soft dashed guide for the free-orbit drag band (tutorial coach). */
+export function drawOrbitBandHint(
+  ctx: CanvasRenderingContext2D,
+  tMs: number,
+  color: string,
+): void {
+  const r = ORBIT_BAND;
+  const pulse = 0.18 + 0.1 * Math.sin(tMs * 0.005);
+  ctx.save();
+  ctx.globalAlpha = pulse;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([10, 8]);
+  ctx.beginPath();
+  const rr = 14;
+  ctx.moveTo(r.x + rr, r.y);
+  ctx.arcTo(r.x + r.w, r.y, r.x + r.w, r.y + r.h, rr);
+  ctx.arcTo(r.x + r.w, r.y + r.h, r.x, r.y + r.h, rr);
+  ctx.arcTo(r.x, r.y + r.h, r.x, r.y, rr);
+  ctx.arcTo(r.x, r.y, r.x + r.w, r.y, rr);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = pulse * 0.55;
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
 }
 
 /** Finger-follow ring while orbiting (no opaque pad). */

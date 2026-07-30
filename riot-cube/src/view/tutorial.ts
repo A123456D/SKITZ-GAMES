@@ -4,6 +4,7 @@ export type TutorialAction =
   | "next"
   | "swipe"
   | "faceTurn"
+  | "peek"
   | "orbit"
   | "scramble"
   | "stickers";
@@ -46,27 +47,37 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
       "Try it now — swipe any row or column.",
     ],
     action: "swipe",
-    hint: "Swipe where the hand is moving on the cube",
+    hint: "Swipe with the hand across the cube",
   },
   {
     title: "SPIN FACE",
     lines: [
-      "The CW and CCW buttons turn the whole front face.",
-      "Use them when you want to rotate that face in place.",
+      "CW and CCW turn the whole front face in place.",
+      "Handy when a face is almost solved.",
       "Tap CW or CCW below the cube.",
     ],
     action: "faceTurn",
     hint: "Tap the button the hand is pointing at",
   },
   {
-    title: "ORBIT",
+    title: "PEEK",
     lines: [
-      "Peek at other faces with the arrows around the cube.",
-      "You can also drag in the empty space beside the cube.",
-      "Turn the cube to work on another side.",
+      "Use the arrows around the cube to peek.",
+      "Each tap turns the cube to another face.",
+      "Tap the arrow the hand is pointing at.",
+    ],
+    action: "peek",
+    hint: "Tap the orbit arrow — follow the hand",
+  },
+  {
+    title: "ROTATE",
+    lines: [
+      "You can also drag in empty space to spin the view.",
+      "Try the band under the cube — drag sideways.",
+      "Release and the cube snaps to a face.",
     ],
     action: "orbit",
-    hint: "Tap the arrow the hand is pointing at",
+    hint: "Drag where the hand is swiping",
   },
   {
     title: "YOUR STICKERS",

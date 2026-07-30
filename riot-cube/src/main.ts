@@ -41,6 +41,7 @@ import {
   drawHud,
   drawMenuButton,
   drawOrbitFinger,
+  drawOrbitBandHint,
   drawPauseMenu,
   drawPlayActions,
   drawSettingsScreen,
@@ -86,6 +87,7 @@ import {
   THEMES_BACK,
   TUTORIAL_NEXT,
   TUTORIAL_SKIP,
+  ORBIT_BAND,
   PLAY_SCRAMBLE_WIDE,
   PLAY_STICKERS_WIDE,
   type FaceTurnButtons,
@@ -265,9 +267,12 @@ let onboardingThemePicked = false;
 let tutorial: { step: number; from: Screen } | null = null;
 /** Puzzle to restore after tutorial practice (progress stays intact). */
 let progressBeforeTutorial: Session | null = null;
+/** When the current tutorial step became active (hand fade-in). */
+let tutorialStepAt = 0;
 
 function beginTutorial(from: Screen): void {
   tutorial = { step: 0, from };
+  tutorialStepAt = performance.now();
   progressBeforeTutorial = cloneSession(session);
   setProgressSaveSuspended(true);
   resetPlayVisuals();
@@ -291,43 +296,83 @@ function tutorialAllows(action: TutorialAction): boolean {
   return step.action === action;
 }
 
-function rectCenter(r: { x: number; y: number; w: number; h: number }): {
-  x: number;
-  y: number;
-} {
-  return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
-}
-
 /** Where the pointing-hand sticker should aim for the current tutorial action. */
 function tutorialPointTarget(action: TutorialAction): TutorialPointTarget | null {
   switch (action) {
     case "next": {
-      const c = rectCenter(TUTORIAL_NEXT);
-      return { x: c.x, y: c.y, mode: "point" };
+      // Tip on the lower edge of NEXT; palm hangs under the coach card.
+      return {
+        x: TUTORIAL_NEXT.x + TUTORIAL_NEXT.w * 0.62,
+        y: TUTORIAL_NEXT.y + TUTORIAL_NEXT.h - 6,
+        mode: "point",
+        size: 92,
+      };
     }
     case "swipe": {
       const layout = cubeLayout();
-      return { x: layout.cx, y: layout.cy + 20, mode: "swipe" };
+      // Bottom row — palm hangs under the cube instead of burying stickers.
+      return {
+        x: layout.cx,
+        y: layout.cy + layout.scale * 0.58,
+        mode: "swipe",
+        size: 96,
+        travel: 86,
+      };
     }
     case "faceTurn": {
       if (!faceTurnBtns) return null;
-      const c = rectCenter(faceTurnBtns.cw);
-      return { x: c.x, y: c.y, mode: "point" };
+      const r = faceTurnBtns.cw;
+      return {
+        x: r.x + r.w * 0.62,
+        y: r.y + r.h * 0.4,
+        mode: "point",
+        size: 88,
+        flip: true,
+      };
+    }
+    case "peek": {
+      if (!orbitBtns) {
+        return { x: W * 0.78, y: 560, mode: "point", size: 78, flip: true };
+      }
+      const r = orbitBtns.right;
+      return {
+        x: Math.min(W - 64, r.x + r.w * 0.38),
+        y: r.y + r.h * 0.48,
+        mode: "point",
+        size: 78,
+        flip: true,
+      };
     }
     case "orbit": {
-      if (orbitBtns) {
-        const c = rectCenter(orbitBtns.right);
-        return { x: c.x, y: c.y, mode: "point" };
-      }
-      return { x: W * 0.72, y: 920, mode: "swipe" };
+      // Keep the swipe tip in the gap under the cube (above SCRAMBLE/STICKERS).
+      return {
+        x: W * 0.5,
+        y: 918,
+        mode: "swipe",
+        size: 86,
+        travel: 100,
+      };
     }
     case "stickers": {
-      const c = rectCenter(PLAY_STICKERS_WIDE);
-      return { x: c.x, y: c.y, mode: "point" };
+      const r = PLAY_STICKERS_WIDE;
+      // Approach from outside-right so the palm clears the button row.
+      return {
+        x: r.x + r.w - 14,
+        y: r.y + r.h * 0.42,
+        mode: "point",
+        size: 96,
+        flip: true,
+      };
     }
     case "scramble": {
-      const c = rectCenter(PLAY_SCRAMBLE_WIDE);
-      return { x: c.x, y: c.y, mode: "point", flip: true };
+      const r = PLAY_SCRAMBLE_WIDE;
+      // Approach from outside-left.
+      return {
+        x: r.x + 14,
+        y: r.y + r.h * 0.42,
+        mode: "point",
+        size: 96,
+      };
     }
     default:
       return null;
@@ -341,6 +386,7 @@ function advanceTutorial(): void {
     return;
   }
   tutorial = { ...tutorial, step: tutorial.step + 1 };
+  tutorialStepAt = performance.now();
   sfxPaperRustle();
 }
 
@@ -703,7 +749,8 @@ function snapOrient(q: Quat): Quat {
 
 function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
   if (drag || session.status !== "playing") return;
-  if (tutorial && !tutorialAllows("orbit")) return;
+  // Tutorial: arrows teach PEEK; free-drag teaches ROTATE.
+  if (tutorial && !tutorialAllows("peek")) return;
   orbitDrag = null;
   if (rotating) {
     orient = quatCopy(targetOrient);
@@ -716,7 +763,7 @@ function startOrbitStep(dir: "left" | "right" | "up" | "down"): void {
   }
   targetOrient = snapOrient(orbitStepQuat(q, dir));
   rotating = true;
-  noteTutorial("orbit");
+  noteTutorial("peek");
   sfxPaperRustle();
 }
 
@@ -936,6 +983,9 @@ function paint(): void {
   if (tutorial && screen === "play") {
     const step = tutorialStep()!;
     const last = tutorial.step >= TUTORIAL_STEPS.length - 1;
+    if (step.action === "orbit") {
+      drawOrbitBandHint(ctx, performance.now(), getPalette().accent);
+    }
     drawTutorialCoach(ctx, {
       step: tutorial.step,
       total: TUTORIAL_STEPS.length,
@@ -948,7 +998,14 @@ function paint(): void {
     });
     const point = tutorialPointTarget(step.action);
     if (point) {
-      drawTutorialPointer(ctx, point, performance.now(), getPalette().accent);
+      const appear = Math.min(1, (performance.now() - tutorialStepAt) / 280);
+      drawTutorialPointer(
+        ctx,
+        point,
+        performance.now(),
+        getPalette().accent,
+        appear,
+      );
     }
   }
 
