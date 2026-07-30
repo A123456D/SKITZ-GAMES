@@ -1,0 +1,9 @@
+{
+  "name": "PAPER RIOT",
+  "short_name": "Paper Riot",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "orientation": "portrait"
+}
