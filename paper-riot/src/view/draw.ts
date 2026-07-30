@@ -18,6 +18,7 @@ import {
 } from "./stickers";
 import { Palette } from "./theme";
 import { drawParticles } from "./particles";
+import { floatPose, getVisual } from "./motion";
 
 export const W = 720;
 export const H = 1280;
@@ -161,15 +162,20 @@ function drawSticker(
   cy: number,
   size: number,
   selected = false,
+  rot = 0,
+  opacity = 1,
 ): void {
   const image = stickerImage(kind);
-  const x = cx - size / 2;
-  const y = cy - size / 2;
   ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.translate(cx, cy);
+  if (rot) ctx.rotate(rot);
   ctx.shadowColor = Palette.shadow;
   ctx.shadowBlur = Math.max(6, size * 0.14);
   ctx.shadowOffsetX = size * 0.05;
   ctx.shadowOffsetY = size * 0.09;
+  const x = -size / 2;
+  const y = -size / 2;
   if (image && image.complete) {
     ctx.drawImage(image, x, y, size, size);
   } else {
@@ -177,13 +183,14 @@ function drawSticker(
     roundRect(ctx, x, y, size, size, 10);
     ctx.fill();
   }
-  ctx.restore();
   if (selected) {
+    ctx.shadowColor = "transparent";
     ctx.strokeStyle = Palette.hot;
     ctx.lineWidth = 4;
     roundRect(ctx, x - 4, y - 4, size + 8, size + 8, 12);
     ctx.stroke();
   }
+  ctx.restore();
 }
 
 function paperBtn(
@@ -406,6 +413,7 @@ export function drawPlay(
     burstT: number;
     armedPower: PowerUpKind | null;
     popFx: { x: number; y: number; t: number } | null;
+    time: number;
   },
 ): void {
   cover(ctx, uiImage("bg-play"), Palette.paper);
@@ -454,7 +462,8 @@ export function drawPlay(
   session.goals.forEach((g, i) => {
     const gx = 110 + i * 180;
     const gy = 220;
-    drawSticker(ctx, g.kind, gx, gy, 52);
+    const bob = Math.sin(opts.time * 2.4 + i * 1.3) * 3;
+    drawSticker(ctx, g.kind, gx, gy + bob, 52, false, Math.sin(opts.time * 1.5 + i) * 0.05);
     ctx.fillStyle = Palette.ink;
     ctx.font = "800 22px 'Chakra Petch', sans-serif";
     ctx.textAlign = "left";
@@ -471,34 +480,59 @@ export function drawPlay(
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  // Tiles
+  // Tiles (motion + float)
   for (let c = 0; c < COLS; c++) {
     for (let r = 0; r < ROWS; r++) {
       if (!session.mask[c]![r]) continue;
       const key = `${c},${r}`;
-      if (opts.clearing.has(key)) continue;
       const cell = session.board[c]![r];
       if (!cell) continue;
-      const center = cellCenter(layout, c, r);
-      const selected = opts.selected?.c === c && opts.selected?.r === r;
-      drawSticker(ctx, cell.kind, center.x, center.y, layout.cell * 0.86, selected);
-      if (cell.obstacle) {
+      const clearing = opts.clearing.has(key);
+      const selected =
+        !!opts.selected && opts.selected.c === c && opts.selected.r === r;
+      const visual = getVisual(cell.id);
+      const base = cellCenter(layout, c, r);
+      const pose = visual
+        ? floatPose(visual, opts.time, selected)
+        : { x: base.x, y: base.y, rot: 0, scale: 1 };
+      const size = layout.cell * 0.86 * pose.scale;
+      const opacity = clearing
+        ? Math.max(0, 1 - opts.burstT)
+        : visual?.opacity ?? 1;
+      if (opacity <= 0.02) continue;
+      drawSticker(
+        ctx,
+        cell.kind,
+        pose.x,
+        pose.y,
+        size,
+        selected,
+        pose.rot,
+        opacity,
+      );
+      if (cell.obstacle && !clearing) {
         const oimg = obstacleImage(cell.obstacle);
-        const s = layout.cell * 0.92;
+        const s = layout.cell * 0.92 * pose.scale;
         ctx.save();
+        ctx.translate(pose.x, pose.y);
+        ctx.rotate(pose.rot * 0.5);
         ctx.shadowColor = Palette.shadow;
         ctx.shadowBlur = 10;
         ctx.shadowOffsetX = 3;
         ctx.shadowOffsetY = 5;
         if (oimg && oimg.complete) {
-          ctx.drawImage(oimg, center.x - s / 2, center.y - s / 2, s, s);
+          ctx.drawImage(oimg, -s / 2, -s / 2, s, s);
         }
         ctx.restore();
         if ((cell.hits ?? 1) > 1) {
           ctx.fillStyle = Palette.hot;
           ctx.font = "800 16px 'Chakra Petch', sans-serif";
           ctx.textAlign = "center";
-          ctx.fillText(String(cell.hits), center.x + s * 0.32, center.y - s * 0.28);
+          ctx.fillText(
+            String(cell.hits),
+            pose.x + s * 0.32,
+            pose.y - s * 0.28,
+          );
         }
       }
     }
@@ -508,7 +542,11 @@ export function drawPlay(
     for (const key of opts.clearing) {
       const [cs, rs] = key.split(",").map(Number);
       if (!session.mask[cs!]?.[rs!]) continue;
-      const center = cellCenter(layout, cs!, rs!);
+      const cell = session.board[cs!]![rs!];
+      const visual = cell ? getVisual(cell.id) : null;
+      const center = visual
+        ? { x: visual.x, y: visual.y }
+        : cellCenter(layout, cs!, rs!);
       const t = opts.burstT;
       ctx.save();
       ctx.translate(center.x, center.y);
@@ -516,7 +554,8 @@ export function drawPlay(
       ctx.beginPath();
       for (let i = 0; i < 10; i++) {
         const a = (i / 10) * Math.PI * 2;
-        const rad = layout.cell * (0.35 + 0.55 * t) * (i % 2 === 0 ? 1.2 : 0.7);
+        const rad =
+          layout.cell * (0.35 + 0.55 * t) * (i % 2 === 0 ? 1.2 : 0.7);
         const x = Math.cos(a) * rad;
         const y = Math.sin(a) * rad;
         if (i === 0) ctx.moveTo(x, y);
@@ -529,14 +568,19 @@ export function drawPlay(
   }
 
   if (opts.popFx && opts.popFx.t < 1) {
-    const image = fxImage("pop-skull") ?? fxImage("swap-star");
-    const s = 90 + 40 * (1 - opts.popFx.t);
+    const frames = ["pop-skull", "swap-star", "match-hearts"] as const;
+    const fi = Math.floor(opts.popFx.t * frames.length * 3) % frames.length;
+    const image = fxImage(frames[fi]!) ?? fxImage("pop-skull");
+    const s = 90 + 50 * (1 - opts.popFx.t);
+    const spin = opts.popFx.t * Math.PI * 1.2;
     ctx.save();
-    ctx.globalAlpha = 1 - opts.popFx.t;
+    ctx.globalAlpha = Math.max(0, 1 - opts.popFx.t);
+    ctx.translate(opts.popFx.x, opts.popFx.y);
+    ctx.rotate(spin);
     ctx.shadowColor = Palette.shadow;
     ctx.shadowBlur = 14;
     if (image && image.complete) {
-      ctx.drawImage(image, opts.popFx.x - s / 2, opts.popFx.y - s / 2, s, s);
+      ctx.drawImage(image, -s / 2, -s / 2, s, s);
     }
     ctx.restore();
   }
@@ -554,10 +598,14 @@ export function drawPlay(
     const pimg = powerImage(slot.kind);
     const cx = slot.rect.x + slot.rect.w / 2;
     const cy = slot.rect.y + slot.rect.h / 2 - 4;
+    const bob = Math.sin(opts.time * 2.8 + slot.rect.x * 0.02) * 3;
+    const rot = Math.sin(opts.time * 1.6 + slot.rect.x * 0.01) * 0.08;
     ctx.save();
+    ctx.translate(cx, cy + bob);
+    ctx.rotate(rot);
     ctx.shadowColor = Palette.shadow;
     ctx.shadowBlur = 8;
-    if (pimg && pimg.complete) ctx.drawImage(pimg, cx - 32, cy - 32, 64, 64);
+    if (pimg && pimg.complete) ctx.drawImage(pimg, -32, -32, 64, 64);
     ctx.restore();
     ctx.fillStyle = armed ? Palette.white : Palette.ink;
     ctx.font = "800 18px 'Chakra Petch', sans-serif";

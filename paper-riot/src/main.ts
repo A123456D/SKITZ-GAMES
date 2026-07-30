@@ -31,6 +31,13 @@ import {
   mapNodeAt,
 } from "./view/draw";
 import {
+  clearMotion,
+  motionBusy,
+  punchClearing,
+  syncBoardMotion,
+  updateMotion,
+} from "./view/motion";
+import {
   burstAt,
   hasParticles,
   updateParticles,
@@ -56,9 +63,14 @@ let needsPaint = true;
 let burstResolve: (() => void) | null = null;
 let popFx: { x: number; y: number; t: number; started: number } | null = null;
 let lastTs = 0;
+let animTime = 0;
 
 function markDirty(): void {
   needsPaint = true;
+}
+
+function syncVisuals(dropIn = false): void {
+  syncBoardMotion(session.board, session.mask, boardLayout(), { dropIn });
 }
 
 function syncZoneFromLevel(id: number): void {
@@ -83,6 +95,7 @@ function resize(): void {
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (screen === "play") syncVisuals(false);
   markDirty();
 }
 
@@ -109,19 +122,42 @@ function paint(): void {
     burstT,
     armedPower,
     popFx: popFx ? { x: popFx.x, y: popFx.y, t: popFx.t } : null,
+    time: animTime,
   });
 }
 
 function isAnimating(): boolean {
-  return busy || burstT > 0 || hasParticles() || (popFx != null && popFx.t < 1);
+  return (
+    screen === "play" ||
+    busy ||
+    burstT > 0 ||
+    hasParticles() ||
+    motionBusy() ||
+    (popFx != null && popFx.t < 1)
+  );
+}
+
+function waitMotion(): Promise<void> {
+  return new Promise((resolve) => {
+    const start = performance.now();
+    const check = () => {
+      if (!motionBusy() || performance.now() - start > 900) {
+        resolve();
+        return;
+      }
+      requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+  });
 }
 
 function tick(ts: number): void {
   const dt = lastTs ? Math.min(0.05, (ts - lastTs) / 1000) : 0.016;
   lastTs = ts;
+  animTime += dt;
 
   if (burstStarted) {
-    burstT = (ts - burstStarted) / 280;
+    burstT = (ts - burstStarted) / 300;
     if (burstT >= 1) {
       burstT = 0;
       burstStarted = 0;
@@ -136,6 +172,8 @@ function tick(ts: number): void {
     if (popFx.t >= 1) popFx = null;
   }
   if (updateParticles(dt)) markDirty();
+  if (updateMotion(dt)) markDirty();
+  if (screen === "play") markDirty();
 
   if (needsPaint || isAnimating()) {
     paint();
@@ -151,12 +189,16 @@ function playMatchBurst(keys: string[]): Promise<void> {
     burstStarted = performance.now();
     burstT = 0.01;
     const layout = boardLayout();
+    const ids: number[] = [];
     for (const key of keys) {
       const [c, r] = key.split(",").map(Number);
       if (!isPlayable(session.mask, c!, r!)) continue;
+      const cell = session.board[c!]![r!];
+      if (cell) ids.push(cell.id);
       const center = cellCenter(layout, c!, r!);
-      burstAt(center.x, center.y, 6);
+      burstAt(center.x, center.y, 8);
     }
+    punchClearing(ids);
     if (keys.length) {
       const [c0, r0] = keys[0]!.split(",").map(Number);
       const mid = cellCenter(layout, c0!, r0!);
@@ -184,8 +226,15 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
   if (busy || session.status !== "playing") return;
   const started = beginSwap(session, a, b);
   selected = null;
+  if (!started.ok) {
+    markDirty();
+    return;
+  }
+
+  busy = true;
+  syncVisuals(false);
   markDirty();
-  if (!started.ok) return;
+  await waitMotion();
 
   let guard = 0;
   while (guard++ < 40) {
@@ -195,21 +244,39 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
     const keys = groups.flatMap((g) => g.cells.map((p) => `${p.c},${p.r}`));
     await playMatchBurst(keys);
     crushWave(session, groups);
+    syncVisuals(true);
     markDirty();
+    await waitMotion();
   }
+  busy = false;
   recordWinIfCleared();
   markDirty();
 }
 
 async function handlePower(kind: PowerUpKind, target: Pos): Promise<void> {
   if (busy) return;
+  busy = true;
+  const layout = boardLayout();
+  const center = cellCenter(layout, target.c, target.r);
+  burstAt(center.x, center.y, 14);
+  popFx = { x: center.x, y: center.y, t: 0, started: performance.now() };
+
   const result = usePower(session, kind, target);
   armedPower = null;
   selected = null;
+  if (!result.ok) {
+    busy = false;
+    markDirty();
+    return;
+  }
+  for (const p of result.cleared) {
+    const mid = cellCenter(layout, p.c, p.r);
+    burstAt(mid.x, mid.y, 5);
+  }
+  syncVisuals(true);
   markDirty();
-  if (!result.ok) return;
-  const keys = result.cleared.map((p) => `${p.c},${p.r}`);
-  await playMatchBurst(keys);
+  await waitMotion();
+  busy = false;
   recordWinIfCleared();
   markDirty();
 }
@@ -221,6 +288,8 @@ function openLevel(id: number): void {
   session = startSession(id);
   selected = null;
   armedPower = null;
+  clearMotion();
+  syncVisuals(true);
   screen = "play";
   markDirty();
 }
@@ -238,7 +307,6 @@ function onTap(x: number, y: number): void {
       return;
     }
     if (hitUi(HOME_SETTINGS, x, y)) {
-      // placeholder
       markDirty();
     }
     return;
@@ -273,7 +341,6 @@ function onTap(x: number, y: number): void {
     return;
   }
 
-  // play
   if (session.status !== "playing") {
     syncZoneFromLevel(session.level.id);
     screen = "map";
@@ -352,6 +419,8 @@ async function boot(): Promise<void> {
   progress = loadProgress();
   saveProgress(progress);
   syncZoneFromLevel(selectedLevel);
+  clearMotion();
+  syncVisuals(false);
   resize();
   markDirty();
   requestAnimationFrame(tick);

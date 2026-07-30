@@ -10,37 +10,40 @@ export type Particle = {
   size: number;
   rot: number;
   spin: number;
-  img: string;
+  frames: readonly string[];
+  frame: number;
+  fps: number;
 };
 
-const PARTICLE_KEYS = [
-  "confetti-a",
-  "confetti-b",
-  "confetti-c",
-  "confetti-d",
-  "splat-a",
-  "puff-a",
-  "star-a",
-  "bits",
-] as const;
+const SEQUENCES: readonly (readonly string[])[] = [
+  ["confetti-a", "confetti-b", "confetti-c", "confetti-d"],
+  ["confetti-c", "confetti-d", "confetti-a", "confetti-b"],
+  ["splat-a", "splat-b", "splat-c"],
+  ["puff-a", "puff-b", "puff-c", "puff-d", "puff-e"],
+  ["star-a", "star-b", "star-c"],
+  ["bits", "confetti-a", "bits", "confetti-b"],
+];
 
 let particles: Particle[] = [];
 
 export function burstAt(x: number, y: number, amount = 10): void {
   for (let i = 0; i < amount; i++) {
     const ang = Math.random() * Math.PI * 2;
-    const spd = 60 + Math.random() * 180;
+    const spd = 70 + Math.random() * 200;
+    const frames = SEQUENCES[(Math.random() * SEQUENCES.length) | 0]!;
     particles.push({
       x,
       y,
       vx: Math.cos(ang) * spd,
-      vy: Math.sin(ang) * spd - 40,
+      vy: Math.sin(ang) * spd - 60,
       life: 0,
-      max: 0.45 + Math.random() * 0.45,
-      size: 18 + Math.random() * 28,
+      max: 0.5 + Math.random() * 0.55,
+      size: 20 + Math.random() * 32,
       rot: Math.random() * Math.PI * 2,
-      spin: (Math.random() - 0.5) * 8,
-      img: PARTICLE_KEYS[(Math.random() * PARTICLE_KEYS.length) | 0]!,
+      spin: (Math.random() - 0.5) * 10,
+      frames,
+      frame: Math.random() * frames.length,
+      fps: 10 + Math.random() * 14,
     });
   }
 }
@@ -53,8 +56,9 @@ export function updateParticles(dt: number): boolean {
     if (p.life >= p.max) continue;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    p.vy += 420 * dt;
+    p.vy += 460 * dt;
     p.rot += p.spin * dt;
+    p.frame += p.fps * dt;
     next.push(p);
   }
   particles = next;
@@ -67,19 +71,21 @@ export function hasParticles(): boolean {
 
 export function drawParticles(ctx: CanvasRenderingContext2D): void {
   for (const p of particles) {
-    const img = particleImage(p.img);
+    const key = p.frames[Math.floor(p.frame) % p.frames.length]!;
+    const img = particleImage(key);
     const t = p.life / p.max;
-    const a = 1 - t;
+    const a = Math.min(1, (1 - t) * 1.15);
+    const pulse = 0.85 + 0.25 * Math.sin(p.frame * 1.4);
     ctx.save();
     ctx.globalAlpha = a;
     ctx.translate(p.x, p.y);
     ctx.rotate(p.rot);
-    const s = p.size * (0.7 + 0.5 * (1 - t));
+    const s = p.size * (0.75 + 0.45 * (1 - t)) * pulse;
     if (img && img.complete) {
-      ctx.shadowColor = "rgba(0,0,0,0.35)";
-      ctx.shadowBlur = 6;
+      ctx.shadowColor = "rgba(0,0,0,0.4)";
+      ctx.shadowBlur = 8;
       ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 3;
+      ctx.shadowOffsetY = 4;
       ctx.drawImage(img, -s / 2, -s / 2, s, s);
     } else {
       ctx.fillStyle = "#ff2d6a";

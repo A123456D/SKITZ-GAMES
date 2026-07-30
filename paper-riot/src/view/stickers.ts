@@ -1,4 +1,4 @@
-const VERSION = 5;
+const VERSION = 6;
 const cache = new Map<string, HTMLImageElement>();
 let loadPromise: Promise<void> | null = null;
 
@@ -44,11 +44,19 @@ export function loadGameArt(): Promise<void> {
     "confetti-b",
     "confetti-c",
     "confetti-d",
+    "confetti-e",
+    "confetti-f",
     "splat-a",
     "splat-b",
+    "splat-c",
     "puff-a",
     "puff-b",
+    "puff-c",
+    "puff-d",
+    "puff-e",
     "star-a",
+    "star-b",
+    "star-c",
     "bits",
   ]) {
     jobs.push(loadOne(`./particles/${k}.png`, `pt:${k}`));
