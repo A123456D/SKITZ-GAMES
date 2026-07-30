@@ -450,10 +450,8 @@ function drawHintMoveLine(
   ctx.strokeStyle = p.hot;
   ctx.fillStyle = p.hot;
   ctx.lineWidth = 5;
-  if (getQuality().paperGrain) {
-    ctx.shadowColor = p.hot;
-    ctx.shadowBlur = 10;
-  }
+  ctx.shadowColor = p.hot;
+  ctx.shadowBlur = 10;
 
   if (move.kind === "face") {
     // Quarter-turn only (one sticker step on the face ring) — not a full 360°.
@@ -689,33 +687,14 @@ function drawFace(
   ctx.clip();
   ctx.strokeStyle = isActive ? p.faceRule : p.faceRuleDim;
   ctx.lineWidth = 1;
-  // Desktop: decorative ruled-paper lines. Mobile: cheap cell dividers only.
-  if (quality.paperGrain) {
-    for (let i = 1; i < 8; i++) {
-      const t = i / 8;
-      const a = lerp2(q[0]!, q[3]!, t);
-      const b = lerp2(q[1]!, q[2]!, t);
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-    }
-  } else {
-    for (let i = 1; i < n; i++) {
-      const t = i / n;
-      const v0 = lerp2(q[0]!, q[3]!, t);
-      const v1 = lerp2(q[1]!, q[2]!, t);
-      ctx.beginPath();
-      ctx.moveTo(v0.x, v0.y);
-      ctx.lineTo(v1.x, v1.y);
-      ctx.stroke();
-      const h0 = lerp2(q[0]!, q[1]!, t);
-      const h1 = lerp2(q[3]!, q[2]!, t);
-      ctx.beginPath();
-      ctx.moveTo(h0.x, h0.y);
-      ctx.lineTo(h1.x, h1.y);
-      ctx.stroke();
-    }
+  for (let i = 1; i < 8; i++) {
+    const t = i / 8;
+    const a = lerp2(q[0]!, q[3]!, t);
+    const b = lerp2(q[1]!, q[2]!, t);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
   }
 
   const gap = 0.04;
@@ -951,7 +930,7 @@ function drawStickerOnQuad(
   const drawH = s * dropScaleY;
 
   // Soft shaped shadow behind the sticker (lane lift only) — not a ground oval.
-  if (castShadow && quality.stickerShadows) {
+  if (castShadow) {
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.42)";
     ctx.shadowBlur = Math.max(8, s * 0.18);

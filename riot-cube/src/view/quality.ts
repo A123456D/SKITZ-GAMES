@@ -2,13 +2,13 @@ export type RenderQuality = {
   dprCap: number;
   stickerShadows: boolean;
   hoverAnim: boolean;
-  /** Craft-paper multiply grain on cube faces — expensive on Canvas 2D. */
+  /** Craft-paper multiply grain on cube faces. */
   paperGrain: boolean;
 };
 
 let quality: RenderQuality = {
   dprCap: 2,
-  stickerShadows: false,
+  stickerShadows: true,
   hoverAnim: true,
   paperGrain: true,
 };
@@ -21,20 +21,19 @@ export function detectQuality(): RenderQuality {
     (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
       ?.saveData,
   );
-  // Only treat real touch / data-saver devices as low-end — not narrow
-  // desktop windows or 4-core laptops (that broke orbit + side stickers).
+  // Touch / data-saver: lower pixel density only — keep the full look (shadows, grain, hover).
   const lowEnd = coarse || saveData;
 
   quality = lowEnd
     ? {
-        dprCap: 1,
-        stickerShadows: false,
-        hoverAnim: false,
-        paperGrain: false,
+        dprCap: 1.25,
+        stickerShadows: true,
+        hoverAnim: true,
+        paperGrain: true,
       }
     : {
         dprCap: 2,
-        stickerShadows: false,
+        stickerShadows: true,
         hoverAnim: true,
         paperGrain: true,
       };
