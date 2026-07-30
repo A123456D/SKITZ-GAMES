@@ -48,4 +48,10 @@ export const SFX_CATALOG = [
     duration: 0.55,
     text: "Soft magical paper hint sparkle, gentle UI tip chime, airy short",
   },
+  {
+    id: "sticker",
+    file: "sticker.mp3",
+    duration: 0.45,
+    text: "Very soft gentle sticker peel and place on paper, quiet sticky vinyl sticker tap, delicate muted craft paper kiss, warm close microphone, soft and low, short, no music no ambience, dry studio",
+  },
 ];

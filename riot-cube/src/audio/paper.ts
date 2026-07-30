@@ -15,7 +15,11 @@ const SAMPLE_FILES = {
   lose: "lose.mp3",
   scramble: "scramble.mp3",
   hint: "hint.mp3",
+  sticker: "sticker.mp3",
 } as const;
+
+/** Bump when replacing mp3s so caches skip stale clips. */
+const SFX_VERSION = 2;
 
 type SampleId = keyof typeof SAMPLE_FILES;
 
@@ -111,7 +115,7 @@ export function loadSfx(): Promise<void> {
     await Promise.all(
       (Object.keys(SAMPLE_FILES) as SampleId[]).map(async (id) => {
         try {
-          const res = await fetch(`./sfx/${SAMPLE_FILES[id]}`);
+          const res = await fetch(`./sfx/${SAMPLE_FILES[id]}?v=${SFX_VERSION}`);
           if (!res.ok) return;
           const raw = await res.arrayBuffer();
           buffers.set(id, await c.decodeAudioData(raw.slice(0)));
@@ -276,6 +280,13 @@ export function sfxPaperFlutter(): void {
   pluck(740, 0.045, 0.036);
   pluck(990, 0.055, 0.03, 0.03, 1180);
   airTick(0.025, 0.03, 0.015);
+}
+
+/** Soft sticker pick / place for the sticker screen. */
+export function sfxSticker(): void {
+  if (playSample("sticker", { volume: 0.85 })) return;
+  airTick(0.02, 0.028);
+  pluck(520 + Math.random() * 30, 0.04, 0.024);
 }
 
 export function sfxWin(): void {

@@ -136,6 +136,7 @@ import {
   sfxPaperFlutter,
   sfxPaperRustle,
   sfxScramble,
+  sfxSticker,
   sfxWin,
   unlockAudio,
 } from "./audio/paper";
@@ -1274,7 +1275,7 @@ canvas.addEventListener(
         const map = pickFaceStickers(() => Math.random(), activeStickerPool());
         stickerDraft = [...map];
         stickerSlot = 0;
-        sfxPaperFlutter();
+        sfxSticker();
         return;
       }
       if (hitUiRect(STICKERS_APPLY, p.x, p.y)) {
@@ -1288,7 +1289,7 @@ canvas.addEventListener(
           if (onboarding === "stickers") {
             onboarding = null;
             screen = "home";
-            sfxPaperFlutter();
+            sfxSticker();
             return;
           }
           if (tutorial && tutorialStep()?.action === "stickers") {
@@ -1302,7 +1303,7 @@ canvas.addEventListener(
               : stickersFrom === "home"
                 ? "home"
                 : "play";
-          sfxPaperFlutter();
+          sfxSticker();
         }
         return;
       }
@@ -1573,7 +1574,7 @@ function endDrag(): void {
           const next = stickerDraft.findIndex((k, i) => i > stickerSlot && !k);
           const wrap = stickerDraft.findIndex((k) => !k);
           stickerSlot = next >= 0 ? next : wrap >= 0 ? wrap : (stickerSlot + 1) % 6;
-          sfxPaperFlutter();
+          sfxSticker();
         }
       }
       stickersScrollDrag = null;
