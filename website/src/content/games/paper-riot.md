@@ -3,6 +3,7 @@ title: Paper Riot
 tagline: Rip. Match. Repeat.
 summary: A punk classroom match-3 — swap sticker tiles, rip matches of 3+, and clear goals before moves run out. Free in the browser.
 cover: /images/paper-riot-logo.png
+preview: /images/previews/paper-riot.gif
 screenshots: []
 featured: true
 released: false

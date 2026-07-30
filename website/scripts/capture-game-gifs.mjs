@@ -16,7 +16,10 @@ const FF =
   process.env.FFMPEG ||
   "C:\\Users\\PC\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.2-full_build\\bin\\ffmpeg.exe";
 
-const BASE = process.argv[2] || "http://127.0.0.1:4177";
+const ARGS = process.argv.slice(2);
+const BASE =
+  ARGS.find((a) => /^https?:\/\//.test(a)) || "http://127.0.0.1:4177";
+const ONLY = ARGS.filter((a) => !/^https?:\/\//.test(a));
 const VIEW = { width: 390, height: 780 };
 
 async function canvasPoint(page, lx, ly) {
@@ -95,7 +98,54 @@ function seedNexus() {
   );
 }
 
+function seedPaperRiot() {
+  localStorage.setItem("paper-riot-audio-mode", "off");
+  localStorage.setItem("paper-riot-muted", "1");
+  localStorage.setItem("paper-riot-music-vol", "0");
+  localStorage.setItem(
+    "paper-riot-progress-v1",
+    JSON.stringify({ unlocked: 5, stars: { 1: 2 }, lives: 5, gems: 400 }),
+  );
+}
+
 const GAMES = [
+  {
+    id: "paper-riot",
+    path: "/games/paper-riot/web/",
+    seed: seedPaperRiot,
+    async play(page) {
+      await page.waitForSelector("canvas#game", { timeout: 20000 });
+      await page.waitForTimeout(900);
+      await clickCanvas(page, 360, 530); // PLAY
+      await page.waitForTimeout(1100);
+      // Board: layout x≈40 y≈320 cell≈102.5 gap=5 → centers
+      const cell = (c, r) => {
+        const gap = 5;
+        const size = (640 - gap * 5) / 6;
+        const x0 = (720 - 640) / 2;
+        const y0 = 320;
+        return [
+          x0 + c * (size + gap) + size / 2,
+          y0 + r * (size + gap) + size / 2,
+        ];
+      };
+      const swaps = [
+        [cell(2, 3), cell(3, 3)],
+        [cell(1, 4), cell(1, 5)],
+        [cell(4, 2), cell(4, 3)],
+        [cell(0, 2), cell(1, 2)],
+        [cell(3, 5), cell(4, 5)],
+        [cell(2, 1), cell(2, 2)],
+      ];
+      for (const [[x0, y0], [x1, y1]] of swaps) {
+        await clickCanvas(page, x0, y0);
+        await page.waitForTimeout(180);
+        await clickCanvas(page, x1, y1);
+        await page.waitForTimeout(520);
+      }
+      await page.waitForTimeout(500);
+    },
+  },
   {
     id: "pulsefold",
     path: "/games/pulsefold/web/",
@@ -265,20 +315,29 @@ async function captureGame(browser, game) {
 
   const url = `${BASE}${game.path}`;
   console.log(`→ ${game.id}: ${url}`);
-  await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
-  await page.waitForTimeout(500);
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(800);
 
   let frame = 0;
+  let grabbing = false;
   const grab = async () => {
-    const path = join(frameDir, `frame-${String(frame).padStart(3, "0")}.png`);
-    await page.screenshot({ path, type: "png" });
-    frame += 1;
+    if (grabbing) return;
+    grabbing = true;
+    try {
+      const path = join(frameDir, `frame-${String(frame).padStart(3, "0")}.png`);
+      await page.screenshot({ path, type: "png", timeout: 15000 });
+      frame += 1;
+    } catch {
+      /* skip dropped frames */
+    } finally {
+      grabbing = false;
+    }
   };
 
   await grab();
   const ticker = setInterval(() => {
-    grab().catch(() => {});
-  }, 160);
+    void grab();
+  }, 220);
 
   try {
     await game.play(page);
@@ -305,7 +364,13 @@ async function main() {
 
   const browser = await chromium.launch({ headless: true });
   try {
-    for (const game of GAMES) {
+    const list = ONLY.length
+      ? GAMES.filter((g) => ONLY.includes(g.id))
+      : GAMES;
+    if (!list.length) {
+      throw new Error(`No games matched: ${ONLY.join(", ")}`);
+    }
+    for (const game of list) {
       await captureGame(browser, game);
     }
   } finally {
