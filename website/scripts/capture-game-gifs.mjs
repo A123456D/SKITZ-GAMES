@@ -99,12 +99,13 @@ function seedNexus() {
 }
 
 function seedPaperRiot() {
+  localStorage.setItem("paper-riot-vol-level", "muted");
   localStorage.setItem("paper-riot-audio-mode", "off");
   localStorage.setItem("paper-riot-muted", "1");
   localStorage.setItem("paper-riot-music-vol", "0");
   localStorage.setItem(
     "paper-riot-progress-v1",
-    JSON.stringify({ unlocked: 5, stars: { 1: 2 }, lives: 5, gems: 400 }),
+    JSON.stringify({ unlocked: 1, stars: {}, lives: 5, gems: 120 }),
   );
 }
 
@@ -116,34 +117,39 @@ const GAMES = [
     async play(page) {
       await page.waitForSelector("canvas#game", { timeout: 20000 });
       await page.waitForTimeout(900);
-      await clickCanvas(page, 360, 530); // PLAY
-      await page.waitForTimeout(1100);
-      // Board: layout x≈40 y≈320 cell≈102.5 gap=5 → centers
-      const cell = (c, r) => {
-        const gap = 5;
-        const size = (640 - gap * 5) / 6;
-        const x0 = (720 - 640) / 2;
-        const y0 = 320;
-        return [
-          x0 + c * (size + gap) + size / 2,
-          y0 + r * (size + gap) + size / 2,
-        ];
-      };
-      const swaps = [
-        [cell(2, 3), cell(3, 3)],
-        [cell(1, 4), cell(1, 5)],
-        [cell(4, 2), cell(4, 3)],
-        [cell(0, 2), cell(1, 2)],
-        [cell(3, 5), cell(4, 5)],
-        [cell(2, 1), cell(2, 2)],
+      await clickCanvas(page, 360, 500); // PLAY
+      await page.waitForTimeout(1200);
+      // Board: 7×9, layout width 640 @ y=320, gap 5
+      const COLS = 7;
+      const gap = 5;
+      const width = 640;
+      const cell = (width - gap * (COLS - 1)) / COLS;
+      const x0 = (720 - width) / 2;
+      const y0 = 320;
+      const mid = (c, r) => [
+        x0 + c * (cell + gap) + cell / 2,
+        y0 + r * (cell + gap) + cell / 2,
       ];
-      for (const [[x0, y0], [x1, y1]] of swaps) {
-        await clickCanvas(page, x0, y0);
-        await page.waitForTimeout(180);
-        await clickCanvas(page, x1, y1);
-        await page.waitForTimeout(520);
+      // Swipe stickers so they visibly slide (match or bounce-back)
+      const swipes = [
+        [mid(2, 3), mid(3, 3)],
+        [mid(1, 4), mid(1, 5)],
+        [mid(4, 2), mid(4, 3)],
+        [mid(0, 3), mid(1, 3)],
+        [mid(3, 5), mid(4, 5)],
+        [mid(2, 1), mid(2, 2)],
+        [mid(5, 4), mid(5, 5)],
+        [mid(3, 3), mid(3, 4)],
+        [mid(1, 2), mid(2, 2)],
+        [mid(4, 6), mid(5, 6)],
+        [mid(2, 5), mid(3, 5)],
+        [mid(0, 6), mid(0, 7)],
+      ];
+      for (const [[ax, ay], [bx, by]] of swipes) {
+        await swipeCanvas(page, ax, ay, bx, by, 22);
+        await page.waitForTimeout(780);
       }
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(700);
     },
   },
   {
@@ -272,7 +278,7 @@ function makeGif(frameDir, outPath) {
   const pattern = join(frameDir, "frame-%03d.png");
   let r = spawnSync(
     FF,
-    ["-y", "-framerate", "7", "-i", pattern, "-vf", "scale=480:-1:flags=lanczos,palettegen=stats_mode=diff", palette],
+    ["-y", "-framerate", "10", "-i", pattern, "-vf", "scale=420:-1:flags=lanczos,palettegen=stats_mode=diff", palette],
     { encoding: "utf8" },
   );
   if (r.status !== 0) {
@@ -284,13 +290,13 @@ function makeGif(frameDir, outPath) {
     [
       "-y",
       "-framerate",
-      "7",
+      "10",
       "-i",
       pattern,
       "-i",
       palette,
       "-lavfi",
-      "scale=480:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=4",
+      "scale=420:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=4",
       "-loop",
       "0",
       outPath,
@@ -337,7 +343,7 @@ async function captureGame(browser, game) {
   await grab();
   const ticker = setInterval(() => {
     void grab();
-  }, 220);
+  }, 140);
 
   try {
     await game.play(page);
