@@ -1495,40 +1495,8 @@ function drawMenu(): void {
   ctx.fillText("Wormholes. Walls. Scarce pulses. Think before you fire.", W / 2, 940);
 }
 
-/** Floating “best with headphones” tip + skip controls — every screen / theme. */
+/** Top music / theme chrome — every screen. */
 function pushMusicChrome(): void {
-  const baseX = 34;
-  const baseY = 36;
-  const bobX = Math.sin(time * 1.15) * 5 + Math.cos(time * 0.65) * 2.5;
-  const bobY = Math.cos(time * 0.95) * 6 + Math.sin(time * 1.35) * 2;
-  const cx = baseX + bobX;
-  const cy = baseY + bobY;
-  const radius = 15;
-
-  ctx.save();
-  ctx.globalAlpha = 0.82;
-  ctx.strokeStyle = P.INK_SOFT;
-  ctx.fillStyle = P.INK_SOFT;
-  ctx.lineWidth = 2.8;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, Math.PI * 0.95, Math.PI * 0.05);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.roundRect(cx - radius - 3.5, cy - 2, 7, 15, 2.5);
-  ctx.roundRect(cx + radius - 3.5, cy - 2, 7, 15, 2.5);
-  ctx.stroke();
-
-  ctx.globalAlpha = 0.72;
-  ctx.font = font(600, 10);
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText("BEST WITH HEADPHONES", cx + radius + 12, cy + 1);
-  ctx.restore();
-
   const nextEnabled = canSkipMusicNext();
   // Relative sizing keeps the control usable as the 720-wide canvas scales
   // down on phones and up on desktop.
