@@ -7,11 +7,13 @@ import {
   damageAdjacentObstacles,
   findMatches,
   isPlayable,
+  maybeSpreadTar,
   swapCells,
   swapCreatesMatch,
+  tryWetSlip,
   canSwapCell,
 } from "./board";
-import { countObstacles } from "./obstacles";
+import { countObstacles, isLineImmune } from "./obstacles";
 import { getLevel } from "./levels";
 import type {
   Goal,
@@ -27,6 +29,8 @@ import { COLS, ROWS, POWERUP_KINDS, paletteForLevel } from "./types";
 
 export type SessionStatus = "playing" | "won" | "lost";
 
+export type WetSlip = { id: number; dc: number; dr: number };
+
 export type Session = {
   level: LevelDef;
   board: ReturnType<typeof createBoard>["board"];
@@ -39,6 +43,8 @@ export type Session = {
   palette: TileKind[];
   /** Snapshot of obstacle counts at level start for clear goals. */
   obstacleBaseline: Record<string, number>;
+  /** Wet stickers that should slide after cascades settle. */
+  pendingWetSlips: WetSlip[];
 };
 
 export function emptyPowers(): PowerInventory {
@@ -94,6 +100,7 @@ export function startSession(level: LevelDef | number = 1): Session {
     powers: powersFromLevel(def),
     palette,
     obstacleBaseline: baseline,
+    pendingWetSlips: [],
   };
 }
 
@@ -150,6 +157,23 @@ export function beginSwap(
     return { ok: false, reason: "no-match" };
   }
   swapCells(session.board, a, b);
+  session.pendingWetSlips = [];
+  const atB = session.board[b.c]![b.r];
+  if (atB?.obstacle === "wet") {
+    session.pendingWetSlips.push({
+      id: atB.id,
+      dc: b.c - a.c,
+      dr: b.r - a.r,
+    });
+  }
+  const atA = session.board[a.c]![a.r];
+  if (atA?.obstacle === "wet") {
+    session.pendingWetSlips.push({
+      id: atA.id,
+      dc: a.c - b.c,
+      dr: a.r - b.r,
+    });
+  }
   session.movesLeft -= 1;
   return { ok: true };
 }
@@ -176,6 +200,33 @@ export function peekSwap(session: Session, a: Pos, b: Pos): boolean {
   return swapCreatesMatch(cloneBoard(session.board), session.mask, a, b);
 }
 
+function findCellPos(
+  board: Session["board"],
+  mask: Session["mask"],
+  id: number,
+): Pos | null {
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < ROWS; r++) {
+      if (!mask[c]![r]) continue;
+      if (board[c]![r]?.id === id) return { c, r };
+    }
+  }
+  return null;
+}
+
+function applyPendingWetSlips(session: Session): boolean {
+  const slips = session.pendingWetSlips;
+  session.pendingWetSlips = [];
+  let moved = false;
+  for (const slip of slips) {
+    const pos = findCellPos(session.board, session.mask, slip.id);
+    if (!pos) continue;
+    const from = { c: pos.c - slip.dc, r: pos.r - slip.dr };
+    if (tryWetSlip(session.board, session.mask, from, pos)) moved = true;
+  }
+  return moved;
+}
+
 export function resolveCascades(session: Session): void {
   let guard = 0;
   while (guard++ < 40) {
@@ -183,6 +234,14 @@ export function resolveCascades(session: Session): void {
     if (!groups.length) break;
     crushWave(session, groups);
   }
+  if (applyPendingWetSlips(session)) {
+    while (guard++ < 40) {
+      const groups = findMatches(session.board, session.mask);
+      if (!groups.length) break;
+      crushWave(session, groups);
+    }
+  }
+  maybeSpreadTar(session.board, session.mask);
   checkEnd(session);
 }
 
@@ -198,8 +257,13 @@ export function usePower(
   }
 
   const cleared: Pos[] = [];
+  const lineClear = kind === "plane" || kind === "rocket";
   const add = (c: number, r: number) => {
     if (!isPlayable(session.mask, c, r)) return;
+    if (lineClear) {
+      const obs = session.board[c]![r]?.obstacle;
+      if (isLineImmune(obs)) return;
+    }
     if (!cleared.some((p) => p.c === c && p.r === r)) cleared.push({ c, r });
   };
 

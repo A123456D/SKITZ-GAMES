@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   COLS,
   ROWS,
+  clearPositions,
   createBoard,
+  damageAdjacentObstacles,
   findMatches,
   makeCell,
+  maybeSpreadTar,
   swapCreatesMatch,
+  tryWetSlip,
   canSwapCell,
 } from "./board";
 import { shapeMask } from "./shapes";
@@ -123,6 +127,112 @@ describe("board", () => {
   });
 });
 
+describe("obstacle behaviors", () => {
+  it("peels pink tape with an adjacent match", () => {
+    const b = fillChecker();
+    const mask = fullMask();
+    b[0]![0] = makeCell("skull");
+    b[1]![0] = makeCell("skull");
+    b[2]![0] = makeCell("skull");
+    b[3]![0] = makeCell("flame");
+    b[3]![0]!.obstacle = "tape-x";
+    b[3]![0]!.hits = 1;
+    const cleared = damageAdjacentObstacles(b, mask, findMatches(b, mask));
+    expect(cleared).toEqual([{ c: 3, r: 0 }]);
+    expect(b[3]![0]!.obstacle).toBeUndefined();
+  });
+
+  it("barbed ignores adjacent matches", () => {
+    const b = fillChecker();
+    const mask = fullMask();
+    b[0]![0] = makeCell("skull");
+    b[1]![0] = makeCell("skull");
+    b[2]![0] = makeCell("skull");
+    b[3]![0] = makeCell("flame");
+    b[3]![0]!.obstacle = "barbed";
+    b[3]![0]!.hits = 1;
+    damageAdjacentObstacles(b, mask, findMatches(b, mask));
+    expect(b[3]![0]!.obstacle).toBe("barbed");
+  });
+
+  it("locks ignore matches of 3 but crack from matches of 4+", () => {
+    const b = fillChecker();
+    const mask = fullMask();
+    b[0]![0] = makeCell("skull");
+    b[1]![0] = makeCell("skull");
+    b[2]![0] = makeCell("skull");
+    b[3]![0] = makeCell("flame");
+    b[3]![0]!.obstacle = "lock";
+    b[3]![0]!.hits = 2;
+    damageAdjacentObstacles(b, mask, findMatches(b, mask));
+    expect(b[3]![0]!.obstacle).toBe("lock");
+    expect(b[3]![0]!.hits).toBe(2);
+
+    b[3]![0] = makeCell("skull");
+    b[4]![0] = makeCell("flame");
+    b[4]![0]!.obstacle = "lock";
+    b[4]![0]!.hits = 2;
+    damageAdjacentObstacles(b, mask, findMatches(b, mask));
+    expect(b[4]![0]!.hits).toBe(1);
+  });
+
+  it("glue pins a cell so gravity cannot drop it", () => {
+    const mask = fullMask();
+    const board: Board = Array.from({ length: COLS }, () =>
+      Array.from({ length: ROWS }, () => makeCell("star")),
+    );
+    const glue = makeCell("pizza");
+    glue.obstacle = "glue";
+    glue.hits = 2;
+    glue.id = 4242;
+    board[2]![4] = glue;
+    clearPositions(
+      board,
+      mask,
+      [
+        { c: 2, r: 7 },
+        { c: 2, r: 8 },
+      ],
+      ["skull", "star"],
+    );
+    expect(board[2]![4]?.id).toBe(4242);
+    expect(board[2]![4]?.obstacle).toBe("glue");
+  });
+
+  it("wet slips one cell in the swap direction", () => {
+    const b = fillChecker();
+    const mask = fullMask();
+    const wet = makeCell("soda");
+    wet.obstacle = "wet";
+    wet.hits = 1;
+    // Wet already sits at the post-swap cell (`to`).
+    b[2]![1] = wet;
+    b[3]![1] = makeCell("flame");
+    expect(tryWetSlip(b, mask, { c: 1, r: 1 }, { c: 2, r: 1 })).toBe(true);
+    expect(b[3]![1]?.obstacle).toBe("wet");
+    expect(b[2]![1]?.kind).toBe("flame");
+  });
+
+  it("tar can spread onto a clear neighbor", () => {
+    const b = fillChecker();
+    const mask = fullMask();
+    b[2]![2]!.obstacle = "tar";
+    b[2]![2]!.hits = 2;
+    for (const [c, r] of [
+      [1, 2],
+      [3, 2],
+      [2, 1],
+      [2, 3],
+    ] as const) {
+      delete b[c]![r]!.obstacle;
+      delete b[c]![r]!.hits;
+    }
+    const infected = maybeSpreadTar(b, mask);
+    expect(infected).not.toBeNull();
+    expect(b[infected!.c]![infected!.r]!.obstacle).toBe("tar");
+  });
+});
+
 describe("levels", () => {
   it("has 40 hand-authored levels with briefs and variety", () => {
     expect(LEVELS.length).toBe(40);
@@ -204,5 +314,23 @@ describe("session", () => {
     const result = usePower(s, "disco", target);
     expect(result.ok).toBe(true);
     expect(s.movesLeft).toBe(before + 5);
+  });
+
+  it("plane skips line-immune boxes", () => {
+    const s = startSession(1);
+    s.powers.plane = 1;
+    const row = 4;
+    let target = { c: 0, r: row };
+    for (let c = 0; c < COLS; c++) {
+      if (!s.mask[c]![row]) continue;
+      const cell = s.board[c]![row]!;
+      cell.obstacle = "box";
+      cell.hits = 2;
+      target = { c, r: row };
+    }
+    const result = usePower(s, "plane", target);
+    expect(result.ok).toBe(true);
+    const boxesLeft = s.board.flat().filter((c) => c?.obstacle === "box").length;
+    expect(boxesLeft).toBeGreaterThan(0);
   });
 });

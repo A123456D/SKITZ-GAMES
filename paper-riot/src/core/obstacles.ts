@@ -2,6 +2,8 @@ import {
   COLS,
   ROWS,
   OBSTACLE_HITS,
+  OBSTACLE_LINE_IMMUNE,
+  OBSTACLE_MATCH_IMMUNE,
   OBSTACLE_SOFT,
   type Board,
   type BoardMask,
@@ -10,6 +12,12 @@ import {
   type ObstaclePattern,
   type ObstacleSpec,
   type Pos,
+} from "./types";
+
+export {
+  OBSTACLE_LINE_IMMUNE,
+  OBSTACLE_MATCH_IMMUNE,
+  LOCK_MIN_MATCH,
 } from "./types";
 
 function playableSlots(mask: BoardMask): Pos[] {
@@ -108,6 +116,18 @@ export function placeObstaclePlan(
 
 export function isSoftObstacle(kind: ObstacleKind | undefined): boolean {
   return !!kind && OBSTACLE_SOFT.has(kind);
+}
+
+export function isPinnedObstacle(kind: ObstacleKind | undefined): boolean {
+  return kind === "glue";
+}
+
+export function isLineImmune(kind: ObstacleKind | undefined): boolean {
+  return !!kind && OBSTACLE_LINE_IMMUNE.has(kind);
+}
+
+export function isMatchImmune(kind: ObstacleKind | undefined): boolean {
+  return !!kind && OBSTACLE_MATCH_IMMUNE.has(kind);
 }
 
 export function canSwapCell(cell: Cell | null): boolean {

@@ -17,15 +17,19 @@ export const TILE_KINDS = [
 export type TileKind = (typeof TILE_KINDS)[number];
 
 /**
- * Obstacles — classroom junk covering stickers.
+ * Obstacles — classroom junk covering stickers. Each kind has a unique rule:
  *
- * Soft (can swap, still blocks matching until peeled):
- *   tape-x (1), tape-black (2), wet (1), glue (2)
- * Hard (cannot swap — crack with adjacent matches or blasts):
- *   box (2), lock (2), tar (2), barbed (1)
+ * Soft (can swap, still block matching until peeled):
+ *   tape-x     — 1 adjacent peel (tutorial cover)
+ *   tape-black — 2 peels; immune to plane/rocket line clears
+ *   wet        — 1 peel; slips one extra cell after a swap
+ *   glue       — 2 peels; pins the cell so it will not fall
  *
- * Peel rule: match NEXT TO an obstacle to deal 1 hit.
- * Bomb / plane / rocket / stapler clear covered cells as collateral.
+ * Hard (cannot swap):
+ *   box    — 2 cracks; immune to plane/rocket line clears
+ *   lock   — 2 cracks; only adjacent matches of size ≥4 (or powers)
+ *   tar    — 2 cracks; after cascades settle, may spread to a neighbor
+ *   barbed — 1 crack; adjacent matches do nothing — needs a power tool
  */
 export const OBSTACLE_KINDS = [
   "tape-x",
@@ -54,14 +58,28 @@ export const OBSTACLE_LABELS: Record<ObstacleKind | "any", string> = {
 
 export const OBSTACLE_BLURBS: Record<ObstacleKind, string> = {
   "tape-x": "Soft cover — match beside it once to peel",
-  "tape-black": "Heavy tape — needs two peels",
-  wet: "Ink smear — match beside it once",
-  glue: "Sticky note — two peels, can still swap",
-  box: "Blocks swaps — crack with 2 side matches",
-  lock: "Locked cell — crack with 2 side matches",
-  tar: "Hard goo — no swaps, 2 cracks",
-  barbed: "Wire fence — hard block, 1 crack",
+  "tape-black": "Heavy tape — 2 peels; plane/rocket bounce off",
+  wet: "Slick smear — peels once; slips after you swap it",
+  glue: "Sticky pin — 2 peels; glued stickers will not fall",
+  box: "Solid crate — 2 cracks; plane/rocket bounce off",
+  lock: "Combo lock — needs a match of 4+ (or a blast)",
+  tar: "Creeping goo — 2 cracks; spreads if you leave it",
+  barbed: "Wire fence — matches won't cut it; use a power",
 };
+
+/** Plane / rocket skip these solid covers. */
+export const OBSTACLE_LINE_IMMUNE: ReadonlySet<ObstacleKind> = new Set([
+  "tape-black",
+  "box",
+]);
+
+/** Adjacent matches never damage these — powers only. */
+export const OBSTACLE_MATCH_IMMUNE: ReadonlySet<ObstacleKind> = new Set([
+  "barbed",
+]);
+
+/** Minimum adjacent match size required to crack a lock. */
+export const LOCK_MIN_MATCH = 4;
 
 /**
  * Power-ups — mechanics match the classroom tool fantasy.

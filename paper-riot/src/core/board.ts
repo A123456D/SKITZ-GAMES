@@ -1,9 +1,16 @@
 import { shapeMask } from "./shapes";
-import { canSwapCell, placeObstaclePlan } from "./obstacles";
+import {
+  canSwapCell,
+  isMatchImmune,
+  isPinnedObstacle,
+  placeObstaclePlan,
+} from "./obstacles";
 import {
   COLS,
   ROWS,
   TILE_KINDS,
+  LOCK_MIN_MATCH,
+  OBSTACLE_HITS,
   type Board,
   type BoardMask,
   type BoardShapeId,
@@ -175,10 +182,19 @@ export function damageAdjacentObstacles(
   groups: MatchGroup[],
 ): Pos[] {
   const matched = new Set(groups.flatMap((g) => g.cells.map((p) => `${p.c},${p.r}`)));
-  const cleared: Pos[] = [];
-  const seen = new Set<string>();
+  const sizeByCell = new Map<string, number>();
+  for (const g of groups) {
+    for (const p of g.cells) {
+      const key = `${p.c},${p.r}`;
+      sizeByCell.set(key, Math.max(sizeByCell.get(key) ?? 0, g.cells.length));
+    }
+  }
+
+  /** Obstacle key → strongest adjacent match size this wave. */
+  const touchSize = new Map<string, number>();
   for (const key of matched) {
     const [cs, rs] = key.split(",").map(Number);
+    const matchSize = sizeByCell.get(key) ?? 0;
     for (const [dc, dr] of [
       [1, 0],
       [-1, 0],
@@ -189,22 +205,137 @@ export function damageAdjacentObstacles(
       const r = rs! + dr;
       if (!isPlayable(mask, c, r)) continue;
       const k = `${c},${r}`;
-      if (seen.has(k) || matched.has(k)) continue;
-      seen.add(k);
+      if (matched.has(k)) continue;
       const cell = board[c]![r];
       if (!cell?.obstacle) continue;
-      cell.hits = (cell.hits ?? 1) - 1;
-      if ((cell.hits ?? 0) <= 0) {
-        delete cell.obstacle;
-        delete cell.hits;
-        cleared.push({ c, r });
-      }
+      touchSize.set(k, Math.max(touchSize.get(k) ?? 0, matchSize));
+    }
+  }
+
+  const cleared: Pos[] = [];
+  for (const [k, matchSize] of touchSize) {
+    const [c, r] = k.split(",").map(Number);
+    const cell = board[c!]![r!];
+    if (!cell?.obstacle) continue;
+    if (isMatchImmune(cell.obstacle)) continue;
+    if (cell.obstacle === "lock" && matchSize < LOCK_MIN_MATCH) continue;
+    cell.hits = (cell.hits ?? 1) - 1;
+    if ((cell.hits ?? 0) <= 0) {
+      delete cell.obstacle;
+      delete cell.hits;
+      cleared.push({ c: c!, r: r! });
     }
   }
   return cleared;
 }
 
-/** Crush matches then gravity within mask; refill from top. */
+/** Wet tiles keep sliding one more step in the swap direction. */
+export function tryWetSlip(
+  board: Board,
+  mask: BoardMask,
+  from: Pos,
+  to: Pos,
+): boolean {
+  const cell = board[to.c]![to.r];
+  if (cell?.obstacle !== "wet") return false;
+  const dc = to.c - from.c;
+  const dr = to.r - from.r;
+  if (dc === 0 && dr === 0) return false;
+  const next = { c: to.c + dc, r: to.r + dr };
+  if (!isPlayable(mask, next.c, next.r)) return false;
+  const other = board[next.c]![next.r];
+  if (!canSwapCell(cell) || !canSwapCell(other)) return false;
+  swapCells(board, to, next);
+  return true;
+}
+
+/**
+ * After cascades settle, tar may smear onto one adjacent uncovered sticker.
+ * Returns the infected position, if any.
+ */
+export function maybeSpreadTar(board: Board, mask: BoardMask): Pos | null {
+  const sources: Pos[] = [];
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < ROWS; r++) {
+      if (!mask[c]![r]) continue;
+      if (board[c]![r]?.obstacle === "tar") sources.push({ c, r });
+    }
+  }
+  if (!sources.length) return null;
+
+  const victims: Pos[] = [];
+  const seen = new Set<string>();
+  for (const src of sources) {
+    for (const [dc, dr] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const c = src.c + dc;
+      const r = src.r + dr;
+      if (!isPlayable(mask, c, r)) continue;
+      const key = `${c},${r}`;
+      if (seen.has(key)) continue;
+      const cell = board[c]![r];
+      if (!cell || cell.obstacle) continue;
+      seen.add(key);
+      victims.push({ c, r });
+    }
+  }
+  if (!victims.length) return null;
+
+  const pick = victims[(Math.random() * victims.length) | 0]!;
+  const cell = board[pick.c]![pick.r]!;
+  cell.obstacle = "tar";
+  cell.hits = OBSTACLE_HITS.tar;
+  return pick;
+}
+
+function applyGravityColumn(
+  board: Board,
+  mask: BoardMask,
+  c: number,
+  palette: readonly TileKind[],
+): void {
+  const rows: number[] = [];
+  for (let r = 0; r < ROWS; r++) {
+    if (mask[c]![r]) rows.push(r);
+  }
+
+  const segments: number[][] = [];
+  let cur: number[] = [];
+  for (const r of rows) {
+    const cell = board[c]![r];
+    if (cell && isPinnedObstacle(cell.obstacle)) {
+      if (cur.length) {
+        segments.push(cur);
+        cur = [];
+      }
+      continue;
+    }
+    cur.push(r);
+  }
+  if (cur.length) segments.push(cur);
+
+  for (const seg of segments) {
+    const kept: Cell[] = [];
+    for (let i = seg.length - 1; i >= 0; i--) {
+      const r = seg[i]!;
+      const cell = board[c]![r];
+      if (cell) kept.push(cell);
+      board[c]![r] = null;
+    }
+    let ki = 0;
+    for (let i = seg.length - 1; i >= 0; i--) {
+      const r = seg[i]!;
+      if (ki < kept.length) board[c]![r] = kept[ki++]!;
+      else board[c]![r] = makeCell(undefined, palette);
+    }
+  }
+}
+
+/** Crush matches then gravity within mask; refill from top. Glue pins stay put. */
 export function crushAndRefill(
   board: Board,
   mask: BoardMask,
@@ -221,22 +352,7 @@ export function crushAndRefill(
   }
 
   for (let c = 0; c < COLS; c++) {
-    const kept: Cell[] = [];
-    for (let r = ROWS - 1; r >= 0; r--) {
-      if (!mask[c]![r]) continue;
-      const cell = board[c]![r];
-      if (cell) kept.push(cell);
-      board[c]![r] = null;
-    }
-    let ki = 0;
-    for (let r = ROWS - 1; r >= 0; r--) {
-      if (!mask[c]![r]) continue;
-      if (ki < kept.length) {
-        board[c]![r] = kept[ki++]!;
-      } else {
-        board[c]![r] = makeCell(undefined, palette);
-      }
-    }
+    applyGravityColumn(board, mask, c, palette);
   }
   return dead.size;
 }
@@ -255,19 +371,7 @@ export function clearPositions(
     board[c!]![r!] = null;
   }
   for (let c = 0; c < COLS; c++) {
-    const kept: Cell[] = [];
-    for (let r = ROWS - 1; r >= 0; r--) {
-      if (!mask[c]![r]) continue;
-      const cell = board[c]![r];
-      if (cell) kept.push(cell);
-      board[c]![r] = null;
-    }
-    let ki = 0;
-    for (let r = ROWS - 1; r >= 0; r--) {
-      if (!mask[c]![r]) continue;
-      if (ki < kept.length) board[c]![r] = kept[ki++]!;
-      else board[c]![r] = makeCell(undefined, palette);
-    }
+    applyGravityColumn(board, mask, c, palette);
   }
   return dead.size;
 }
