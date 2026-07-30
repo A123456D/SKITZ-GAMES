@@ -115,6 +115,6 @@ export const SFX_CATALOG = [
     id: "oops",
     file: "oops.mp3",
     duration: 1.2,
-    text: "Clear close-mic recording of a young girl giggling: bright playful hee-hee laugh, teasing and cute, loud and distinct, short cartoon laugh, no words, no music, no ambience, dry studio",
+    text: "Clear close-mic recording of an adult woman laughing: bright playful giggle hee-hee, teasing and warm, mature female voice, loud and distinct, short natural laugh, no words, no music, no ambience, dry studio",
   },
 ];
