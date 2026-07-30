@@ -16,7 +16,7 @@ const games = (await getCollection('games')).sort((a, b) => a.data.title.localeC
 				<p class="eyebrow">catalog</p>
 				<h1 class="section-title">Games</h1>
 				<p class="lead muted">
-					Freemium games and apps — free in the browser, free to install on Android.
+					Free games and apps — play in the browser, install on Android.
 				</p>
 				<div class="list">
 					{
@@ -40,11 +40,21 @@ const games = (await getCollection('games')).sort((a, b) => a.data.title.localeC
 <style>
 	.lead {
 		max-width: 34rem;
-		margin-bottom: 1.5rem;
+		margin-bottom: 1.75rem;
 		font-family: var(--font-type);
 	}
 
 	.list {
+		display: grid;
+		gap: 1.75rem 1.35rem;
 		animation: rise 500ms var(--ease);
+	}
+
+	@media (min-width: 700px) {
+		.list {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 2rem 1.75rem;
+			align-items: start;
+		}
 	}
 </style>

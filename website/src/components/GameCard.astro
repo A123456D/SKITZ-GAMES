@@ -27,32 +27,27 @@ const { href, title, summary, cover, genre } = Astro.props;
 <style>
 	.game-link {
 		display: block;
+		height: 100%;
 		text-decoration: none;
 		color: inherit;
 	}
 
 	.game-item {
 		display: grid;
-		gap: 1.25rem;
-		align-items: center;
-		padding: 1.5rem 0;
-		border-bottom: 1px dashed var(--line);
+		gap: 0.9rem;
+		height: 100%;
+		padding: 0.35rem 0.15rem 0.5rem;
 		transition: transform 180ms var(--ease);
 	}
 
-	@media (min-width: 720px) {
-		.game-item {
-			grid-template-columns: 210px 1fr;
-			gap: 1.75rem;
-		}
-	}
-
 	.game-link:hover .game-item {
-		transform: translateX(6px);
+		transform: translateY(-5px);
 	}
 
 	.game-item__media {
-		max-width: 210px;
+		width: 100%;
+		max-width: 280px;
+		margin-inline: auto;
 		background: #fff;
 		padding: 0.45rem;
 		box-shadow: 5px 6px 0 var(--skitz-red);
@@ -65,15 +60,35 @@ const { href, title, summary, cover, genre } = Astro.props;
 		transform: rotate(1deg);
 	}
 
+	.game-link:nth-child(3n) .game-item__media {
+		box-shadow: 5px 6px 0 var(--skitz-green);
+		transform: rotate(-0.6deg);
+	}
+
 	.game-item__media img {
 		width: 100%;
 		height: auto;
 		display: block;
+		aspect-ratio: 1;
+		object-fit: cover;
+	}
+
+	.game-item__body {
+		text-align: center;
 	}
 
 	.game-item__body h2 {
-		font-size: clamp(1.8rem, 4vw, 2.4rem);
+		font-size: clamp(1.55rem, 3.2vw, 2rem);
 		margin-bottom: 0.35rem;
+	}
+
+	.game-item__body .muted {
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		margin-bottom: 0.55rem;
+		font-size: 0.95rem;
 	}
 
 	.cta {
