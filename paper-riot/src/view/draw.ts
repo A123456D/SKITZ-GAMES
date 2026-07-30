@@ -32,10 +32,18 @@ export const HOME_THEME: UiRect = { x: 90, y: 730, w: 540, h: 100 };
 export const HOME_SOUND: UiRect = { x: 90, y: 850, w: 540, h: 100 };
 /** @deprecated alias — home sound control */
 export const HOME_SETTINGS = HOME_SOUND;
-export const PAUSE_BTN: UiRect = { x: 620, y: 36, w: 64, h: 64 };
-export const PLAY_SOUND_BTN: UiRect = { x: 536, y: 36, w: 64, h: 64 };
+export const MENU_BTN: UiRect = { x: 548, y: 40, w: 136, h: 56 };
+/** @deprecated alias — same control as MENU_BTN */
+export const PAUSE_BTN = MENU_BTN;
+export const PLAY_SOUND_BTN: UiRect = { x: 464, y: 40, w: 64, h: 56 };
 export const MAP_BACK: UiRect = { x: 36, y: 36, w: 120, h: 56 };
 export const MAP_PLAY: UiRect = { x: 200, y: 1160, w: 320, h: 72 };
+
+export const MENU_RESUME: UiRect = { x: 110, y: 360, w: 500, h: 96 };
+export const MENU_MAP: UiRect = { x: 110, y: 480, w: 500, h: 88 };
+export const MENU_THEME: UiRect = { x: 110, y: 588, w: 500, h: 88 };
+export const MENU_SOUND: UiRect = { x: 110, y: 696, w: 500, h: 88 };
+export const MENU_HOME: UiRect = { x: 110, y: 804, w: 500, h: 88 };
 
 export function powerDockFor(levelId: number) {
   const shown = unlockedPowers(levelId);
@@ -552,7 +560,7 @@ export function hitZoneTab(x: number, y: number): ZoneId | null {
 
 /** Which primary scrap button is under the pointer (for hover / press). */
 export function hitButtonId(
-  screen: "home" | "map" | "play",
+  screen: "home" | "map" | "play" | "menu",
   x: number,
   y: number,
 ): string | null {
@@ -564,9 +572,15 @@ export function hitButtonId(
   } else if (screen === "map") {
     if (hitUi(MAP_BACK, x, y)) return "map-back";
     if (hitUi(MAP_PLAY, x, y)) return "map-play";
+  } else if (screen === "menu") {
+    if (hitUi(MENU_RESUME, x, y)) return "menu-resume";
+    if (hitUi(MENU_MAP, x, y)) return "menu-map";
+    if (hitUi(MENU_THEME, x, y)) return "menu-theme";
+    if (hitUi(MENU_SOUND, x, y)) return "menu-sound";
+    if (hitUi(MENU_HOME, x, y)) return "menu-home";
   } else {
     if (hitUi(PLAY_SOUND_BTN, x, y)) return "play-sound";
-    if (hitUi(PAUSE_BTN, x, y)) return "pause";
+    if (hitUi(MENU_BTN, x, y)) return "menu";
   }
   return null;
 }
@@ -649,11 +663,21 @@ export function drawPlay(
     ctx.shadowOffsetY = 4 + lift * 0.5;
     ctx.translate(0, -lift);
     ctx.fillStyle = Palette.paper;
-    roundRect(ctx, PAUSE_BTN.x, PAUSE_BTN.y, PAUSE_BTN.w, PAUSE_BTN.h, 8);
+    roundRect(ctx, MENU_BTN.x, MENU_BTN.y, MENU_BTN.w, MENU_BTN.h, 8);
     ctx.fill();
+    ctx.strokeStyle = Palette.ink;
+    ctx.lineWidth = 3;
+    roundRect(ctx, MENU_BTN.x, MENU_BTN.y, MENU_BTN.w, MENU_BTN.h, 8);
+    ctx.stroke();
     ctx.fillStyle = Palette.ink;
-    ctx.fillRect(PAUSE_BTN.x + 20, PAUSE_BTN.y + 18, 8, 28);
-    ctx.fillRect(PAUSE_BTN.x + 36, PAUSE_BTN.y + 18, 8, 28);
+    ctx.font = "800 22px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(
+      "MENU",
+      MENU_BTN.x + MENU_BTN.w / 2,
+      MENU_BTN.y + MENU_BTN.h / 2 + 1,
+    );
     ctx.restore();
   }
 
@@ -942,4 +966,61 @@ export function drawPlay(
     ctx.font = "800 26px 'Chakra Petch', sans-serif";
     ctx.fillText("TAP FOR MAP", W / 2, 640);
   }
+}
+
+export function drawMenu(
+  ctx: CanvasRenderingContext2D,
+  ui: { time: number; hover: string | null; pressed: string | null },
+): void {
+  cover(ctx, uiImage("bg-play"), Palette.paper);
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = Palette.paper;
+  roundRect(ctx, 70, 240, 580, 720, 14);
+  ctx.fill();
+  ctx.strokeStyle = Palette.ink;
+  ctx.lineWidth = 4;
+  roundRect(ctx, 70, 240, 580, 720, 14);
+  ctx.stroke();
+  ctx.fillStyle = Palette.hot;
+  ctx.fillRect(110, 228, 96, 18);
+
+  ctx.fillStyle = Palette.ink;
+  ctx.font = "800 52px 'Permanent Marker', cursive";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("MENU", W / 2, 310);
+
+  paperBtn(ctx, MENU_RESUME, "RESUME", {
+    play: true,
+    time: ui.time,
+    phase: 0.2,
+    hover: ui.hover === "menu-resume",
+    pressed: ui.pressed === "menu-resume",
+  });
+  paperBtn(ctx, MENU_MAP, "WORLD MAP", {
+    time: ui.time,
+    phase: 0.8,
+    hover: ui.hover === "menu-map",
+    pressed: ui.pressed === "menu-map",
+  });
+  paperBtn(ctx, MENU_THEME, `THEME · ${THEME_LABELS[getTheme()]}`, {
+    time: ui.time,
+    phase: 1.4,
+    hover: ui.hover === "menu-theme",
+    pressed: ui.pressed === "menu-theme",
+  });
+  paperBtn(ctx, MENU_SOUND, `AUDIO · ${audioModeLabel()}`, {
+    time: ui.time,
+    phase: 2.0,
+    hover: ui.hover === "menu-sound",
+    pressed: ui.pressed === "menu-sound",
+  });
+  paperBtn(ctx, MENU_HOME, "HOME", {
+    time: ui.time,
+    phase: 2.6,
+    hover: ui.hover === "menu-home",
+    pressed: ui.pressed === "menu-home",
+  });
 }

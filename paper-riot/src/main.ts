@@ -18,15 +18,21 @@ import {
   HOME_MAP,
   HOME_THEME,
   HOME_SOUND,
-  PAUSE_BTN,
+  MENU_BTN,
   PLAY_SOUND_BTN,
   MAP_BACK,
   MAP_PLAY,
+  MENU_RESUME,
+  MENU_MAP,
+  MENU_THEME,
+  MENU_SOUND,
+  MENU_HOME,
   boardLayout,
   cellAt,
   cellCenter,
   drawHome,
   drawMap,
+  drawMenu,
   drawPlay,
   hitButtonId,
   hitPowerDock,
@@ -78,7 +84,7 @@ function handleAudioCycle(): void {
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
 
-type Screen = "home" | "map" | "play";
+type Screen = "home" | "map" | "play" | "menu";
 let screen: Screen = "home";
 let progress: Progress = loadProgress();
 let mapZone: ZoneId = "desk";
@@ -152,6 +158,10 @@ function paint(): void {
     drawMap(ctx, progress, mapZone, selectedLevel, ui);
     return;
   }
+  if (screen === "menu") {
+    drawMenu(ctx, ui);
+    return;
+  }
   drawPlay(ctx, session, {
     selected,
     clearing,
@@ -167,6 +177,7 @@ function isAnimating(): boolean {
   return (
     screen === "home" ||
     screen === "map" ||
+    screen === "menu" ||
     screen === "play" ||
     busy ||
     burstT > 0 ||
@@ -470,6 +481,47 @@ function onTap(x: number, y: number): void {
     return;
   }
 
+  if (screen === "menu") {
+    if (hitUi(MENU_RESUME, x, y)) {
+      playSfx("ui-tap");
+      screen = "play";
+      markDirty();
+      return;
+    }
+    if (hitUi(MENU_MAP, x, y)) {
+      playSfx("ui-tap");
+      syncZoneFromLevel(session.level.id);
+      armedPower = null;
+      planeFrom = null;
+      selected = null;
+      screen = "map";
+      markDirty();
+      return;
+    }
+    if (hitUi(MENU_THEME, x, y)) {
+      playSfx("ui-tap");
+      const next = cycleTheme();
+      syncMusicForTheme(next);
+      void reloadThemeArt(next).then(() => markDirty());
+      markDirty();
+      return;
+    }
+    if (hitUi(MENU_SOUND, x, y)) {
+      handleAudioCycle();
+      return;
+    }
+    if (hitUi(MENU_HOME, x, y)) {
+      playSfx("ui-tap");
+      armedPower = null;
+      planeFrom = null;
+      selected = null;
+      screen = "home";
+      markDirty();
+      return;
+    }
+    return;
+  }
+
   if (session.status !== "playing") {
     playSfx("ui-tap");
     syncZoneFromLevel(session.level.id);
@@ -478,11 +530,12 @@ function onTap(x: number, y: number): void {
     return;
   }
 
-  if (hitUi(PAUSE_BTN, x, y)) {
+  if (hitUi(MENU_BTN, x, y)) {
     playSfx("ui-tap");
-    screen = "map";
     armedPower = null;
     planeFrom = null;
+    selected = null;
+    screen = "menu";
     markDirty();
     return;
   }

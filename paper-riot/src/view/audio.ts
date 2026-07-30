@@ -42,6 +42,8 @@ const FILES: Record<SfxId, string> = {
 };
 
 const MUTE_KEY = "paper-riot-muted";
+/** Bump when regenerating mp3s so clients skip stale cache. */
+const SFX_VERSION = 3;
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -70,7 +72,7 @@ function ensureCtx(): AudioContext {
   if (!ctx) {
     ctx = new AudioContext();
     master = ctx.createGain();
-    master.gain.value = muted ? 0 : 0.85;
+    master.gain.value = muted ? 0 : 0.7;
     master.connect(ctx.destination);
   }
   return ctx;
@@ -78,7 +80,7 @@ function ensureCtx(): AudioContext {
 
 async function decodeOne(id: SfxId, audio: AudioContext): Promise<void> {
   try {
-    const res = await fetch(`./sfx/${FILES[id]}`);
+    const res = await fetch(`./sfx/${FILES[id]}?v=${SFX_VERSION}`);
     if (!res.ok) return;
     const raw = await res.arrayBuffer();
     const buf = await audio.decodeAudioData(raw.slice(0));
@@ -132,7 +134,7 @@ export function isMuted(): boolean {
 export function setMuted(next: boolean): void {
   muted = next;
   writeMuted(next);
-  if (master) master.gain.value = muted ? 0 : 0.85;
+  if (master) master.gain.value = muted ? 0 : 0.7;
 }
 
 export function toggleMute(): boolean {

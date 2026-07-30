@@ -84,8 +84,8 @@ async function generateOne(entry) {
     },
     body: JSON.stringify({
       text: entry.text,
-      duration_seconds: entry.duration,
-      prompt_influence: 0.45,
+      duration_seconds: Math.max(0.5, entry.duration),
+      prompt_influence: 0.5,
       model_id: "eleven_text_to_sound_v2",
     }),
   });
