@@ -26,6 +26,7 @@ import {
   MENU_MAP,
   MENU_THEME,
   MENU_SOUND,
+  MENU_FEEDBACK,
   MENU_HOME,
   boardLayout,
   cellAt,
@@ -72,6 +73,7 @@ import {
   initAudioMode,
 } from "./view/audioMode";
 import { countObstacles } from "./core/obstacles";
+import { openFeedback } from "./view/feedback";
 import { cycleTheme, getTheme, initTheme } from "./view/theme";
 
 function handleAudioCycle(): void {
@@ -508,6 +510,11 @@ function onTap(x: number, y: number): void {
     }
     if (hitUi(MENU_SOUND, x, y)) {
       handleAudioCycle();
+      return;
+    }
+    if (hitUi(MENU_FEEDBACK, x, y)) {
+      playSfx("ui-tap");
+      openFeedback("Paper Riot");
       return;
     }
     if (hitUi(MENU_HOME, x, y)) {

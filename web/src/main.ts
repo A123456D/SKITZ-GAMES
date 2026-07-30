@@ -35,6 +35,7 @@ import {
   type SaveData,
 } from "./app/save";
 import { onMusicScreen, unlockMusic, skipMusicTrack, canSkipMusicNext } from "./audio/music";
+import { openFeedback } from "./view/feedback";
 import {
   unlockAudio,
   sfxBeamHit,
@@ -1072,6 +1073,10 @@ function onButton(id: string): void {
     screen = "how";
     return;
   }
+  if (id === "feedback") {
+    openFeedback("Pulse Link");
+    return;
+  }
   if (id === "how_next") {
     if (howPage < TUTORIAL_PAGES.length - 1) howPage += 1;
     return;
@@ -1471,21 +1476,23 @@ function drawMenu(): void {
   drawBackground(ctx, time);
   // Mark + wordmark; keep clear of the PLAY stack starting at y 450.
   drawLogo(ctx, W / 2, 72, 320);
-  const play: ButtonRect = { x: 120, y: 450, w: 480, h: 68, id: "play" };
-  const levelsBtn: ButtonRect = { x: 120, y: 535, w: 480, h: 60, id: "levels" };
-  const tutBtn: ButtonRect = { x: 120, y: 610, w: 480, h: 60, id: "tutorial" };
-  const howBtn: ButtonRect = { x: 120, y: 685, w: 480, h: 60, id: "how" };
-  const settingsBtn: ButtonRect = { x: 120, y: 760, w: 480, h: 60, id: "settings" };
+  const play: ButtonRect = { x: 120, y: 430, w: 480, h: 64, id: "play" };
+  const levelsBtn: ButtonRect = { x: 120, y: 508, w: 480, h: 56, id: "levels" };
+  const tutBtn: ButtonRect = { x: 120, y: 576, w: 480, h: 56, id: "tutorial" };
+  const howBtn: ButtonRect = { x: 120, y: 644, w: 480, h: 56, id: "how" };
+  const feedbackBtn: ButtonRect = { x: 120, y: 712, w: 480, h: 56, id: "feedback" };
+  const settingsBtn: ButtonRect = { x: 120, y: 780, w: 480, h: 56, id: "settings" };
   drawGlassButton(ctx, play, session && !inTutorial ? "RESUME" : "PLAY", true, time);
   drawGlassButton(ctx, levelsBtn, `LEVELS · ${DIFFICULTY_COUNT}`, false, time);
   drawGlassButton(ctx, tutBtn, "TUTORIAL", false, time);
   drawGlassButton(ctx, howBtn, "HOW TO PLAY", false, time);
+  drawGlassButton(ctx, feedbackBtn, "FEEDBACK", false, time);
   drawGlassButton(ctx, settingsBtn, "SETTINGS", false, time);
-  buttons.push(play, levelsBtn, tutBtn, howBtn, settingsBtn);
+  buttons.push(play, levelsBtn, tutBtn, howBtn, feedbackBtn, settingsBtn);
   ctx.fillStyle = P.INK_FAINT;
   ctx.font = font(400, 16);
   ctx.textAlign = "center";
-  ctx.fillText("Wormholes. Walls. Scarce pulses. Think before you fire.", W / 2, 920);
+  ctx.fillText("Wormholes. Walls. Scarce pulses. Think before you fire.", W / 2, 940);
 }
 
 /** Floating “best with headphones” tip + skip controls — every screen / theme. */
@@ -1794,15 +1801,17 @@ function drawPause(): void {
   ctx.textAlign = "center";
   ctx.fillText(session ? levelTitle(levelIndex + 1).toUpperCase() : "", W / 2, 120);
 
-  const resume: ButtonRect = { x: 120, y: 420, w: 480, h: 68, id: "pause_resume" };
-  const settingsBtn: ButtonRect = { x: 120, y: 510, w: 480, h: 64, id: "settings" };
-  const levelsBtn: ButtonRect = { x: 120, y: 595, w: 480, h: 64, id: "pause_levels" };
-  const homeBtn: ButtonRect = { x: 120, y: 680, w: 480, h: 64, id: "main_menu" };
+  const resume: ButtonRect = { x: 120, y: 400, w: 480, h: 64, id: "pause_resume" };
+  const settingsBtn: ButtonRect = { x: 120, y: 482, w: 480, h: 58, id: "settings" };
+  const levelsBtn: ButtonRect = { x: 120, y: 556, w: 480, h: 58, id: "pause_levels" };
+  const feedbackBtn: ButtonRect = { x: 120, y: 630, w: 480, h: 58, id: "feedback" };
+  const homeBtn: ButtonRect = { x: 120, y: 704, w: 480, h: 58, id: "main_menu" };
   drawGlassButton(ctx, resume, "RESUME", true, time);
   drawGlassButton(ctx, settingsBtn, "SETTINGS", false, time);
   drawGlassButton(ctx, levelsBtn, "LEVELS", false, time);
+  drawGlassButton(ctx, feedbackBtn, "FEEDBACK", false, time);
   drawGlassButton(ctx, homeBtn, "MAIN MENU", false, time);
-  buttons.push(resume, settingsBtn, levelsBtn, homeBtn);
+  buttons.push(resume, settingsBtn, levelsBtn, feedbackBtn, homeBtn);
 }
 
 function drawPlay(): void {

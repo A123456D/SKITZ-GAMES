@@ -39,11 +39,12 @@ export const PLAY_SOUND_BTN: UiRect = { x: 464, y: 40, w: 64, h: 56 };
 export const MAP_BACK: UiRect = { x: 36, y: 36, w: 120, h: 56 };
 export const MAP_PLAY: UiRect = { x: 200, y: 1160, w: 320, h: 72 };
 
-export const MENU_RESUME: UiRect = { x: 110, y: 360, w: 500, h: 96 };
-export const MENU_MAP: UiRect = { x: 110, y: 480, w: 500, h: 88 };
-export const MENU_THEME: UiRect = { x: 110, y: 588, w: 500, h: 88 };
-export const MENU_SOUND: UiRect = { x: 110, y: 696, w: 500, h: 88 };
-export const MENU_HOME: UiRect = { x: 110, y: 804, w: 500, h: 88 };
+export const MENU_RESUME: UiRect = { x: 110, y: 340, w: 500, h: 84 };
+export const MENU_MAP: UiRect = { x: 110, y: 440, w: 500, h: 78 };
+export const MENU_THEME: UiRect = { x: 110, y: 534, w: 500, h: 78 };
+export const MENU_SOUND: UiRect = { x: 110, y: 628, w: 500, h: 78 };
+export const MENU_FEEDBACK: UiRect = { x: 110, y: 722, w: 500, h: 78 };
+export const MENU_HOME: UiRect = { x: 110, y: 816, w: 500, h: 78 };
 
 export function powerDockFor(levelId: number) {
   const shown = unlockedPowers(levelId);
@@ -577,6 +578,7 @@ export function hitButtonId(
     if (hitUi(MENU_MAP, x, y)) return "menu-map";
     if (hitUi(MENU_THEME, x, y)) return "menu-theme";
     if (hitUi(MENU_SOUND, x, y)) return "menu-sound";
+    if (hitUi(MENU_FEEDBACK, x, y)) return "menu-feedback";
     if (hitUi(MENU_HOME, x, y)) return "menu-home";
   } else {
     if (hitUi(PLAY_SOUND_BTN, x, y)) return "play-sound";
@@ -977,20 +979,20 @@ export function drawMenu(
   ctx.fillRect(0, 0, W, H);
 
   ctx.fillStyle = Palette.paper;
-  roundRect(ctx, 70, 240, 580, 720, 14);
+  roundRect(ctx, 70, 220, 580, 740, 14);
   ctx.fill();
   ctx.strokeStyle = Palette.ink;
   ctx.lineWidth = 4;
-  roundRect(ctx, 70, 240, 580, 720, 14);
+  roundRect(ctx, 70, 220, 580, 740, 14);
   ctx.stroke();
   ctx.fillStyle = Palette.hot;
-  ctx.fillRect(110, 228, 96, 18);
+  ctx.fillRect(110, 208, 96, 18);
 
   ctx.fillStyle = Palette.ink;
   ctx.font = "800 52px 'Permanent Marker', cursive";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("MENU", W / 2, 310);
+  ctx.fillText("MENU", W / 2, 290);
 
   paperBtn(ctx, MENU_RESUME, "RESUME", {
     play: true,
@@ -1016,6 +1018,12 @@ export function drawMenu(
     phase: 2.0,
     hover: ui.hover === "menu-sound",
     pressed: ui.pressed === "menu-sound",
+  });
+  paperBtn(ctx, MENU_FEEDBACK, "FEEDBACK", {
+    time: ui.time,
+    phase: 2.3,
+    hover: ui.hover === "menu-feedback",
+    pressed: ui.pressed === "menu-feedback",
   });
   paperBtn(ctx, MENU_HOME, "HOME", {
     time: ui.time,

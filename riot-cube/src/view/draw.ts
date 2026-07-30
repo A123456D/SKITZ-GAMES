@@ -516,11 +516,12 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   });
 }
 
-export const PAUSE_RESUME: UiRect = { x: 160, y: 340, w: 400, h: 64 };
-export const PAUSE_THEMES: UiRect = { x: 160, y: 420, w: 400, h: 60 };
-export const PAUSE_HOW: UiRect = { x: 160, y: 496, w: 400, h: 60 };
-export const PAUSE_SETTINGS: UiRect = { x: 160, y: 572, w: 400, h: 60 };
-export const PAUSE_HOME: UiRect = { x: 160, y: 648, w: 400, h: 60 };
+export const PAUSE_RESUME: UiRect = { x: 160, y: 320, w: 400, h: 58 };
+export const PAUSE_THEMES: UiRect = { x: 160, y: 392, w: 400, h: 54 };
+export const PAUSE_HOW: UiRect = { x: 160, y: 460, w: 400, h: 54 };
+export const PAUSE_SETTINGS: UiRect = { x: 160, y: 528, w: 400, h: 54 };
+export const PAUSE_FEEDBACK: UiRect = { x: 160, y: 596, w: 400, h: 54 };
+export const PAUSE_HOME: UiRect = { x: 160, y: 664, w: 400, h: 54 };
 
 export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   const p = getPalette();
@@ -528,18 +529,18 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   ctx.fillRect(0, 0, W, H);
 
   ctx.fillStyle = p.paper;
-  roundRect(ctx, 100, 220, 520, 560, 10);
+  roundRect(ctx, 100, 200, 520, 580, 10);
   ctx.fill();
   ctx.strokeStyle = p.ink;
   ctx.lineWidth = 4;
   ctx.stroke();
   ctx.fillStyle = p.hot;
-  ctx.fillRect(140, 208, 90, 18);
+  ctx.fillRect(140, 188, 90, 18);
 
   ctx.fillStyle = p.ink;
   ctx.font = "800 40px 'Permanent Marker', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("MENU", W / 2, 290);
+  ctx.fillText("MENU", W / 2, 270);
 
   drawPaperButton(ctx, PAUSE_RESUME, "RESUME", {
     fill: p.accent,
@@ -558,6 +559,11 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   drawPaperButton(ctx, PAUSE_SETTINGS, "SETTINGS", {
     fill: p.paper,
     text: p.ink,
+  });
+  drawPaperButton(ctx, PAUSE_FEEDBACK, "FEEDBACK", {
+    fill: p.paper,
+    text: p.ink,
+    tape: p.hot,
   });
   drawPaperButton(ctx, PAUSE_HOME, "HOME", {
     fill: p.panel,

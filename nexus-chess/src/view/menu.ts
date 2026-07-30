@@ -186,6 +186,17 @@ export function drawHub(
   const how: ButtonRect = { x: btnX, y: by, w: btnW, h: btnH - 6, id: "menu-how" };
   drawPremiumBtn(ctx, how, "How to Play", { fontSize: compact ? 13 : 14 });
   buttons.push(how);
+  by += btnH + 10;
+
+  const feedback: ButtonRect = {
+    x: btnX,
+    y: by,
+    w: btnW,
+    h: btnH - 6,
+    id: "menu-feedback",
+  };
+  drawPremiumBtn(ctx, feedback, "Feedback", { fontSize: compact ? 13 : 14 });
+  buttons.push(feedback);
 
   const back: ButtonRect = {
     x: btnX,

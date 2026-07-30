@@ -78,6 +78,7 @@ import {
   playWin,
   playLose,
 } from "./view/sfx";
+import { openFeedback } from "./view/feedback";
 import {
   drawHome,
   drawHub,
@@ -532,6 +533,12 @@ function onMenuClick(id: string) {
   if (id === "menu-how") {
     if (tutorialActive) return;
     screen = "how";
+    return;
+  }
+  if (id === "menu-feedback") {
+    if (tutorialActive) return;
+    playUiTap();
+    openFeedback("Nexus Chess");
     return;
   }
   if (id === "menu-back") {
