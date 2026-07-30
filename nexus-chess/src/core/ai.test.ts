@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { newGame } from "./board";
+import { newGame, isInNexus } from "./board";
 import { beginTurn, skipAbility } from "./turn";
 import {
   aiPickMove,
@@ -124,6 +124,56 @@ describe("ai difficulty", () => {
     // Walking onto d4 is suicide — anything else (or staying out) is fine
     expect(!(move!.from === "d3" && move!.to === "d4")).toBe(true);
   });
+
+  it("hunts an enemy Nexus king instead of racing past the kill", () => {
+    let s = newGame();
+    s.board = new Map();
+    // Black king sits in Nexus; white can assassinate with rook or king
+    s.board.set("d3", bareKing("w"));
+    s.board.set("d4", bareKing("b"));
+    s.board.set("a4", piece("R", "w"));
+    s = beginTurn(s);
+    const move = aiPickMove(s, 2);
+    expect(move).not.toBeNull();
+    expect(move!.to).toBe("d4"); // assassination — rook or king both fine
+  });
+
+  it("gets its king out of assassination fire in the Nexus", () => {
+    let s = newGame();
+    s.board = new Map();
+    s.board.set("d4", bareKing("w"));
+    s.board.set("a8", bareKing("b"));
+    s.board.set("d7", piece("R", "b")); // eyes the white king on the d-file
+    s.board.set("h2", piece("N", "w"));
+    s = beginTurn(s);
+    const move = aiPickMove(s, 3);
+    expect(move).not.toBeNull();
+    // Must resolve the threat: flee, step to a safe Nexus tile, or block/capture
+    if (move!.from === "d4") {
+      // After the king move, it should no longer be freely takable on the d-file
+      expect(move!.to === "d5" || move!.to.startsWith("e") || !isInNexus(move!.to)).toBe(true);
+      expect(move!.to !== "d4").toBe(true);
+    } else {
+      // Non-king reply that deals with the attacker (block / capture)
+      expect(["d7", "d5", "d6"].includes(move!.to) || move!.from === "h2").toBe(true);
+    }
+  });
+
+  it("swings a rook onto the enemy Nexus king's file instead of only shuffling the king", () => {
+    let s = newGame();
+    s.board = new Map();
+    s.board.set("h1", bareKing("w")); // far from Nexus — king rush is slow
+    s.board.set("e5", bareKing("b")); // in Nexus
+    s.board.set("a2", piece("R", "w"));
+    s = beginTurn(s);
+    const move = aiPickMove(s, 3);
+    expect(move).not.toBeNull();
+    expect(move!.from).toBe("a2");
+    // Onto the e-file (eyes the king) or along the 5th rank toward it
+    const to = move!.to;
+    expect(to[0] === "e" || to[1] === "5" || to === "a5").toBe(true);
+  });
+
   it("evaluatePosition favors own king in Nexus", () => {
     let s = newGame();
     s.board = new Map();

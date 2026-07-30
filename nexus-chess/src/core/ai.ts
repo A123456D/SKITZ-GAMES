@@ -171,15 +171,69 @@ function squareAttackedBy(state: GameState, sq: Square, by: Color): boolean {
   return false;
 }
 
+/** How many of `by`'s pieces attack `sq`. */
+function attackCount(state: GameState, sq: Square, by: Color): number {
+  let n = 0;
+  for (const [from, p] of state.board) {
+    if (p.color !== by) continue;
+    if (pieceAttacksSquare(state.board, from, sq, p.kind, p.color)) n++;
+  }
+  return n;
+}
+
 function kingAssassinable(state: GameState, kingColor: Color): boolean {
   const ksq = findKing(state.board, kingColor);
   if (!ksq || !isInNexus(ksq)) return false;
   return squareAttackedBy(state, ksq, opponent(kingColor));
 }
 
+/** Friendly non-king pieces contesting the Nexus zone. */
+function nexusSupportCount(state: GameState, color: Color): number {
+  let n = 0;
+  for (const [sq, p] of state.board) {
+    if (p.color !== color || p.kind === "K") continue;
+    if (isInNexus(sq)) n += 2;
+    else if (distToNexus(sq) <= 2) n++;
+  }
+  return n;
+}
+
+/** After king steps onto `to` (vacating `from`), can the opponent capture it? */
+function kingWouldBeAssassinable(
+  state: GameState,
+  to: Square,
+  kingColor: Color,
+  from: Square,
+): boolean {
+  if (!isInNexus(to)) return false;
+  const board = new Map(state.board);
+  const king = board.get(from);
+  if (!king || king.kind !== "K") return false;
+  if (king.isShielded) return false;
+  board.delete(from);
+  board.set(to, { ...king });
+  return squareAttackedBy({ ...state, board }, to, opponent(kingColor));
+}
+
+function isSuicidalKingEntry(state: GameState, move: Move): boolean {
+  const p = state.board.get(move.from);
+  if (!p || p.kind !== "K") return false;
+  if (!isInNexus(move.to) || isInNexus(move.from)) return false;
+  return kingWouldBeAssassinable(state, move.to, p.color, move.from);
+}
+
+function boardAfterMove(state: GameState, move: Move): GameState["board"] {
+  const board = new Map(state.board);
+  const p = board.get(move.from);
+  if (!p) return board;
+  board.delete(move.from);
+  board.set(move.to, { ...p });
+  return board;
+}
+
 /**
  * Static evaluation from `perspective`'s point of view (higher = better for them).
- * Nexus Hold matters, but material, safety, and piece pressure decide most positions.
+ * Priority: win now (assassinate / hold) → don't lose the king → fight for the Nexus with pieces.
  */
 export function evaluatePosition(state: GameState, perspective: Color): number {
   if (state.winner === perspective) return 1_000_000;
@@ -202,7 +256,6 @@ export function evaluatePosition(state: GameState, perspective: Color): number {
       myMaterial += val;
       if (isInNexus(sq) && p.kind !== "K") myNexusPieces++;
       if (p.kind !== "K" && p.kind !== "P") {
-        // Centralize minor/major pieces; develop off the back rank
         score += (4 - Math.min(4, d)) * 8;
         const [r] = squareToRC(sq);
         if (perspective === "w" && r > 0) score += 12;
@@ -216,10 +269,8 @@ export function evaluatePosition(state: GameState, perspective: Color): number {
     }
   }
   score += myMaterial - oppMaterial;
-  // Occupying Nexus with pieces fuels mana — valuable but secondary to material
-  score += (myNexusPieces - oppNexusPieces) * 70;
-  // Contest the zone with supporting pieces (not only the king)
-  score += (myNearNexus - oppNearNexus) * 45;
+  score += (myNexusPieces - oppNexusPieces) * 80;
+  score += (myNearNexus - oppNearNexus) * 55;
 
   const myKing = findKing(state.board, perspective);
   const oppKing = findKing(state.board, opp);
@@ -228,18 +279,20 @@ export function evaluatePosition(state: GameState, perspective: Color): number {
     const d = distToNexus(myKing);
     const king = state.board.get(myKing)!;
     if (d === 0) {
-      // Presence helps; turns held are what actually win
-      score += 520 + king.nexusTurnCount * 2_400;
-      if (kingAssassinable(state, perspective)) {
-        score -= 9_000;
+      const underFire = kingAssassinable(state, perspective);
+      if (underFire) {
+        // Standing in a kill zone is almost losing — flee or clear attackers
+        score -= 12_000 + king.nexusTurnCount * 800;
       } else {
-        score -= Math.min(1_600, proximityDanger(state, myKing, opp) * 0.35);
+        const support = myNearNexus + myNexusPieces;
+        score += 280 + king.nexusTurnCount * 2_600;
+        if (support < 1 && !king.isShielded) score -= 900;
+        score -= Math.min(1_200, proximityDanger(state, myKing, opp) * 0.3);
       }
     } else {
-      // Approach gradually — never dwarf a free rook/queen
-      score += (5 - Math.min(5, d)) * 38;
-      // Prefer approaching with support nearby
-      if (d <= 2) score += myNearNexus * 20;
+      const support = myNearNexus;
+      score += (5 - Math.min(5, d)) * (support >= 1 ? 32 : 12);
+      if (d <= 2) score += support * 35;
     }
   } else {
     score -= 50_000;
@@ -249,14 +302,18 @@ export function evaluatePosition(state: GameState, perspective: Color): number {
     const d = distToNexus(oppKing);
     const king = state.board.get(oppKing)!;
     if (d === 0) {
-      score -= 520 + king.nexusTurnCount * 2_400;
+      // Hunting their Nexus king is the main plan
+      score -= 200 + king.nexusTurnCount * 2_800;
       if (kingAssassinable(state, opp)) {
-        score += 8_500; // we can (or could) take their Nexus king
+        score += 15_000; // one capture from winning
       } else {
-        score += Math.min(1_800, proximityDanger(state, oppKing, perspective) * 0.45);
+        const pressure = attackCount(state, oppKing, perspective);
+        score += pressure * 420;
+        score += Math.min(2_400, proximityDanger(state, oppKing, perspective) * 0.55);
+        score += myNearNexus * 40;
       }
     } else {
-      score -= (5 - Math.min(5, d)) * 38;
+      score -= (5 - Math.min(5, d)) * 28;
     }
   }
 
@@ -272,59 +329,90 @@ function scoreMove(state: GameState, move: Move, perspective: Color): number {
   let score = 0;
   const piece = state.board.get(move.from)!;
   const target = state.board.get(move.to);
+  const opp = opponent(perspective);
+  const oppKing = findKing(state.board, opp);
+  const myKing = findKing(state.board, perspective);
 
-  if (target && target.kind === "K" && isInNexus(move.to)) return 100_000;
+  // Instant win
+  if (target && target.kind === "K" && isInNexus(move.to)) return 1_000_000;
 
   if (target && target.kind !== "K") {
     score += PIECE_VALUE[target.kind] * 12 - PIECE_VALUE[piece.kind];
+  }
+
+  // Deliver or prepare assassination on their Nexus king
+  if (oppKing && isInNexus(oppKing)) {
+    if (move.to === oppKing) return 1_000_000;
+    const after = boardAfterMove(state, move);
+    if (pieceAttacksSquare(after, move.to, oppKing, piece.kind, perspective)) {
+      score += 6_500; // gun pointed at their king
+    }
+    if (target && distToNexus(move.to) <= 1) score += 400;
+    const before = manhattan(move.from, oppKing);
+    const afterDist = manhattan(move.to, oppKing);
+    if (afterDist < before) score += (before - afterDist) * 45;
+  }
+
+  // Emergency: our king is in the kill zone
+  const myKingHot = !!(myKing && isInNexus(myKing) && kingAssassinable(state, perspective));
+  if (myKingHot && myKing) {
+    if (piece.kind === "K" && !isInNexus(move.to)) {
+      score += 8_000; // flee the Nexus
+    }
+    // Capture a piece that currently attacks our king
+    if (target && pieceAttacksSquare(state.board, move.to, myKing, target.kind, opp)) {
+      score += 7_500;
+    }
+    if (piece.kind !== "K" && isInNexus(move.to)) score += 900;
   }
 
   if (piece.kind === "K") {
     const fromDist = distToNexus(move.from);
     const toDist = distToNexus(move.to);
     if (toDist === 0 && fromDist > 0) {
-      // Entering is good only when not a free assassination
-      if (kingWouldBeAssassinable(state, move.to, perspective, move.from)) {
-        score -= 4_000;
+      if (isSuicidalKingEntry(state, move)) {
+        score -= 100_000;
       } else {
-        score += 280;
-        score -= Math.min(500, proximityDanger(state, move.to, opponent(perspective)) * 0.3);
+        const support = nexusSupportCount(state, perspective);
+        const danger = proximityDanger(state, move.to, opp);
+        if (support < 1 && !piece.isShielded) {
+          score -= 2_200; // naked rush — hunt / develop first
+        } else {
+          score += 180 + support * 60;
+        }
+        score -= Math.min(800, danger * 0.4);
       }
     }
-    if (fromDist === 0 && toDist === 0) score += 160;
-    if (fromDist === 0 && toDist > 0) score -= 700;
-    if (toDist < fromDist) score += (fromDist - toDist) * 40;
-    else if (toDist > fromDist) score -= (toDist - fromDist) * 35;
+    if (fromDist === 0 && toDist === 0) {
+      if (myKingHot) {
+        const stillHot = kingWouldBeAssassinable(state, move.to, perspective, move.from);
+        score += stillHot ? -2_000 : 3_500;
+      } else {
+        score += 120;
+      }
+    }
+    if (fromDist === 0 && toDist > 0) {
+      score += myKingHot ? 8_000 : -550;
+    }
+    // Their king is already in — hunt with pieces before racing yours in
+    if (oppKing && isInNexus(oppKing) && toDist < fromDist) {
+      score -= 250;
+    }
+    if (toDist < fromDist) score += (fromDist - toDist) * (myKingHot ? 10 : 28);
+    else if (toDist > fromDist) score -= (toDist - fromDist) * 30;
   } else {
-    if (isInNexus(move.to) && !isInNexus(move.from)) score += 110;
-    if (isInNexus(move.from) && !isInNexus(move.to)) score -= 20;
-    if (target && distToNexus(move.to) <= 2) score += 35;
-    if (target) score += (3 - Math.min(3, distToNexus(move.to))) * 18;
-    // Develop / advance toward the zone
+    if (isInNexus(move.to) && !isInNexus(move.from)) score += 140;
+    if (isInNexus(move.from) && !isInNexus(move.to)) score -= 15;
+    if (target && distToNexus(move.to) <= 2) score += 40;
+    if (target) score += (3 - Math.min(3, distToNexus(move.to))) * 20;
     if (!target) {
       const fd = distToNexus(move.from);
       const td = distToNexus(move.to);
-      if (td < fd) score += (fd - td) * 22;
+      if (td < fd) score += (fd - td) * 28;
     }
   }
 
   return score;
-}
-
-/** After king steps onto `to` (vacating `from`), can the opponent capture it? */
-function kingWouldBeAssassinable(
-  state: GameState,
-  to: Square,
-  kingColor: Color,
-  from: Square,
-): boolean {
-  if (!isInNexus(to)) return false;
-  const board = new Map(state.board);
-  const king = { ...board.get(from)! };
-  if (king.isShielded) return false;
-  board.delete(from);
-  board.set(to, king);
-  return squareAttackedBy({ ...state, board }, to, opponent(kingColor));
 }
 
 function isTacticalMove(state: GameState, move: Move): boolean {
@@ -332,7 +420,14 @@ function isTacticalMove(state: GameState, move: Move): boolean {
   const piece = state.board.get(move.from);
   if (!piece) return false;
   if (piece.kind === "K" && isInNexus(move.to)) return true;
+  if (piece.kind === "K" && isInNexus(move.from) && !isInNexus(move.to)) return true; // flee
   if (isInNexus(move.to)) return true;
+  const opp = opponent(state.activeColor);
+  const oppKing = findKing(state.board, opp);
+  if (oppKing && isInNexus(oppKing)) {
+    const after = boardAfterMove(state, move);
+    if (pieceAttacksSquare(after, move.to, oppKing, piece.kind, state.activeColor)) return true;
+  }
   return false;
 }
 
@@ -375,7 +470,47 @@ function orderedMoves(state: GameState, cap = 40): Move[] {
       return r !== 0 && r !== 7;
     });
   }
+  // Never walk the king into a free assassination
+  const safe = moves.filter((m) => !isSuicidalKingEntry(s, m));
+  if (safe.length > 0) moves = safe;
+
   const color = s.activeColor;
+  const opp = opponent(color);
+  const oppKing = findKing(s.board, opp);
+
+  // If their king is in the Nexus, force the search to consider kill-shots / setups first.
+  // When a direct aim exists, search ONLY those (plus any captures) so the AI doesn't
+  // wander its own king instead of taking the fight to theirs.
+  if (oppKing && isInNexus(oppKing)) {
+    const aim: Move[] = [];
+    const approach: Move[] = [];
+    for (const m of moves) {
+      if (m.to === oppKing) {
+        aim.push(m);
+        continue;
+      }
+      const p = s.board.get(m.from);
+      if (!p) continue;
+      const after = boardAfterMove(s, m);
+      if (pieceAttacksSquare(after, m.to, oppKing, p.kind, color)) {
+        aim.push(m);
+      } else if (
+        s.board.has(m.to) ||
+        manhattan(m.to, oppKing) < manhattan(m.from, oppKing)
+      ) {
+        approach.push(m);
+      }
+    }
+    if (aim.length > 0) {
+      moves = aim;
+    } else if (approach.length > 0) {
+      const rest = moves.filter(
+        (m) => !approach.some((a) => a.from === m.from && a.to === m.to),
+      );
+      moves = [...approach, ...rest];
+    }
+  }
+
   return moves
     .map((m) => ({ m, sc: scoreMove(s, m, color) }))
     .sort((a, b) => b.sc - a.sc)
@@ -506,7 +641,9 @@ function abilityCandidates(state: GameState, difficulty: AiDifficulty): (Ability
 
   const mana = activePlayer(state).mana;
   const me = state.activeColor;
+  const opp = opponent(me);
   const kingSq = findKing(state.board, me);
+  const oppKing = findKing(state.board, opp);
   const maxExtra = difficulty >= 4 ? 5 : difficulty >= 3 ? 4 : 3;
 
   const push = (cast: AbilityCast) => {
@@ -515,20 +652,19 @@ function abilityCandidates(state: GameState, difficulty: AiDifficulty): (Ability
   };
 
   if (mana >= ABILITY_COST.aegis) {
-    // Shield king before a Nexus push when support is thin / danger is high
+    // Shield king before a Nexus push — critical so entry isn't suicide next turn
     if (kingSq && !isInNexus(kingSq)) {
       const d = distToNexus(kingSq);
-      const danger = proximityDanger(state, kingSq, opponent(me));
-      if (d <= 2 || danger > 400) {
+      const danger = proximityDanger(state, kingSq, opp);
+      if (d <= 2 || danger > 300 || nexusSupportCount(state, me) < 2) {
         push({ ability: "aegis", target: kingSq });
       }
     }
-    // Shield a hanging queen/rook near the fight
     for (const [sq, p] of state.board) {
       if (p.color !== me || p.kind === "K" || p.kind === "P") continue;
       if (p.isShielded) continue;
       if (PIECE_VALUE[p.kind] < 500) continue;
-      if (proximityDanger(state, sq, opponent(me)) > 350) {
+      if (proximityDanger(state, sq, opp) > 350) {
         push({ ability: "aegis", target: sq });
       }
     }
@@ -536,13 +672,17 @@ function abilityCandidates(state: GameState, difficulty: AiDifficulty): (Ability
 
   if (mana >= ABILITY_COST.overdrive) {
     const targets = abilityTargets(state, "overdrive");
-    // Prefer pieces that can capture or sit near the Nexus
     const ranked = targets
       .map((sq) => {
         const p = state.board.get(sq)!;
         let sc = PIECE_VALUE[p.kind];
         sc += (3 - Math.min(3, distToNexus(sq))) * 40;
-        sc += proximityDanger(state, sq, opponent(me)) > 200 ? 30 : 0;
+        // Prefer overdrive that can finish / hunt a Nexus king
+        if (oppKing && isInNexus(oppKing)) {
+          sc += 500;
+          sc += Math.max(0, 6 - manhattan(sq, oppKing)) * 80;
+          if (pieceAttacksSquare(state.board, sq, oppKing, p.kind, me)) sc += 2_000;
+        }
         return { sq, sc };
       })
       .sort((a, b) => b.sc - a.sc)
@@ -551,13 +691,23 @@ function abilityCandidates(state: GameState, difficulty: AiDifficulty): (Ability
   }
 
   if (mana >= ABILITY_COST.tacticalSwap && kingSq && difficulty >= 3) {
-    const kd = distToNexus(kingSq);
-    const swaps = abilityTargets(state, "tacticalSwap")
-      .map((sq) => ({ sq, d: distToNexus(sq) }))
-      .filter((x) => x.d < kd && x.d > 0)
-      .sort((a, b) => a.d - b.d)
-      .slice(0, 2);
-    for (const { sq } of swaps) push({ ability: "tacticalSwap", target: sq });
+    // Flee: swap king OUT of a hot Nexus
+    if (isInNexus(kingSq) && kingAssassinable(state, me)) {
+      const escapes = abilityTargets(state, "tacticalSwap")
+        .map((sq) => ({ sq, d: distToNexus(sq) }))
+        .filter((x) => x.d > 0)
+        .sort((a, b) => b.d - a.d)
+        .slice(0, 2);
+      for (const { sq } of escapes) push({ ability: "tacticalSwap", target: sq });
+    } else {
+      const kd = distToNexus(kingSq);
+      const swaps = abilityTargets(state, "tacticalSwap")
+        .map((sq) => ({ sq, d: distToNexus(sq) }))
+        .filter((x) => x.d < kd && x.d > 0)
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 2);
+      for (const { sq } of swaps) push({ ability: "tacticalSwap", target: sq });
+    }
   }
 
   return out;
