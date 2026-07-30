@@ -26,10 +26,11 @@ export const H = 1280;
 
 export type UiRect = { x: number; y: number; w: number; h: number };
 
-export const HOME_PLAY: UiRect = { x: 70, y: 470, w: 580, h: 120 };
-export const HOME_MAP: UiRect = { x: 90, y: 610, w: 540, h: 100 };
-export const HOME_THEME: UiRect = { x: 90, y: 730, w: 540, h: 100 };
-export const HOME_SOUND: UiRect = { x: 90, y: 850, w: 540, h: 100 };
+export const HOME_PLAY: UiRect = { x: 70, y: 450, w: 580, h: 100 };
+export const HOME_MAP: UiRect = { x: 90, y: 568, w: 540, h: 88 };
+export const HOME_THEME: UiRect = { x: 90, y: 672, w: 540, h: 88 };
+export const HOME_SOUND: UiRect = { x: 90, y: 776, w: 540, h: 88 };
+export const HOME_FEEDBACK: UiRect = { x: 90, y: 880, w: 540, h: 88 };
 /** @deprecated alias — home sound control */
 export const HOME_SETTINGS = HOME_SOUND;
 export const MENU_BTN: UiRect = { x: 548, y: 40, w: 136, h: 56 };
@@ -39,12 +40,11 @@ export const PLAY_SOUND_BTN: UiRect = { x: 464, y: 40, w: 64, h: 56 };
 export const MAP_BACK: UiRect = { x: 36, y: 36, w: 120, h: 56 };
 export const MAP_PLAY: UiRect = { x: 200, y: 1160, w: 320, h: 72 };
 
-export const MENU_RESUME: UiRect = { x: 110, y: 340, w: 500, h: 84 };
-export const MENU_MAP: UiRect = { x: 110, y: 440, w: 500, h: 78 };
-export const MENU_THEME: UiRect = { x: 110, y: 534, w: 500, h: 78 };
-export const MENU_SOUND: UiRect = { x: 110, y: 628, w: 500, h: 78 };
-export const MENU_FEEDBACK: UiRect = { x: 110, y: 722, w: 500, h: 78 };
-export const MENU_HOME: UiRect = { x: 110, y: 816, w: 500, h: 78 };
+export const MENU_RESUME: UiRect = { x: 110, y: 360, w: 500, h: 84 };
+export const MENU_MAP: UiRect = { x: 110, y: 460, w: 500, h: 78 };
+export const MENU_THEME: UiRect = { x: 110, y: 554, w: 500, h: 78 };
+export const MENU_SOUND: UiRect = { x: 110, y: 648, w: 500, h: 78 };
+export const MENU_HOME: UiRect = { x: 110, y: 742, w: 500, h: 78 };
 
 export function powerDockFor(levelId: number) {
   const shown = unlockedPowers(levelId);
@@ -343,11 +343,17 @@ export function drawHome(
     hover: ui.hover === "home-theme",
     pressed: ui.pressed === "home-theme",
   });
-  paperBtn(ctx, HOME_SOUND, `AUDIO · ${audioModeLabel()}`, {
+  paperBtn(ctx, HOME_SOUND, `VOLUME · ${audioModeLabel()}`, {
     time: ui.time,
     phase: 2.0,
     hover: ui.hover === "home-sound",
     pressed: ui.pressed === "home-sound",
+  });
+  paperBtn(ctx, HOME_FEEDBACK, "FEEDBACK", {
+    time: ui.time,
+    phase: 2.4,
+    hover: ui.hover === "home-feedback",
+    pressed: ui.pressed === "home-feedback",
   });
 
   ctx.fillStyle = Palette.white;
@@ -356,7 +362,7 @@ export function drawHome(
   ctx.fillText(
     `Next: Level ${Math.min(progress.unlocked, 40)}`,
     W / 2,
-    980,
+    1000,
   );
 
   // Lives / gems
@@ -570,6 +576,7 @@ export function hitButtonId(
     if (hitUi(HOME_MAP, x, y)) return "home-map";
     if (hitUi(HOME_THEME, x, y)) return "home-theme";
     if (hitUi(HOME_SOUND, x, y)) return "home-sound";
+    if (hitUi(HOME_FEEDBACK, x, y)) return "home-feedback";
   } else if (screen === "map") {
     if (hitUi(MAP_BACK, x, y)) return "map-back";
     if (hitUi(MAP_PLAY, x, y)) return "map-play";
@@ -578,7 +585,6 @@ export function hitButtonId(
     if (hitUi(MENU_MAP, x, y)) return "menu-map";
     if (hitUi(MENU_THEME, x, y)) return "menu-theme";
     if (hitUi(MENU_SOUND, x, y)) return "menu-sound";
-    if (hitUi(MENU_FEEDBACK, x, y)) return "menu-feedback";
     if (hitUi(MENU_HOME, x, y)) return "menu-home";
   } else {
     if (hitUi(PLAY_SOUND_BTN, x, y)) return "play-sound";
@@ -649,7 +655,7 @@ export function drawPlay(
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const glyph =
-      mode === "off" ? "✕" : mode === "sfx" ? "♪" : "♫";
+      mode === "muted" ? "✕" : mode === "low" ? "♪" : mode === "med" ? "♫" : "♬";
     ctx.fillText(
       glyph,
       PLAY_SOUND_BTN.x + PLAY_SOUND_BTN.w / 2,
@@ -997,11 +1003,11 @@ export function drawMenu(
   ctx.fillRect(0, 0, W, H);
 
   ctx.fillStyle = Palette.paper;
-  roundRect(ctx, 70, 220, 580, 740, 14);
+  roundRect(ctx, 70, 220, 580, 660, 14);
   ctx.fill();
   ctx.strokeStyle = Palette.ink;
   ctx.lineWidth = 4;
-  roundRect(ctx, 70, 220, 580, 740, 14);
+  roundRect(ctx, 70, 220, 580, 660, 14);
   ctx.stroke();
   ctx.fillStyle = Palette.hot;
   ctx.fillRect(110, 208, 96, 18);
@@ -1031,17 +1037,11 @@ export function drawMenu(
     hover: ui.hover === "menu-theme",
     pressed: ui.pressed === "menu-theme",
   });
-  paperBtn(ctx, MENU_SOUND, `AUDIO · ${audioModeLabel()}`, {
+  paperBtn(ctx, MENU_SOUND, `VOLUME · ${audioModeLabel()}`, {
     time: ui.time,
     phase: 2.0,
     hover: ui.hover === "menu-sound",
     pressed: ui.pressed === "menu-sound",
-  });
-  paperBtn(ctx, MENU_FEEDBACK, "FEEDBACK", {
-    time: ui.time,
-    phase: 2.3,
-    hover: ui.hover === "menu-feedback",
-    pressed: ui.pressed === "menu-feedback",
   });
   paperBtn(ctx, MENU_HOME, "HOME", {
     time: ui.time,

@@ -67,10 +67,10 @@ import {
   HOME_HOW,
   HOME_PLAY,
   HOME_SETTINGS,
+  HOME_FEEDBACK,
   MENU_BTN,
   PAUSE_HOME,
   PAUSE_HOW,
-  PAUSE_FEEDBACK,
   PAUSE_RESUME,
   PAUSE_SETTINGS,
   PAUSE_THEMES,
@@ -1180,6 +1180,11 @@ canvas.addEventListener(
         screen = "settings";
         return;
       }
+      if (hitUiRect(HOME_FEEDBACK, p.x, p.y)) {
+        sfxPaperRustle();
+        openFeedback("Riot Cube");
+        return;
+      }
       return;
     }
 
@@ -1336,11 +1341,6 @@ canvas.addEventListener(
       if (hitUiRect(PAUSE_SETTINGS, p.x, p.y)) {
         settingsFrom = "menu";
         screen = "settings";
-        return;
-      }
-      if (hitUiRect(PAUSE_FEEDBACK, p.x, p.y)) {
-        sfxPaperRustle();
-        openFeedback("Riot Cube");
         return;
       }
       if (hitUiRect(PAUSE_HOME, p.x, p.y)) {

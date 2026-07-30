@@ -20,6 +20,7 @@ import {
   HOME_MAP,
   HOME_THEME,
   HOME_SOUND,
+  HOME_FEEDBACK,
   MENU_BTN,
   PLAY_SOUND_BTN,
   MAP_BACK,
@@ -28,7 +29,6 @@ import {
   MENU_MAP,
   MENU_THEME,
   MENU_SOUND,
-  MENU_FEEDBACK,
   MENU_HOME,
   boardLayout,
   cellAt,
@@ -80,9 +80,10 @@ import { openFeedback } from "./view/feedback";
 import { cycleTheme, getTheme, initTheme } from "./view/theme";
 
 function handleAudioCycle(): void {
-  if (getAudioMode() === "full") playSfx("mute-on", { vary: false });
+  const cur = getAudioMode();
+  if (cur === "high") playSfx("mute-on", { vary: false });
   const next = cycleAudioMode();
-  if (next !== "off") playSfx("ui-tap");
+  if (next !== "muted") playSfx("ui-tap");
   markDirty();
 }
 
@@ -519,6 +520,11 @@ function onTap(x: number, y: number): void {
       handleAudioCycle();
       return;
     }
+    if (hitUi(HOME_FEEDBACK, x, y)) {
+      playSfx("ui-tap");
+      openFeedback("Paper Riot");
+      return;
+    }
     return;
   }
 
@@ -581,11 +587,6 @@ function onTap(x: number, y: number): void {
     }
     if (hitUi(MENU_SOUND, x, y)) {
       handleAudioCycle();
-      return;
-    }
-    if (hitUi(MENU_FEEDBACK, x, y)) {
-      playSfx("ui-tap");
-      openFeedback("Paper Riot");
       return;
     }
     if (hitUi(MENU_HOME, x, y)) {
@@ -711,7 +712,7 @@ canvas.addEventListener(
   (e) => {
     e.preventDefault();
     void unlockAudio().then(() => {
-      if (getAudioMode() === "full") {
+      if (getAudioMode() !== "muted") {
         syncMusicForTheme(getTheme());
         unlockMusic();
       }

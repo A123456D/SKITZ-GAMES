@@ -23,9 +23,56 @@ export type SfxPackId = "forge" | "soft";
 let ctx: AudioContext | null = null;
 let unlocked = false;
 let master: GainNode | null = null;
+const VOL_KEY = "nexus-chess-vol";
+const VOL_STEPS = [0, 0.35, 0.65, 1] as const;
+let sfxVol = readStoredVol();
 /** Buffers per pack so theme switches stay instant after first load. */
 const packBuffers = new Map<SfxPackId, Map<SampleId, AudioBuffer>>();
 const packLoadPromises = new Map<SfxPackId, Promise<void>>();
+
+function readStoredVol(): number {
+  try {
+    const raw = localStorage.getItem(VOL_KEY);
+    if (raw == null) return 1;
+    const n = Number(raw);
+    if (VOL_STEPS.includes(n as (typeof VOL_STEPS)[number])) return n;
+    if (n <= 0) return 0;
+    if (n < 0.45) return 0.35;
+    if (n < 0.8) return 0.65;
+    return 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function getSfxVolume(): number {
+  return sfxVol;
+}
+
+export function volLevelLabel(v: number = sfxVol): string {
+  if (v <= 0.001) return "Muted";
+  if (v < 0.5) return "Low";
+  if (v < 0.85) return "Med";
+  return "High";
+}
+
+export function setSfxVolume(v: number): void {
+  sfxVol = Math.max(0, Math.min(1, v));
+  try {
+    localStorage.setItem(VOL_KEY, String(sfxVol));
+  } catch {
+    /* ignore */
+  }
+  const g = bus();
+  if (g) g.gain.value = sfxVol * 0.85;
+}
+
+export function cycleSfxVolume(): number {
+  const i = VOL_STEPS.findIndex((s) => Math.abs(s - sfxVol) < 0.05);
+  const next = VOL_STEPS[(i < 0 ? 3 : i + 1) % VOL_STEPS.length]!;
+  setSfxVolume(next);
+  return next;
+}
 
 export function activeSfxPack(): SfxPackId {
   return Theme.id === "forge" ? "forge" : "soft";
@@ -49,7 +96,7 @@ function bus(): GainNode | null {
   if (!c) return null;
   if (!master) {
     master = c.createGain();
-    master.gain.value = 0.85;
+    master.gain.value = sfxVol * 0.85;
     master.connect(c.destination);
   }
   return master;

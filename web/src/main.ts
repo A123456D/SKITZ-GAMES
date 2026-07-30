@@ -25,7 +25,9 @@ import { tableContains } from "./core/tableDef";
 import {
   clearActiveRun,
   completeTutorial,
+  cycleMasterVolume,
   loadSave,
+  masterVolLabel,
   recordClear,
   setTheme,
   setVolumes,
@@ -997,7 +999,7 @@ function onButton(id: string): void {
     return;
   }
   if (id === "mute_music") {
-    setMusicMuted(save, !save.musicMuted);
+    cycleMasterVolume(save);
     return;
   }
   if (id === "change_theme") {
@@ -1527,7 +1529,7 @@ function pushMusicChrome(): void {
     h: 40,
     id: "mute_music",
   };
-  drawGlassButton(ctx, muteButton, save.musicMuted ? "UNMUTE" : "MUTE", false, time);
+  drawGlassButton(ctx, muteButton, masterVolLabel(save), false, time);
   buttons.push(muteButton);
 }
 
@@ -1772,14 +1774,12 @@ function drawPause(): void {
   const resume: ButtonRect = { x: 120, y: 400, w: 480, h: 64, id: "pause_resume" };
   const settingsBtn: ButtonRect = { x: 120, y: 482, w: 480, h: 58, id: "settings" };
   const levelsBtn: ButtonRect = { x: 120, y: 556, w: 480, h: 58, id: "pause_levels" };
-  const feedbackBtn: ButtonRect = { x: 120, y: 630, w: 480, h: 58, id: "feedback" };
-  const homeBtn: ButtonRect = { x: 120, y: 704, w: 480, h: 58, id: "main_menu" };
+  const homeBtn: ButtonRect = { x: 120, y: 630, w: 480, h: 58, id: "main_menu" };
   drawGlassButton(ctx, resume, "RESUME", true, time);
   drawGlassButton(ctx, settingsBtn, "SETTINGS", false, time);
   drawGlassButton(ctx, levelsBtn, "LEVELS", false, time);
-  drawGlassButton(ctx, feedbackBtn, "FEEDBACK", false, time);
   drawGlassButton(ctx, homeBtn, "MAIN MENU", false, time);
-  buttons.push(resume, settingsBtn, levelsBtn, feedbackBtn, homeBtn);
+  buttons.push(resume, settingsBtn, levelsBtn, homeBtn);
 }
 
 function drawPlay(): void {

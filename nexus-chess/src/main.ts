@@ -77,6 +77,7 @@ import {
   playSelect,
   playWin,
   playLose,
+  cycleSfxVolume,
 } from "./view/sfx";
 import { openFeedback } from "./view/feedback";
 import {
@@ -472,6 +473,19 @@ function onMenuClick(id: string) {
     if (tutorialActive && tutorialStep === "welcome") advanceTutorial();
     return;
   }
+  if (id === "home-volume") {
+    if (tutorialActive) return;
+    unlockAudio();
+    cycleSfxVolume();
+    playUiTap();
+    return;
+  }
+  if (id === "home-feedback") {
+    if (tutorialActive) return;
+    playUiTap();
+    openFeedback("Nexus Chess");
+    return;
+  }
   if (id === "hub-home") {
     if (tutorialActive) return;
     goHome();
@@ -533,12 +547,6 @@ function onMenuClick(id: string) {
   if (id === "menu-how") {
     if (tutorialActive) return;
     screen = "how";
-    return;
-  }
-  if (id === "menu-feedback") {
-    if (tutorialActive) return;
-    playUiTap();
-    openFeedback("Nexus Chess");
     return;
   }
   if (id === "menu-back") {

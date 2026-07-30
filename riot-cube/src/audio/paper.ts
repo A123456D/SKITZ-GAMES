@@ -3,8 +3,8 @@
  */
 
 const VOL_KEY = "riotcube_sfx_vol";
-/** Cycle: muted → soft → normal */
-const VOL_STEPS = [0, 0.4, 0.75] as const;
+/** Cycle: muted → low → med → high */
+const VOL_STEPS = [0, 0.35, 0.65, 1] as const;
 
 const SAMPLE_FILES = {
   rustle: "rustle.mp3",
@@ -29,14 +29,15 @@ let loadPromise: Promise<void> | null = null;
 function readStoredVol(): number {
   try {
     const raw = localStorage.getItem(VOL_KEY);
-    if (raw == null) return 0.75;
+    if (raw == null) return 1;
     const n = Number(raw);
     if (VOL_STEPS.includes(n as (typeof VOL_STEPS)[number])) return n;
     if (n <= 0) return 0;
-    if (n < 0.55) return 0.4;
-    return 0.75;
+    if (n < 0.45) return 0.35;
+    if (n < 0.8) return 0.65;
+    return 1;
   } catch {
-    return 0.75;
+    return 1;
   }
 }
 
@@ -142,6 +143,13 @@ export function isAudioUnlocked(): boolean {
 
 export function getSfxVolume(): number {
   return sfxVol;
+}
+
+export function volLevelLabel(v: number): string {
+  if (v <= 0.001) return "MUTED";
+  if (v < 0.5) return "LOW";
+  if (v < 0.85) return "MED";
+  return "HIGH";
 }
 
 export function setSfxVolume(v: number): void {

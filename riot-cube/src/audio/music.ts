@@ -12,7 +12,7 @@ type PlaylistManifest = {
 };
 
 const VOL_KEY = "riotcube_music_vol";
-const VOL_STEPS = [0, 0.35, 0.7] as const;
+const VOL_STEPS = [0, 0.35, 0.65, 1] as const;
 /** Keep music under SFX so twists stay crisp. */
 const MUSIC_TRIM = 0.14;
 
@@ -41,14 +41,15 @@ let playEpoch = 0;
 function readStoredVol(): number {
   try {
     const raw = localStorage.getItem(VOL_KEY);
-    if (raw == null) return 0.7;
+    if (raw == null) return 1;
     const n = Number(raw);
     if (VOL_STEPS.includes(n as (typeof VOL_STEPS)[number])) return n;
     if (n <= 0) return 0;
-    if (n < 0.5) return 0.35;
-    return 0.7;
+    if (n < 0.45) return 0.35;
+    if (n < 0.8) return 0.65;
+    return 1;
   } catch {
-    return 0.7;
+    return 1;
   }
 }
 

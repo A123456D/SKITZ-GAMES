@@ -184,6 +184,31 @@ export function setMusicMuted(save: SaveData, muted: boolean): void {
   writeSave(save);
 }
 
+const MASTER_VOL_STEPS = [0, 0.35, 0.65, 1] as const;
+
+export function masterVolLabel(save: SaveData): string {
+  if (save.musicMuted || save.musicVol <= 0.001) return "MUTED";
+  if (save.musicVol < 0.5) return "LOW";
+  if (save.musicVol < 0.85) return "MED";
+  return "HIGH";
+}
+
+/** Cycle muted → low → med → high for music + SFX together. */
+export function cycleMasterVolume(save: SaveData): string {
+  const cur = save.musicMuted ? 0 : save.musicVol;
+  let i = MASTER_VOL_STEPS.findIndex((s) => Math.abs(s - cur) < 0.08);
+  if (i < 0) {
+    i = cur <= 0.001 ? 0 : cur < 0.5 ? 1 : cur < 0.85 ? 2 : 3;
+  }
+  const next = MASTER_VOL_STEPS[(i + 1) % MASTER_VOL_STEPS.length]!;
+  save.musicMuted = next <= 0.001;
+  save.musicVol = next <= 0.001 ? 0.7 : next;
+  save.sfxVol = next <= 0.001 ? 0 : next;
+  applyAudioFromSave(save);
+  writeSave(save);
+  return masterVolLabel(save);
+}
+
 export function storeActiveRun(save: SaveData, run: ActiveRunData): void {
   save.lastLevelIndex = run.levelIndex;
   save.activeRun = run;

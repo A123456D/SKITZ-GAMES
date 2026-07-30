@@ -1,6 +1,7 @@
 import type { ButtonRect, DrawCtx } from "./draw";
 import { Theme } from "./theme";
 import { drawAtmosphere, drawPanel, drawPremiumBtn } from "./fx";
+import { volLevelLabel } from "./sfx";
 import type { EloProfile, EloResult } from "../core/elo";
 import {
   PLAYER_ELO_PRESETS,
@@ -102,13 +103,33 @@ export function drawHome(dc: DrawCtx, buttons: ButtonRect[], time = 0) {
   const btnW = Math.min(260, width - pad * 2);
   const play: ButtonRect = {
     x: (width - btnW) / 2,
-    y: height * 0.72,
+    y: height * 0.66,
     w: btnW,
     h: compact ? 52 : 56,
     id: "home-play",
   };
   drawPremiumBtn(ctx, play, "Play", { primary: true, fontSize: compact ? 16 : 18 });
   buttons.push(play);
+
+  const vol: ButtonRect = {
+    x: (width - btnW) / 2,
+    y: play.y + play.h + 12,
+    w: btnW,
+    h: compact ? 44 : 48,
+    id: "home-volume",
+  };
+  drawPremiumBtn(ctx, vol, `Volume · ${volLevelLabel()}`, { fontSize: compact ? 13 : 14 });
+  buttons.push(vol);
+
+  const feedback: ButtonRect = {
+    x: (width - btnW) / 2,
+    y: vol.y + vol.h + 12,
+    w: btnW,
+    h: compact ? 44 : 48,
+    id: "home-feedback",
+  };
+  drawPremiumBtn(ctx, feedback, "Feedback", { fontSize: compact ? 13 : 14 });
+  buttons.push(feedback);
 }
 
 /** Play hub after home — modes + rating. */
@@ -187,16 +208,6 @@ export function drawHub(
   drawPremiumBtn(ctx, how, "How to Play", { fontSize: compact ? 13 : 14 });
   buttons.push(how);
   by += btnH + 10;
-
-  const feedback: ButtonRect = {
-    x: btnX,
-    y: by,
-    w: btnW,
-    h: btnH - 6,
-    id: "menu-feedback",
-  };
-  drawPremiumBtn(ctx, feedback, "Feedback", { fontSize: compact ? 13 : 14 });
-  buttons.push(feedback);
 
   const back: ButtonRect = {
     x: btnX,

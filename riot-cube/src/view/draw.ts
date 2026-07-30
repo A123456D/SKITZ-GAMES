@@ -245,11 +245,16 @@ function drawVolumeButton(ctx: CanvasRenderingContext2D, vol: number): void {
     ctx.strokeStyle = p.hudInk;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(cx + 3, cy, 6, -0.6, 0.6);
+    ctx.arc(cx + 3, cy, 5, -0.55, 0.55);
     ctx.stroke();
-    if (vol > 0.5) {
+    if (vol >= 0.5) {
       ctx.beginPath();
-      ctx.arc(cx + 3, cy, 10, -0.7, 0.7);
+      ctx.arc(cx + 3, cy, 8.5, -0.65, 0.65);
+      ctx.stroke();
+    }
+    if (vol >= 0.85) {
+      ctx.beginPath();
+      ctx.arc(cx + 3, cy, 12, -0.75, 0.75);
       ctx.stroke();
     }
   }
@@ -449,9 +454,10 @@ function drawPaperButton(
   ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 + 1);
 }
 
-export const HOME_PLAY: UiRect = { x: 150, y: 820, w: 420, h: 72 };
-export const HOME_HOW: UiRect = { x: 150, y: 910, w: 420, h: 64 };
-export const HOME_SETTINGS: UiRect = { x: 150, y: 990, w: 420, h: 64 };
+export const HOME_PLAY: UiRect = { x: 150, y: 780, w: 420, h: 68 };
+export const HOME_HOW: UiRect = { x: 150, y: 864, w: 420, h: 60 };
+export const HOME_SETTINGS: UiRect = { x: 150, y: 940, w: 420, h: 60 };
+export const HOME_FEEDBACK: UiRect = { x: 150, y: 1016, w: 420, h: 60 };
 
 let logoImg: HTMLImageElement | null = null;
 let logoReady = false;
@@ -497,7 +503,7 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = p.accent;
   ctx.font = "600 20px 'Patrick Hand', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("A sticker Rubik\u2019s Cube. No timer. Just twist.", W / 2, 760);
+  ctx.fillText("A sticker Rubik\u2019s Cube. No timer. Just twist.", W / 2, 720);
 
   drawPaperButton(ctx, HOME_PLAY, "PLAY", {
     fill: p.hot,
@@ -514,14 +520,18 @@ export function drawHomeScreen(ctx: CanvasRenderingContext2D): void {
     text: p.ink,
     tape: p.hot,
   });
+  drawPaperButton(ctx, HOME_FEEDBACK, "FEEDBACK", {
+    fill: p.paper,
+    text: p.ink,
+    tape: p.accent,
+  });
 }
 
-export const PAUSE_RESUME: UiRect = { x: 160, y: 320, w: 400, h: 58 };
-export const PAUSE_THEMES: UiRect = { x: 160, y: 392, w: 400, h: 54 };
-export const PAUSE_HOW: UiRect = { x: 160, y: 460, w: 400, h: 54 };
-export const PAUSE_SETTINGS: UiRect = { x: 160, y: 528, w: 400, h: 54 };
-export const PAUSE_FEEDBACK: UiRect = { x: 160, y: 596, w: 400, h: 54 };
-export const PAUSE_HOME: UiRect = { x: 160, y: 664, w: 400, h: 54 };
+export const PAUSE_RESUME: UiRect = { x: 160, y: 340, w: 400, h: 58 };
+export const PAUSE_THEMES: UiRect = { x: 160, y: 412, w: 400, h: 54 };
+export const PAUSE_HOW: UiRect = { x: 160, y: 480, w: 400, h: 54 };
+export const PAUSE_SETTINGS: UiRect = { x: 160, y: 548, w: 400, h: 54 };
+export const PAUSE_HOME: UiRect = { x: 160, y: 616, w: 400, h: 54 };
 
 export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   const p = getPalette();
@@ -529,18 +539,18 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   ctx.fillRect(0, 0, W, H);
 
   ctx.fillStyle = p.paper;
-  roundRect(ctx, 100, 200, 520, 580, 10);
+  roundRect(ctx, 100, 220, 520, 510, 10);
   ctx.fill();
   ctx.strokeStyle = p.ink;
   ctx.lineWidth = 4;
   ctx.stroke();
   ctx.fillStyle = p.hot;
-  ctx.fillRect(140, 188, 90, 18);
+  ctx.fillRect(140, 208, 90, 18);
 
   ctx.fillStyle = p.ink;
   ctx.font = "800 40px 'Permanent Marker', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("MENU", W / 2, 270);
+  ctx.fillText("MENU", W / 2, 290);
 
   drawPaperButton(ctx, PAUSE_RESUME, "RESUME", {
     fill: p.accent,
@@ -559,11 +569,6 @@ export function drawPauseMenu(ctx: CanvasRenderingContext2D): void {
   drawPaperButton(ctx, PAUSE_SETTINGS, "SETTINGS", {
     fill: p.paper,
     text: p.ink,
-  });
-  drawPaperButton(ctx, PAUSE_FEEDBACK, "FEEDBACK", {
-    fill: p.paper,
-    text: p.ink,
-    tape: p.hot,
   });
   drawPaperButton(ctx, PAUSE_HOME, "HOME", {
     fill: p.panel,
@@ -612,13 +617,21 @@ export function drawSettingsScreen(
   ctx.fillText("Sound, look, cube, move cap, hints", W / 2, 255);
 
   const volLabel =
-    opts.sfxVol <= 0.001 ? "MUTED" : opts.sfxVol < 0.55 ? "SOFT" : "NORMAL";
+    opts.sfxVol <= 0.001
+      ? "MUTED"
+      : opts.sfxVol < 0.5
+        ? "LOW"
+        : opts.sfxVol < 0.85
+          ? "MED"
+          : "HIGH";
   const musicLabel =
     opts.musicVol <= 0.001
       ? "MUTED"
       : opts.musicVol < 0.5
-        ? "SOFT"
-        : "NORMAL";
+        ? "LOW"
+        : opts.musicVol < 0.85
+          ? "MED"
+          : "HIGH";
   drawPaperButton(ctx, SETTINGS_VOL, `SFX  \u00B7  ${volLabel}`, {
     fill: p.panel,
     text: p.accent,

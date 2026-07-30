@@ -51,6 +51,8 @@ let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 const buffers = new Map<SfxId, AudioBuffer>();
 let muted = false;
+/** 0..1 master scale (volume button). Applied with mute. */
+let masterVol = 0.7;
 let unlocked = false;
 let loadPromise: Promise<void> | null = null;
 
@@ -74,7 +76,7 @@ function ensureCtx(): AudioContext {
   if (!ctx) {
     ctx = new AudioContext();
     master = ctx.createGain();
-    master.gain.value = muted ? 0 : 0.7;
+    master.gain.value = muted ? 0 : masterVol;
     master.connect(ctx.destination);
   }
   return ctx;
@@ -143,7 +145,13 @@ export function isMuted(): boolean {
 export function setMuted(next: boolean): void {
   muted = next;
   writeMuted(next);
-  if (master) master.gain.value = muted ? 0 : 0.7;
+  if (master) master.gain.value = muted ? 0 : masterVol;
+}
+
+/** Set master SFX volume 0..1 (volume button). Does not force unmute. */
+export function setSfxMasterVolume(v: number): void {
+  masterVol = Math.max(0, Math.min(1, v)) * 0.7;
+  if (master) master.gain.value = muted ? 0 : masterVol;
 }
 
 export function toggleMute(): boolean {
