@@ -40,13 +40,28 @@ export function loadCubePaper(): Promise<void> {
   return cubePaperPromise;
 }
 
+function lerpFace2(a: Vec2, b: Vec2, t: number): Vec2 {
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+
+/** Bilinear sample of a screen-space face quad (TL, TR, BR, BL). */
+function bilineFace(q: readonly Vec2[], u: number, v: number): Vec2 {
+  const top = lerpFace2(q[0]!, q[1]!, u);
+  const bot = lerpFace2(q[3]!, q[2]!, u);
+  return lerpFace2(top, bot, v);
+}
+
+/**
+ * Fill a projected face with craft paper.
+ * Solid paper first (no holes), then a subdivided texture map so perspective
+ * faces don't get the old affine "diagonal shadow" gap.
+ */
 function fillFacePaper(
   ctx: CanvasRenderingContext2D,
   q: readonly Vec2[],
   isActive: boolean,
 ): void {
   const p = getPalette();
-  const img = cubePaperImg;
   const pathQuad = () => {
     ctx.beginPath();
     ctx.moveTo(q[0]!.x, q[0]!.y);
@@ -56,39 +71,53 @@ function fillFacePaper(
     ctx.closePath();
   };
 
-  if (img && img.complete && img.naturalWidth > 0) {
-    const w = img.naturalWidth;
-    const h = img.naturalHeight;
-    const a = q[0]!;
-    const b = q[1]!;
-    const d = q[3]!;
-    pathQuad();
-    ctx.save();
-    ctx.clip();
-    // Affine map the paper onto the face parallelogram (good enough for cube faces).
-    ctx.transform(
-      (b.x - a.x) / w,
-      (b.y - a.y) / w,
-      (d.x - a.x) / h,
-      (d.y - a.y) / h,
-      a.x,
-      a.y,
-    );
-    ctx.drawImage(img, 0, 0);
-    ctx.restore();
-    pathQuad();
-    if (!isActive) {
-      ctx.fillStyle = "rgba(40, 28, 16, 0.16)";
-      ctx.fill();
-    } else {
-      ctx.fillStyle = "rgba(255, 250, 240, 0.08)";
-      ctx.fill();
-    }
-    return;
-  }
   pathQuad();
   ctx.fillStyle = isActive ? p.faceActive : p.faceSide;
   ctx.fill();
+
+  const img = cubePaperImg;
+  if (!img || !img.complete || img.naturalWidth <= 0) return;
+
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  const divs = getQuality().dprCap < 2 ? 4 : 7;
+
+  pathQuad();
+  ctx.save();
+  ctx.clip();
+  for (let iv = 0; iv < divs; iv++) {
+    for (let iu = 0; iu < divs; iu++) {
+      const u0 = iu / divs;
+      const u1 = (iu + 1) / divs;
+      const v0 = iv / divs;
+      const v1 = (iv + 1) / divs;
+      const p00 = bilineFace(q, u0, v0);
+      const p10 = bilineFace(q, u1, v0);
+      const p01 = bilineFace(q, u0, v1);
+      const sx = u0 * w;
+      const sy = v0 * h;
+      const sw = (u1 - u0) * w;
+      const sh = (v1 - v0) * h;
+      ctx.save();
+      ctx.transform(
+        (p10.x - p00.x) / sw,
+        (p10.y - p00.y) / sw,
+        (p01.x - p00.x) / sh,
+        (p01.y - p00.y) / sh,
+        p00.x,
+        p00.y,
+      );
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+
+  if (!isActive) {
+    pathQuad();
+    ctx.fillStyle = "rgba(40, 28, 16, 0.14)";
+    ctx.fill();
+  }
 }
 
 type FaceGeom = {
