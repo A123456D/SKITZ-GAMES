@@ -19,7 +19,7 @@ const SAMPLE_FILES = {
 } as const;
 
 /** Bump when replacing mp3s so caches skip stale clips. */
-const SFX_VERSION = 2;
+const SFX_VERSION = 3;
 
 type SampleId = keyof typeof SAMPLE_FILES;
 
@@ -282,11 +282,12 @@ export function sfxPaperFlutter(): void {
   airTick(0.025, 0.03, 0.015);
 }
 
-/** Soft sticker pick / place for the sticker screen. */
+/** Sticker pick / place for the sticker screen. */
 export function sfxSticker(): void {
-  if (playSample("sticker", { volume: 0.85 })) return;
-  airTick(0.02, 0.028);
-  pluck(520 + Math.random() * 30, 0.04, 0.024);
+  if (playSample("sticker", { volume: 2.4, vary: false })) return;
+  airTick(0.035, 0.09);
+  pluck(620 + Math.random() * 40, 0.055, 0.08);
+  pluck(880, 0.04, 0.05, 0.02);
 }
 
 export function sfxWin(): void {

@@ -52,6 +52,6 @@ export const SFX_CATALOG = [
     id: "sticker",
     file: "sticker.mp3",
     duration: 0.45,
-    text: "Very soft gentle sticker peel and place on paper, quiet sticky vinyl sticker tap, delicate muted craft paper kiss, warm close microphone, soft and low, short, no music no ambience, dry studio",
+    text: "Loud clear sticky vinyl sticker peel and place on paper, crisp paper sticker tap, close microphone, punchy and present, short, no music no ambience, dry studio",
   },
 ];

@@ -68,7 +68,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     title: "READY",
     lines: [
-      "MENU pauses. VOLUME cycles mute → low → med → high.",
+      "MENU pauses. VOLUME cycles mute → sfx → low → med → high.",
       "You're set — rip the desk.",
     ],
     action: "done",

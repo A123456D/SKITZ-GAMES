@@ -1,6 +1,7 @@
 /**
- * Combined volume control: MUTED → LOW → MED → HIGH.
+ * Combined volume control: MUTED → SFX → LOW → MED → HIGH.
  * Home + in-play + menu share the same cycle.
+ * SFX = game sounds only (music off).
  */
 import { setMuted, setSfxMasterVolume } from "./audio";
 import {
@@ -10,20 +11,30 @@ import {
   unlockMusic,
 } from "./music";
 
-export type VolLevel = "muted" | "low" | "med" | "high";
+export type VolLevel = "muted" | "sfx" | "low" | "med" | "high";
 
 const MODE_KEY = "paper-riot-vol-level";
 const LEGACY_MODE_KEY = "paper-riot-audio-mode";
 
-/** Master volumes for SFX / music at each level. */
-const LEVEL_GAIN: Record<VolLevel, number> = {
+/** Master volumes for SFX at each level. */
+const SFX_GAIN: Record<VolLevel, number> = {
   muted: 0,
+  sfx: 0.85,
   low: 0.35,
   med: 0.65,
   high: 1,
 };
 
-const ORDER: VolLevel[] = ["muted", "low", "med", "high"];
+/** Music volumes — zero on MUTED and SFX-only. */
+const MUSIC_GAIN: Record<VolLevel, number> = {
+  muted: 0,
+  sfx: 0,
+  low: 0.35,
+  med: 0.65,
+  high: 1,
+};
+
+const ORDER: VolLevel[] = ["muted", "sfx", "low", "med", "high"];
 
 function nearestLevel(v: number): VolLevel {
   if (v <= 0.001) return "muted";
@@ -35,13 +46,19 @@ function nearestLevel(v: number): VolLevel {
 function readLevel(): VolLevel {
   try {
     const raw = localStorage.getItem(MODE_KEY);
-    if (raw === "muted" || raw === "low" || raw === "med" || raw === "high") {
+    if (
+      raw === "muted" ||
+      raw === "sfx" ||
+      raw === "low" ||
+      raw === "med" ||
+      raw === "high"
+    ) {
       return raw;
     }
     // Migrate legacy OFF / SFX / FULL modes.
     const legacy = localStorage.getItem(LEGACY_MODE_KEY);
     if (legacy === "off") return "muted";
-    if (legacy === "sfx") return "med";
+    if (legacy === "sfx") return "sfx";
     if (legacy === "full") return "high";
   } catch {
     /* ignore */
@@ -68,6 +85,8 @@ export function audioModeLabel(m: VolLevel = level): string {
   switch (m) {
     case "muted":
       return "MUTED";
+    case "sfx":
+      return "SFX";
     case "low":
       return "LOW";
     case "med":
@@ -88,15 +107,16 @@ function persist(m: VolLevel): void {
 function applyLevel(m: VolLevel, startMusic: boolean): void {
   level = m;
   persist(m);
-  const gain = LEVEL_GAIN[m];
-  setSfxMasterVolume(gain);
-  setMuted(gain <= 0.001);
-  setMusicVolume(gain);
-  setMusicMuted(gain <= 0.001);
-  if (gain > 0.001 && startMusic) unlockMusic();
+  const sfx = SFX_GAIN[m];
+  const music = MUSIC_GAIN[m];
+  setSfxMasterVolume(sfx);
+  setMuted(sfx <= 0.001);
+  setMusicVolume(music);
+  setMusicMuted(music <= 0.001);
+  if (music > 0.001 && startMusic) unlockMusic();
 }
 
-/** Cycle MUTED → LOW → MED → HIGH → MUTED. */
+/** Cycle MUTED → SFX → LOW → MED → HIGH → MUTED. */
 export function cycleAudioMode(): VolLevel {
   const i = ORDER.indexOf(level);
   const next = ORDER[(i + 1) % ORDER.length]!;

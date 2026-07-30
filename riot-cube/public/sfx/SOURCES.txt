@@ -3,4 +3,4 @@ slide: Mixkit "Big paper page turn" (id 1105)
 crumple: Mixkit "Single book paging" (id 1101)
 flutter: Mixkit "Page turn single" (id 1104)
 Softened with lowpass + compressor. Mixkit License.
-sticker: ElevenLabs soft sticker peel/place (2026-07-31).
+sticker: ElevenLabs sticker peel/place (louder, 2026-07-31).

@@ -665,7 +665,15 @@ export function drawPlay(
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const glyph =
-      mode === "muted" ? "✕" : mode === "low" ? "♪" : mode === "med" ? "♫" : "♬";
+      mode === "muted"
+        ? "✕"
+        : mode === "sfx"
+          ? "◇"
+          : mode === "low"
+            ? "♪"
+            : mode === "med"
+              ? "♫"
+              : "♬";
     ctx.fillText(
       glyph,
       PLAY_SOUND_BTN.x + PLAY_SOUND_BTN.w / 2,
