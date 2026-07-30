@@ -698,32 +698,6 @@ export function drawPlay(
   }
   ctx.restore();
 
-  // Missing mask cells as torn dark holes in the plate
-  for (let c = 0; c < COLS; c++) {
-    for (let r = 0; r < ROWS; r++) {
-      if (session.mask[c]![r]) continue;
-      const center = cellCenter(layout, c, r);
-      const s = layout.cell * 0.92;
-      ctx.save();
-      ctx.fillStyle = "#14110e";
-      ctx.beginPath();
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
-        const rad = s * (0.4 + (i % 2 === 0 ? 0.1 : 0));
-        const x = center.x + Math.cos(a) * rad;
-        const y = center.y + Math.sin(a) * rad;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,0.65)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.restore();
-    }
-  }
-
   // Tiles (motion + float)
   for (let c = 0; c < COLS; c++) {
     for (let r = 0; r < ROWS; r++) {
