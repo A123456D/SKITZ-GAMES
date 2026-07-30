@@ -18,6 +18,7 @@ import {
   H,
   HOME_PLAY,
   HOME_MAP,
+  HOME_HOW,
   HOME_THEME,
   HOME_SOUND,
   HOME_FEEDBACK,
@@ -30,6 +31,7 @@ import {
   MENU_THEME,
   MENU_SOUND,
   MENU_HOME,
+  GOALS_HINT,
   boardLayout,
   cellAt,
   cellCenter,
@@ -37,11 +39,14 @@ import {
   drawMap,
   drawMenu,
   drawPlay,
+  drawTutorialCoach,
   hitButtonId,
   hitPowerDock,
   hitUi,
   hitZoneTab,
   mapNodeAt,
+  powerDockFor,
+  tutorialButtonRects,
 } from "./view/draw";
 import {
   clearMotion,
@@ -77,7 +82,18 @@ import {
 } from "./view/audioMode";
 import { countObstacles } from "./core/obstacles";
 import { openFeedback } from "./view/feedback";
-import { cycleTheme, getTheme, initTheme } from "./view/theme";
+import { cycleTheme, getTheme, initTheme, Palette } from "./view/theme";
+import {
+  TUTORIAL_STEPS,
+  isTutorialCompleted,
+  setTutorialCompleted,
+  type TutorialAction,
+} from "./view/tutorial";
+import {
+  drawTutorialPointer,
+  loadTutorialHand,
+  type TutorialPointTarget,
+} from "./view/tutorialPointer";
 
 function handleAudioCycle(): void {
   const cur = getAudioMode();
@@ -114,6 +130,122 @@ let lastTs = 0;
 let animTime = 0;
 let hoverBtn: string | null = null;
 let pressedBtn: string | null = null;
+
+type TutorialState = { step: number; from: "home" | "play" | "menu" };
+let tutorial: TutorialState | null = null;
+let tutorialStepAt = 0;
+
+function tutorialStep() {
+  return tutorial ? TUTORIAL_STEPS[tutorial.step]! : null;
+}
+
+function coachTopY(): number {
+  return tutorialStep()?.action === "goals" ? 300 : 78;
+}
+
+function beginTutorial(from: "home" | "play" | "menu"): void {
+  tutorial = { step: 0, from };
+  tutorialStepAt = performance.now();
+  selectedLevel = 1;
+  syncZoneFromLevel(1);
+  session = startSession(1);
+  selected = null;
+  armedPower = null;
+  planeFrom = null;
+  clearMotion();
+  syncVisuals(true);
+  screen = "play";
+  playSfx("ui-tap");
+  markDirty();
+}
+
+function tutorialAllows(action: TutorialAction): boolean {
+  if (!tutorial) return true;
+  const step = tutorialStep();
+  if (!step) return true;
+  if (
+    step.action === "next" ||
+    step.action === "done" ||
+    step.action === "goals"
+  ) {
+    return false;
+  }
+  return step.action === action;
+}
+
+function tutorialPointTarget(action: TutorialAction): TutorialPointTarget | null {
+  switch (action) {
+    case "next":
+    case "done": {
+      const { next } = tutorialButtonRects(coachTopY());
+      return {
+        x: next.x + next.w * 0.62,
+        y: next.y + next.h - 6,
+        mode: "point",
+        size: 92,
+      };
+    }
+    case "goals":
+      return {
+        x: GOALS_HINT.x,
+        y: GOALS_HINT.y,
+        mode: "point",
+        size: 96,
+      };
+    case "swap": {
+      const layout = boardLayout();
+      return {
+        x: layout.x + layout.cell * 2.5,
+        y: layout.y + layout.cell * 3.2,
+        mode: "swipe",
+        size: 100,
+        travel: layout.cell * 0.95,
+      };
+    }
+    case "power": {
+      const dock = powerDockFor(session.level.id);
+      const bomb = dock.find((d) => d.kind === "bomb") ?? dock[0];
+      if (!bomb) return null;
+      return {
+        x: bomb.rect.x + bomb.rect.w * 0.5,
+        y: bomb.rect.y + bomb.rect.h * 0.35,
+        mode: "point",
+        size: 96,
+      };
+    }
+    default:
+      return null;
+  }
+}
+
+function advanceTutorial(): void {
+  if (!tutorial) return;
+  if (tutorial.step >= TUTORIAL_STEPS.length - 1) {
+    finishTutorial();
+    return;
+  }
+  tutorial = { ...tutorial, step: tutorial.step + 1 };
+  tutorialStepAt = performance.now();
+  playSfx("ui-tap");
+  markDirty();
+}
+
+function noteTutorial(action: TutorialAction): void {
+  if (!tutorial) return;
+  const step = tutorialStep();
+  if (step && step.action === action) advanceTutorial();
+}
+
+function finishTutorial(): void {
+  setTutorialCompleted();
+  const from = tutorial?.from ?? "home";
+  tutorial = null;
+  if (from === "menu") screen = "menu";
+  else if (from === "home") screen = "home";
+  else screen = "play";
+  playSfx("ui-tap");
+  markDirty();
+}
 
 type BoardGesture = {
   pointerId: number;
@@ -192,6 +324,38 @@ function paint(): void {
     winFx: winFx ? { t: winFx.t } : null,
     time: animTime,
   });
+
+  if (tutorial) {
+    const step = tutorialStep()!;
+    const last = tutorial.step >= TUTORIAL_STEPS.length - 1;
+    const topY = coachTopY();
+    drawTutorialCoach(ctx, {
+      step: tutorial.step,
+      total: TUTORIAL_STEPS.length,
+      title: step.title,
+      lines: step.lines,
+      hint: step.hint,
+      showNext:
+        step.action === "next" ||
+        step.action === "goals" ||
+        step.action === "done",
+      showSkip: true,
+      nextLabel: last ? "DONE" : "NEXT",
+      time: animTime,
+      topY,
+    });
+    const point = tutorialPointTarget(step.action);
+    if (point) {
+      const appear = Math.min(1, (performance.now() - tutorialStepAt) / 280);
+      drawTutorialPointer(
+        ctx,
+        point,
+        performance.now(),
+        Palette.hot,
+        appear,
+      );
+    }
+  }
 }
 
 function isAnimating(): boolean {
@@ -204,6 +368,7 @@ function isAnimating(): boolean {
     burstT > 0 ||
     hasParticles() ||
     motionBusy() ||
+    tutorial != null ||
     (popFx != null && popFx.t < 1) ||
     (oopsFx != null && oopsFx.t < 1) ||
     (noiceFx != null && noiceFx.t < 1) ||
@@ -387,6 +552,7 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
 
   playSfx("swap");
   busy = true;
+  noteTutorial("swap");
   syncVisuals(false);
   markDirty();
   await waitMotion();
@@ -442,6 +608,7 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
 
 async function playFailedSwap(a: Pos, b: Pos): Promise<void> {
   busy = true;
+  noteTutorial("swap");
   const layout = boardLayout();
   const midA = cellCenter(layout, a.c, a.r);
   const midB = cellCenter(layout, b.c, b.r);
@@ -540,6 +707,10 @@ async function handlePower(kind: PowerUpKind, target: Pos): Promise<void> {
 
 function openLevel(id: number): void {
   if (id > progress.unlocked) return;
+  if (!tutorial && !isTutorialCompleted()) {
+    beginTutorial("play");
+    return;
+  }
   playSfx("ui-tap");
   selectedLevel = id;
   syncZoneFromLevel(id);
@@ -554,6 +725,26 @@ function openLevel(id: number): void {
 }
 
 function onTap(x: number, y: number): void {
+  if (tutorial && screen === "play") {
+    const btns = tutorialButtonRects(coachTopY());
+    if (hitUi(btns.skip, x, y)) {
+      finishTutorial();
+      return;
+    }
+    const step = tutorialStep();
+    if (
+      step &&
+      (step.action === "next" ||
+        step.action === "goals" ||
+        step.action === "done") &&
+      hitUi(btns.next, x, y)
+    ) {
+      if (step.action === "done") finishTutorial();
+      else advanceTutorial();
+      return;
+    }
+  }
+
   if (screen === "home") {
     if (hitUi(HOME_PLAY, x, y)) {
       openLevel(Math.min(progress.unlocked, selectedLevel));
@@ -564,6 +755,10 @@ function onTap(x: number, y: number): void {
       syncZoneFromLevel(selectedLevel);
       screen = "map";
       markDirty();
+      return;
+    }
+    if (hitUi(HOME_HOW, x, y)) {
+      beginTutorial("home");
       return;
     }
     if (hitUi(HOME_THEME, x, y)) {
@@ -660,6 +855,7 @@ function onTap(x: number, y: number): void {
   }
 
   if (session.status !== "playing") {
+    if (tutorial) return;
     playSfx("ui-tap");
     syncZoneFromLevel(session.level.id);
     screen = "map";
@@ -668,6 +864,7 @@ function onTap(x: number, y: number): void {
   }
 
   if (hitUi(MENU_BTN, x, y)) {
+    if (tutorial) return;
     playSfx("ui-tap");
     armedPower = null;
     planeFrom = null;
@@ -684,6 +881,7 @@ function onTap(x: number, y: number): void {
 
   const powerHit = hitPowerDock(x, y, session.level.id);
   if (powerHit) {
+    if (tutorial && !tutorialAllows("power")) return;
     if ((session.powers[powerHit] ?? 0) <= 0) return;
     playSfx("select");
     if (armedPower === powerHit) {
@@ -693,12 +891,14 @@ function onTap(x: number, y: number): void {
       armedPower = powerHit;
       planeFrom = null;
       selected = null;
+      noteTutorial("power");
     }
     markDirty();
     return;
   }
 
   if (busy) return;
+  if (tutorial && !tutorialAllows("swap")) return;
   const layout = boardLayout();
   const hit = cellAt(layout, x, y);
   if (!hit || !isPlayable(session.mask, hit.c, hit.r)) {
@@ -781,12 +981,19 @@ canvas.addEventListener(
     hoverBtn = pressedBtn;
     boardGesture = null;
 
+    const tutBtns = tutorial ? tutorialButtonRects(coachTopY()) : null;
+    const onTutBtn =
+      !!tutBtns &&
+      (hitUi(tutBtns.next, p.x, p.y) || hitUi(tutBtns.skip, p.x, p.y));
+
     const deferBoard =
       screen === "play" &&
       session.status === "playing" &&
       !busy &&
       !armedPower &&
       !pressedBtn &&
+      !onTutBtn &&
+      (!tutorial || tutorialAllows("swap")) &&
       !hitUi(MENU_BTN, p.x, p.y) &&
       !hitUi(PLAY_SOUND_BTN, p.x, p.y) &&
       !hitPowerDock(p.x, p.y, session.level.id);
@@ -918,7 +1125,7 @@ async function boot(): Promise<void> {
   resize();
   markDirty();
   requestAnimationFrame(tick);
-  await Promise.all([loadGameArt(), loadSfx()]);
+  await Promise.all([loadGameArt(), loadSfx(), loadTutorialHand()]);
   markDirty();
 }
 

@@ -26,11 +26,12 @@ export const H = 1280;
 
 export type UiRect = { x: number; y: number; w: number; h: number };
 
-export const HOME_PLAY: UiRect = { x: 70, y: 450, w: 580, h: 100 };
-export const HOME_MAP: UiRect = { x: 90, y: 568, w: 540, h: 88 };
-export const HOME_THEME: UiRect = { x: 90, y: 672, w: 540, h: 88 };
-export const HOME_SOUND: UiRect = { x: 90, y: 776, w: 540, h: 88 };
-export const HOME_FEEDBACK: UiRect = { x: 90, y: 880, w: 540, h: 88 };
+export const HOME_PLAY: UiRect = { x: 70, y: 430, w: 580, h: 90 };
+export const HOME_MAP: UiRect = { x: 90, y: 536, w: 540, h: 78 };
+export const HOME_HOW: UiRect = { x: 90, y: 628, w: 540, h: 78 };
+export const HOME_THEME: UiRect = { x: 90, y: 720, w: 540, h: 78 };
+export const HOME_SOUND: UiRect = { x: 90, y: 812, w: 540, h: 78 };
+export const HOME_FEEDBACK: UiRect = { x: 90, y: 904, w: 540, h: 78 };
 /** @deprecated alias — home sound control */
 export const HOME_SETTINGS = HOME_SOUND;
 export const MENU_BTN: UiRect = { x: 548, y: 40, w: 136, h: 56 };
@@ -337,6 +338,12 @@ export function drawHome(
     hover: ui.hover === "home-map",
     pressed: ui.pressed === "home-map",
   });
+  paperBtn(ctx, HOME_HOW, "HOW TO PLAY", {
+    time: ui.time,
+    phase: 1.35,
+    hover: ui.hover === "home-how",
+    pressed: ui.pressed === "home-how",
+  });
   paperBtn(ctx, HOME_THEME, `THEME · ${THEME_LABELS[getTheme()]}`, {
     time: ui.time,
     phase: 1.55,
@@ -362,7 +369,7 @@ export function drawHome(
   ctx.fillText(
     `Next: Level ${Math.min(progress.unlocked, 40)}`,
     W / 2,
-    1000,
+    1010,
   );
 
   // Lives / gems
@@ -574,6 +581,7 @@ export function hitButtonId(
   if (screen === "home") {
     if (hitUi(HOME_PLAY, x, y)) return "home-play";
     if (hitUi(HOME_MAP, x, y)) return "home-map";
+    if (hitUi(HOME_HOW, x, y)) return "home-how";
     if (hitUi(HOME_THEME, x, y)) return "home-theme";
     if (hitUi(HOME_SOUND, x, y)) return "home-sound";
     if (hitUi(HOME_FEEDBACK, x, y)) return "home-feedback";
@@ -1049,6 +1057,101 @@ export function drawPlay(
     ctx.font = "800 26px 'Chakra Petch', sans-serif";
     ctx.fillText("TAP FOR MAP", W / 2, session.status === "won" ? 660 : 640);
   }
+}
+
+/** Coach card during the interactive tutorial (top of play view). */
+export const TUTORIAL_NEXT: UiRect = { x: 420, y: 248, w: 200, h: 50 };
+export const TUTORIAL_SKIP: UiRect = { x: 100, y: 248, w: 200, h: 50 };
+/** Approximate goals panel center for the pointing hand. */
+export const GOALS_HINT: { x: number; y: number } = { x: 360, y: 168 };
+
+export function drawTutorialCoach(
+  ctx: CanvasRenderingContext2D,
+  opts: {
+    step: number;
+    total: number;
+    title: string;
+    lines: readonly string[];
+    hint: string;
+    showNext: boolean;
+    showSkip: boolean;
+    nextLabel?: string;
+    time?: number;
+    /** Shift the coach card down so goals stay visible. */
+    topY?: number;
+  },
+): void {
+  const time = opts.time ?? 0;
+  const top = opts.topY ?? 78;
+  const dy = top - 78;
+  const skipR = { ...TUTORIAL_SKIP, y: TUTORIAL_SKIP.y + dy };
+  const nextR = { ...TUTORIAL_NEXT, y: TUTORIAL_NEXT.y + dy };
+
+  ctx.fillStyle = "rgba(0,0,0,0.42)";
+  roundRect(ctx, 48, top, 624, 240, 12);
+  ctx.fill();
+  ctx.fillStyle = Palette.paper;
+  roundRect(ctx, 56, top + 8, 608, 224, 10);
+  ctx.fill();
+  ctx.strokeStyle = Palette.ink;
+  ctx.lineWidth = 3;
+  roundRect(ctx, 56, top + 8, 608, 224, 10);
+  ctx.stroke();
+  ctx.fillStyle = Palette.hot;
+  ctx.fillRect(72, top, 72, 12);
+
+  ctx.fillStyle = Palette.ink;
+  ctx.font = "800 26px 'Permanent Marker', cursive";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(opts.title, 80, 128 + dy);
+  ctx.fillStyle = Palette.paperDim;
+  ctx.font = "600 16px 'Patrick Hand', cursive";
+  ctx.textAlign = "right";
+  ctx.fillText(`${opts.step + 1} / ${opts.total}`, 640, 128 + dy);
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = Palette.ink;
+  ctx.font = "600 18px 'Patrick Hand', cursive";
+  let y = 158 + dy;
+  for (const line of opts.lines) {
+    ctx.fillText(line, 80, y);
+    y += 26;
+  }
+
+  ctx.fillStyle = Palette.lime;
+  ctx.font = "700 16px 'Chakra Petch', sans-serif";
+  ctx.fillText(opts.hint, 80, 248 + dy);
+
+  if (opts.showSkip) {
+    paperBtn(ctx, skipR, "SKIP", {
+      time,
+      phase: 0.4,
+      hover: false,
+      pressed: false,
+    });
+  }
+  if (opts.showNext) {
+    paperBtn(ctx, nextR, opts.nextLabel ?? "NEXT", {
+      play: true,
+      time,
+      phase: 0.8,
+      hover: false,
+      pressed: false,
+    });
+  }
+}
+
+/** Hit-test helper for tutorial buttons when coach is shifted. */
+export function tutorialButtonRects(topY = 78): {
+  next: UiRect;
+  skip: UiRect;
+} {
+  const dy = topY - 78;
+  return {
+    next: { ...TUTORIAL_NEXT, y: TUTORIAL_NEXT.y + dy },
+    skip: { ...TUTORIAL_SKIP, y: TUTORIAL_SKIP.y + dy },
+  };
 }
 
 export function drawMenu(
