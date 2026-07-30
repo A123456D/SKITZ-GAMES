@@ -585,9 +585,6 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
         t: 0,
         started: performance.now(),
       };
-      void ensureSfx("noice").then((ok) => {
-        if (ok) playSfx("noice", { vary: false, volume: 1.2 });
-      });
     }
     const beforeObs = countAllObstacles();
     await playMatchBurst(keys, hint);

@@ -20,8 +20,7 @@ export type SfxId =
   | "lose"
   | "mute-on"
   | "oops"
-  | "hell-yeah"
-  | "noice";
+  | "hell-yeah";
 
 const FILES: Record<SfxId, string> = {
   "ui-tap": "ui-tap.mp3",
@@ -44,7 +43,6 @@ const FILES: Record<SfxId, string> = {
   "mute-on": "mute-on.mp3",
   oops: "oops.mp3",
   "hell-yeah": "hell-yeah.mp3",
-  noice: "noice.mp3",
 };
 
 const MUTE_KEY = "paper-riot-muted";
