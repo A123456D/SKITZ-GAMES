@@ -54,7 +54,7 @@ let master: GainNode | null = null;
 const buffers = new Map<SfxId, AudioBuffer>();
 let muted = false;
 /** 0..1 master scale (volume button). Applied with mute. */
-let masterVol = 0.7;
+let masterVol = 1;
 let unlocked = false;
 let loadPromise: Promise<void> | null = null;
 
@@ -152,7 +152,7 @@ export function setMuted(next: boolean): void {
 
 /** Set master SFX volume 0..1 (volume button). Does not force unmute. */
 export function setSfxMasterVolume(v: number): void {
-  masterVol = Math.max(0, Math.min(1, v)) * 0.7;
+  masterVol = Math.max(0, Math.min(1, v));
   if (master) master.gain.value = muted ? 0 : masterVol;
 }
 
@@ -201,7 +201,7 @@ export function playSfx(
 function playHtmlFallback(id: SfxId, volume: number): void {
   try {
     const el = new Audio(`./sfx/${FILES[id]}?v=${SFX_VERSION}`);
-    el.volume = Math.max(0, Math.min(1, volume * 0.85));
+    el.volume = Math.max(0, Math.min(1, volume));
     void el.play();
   } catch {
     /* ignore */

@@ -484,9 +484,9 @@ function countAllObstacles(): number {
 
 function playEndSting(): void {
   if (session.status === "won") {
-    playSfx("win", { vary: false, volume: 0.75 });
+    playSfx("win", { vary: false });
     void ensureSfx("hell-yeah").then((ok) => {
-      if (ok) playSfx("hell-yeah", { vary: false, volume: 1.25 });
+      if (ok) playSfx("hell-yeah", { vary: false });
     });
     winFx = { t: 0, started: performance.now() };
     const layout = boardLayout();
@@ -591,7 +591,7 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
     crushWave(session, groups);
     const peeled = beforeObs - countAllObstacles();
     if (peeled > 0) playSfx(peeled > 2 ? "crack" : "peel");
-    else playSfx("select", { volume: 0.45, rate: 0.92 });
+    else playSfx("select", { rate: 0.92 });
     syncVisuals(true);
     markDirty();
     await waitMotion();
@@ -619,7 +619,7 @@ async function playFailedSwap(a: Pos, b: Pos): Promise<void> {
   swapCells(session.board, a, b);
   syncVisuals(false);
   const laughReady = await ensureSfx("oops");
-  if (laughReady) playSfx("oops", { vary: false, volume: 1.35 });
+  if (laughReady) playSfx("oops", { vary: false });
   else playSfx("swap-fail");
   markDirty();
   await waitMotion();
@@ -912,7 +912,7 @@ function onTap(x: number, y: number): void {
         markDirty();
         return;
       }
-      playSfx("select", { volume: 0.7 });
+      playSfx("select");
       planeFrom = hit;
       selected = null;
       markDirty();
@@ -938,7 +938,7 @@ function onTap(x: number, y: number): void {
   }
 
   if (!selected) {
-    playSfx("select", { volume: 0.7 });
+    playSfx("select");
     selected = hit;
     markDirty();
     return;
@@ -957,7 +957,7 @@ function onTap(x: number, y: number): void {
     return;
   }
 
-  playSfx("select", { volume: 0.7 });
+  playSfx("select");
   selected = hit;
   markDirty();
 }

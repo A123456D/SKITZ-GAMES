@@ -13,8 +13,8 @@ type PlaylistManifest = {
 
 const VOL_KEY = "paper-riot-music-vol";
 const VOL_STEPS = [0, 0.35, 0.65, 1] as const;
-/** Keep music under SFX so matches stay crisp. */
-const MUSIC_TRIM = 0.16;
+/** Playback scale relative to stored music volume (1 = match SFX master). */
+const MUSIC_TRIM = 1;
 
 let musicVol = readStoredVol();
 let started = false;

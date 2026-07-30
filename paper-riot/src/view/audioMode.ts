@@ -91,7 +91,7 @@ function applyLevel(m: VolLevel, startMusic: boolean): void {
   const gain = LEVEL_GAIN[m];
   setSfxMasterVolume(gain);
   setMuted(gain <= 0.001);
-  setMusicVolume(gain <= 0.001 ? 0 : Math.min(1, gain * 0.7));
+  setMusicVolume(gain);
   setMusicMuted(gain <= 0.001);
   if (gain > 0.001 && startMusic) unlockMusic();
 }
