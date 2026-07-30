@@ -394,7 +394,7 @@ async function playFailedSwap(a: Pos, b: Pos): Promise<void> {
 
   swapCells(session.board, a, b);
   syncVisuals(false);
-  playSfx("swap-fail");
+  playSfx("oops", { vary: false, volume: 0.9 });
   markDirty();
   await waitMotion();
 

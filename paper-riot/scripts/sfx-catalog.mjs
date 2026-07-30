@@ -111,4 +111,10 @@ export const SFX_CATALOG = [
     duration: 0.5,
     text: "Tiny soft mute click, quiet volume off UI, very short gentle",
   },
+  {
+    id: "oops",
+    file: "oops.mp3",
+    duration: 1.1,
+    text: "Young girl short playful giggle laugh, cute teasing ha-ha, light and friendly, no words, short cartoonish laugh, clean studio, not creepy",
+  },
 ];
