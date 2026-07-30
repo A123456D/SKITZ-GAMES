@@ -75,8 +75,28 @@ describe("board", () => {
     const hard = makeCell("skull");
     hard.obstacle = "box";
     hard.hits = 2;
+    const tar = makeCell("skull");
+    tar.obstacle = "tar";
+    tar.hits = 2;
+    const glue = makeCell("skull");
+    glue.obstacle = "glue";
+    glue.hits = 2;
     expect(canSwapCell(soft)).toBe(true);
+    expect(canSwapCell(glue)).toBe(true);
     expect(canSwapCell(hard)).toBe(false);
+    expect(canSwapCell(tar)).toBe(false);
+  });
+
+  it("level 4 introduces tape and later levels use unique obstacles", () => {
+    expect(getLevel(4).obstaclePlan[0]?.kind).toBe("tape-x");
+    expect(getLevel(8).obstaclePlan[0]?.kind).toBe("box");
+    expect(getLevel(12).obstaclePlan[0]?.kind).toBe("lock");
+    const kinds = new Set(
+      LEVELS.flatMap((l) => l.obstaclePlan.map((o) => o.kind)),
+    );
+    expect(kinds.has("tape-x")).toBe(true);
+    expect(kinds.has("glue")).toBe(true);
+    expect(kinds.has("barbed")).toBe(true);
   });
 
   it("finds a horizontal match of 3", () => {

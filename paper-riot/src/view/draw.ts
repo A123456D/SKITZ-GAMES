@@ -2,6 +2,7 @@ import {
   COLS,
   ROWS,
   POWER_BLURBS,
+  OBSTACLE_LABELS,
   type PowerUpKind,
   type Progress,
   type TileKind,
@@ -663,12 +664,14 @@ export function drawPlay(
       ctx.restore();
     }
     ctx.fillStyle = Palette.ink;
-    ctx.font = "800 20px 'Chakra Petch', sans-serif";
+    ctx.font = "800 18px 'Chakra Petch', sans-serif";
     ctx.textAlign = "left";
-    const label =
-      g.type === "clear" && g.obstacle === "any" ? "JUNK" : "";
+    const tag =
+      g.type === "clear"
+        ? OBSTACLE_LABELS[g.obstacle]
+        : "";
     ctx.fillText(
-      `${label}${g.have}/${g.need}`,
+      tag ? `${tag} ${g.have}/${g.need}` : `${g.have}/${g.need}`,
       gx + 34,
       gy + 6,
     );

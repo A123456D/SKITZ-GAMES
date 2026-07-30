@@ -1,6 +1,6 @@
 import { TILE_KINDS } from "../core/types";
 
-const VERSION = 8;
+const VERSION = 9;
 const cache = new Map<string, HTMLImageElement>();
 let loadPromise: Promise<void> | null = null;
 

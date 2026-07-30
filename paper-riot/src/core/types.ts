@@ -17,10 +17,15 @@ export const TILE_KINDS = [
 export type TileKind = (typeof TILE_KINDS)[number];
 
 /**
- * Obstacles — classroom junk that covers / locks stickers.
+ * Obstacles — classroom junk covering stickers.
  *
- * Soft (swap ok, no match until cleared): tape-x, tape-black, glue, wet
- * Hard (no swap): box, lock, tar, barbed
+ * Soft (can swap, still blocks matching until peeled):
+ *   tape-x (1), tape-black (2), wet (1), glue (2)
+ * Hard (cannot swap — crack with adjacent matches or stapler):
+ *   box (2), lock (2), tar (2), barbed (1)
+ *
+ * Peel rule: match NEXT TO an obstacle to deal 1 hit.
+ * Stapler: strip obstacles in a 3×3 without needing a match.
  */
 export const OBSTACLE_KINDS = [
   "tape-x",
@@ -35,13 +40,36 @@ export const OBSTACLE_KINDS = [
 
 export type ObstacleKind = (typeof OBSTACLE_KINDS)[number];
 
+export const OBSTACLE_LABELS: Record<ObstacleKind | "any", string> = {
+  "tape-x": "PINK TAPE",
+  "tape-black": "BLACK TAPE",
+  box: "BOX",
+  tar: "TAR",
+  glue: "GLUE",
+  lock: "LOCK",
+  wet: "WET",
+  barbed: "BARBED",
+  any: "JUNK",
+};
+
+export const OBSTACLE_BLURBS: Record<ObstacleKind, string> = {
+  "tape-x": "Soft cover — match beside it once to peel",
+  "tape-black": "Heavy tape — needs two peels",
+  wet: "Ink smear — match beside it once",
+  glue: "Sticky note — two peels, can still swap",
+  box: "Blocks swaps — crack with 2 side matches",
+  lock: "Locked cell — 2 hits or stapler",
+  tar: "Hard goo — no swaps, 2 cracks",
+  barbed: "Wire fence — hard block, 1 crack",
+};
+
 /**
  * Power-ups — each solves a different board problem.
  * bomb: 3×3 blast for stuck clusters
  * plane: clear a row (tape stripes)
  * rocket: clear a column (locker stacks)
  * magnet: clear one sticker color (collection goals)
- * stapler: rip obstacles in 3×3 (locks/boxes)
+ * stapler: rip obstacles in 3×3 (locks/boxes/tar)
  * disco: chaotic multi-clear (late game clutch)
  */
 export const POWERUP_KINDS = [
@@ -66,12 +94,12 @@ export const POWER_BLURBS: Record<PowerUpKind, string> = {
 
 export const OBSTACLE_HITS: Record<ObstacleKind, number> = {
   "tape-x": 1,
-  "tape-black": 1,
-  box: 2,
-  tar: 1,
-  glue: 2,
-  lock: 2,
+  "tape-black": 2,
   wet: 1,
+  glue: 2,
+  box: 2,
+  lock: 2,
+  tar: 2,
   barbed: 1,
 };
 

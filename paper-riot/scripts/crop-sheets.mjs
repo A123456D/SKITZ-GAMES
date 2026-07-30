@@ -241,11 +241,45 @@ async function main() {
 
   await cropSheet(
     obsSrc,
-    join(root, "public/obstacles"),
-    ["tape-x", "tape-black", "box", "tar", "glue", "lock", "wet", "barbed"],
+    join(root, "public/obstacles/_raw"),
+    [
+      "banner",
+      "tape-x",
+      "box",
+      "tape-black",
+      "edge-l",
+      "edge-r",
+      "spark-a",
+      "glue",
+      "tar",
+      "lock-outline",
+      "lock",
+      "wet",
+      "barbed",
+      "spark-b",
+    ],
     "dark",
-    { areaMinFrac: 0.004, size: 220 },
+    { areaMinFrac: 0.002, size: 220 },
   );
+  // Remap verified crops → final names (auto order drifts with sheet noise)
+  const { copyFileSync, rmSync } = await import("node:fs");
+  const raw = join(root, "public/obstacles/_raw");
+  const dest = join(root, "public/obstacles");
+  const map = {
+    "tape-x": "tape-x.png",
+    "tape-black": "tape-black.png",
+    box: "box.png",
+    tar: "tar.png",
+    glue: "glue.png",
+    lock: "lock.png",
+    wet: "wet.png",
+    barbed: "barbed.png",
+  };
+  for (const [from, to] of Object.entries(map)) {
+    copyFileSync(join(raw, `${from}.png`), join(dest, to));
+  }
+  rmSync(raw, { recursive: true, force: true });
+  console.log("  remapped obstacles →", Object.keys(map).join(", "));
 
   await cropSheet(
     powSrc,
