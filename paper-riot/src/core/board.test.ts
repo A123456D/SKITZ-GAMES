@@ -334,3 +334,18 @@ describe("session", () => {
     expect(boxesLeft).toBeGreaterThan(0);
   });
 });
+
+describe("theme", () => {
+  it("cycles between classroom and edgy themes", async () => {
+    const { cycleTheme, getTheme, initTheme, Palette, THEME_PALETTES } =
+      await import("../view/theme");
+    initTheme();
+    const first = getTheme();
+    expect(THEME_PALETTES[first]).toBeTruthy();
+    const next = cycleTheme();
+    expect(next).not.toBe(first);
+    expect(Palette.purple).toBe(THEME_PALETTES[next].purple);
+    cycleTheme();
+    expect(getTheme()).toBe(first);
+  });
+});

@@ -15,6 +15,7 @@ import {
   H,
   HOME_PLAY,
   HOME_MAP,
+  HOME_THEME,
   HOME_SETTINGS,
   PAUSE_BTN,
   MAP_BACK,
@@ -46,7 +47,7 @@ import {
   styleForTile,
   updateParticles,
 } from "./view/particles";
-import { loadGameArt } from "./view/stickers";
+import { loadGameArt, reloadThemeArt } from "./view/stickers";
 import {
   isMuted,
   loadSfx,
@@ -56,6 +57,7 @@ import {
   unlockAudio,
 } from "./view/audio";
 import { countObstacles } from "./core/obstacles";
+import { cycleTheme, initTheme } from "./view/theme";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const ctx = canvas.getContext("2d")!;
@@ -366,6 +368,13 @@ function onTap(x: number, y: number): void {
       markDirty();
       return;
     }
+    if (hitUi(HOME_THEME, x, y)) {
+      playSfx("ui-tap");
+      const next = cycleTheme();
+      void reloadThemeArt(next).then(() => markDirty());
+      markDirty();
+      return;
+    }
     if (hitUi(HOME_SETTINGS, x, y)) {
       if (!isMuted()) {
         playSfx("mute-on", { vary: false });
@@ -538,6 +547,7 @@ window.addEventListener("resize", resize);
 window.addEventListener("orientationchange", resize);
 
 async function boot(): Promise<void> {
+  initTheme();
   progress = loadProgress();
   saveProgress(progress);
   syncZoneFromLevel(selectedLevel);

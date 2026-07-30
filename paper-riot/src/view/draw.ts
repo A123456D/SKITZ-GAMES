@@ -16,7 +16,7 @@ import {
   stickerImage,
   uiImage,
 } from "./stickers";
-import { Palette } from "./theme";
+import { Palette, THEME_LABELS, getTheme } from "./theme";
 import { drawParticles } from "./particles";
 import { floatPose, getVisual } from "./motion";
 import { isMuted } from "./audio";
@@ -26,9 +26,10 @@ export const H = 1280;
 
 export type UiRect = { x: number; y: number; w: number; h: number };
 
-export const HOME_PLAY: UiRect = { x: 70, y: 500, w: 580, h: 130 };
-export const HOME_MAP: UiRect = { x: 90, y: 650, w: 540, h: 110 };
-export const HOME_SETTINGS: UiRect = { x: 90, y: 780, w: 540, h: 110 };
+export const HOME_PLAY: UiRect = { x: 70, y: 470, w: 580, h: 120 };
+export const HOME_MAP: UiRect = { x: 90, y: 610, w: 540, h: 100 };
+export const HOME_THEME: UiRect = { x: 90, y: 730, w: 540, h: 100 };
+export const HOME_SETTINGS: UiRect = { x: 90, y: 850, w: 540, h: 100 };
 export const PAUSE_BTN: UiRect = { x: 620, y: 36, w: 64, h: 64 };
 export const MAP_BACK: UiRect = { x: 36, y: 36, w: 120, h: 56 };
 export const MAP_PLAY: UiRect = { x: 200, y: 1160, w: 320, h: 72 };
@@ -324,6 +325,12 @@ export function drawHome(
     hover: ui.hover === "home-map",
     pressed: ui.pressed === "home-map",
   });
+  paperBtn(ctx, HOME_THEME, `THEME · ${THEME_LABELS[getTheme()]}`, {
+    time: ui.time,
+    phase: 1.55,
+    hover: ui.hover === "home-theme",
+    pressed: ui.pressed === "home-theme",
+  });
   paperBtn(ctx, HOME_SETTINGS, isMuted() ? "SOUND OFF" : "SOUND ON", {
     time: ui.time,
     phase: 2.0,
@@ -337,23 +344,23 @@ export function drawHome(
   ctx.fillText(
     `Next: Level ${Math.min(progress.unlocked, 40)}`,
     W / 2,
-    920,
+    980,
   );
 
   // Lives / gems
   ctx.fillStyle = "rgba(0,0,0,0.72)";
-  roundRect(ctx, 40, 980, 220, 70, 8);
+  roundRect(ctx, 40, 1020, 220, 70, 8);
   ctx.fill();
   ctx.fillStyle = Palette.hot;
   ctx.font = "800 26px 'Chakra Petch', sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText(`♥  ${progress.lives} FULL`, 60, 1024);
+  ctx.fillText(`♥  ${progress.lives} FULL`, 60, 1064);
 
   ctx.fillStyle = "rgba(0,0,0,0.72)";
-  roundRect(ctx, 420, 980, 260, 70, 8);
+  roundRect(ctx, 420, 1020, 260, 70, 8);
   ctx.fill();
   ctx.fillStyle = Palette.purple;
-  ctx.fillText(`◆  ${progress.gems}`, 440, 1024);
+  ctx.fillText(`◆  ${progress.gems}`, 440, 1064);
 
   ctx.fillStyle = Palette.white;
   ctx.font = "600 28px 'Patrick Hand', cursive";
@@ -549,6 +556,7 @@ export function hitButtonId(
   if (screen === "home") {
     if (hitUi(HOME_PLAY, x, y)) return "home-play";
     if (hitUi(HOME_MAP, x, y)) return "home-map";
+    if (hitUi(HOME_THEME, x, y)) return "home-theme";
     if (hitUi(HOME_SETTINGS, x, y)) return "home-settings";
   } else if (screen === "map") {
     if (hitUi(MAP_BACK, x, y)) return "map-back";
