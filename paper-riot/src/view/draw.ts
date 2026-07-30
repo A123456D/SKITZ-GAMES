@@ -25,9 +25,9 @@ export const H = 1280;
 
 export type UiRect = { x: number; y: number; w: number; h: number };
 
-export const HOME_PLAY: UiRect = { x: 90, y: 520, w: 540, h: 100 };
-export const HOME_MAP: UiRect = { x: 110, y: 640, w: 500, h: 80 };
-export const HOME_SETTINGS: UiRect = { x: 110, y: 740, w: 500, h: 80 };
+export const HOME_PLAY: UiRect = { x: 70, y: 500, w: 580, h: 130 };
+export const HOME_MAP: UiRect = { x: 90, y: 650, w: 540, h: 110 };
+export const HOME_SETTINGS: UiRect = { x: 90, y: 780, w: 540, h: 110 };
 export const PAUSE_BTN: UiRect = { x: 620, y: 36, w: 64, h: 64 };
 export const MAP_BACK: UiRect = { x: 36, y: 36, w: 120, h: 56 };
 export const MAP_PLAY: UiRect = { x: 200, y: 1160, w: 320, h: 72 };
@@ -265,9 +265,11 @@ function paperBtn(
   ctx.shadowColor = "transparent";
   ctx.fillStyle = opts?.play || opts?.hot ? Palette.white : Palette.ink;
   ctx.font =
-    rect.h >= 90
-      ? "800 34px 'Chakra Petch', sans-serif"
-      : "800 26px 'Chakra Petch', sans-serif";
+    rect.h >= 120
+      ? "800 40px 'Chakra Petch', sans-serif"
+      : rect.h >= 100
+        ? "800 34px 'Chakra Petch', sans-serif"
+        : "800 26px 'Chakra Petch', sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(label, 0, 2);
@@ -326,7 +328,7 @@ export function drawHome(
   ctx.fillText(
     `Next: Level ${Math.min(progress.unlocked, 40)}`,
     W / 2,
-    880,
+    920,
   );
 
   // Lives / gems
