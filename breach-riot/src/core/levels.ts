@@ -10,8 +10,8 @@ function d(
 }
 
 /**
- * 16 hand-authored levels: teach faithful rules, then gate twists.
- * Fixed matrices for early tutorials; seeded generation afterward.
+ * 16 hand-authored levels — gentle openers, then a steeper mid/late curve:
+ * tighter buffers, longer required sequences, denser hazards, harder scramble.
  */
 export const LEVELS: LevelDef[] = [
   {
@@ -63,9 +63,10 @@ export const LEVELS: LevelDef[] = [
     name: "DOUBLE TRACE",
     brief: "Two required daemons. Chain them in one path.",
     size: 5,
-    buffer: 6,
+    buffer: 5,
     seed: 103,
     twists: {
+      firstRowOnly: true,
       coach: "Clearing 2+ daemons multiplies your breach score.",
     },
     daemons: [
@@ -78,9 +79,9 @@ export const LEVELS: LevelDef[] = [
     name: "WIDE NET",
     brief: "Bigger matrix. Same path rules.",
     size: 6,
-    buffer: 6,
+    buffer: 5,
     seed: 104,
-    twists: {},
+    twists: { firstRowOnly: true },
     daemons: [
       d("a", "OVERCLOCK", ["BD", "E9", "1C"], true),
       d("b", "RAZOR", ["FF", "7A"], false),
@@ -91,15 +92,15 @@ export const LEVELS: LevelDef[] = [
     name: "JAM LINE",
     brief: "Jammed cells are dead. Plan around them.",
     size: 6,
-    buffer: 6,
+    buffer: 5,
     seed: 105,
     twists: {
       jam: true,
       coach: "Dark jammed cells cannot be picked — route around them.",
     },
     daemons: [
-      d("a", "ICEPICK", ["7A", "BD"], true),
-      d("b", "DATAMINE", ["1C", "E9", "FF"], true),
+      d("a", "ICEPICK", ["7A", "BD", "E9"], true),
+      d("b", "DATAMINE", ["1C", "FF"], true),
     ],
   },
   {
@@ -107,15 +108,15 @@ export const LEVELS: LevelDef[] = [
     name: "STICKY HEX",
     brief: "Sticky glyphs cost two buffer slots.",
     size: 6,
-    buffer: 7,
+    buffer: 6,
     seed: 106,
     twists: {
       sticky: true,
       coach: "Tape-marked sticky glyphs cost 2 buffer. Avoid unless you need them.",
     },
     daemons: [
-      d("a", "SOULKILLER", ["55", "7A", "BD"], true),
-      d("b", "GHOST", ["E9", "1C"], false),
+      d("a", "SOULKILLER", ["55", "7A", "BD", "E9"], true),
+      d("b", "GHOST", ["1C", "FF"], false),
     ],
   },
   {
@@ -123,11 +124,11 @@ export const LEVELS: LevelDef[] = [
     name: "JAM + STICK",
     brief: "Detours and costly glyphs.",
     size: 6,
-    buffer: 7,
+    buffer: 6,
     seed: 107,
-    twists: { jam: true, sticky: true },
+    twists: { jam: true, sticky: true, hazardScale: 1.15 },
     daemons: [
-      d("a", "OVERCLOCK", ["FF", "1C", "55"], true),
+      d("a", "OVERCLOCK", ["FF", "1C", "55", "7A"], true),
       d("b", "RAZOR", ["BD", "E9"], true),
     ],
   },
@@ -136,15 +137,16 @@ export const LEVELS: LevelDef[] = [
     name: "LIVE SCRAMBLE",
     brief: "Unused cells mutate. Commit fast.",
     size: 6,
-    buffer: 7,
+    buffer: 6,
     seed: 108,
     twists: {
       scramble: true,
-      coach: "Unpicked codes may scramble every other pick. Lock your path.",
+      scrambleHard: true,
+      coach: "Unpicked codes scramble after every pick. Lock your path early.",
     },
     daemons: [
-      d("a", "DATAMINE", ["1C", "BD", "7A"], true),
-      d("b", "ICEPICK", ["E9", "FF"], false),
+      d("a", "DATAMINE", ["1C", "BD", "7A", "E9"], true),
+      d("b", "ICEPICK", ["FF", "55"], false),
     ],
   },
   {
@@ -152,11 +154,12 @@ export const LEVELS: LevelDef[] = [
     name: "FORK PROTOCOL",
     brief: "Optional fork shares a prefix — greed or safety.",
     size: 6,
-    buffer: 8,
+    buffer: 6,
     seed: 109,
     twists: {
       fork: true,
       earlyConfirm: true,
+      jam: true,
       coach: "Fork daemon shares a prefix. Confirm early if the buffer is tight.",
     },
     daemons: [
@@ -167,28 +170,33 @@ export const LEVELS: LevelDef[] = [
   {
     id: 10,
     name: "SEVEN WIDE",
-    brief: "Full 7×7 grid.",
+    brief: "Full 7×7 grid. No spare buffer.",
     size: 7,
-    buffer: 7,
+    buffer: 6,
     seed: 110,
-    twists: { jam: true },
+    twists: { jam: true, hazardScale: 1.2 },
     daemons: [
-      d("a", "OVERCLOCK", ["BD", "1C", "E9"], true),
-      d("b", "RAZOR", ["55", "FF"], true),
-      d("c", "GHOST", ["7A", "BD"], false),
+      d("a", "OVERCLOCK", ["BD", "1C", "E9", "FF"], true),
+      d("b", "RAZOR", ["55", "7A"], true),
+      d("c", "GHOST", ["FF", "BD"], false),
     ],
   },
   {
     id: 11,
     name: "HEAT SINK",
-    brief: "Scramble under jam pressure.",
+    brief: "Hard scramble under jam pressure.",
     size: 7,
-    buffer: 8,
+    buffer: 6,
     seed: 111,
-    twists: { jam: true, scramble: true },
+    twists: {
+      jam: true,
+      scramble: true,
+      scrambleHard: true,
+      hazardScale: 1.25,
+    },
     daemons: [
-      d("a", "ICEPICK", ["7A", "E9", "1C"], true),
-      d("b", "DATAMINE", ["FF", "55", "BD"], true),
+      d("a", "ICEPICK", ["7A", "E9", "1C", "55"], true),
+      d("b", "DATAMINE", ["FF", "BD", "7A"], true),
     ],
   },
   {
@@ -196,26 +204,26 @@ export const LEVELS: LevelDef[] = [
     name: "TAPE STORM",
     brief: "Sticky everywhere that matters.",
     size: 7,
-    buffer: 8,
+    buffer: 6,
     seed: 112,
-    twists: { sticky: true, jam: true },
+    twists: { sticky: true, jam: true, hazardScale: 1.3 },
     daemons: [
       d("a", "SOULKILLER", ["55", "1C", "FF", "7A"], true),
-      d("b", "RAZOR", ["BD", "E9"], false),
+      d("b", "RAZOR", ["BD", "E9", "1C"], true),
     ],
   },
   {
     id: 13,
     name: "TRIPLE BREACH",
-    brief: "Three required daemons. Score big.",
+    brief: "Three required daemons. No early out.",
     size: 7,
-    buffer: 8,
+    buffer: 7,
     seed: 113,
-    twists: { fork: true, earlyConfirm: true },
+    twists: { jam: true, fork: true, hazardScale: 1.2 },
     daemons: [
-      d("a", "DATAMINE", ["1C", "55"], true),
-      d("b", "ICEPICK", ["55", "7A", "BD"], true),
-      d("c", "GHOST", ["BD", "E9"], true),
+      d("a", "DATAMINE", ["1C", "55", "7A"], true),
+      d("b", "ICEPICK", ["7A", "BD", "E9"], true),
+      d("c", "GHOST", ["E9", "FF"], true),
     ],
   },
   {
@@ -223,33 +231,39 @@ export const LEVELS: LevelDef[] = [
     name: "ALL NOISE",
     brief: "Every twist on the board.",
     size: 7,
-    buffer: 8,
+    buffer: 7,
     seed: 114,
     twists: {
       jam: true,
       sticky: true,
       scramble: true,
+      scrambleHard: true,
       fork: true,
-      earlyConfirm: true,
+      hazardScale: 1.35,
       coach: "All systems hostile. Trace carefully.",
     },
     daemons: [
-      d("a", "OVERCLOCK", ["FF", "1C", "7A"], true),
+      d("a", "OVERCLOCK", ["FF", "1C", "7A", "BD"], true),
       d("b", "SOULKILLER", ["FF", "1C", "BD", "E9"], false),
-      d("c", "RAZOR", ["55", "BD"], true),
+      d("c", "RAZOR", ["55", "BD", "E9"], true),
     ],
   },
   {
     id: 15,
     name: "DEEP STACK",
-    brief: "Long sequences. Tight buffer.",
+    brief: "Long sequences. Almost no slack.",
     size: 7,
-    buffer: 8,
+    buffer: 7,
     seed: 115,
-    twists: { jam: true, scramble: true, earlyConfirm: true },
+    twists: {
+      jam: true,
+      scramble: true,
+      scrambleHard: true,
+      hazardScale: 1.4,
+    },
     daemons: [
       d("a", "SOULKILLER", ["1C", "55", "7A", "BD"], true),
-      d("b", "GHOST", ["E9", "FF", "1C"], true),
+      d("b", "GHOST", ["BD", "E9", "FF"], true),
     ],
   },
   {
@@ -257,18 +271,19 @@ export const LEVELS: LevelDef[] = [
     name: "ROOT OVERRIDE",
     brief: "Final access point.",
     size: 7,
-    buffer: 8,
+    buffer: 7,
     seed: 116,
     twists: {
       jam: true,
       sticky: true,
       scramble: true,
+      scrambleHard: true,
       fork: true,
-      earlyConfirm: true,
+      hazardScale: 1.5,
     },
     daemons: [
       d("a", "DATAMINE", ["BD", "E9", "FF"], true),
-      d("b", "ICEPICK", ["7A", "1C", "55"], true),
+      d("b", "ICEPICK", ["FF", "7A", "1C", "55"], true),
       d("c", "SOULKILLER", ["BD", "E9", "FF", "7A"], false),
     ],
   },

@@ -38,11 +38,15 @@ export type LevelTwists = {
   jam?: boolean;
   sticky?: boolean;
   scramble?: boolean;
+  /** Scramble fires every pick (default: every other). */
+  scrambleHard?: boolean;
   fork?: boolean;
   /** Allow finishing before buffer is full. */
   earlyConfirm?: boolean;
   /** First pick restricted to top row. */
   firstRowOnly?: boolean;
+  /** 0–1 jam/sticky density scale (default 1). */
+  hazardScale?: number;
   coach?: string;
 };
 

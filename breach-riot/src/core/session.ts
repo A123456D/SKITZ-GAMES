@@ -117,8 +117,10 @@ export function tryPick(session: Session, pos: Pos): PickResult {
   let scrambled: Pos[] = [];
   if (session.level.twists.scramble && !next.ended) {
     next.scrambleAt += 1;
-    if (next.scrambleAt % 2 === 0) {
-      scrambled = scrambleUnused(next.matrix, next.rng);
+    const every = session.level.twists.scrambleHard ? 1 : 2;
+    if (next.scrambleAt % every === 0) {
+      const rate = session.level.twists.scrambleHard ? 0.26 : 0.18;
+      scrambled = scrambleUnused(next.matrix, next.rng, undefined, rate);
     }
   }
 

@@ -209,10 +209,11 @@ export function generatePuzzle(level: LevelDef): {
 
   // Place jams before path search so path avoids them.
   if (level.twists.jam) {
-    const jamCount = Math.max(1, Math.floor(size * 0.35));
+    const scale = level.twists.hazardScale ?? 1;
+    const jamCount = Math.max(2, Math.floor(size * size * 0.18 * scale));
     let placed = 0;
     let guard = 0;
-    while (placed < jamCount && guard++ < 200) {
+    while (placed < jamCount && guard++ < 400) {
       const c = Math.floor(rng() * size);
       const r = Math.floor(rng() * size);
       if (level.twists.firstRowOnly && r === 0) continue;
@@ -249,12 +250,16 @@ export function generatePuzzle(level: LevelDef): {
     matrix[p.r]![p.c]!.kind = "code";
   }
 
+  // Decoy prefixes: sprinkle sequence starts off-path so wrong routes look tempting.
+  plantDecoys(matrix, path, required, rng);
+
   if (level.twists.sticky) {
-    const stickyCount = Math.max(1, Math.floor(size * 0.2));
+    const scale = level.twists.hazardScale ?? 1;
+    const stickyCount = Math.max(2, Math.floor(size * size * 0.12 * scale));
     let placed = 0;
     let guard = 0;
     const pathSet = new Set(path.map((p) => `${p.c},${p.r}`));
-    while (placed < stickyCount && guard++ < 200) {
+    while (placed < stickyCount && guard++ < 400) {
       const c = Math.floor(rng() * size);
       const r = Math.floor(rng() * size);
       const key = `${c},${r}`;
@@ -266,6 +271,27 @@ export function generatePuzzle(level: LevelDef): {
   }
 
   return { matrix, path };
+}
+
+function plantDecoys(
+  matrix: Matrix,
+  path: Pos[],
+  required: DaemonDef[],
+  rng: () => number,
+): void {
+  if (required.length === 0) return;
+  const pathSet = new Set(path.map((p) => `${p.c},${p.r}`));
+  const prefixes = required.map((d) => d.sequence[0]!).filter(Boolean);
+  for (let r = 0; r < matrix.length; r++) {
+    for (let c = 0; c < matrix.length; c++) {
+      if (pathSet.has(`${c},${r}`)) continue;
+      const cell = matrix[r]![c]!;
+      if (cell.kind === "jam") continue;
+      if (rng() < 0.28) {
+        cell.token = prefixes[Math.floor(rng() * prefixes.length)]!;
+      }
+    }
+  }
 }
 
 /** Merge seq into existing footprint: if seq is already a subsequence, keep; else append. */
@@ -337,13 +363,14 @@ export function scrambleUnused(
   matrix: Matrix,
   rng: () => number,
   alphabet: readonly Token[] = TOKENS,
+  rate = 0.18,
 ): Pos[] {
   const changed: Pos[] = [];
   for (let r = 0; r < matrix.length; r++) {
     for (let c = 0; c < matrix.length; c++) {
       const cell = matrix[r]![c]!;
       if (cell.used || cell.kind === "jam") continue;
-      if (rng() < 0.08) {
+      if (rng() < rate) {
         cell.token = pickToken(rng, alphabet);
         changed.push({ c, r });
       }
