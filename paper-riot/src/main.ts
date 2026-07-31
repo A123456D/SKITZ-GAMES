@@ -592,7 +592,7 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
     if (wave === 0) {
       playSfx("match");
     } else {
-      playSfx("cascade");
+      playSfx("cascade", { volume: 1.15 });
       const layout = boardLayout();
       let sx = 0;
       let sy = 0;
@@ -724,7 +724,7 @@ async function handlePlaneFerry(from: Pos, beside: Pos): Promise<void> {
     const hint = groups[0]?.kind;
     if (wave === 0) playSfx("match");
     else {
-      playSfx("cascade");
+      playSfx("cascade", { volume: 1.15 });
       let sx = 0;
       let sy = 0;
       for (const key of keys) {
