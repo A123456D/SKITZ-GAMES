@@ -238,7 +238,9 @@ describe("levels", () => {
     expect(LEVELS.length).toBe(40);
     expect(getLevel(1).obstaclePlan.length).toBe(0);
     expect(getLevel(4).obstaclePlan.length).toBeGreaterThan(0);
-    expect(getLevel(4).goals.some((g) => g.type === "clear")).toBe(true);
+    expect(LEVELS.every((l) => l.goals.every((g) => g.type === "collect"))).toBe(
+      true,
+    );
     expect(getLevel(11).shape).toBe("lanes");
     expect(getLevel(40).zone).toBe("roof");
     expect(getLevel(1).brief.length).toBeGreaterThan(5);

@@ -49,8 +49,8 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
     title: "GOALS",
     lines: [
       "Each level has goals at the top of the board.",
-      "Collect stickers or peel tape before moves run out.",
-      "Clear every goal to finish the level.",
+      "Collect the stickers shown before moves run out.",
+      "Tape and junk only get in the way — they are not goals.",
     ],
     action: "goals",
     hint: "Look where the hand points — then tap NEXT",
