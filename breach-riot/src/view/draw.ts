@@ -476,7 +476,7 @@ export function boardLayout(size: number): BoardLayout {
   const cell = Math.floor((maxW - gap * (size - 1)) / size);
   const total = cell * size + gap * (size - 1);
   const originX = (W - total) / 2;
-  const originY = 290;
+  const originY = 300;
   return { originX, originY, cell, gap };
 }
 
@@ -655,9 +655,9 @@ function drawBreachTimer(ctx: CanvasRenderingContext2D, session: Session): void 
   ctx.font = "700 14px 'Chakra Petch', sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText(label, PAD, 28);
+  ctx.fillText(label, PAD, 26);
 
-  ctx.font = "800 36px 'JetBrains Mono', monospace";
+  ctx.font = "800 32px 'JetBrains Mono', monospace";
   ctx.fillStyle = !session.timerStarted
     ? theme.text
     : urgent
@@ -665,15 +665,14 @@ function drawBreachTimer(ctx: CanvasRenderingContext2D, session: Session): void 
       : running
         ? theme.accent
         : theme.dim;
-  ctx.fillText(text, PAD, 62);
+  ctx.fillText(text, PAD, 56);
 
-  // Thin bar under the clock
   const barW = 160;
   const pct = session.level.timeLimit > 0 ? secs / session.level.timeLimit : 0;
   ctx.fillStyle = theme.bg2;
-  ctx.fillRect(PAD, 72, barW, 4);
+  ctx.fillRect(PAD, 64, barW, 4);
   ctx.fillStyle = urgent ? theme.fail : theme.accent;
-  ctx.fillRect(PAD, 72, Math.max(0, barW * pct), 4);
+  ctx.fillRect(PAD, 64, Math.max(0, barW * pct), 4);
 }
 
 function drawBuffer(ctx: CanvasRenderingContext2D, session: Session): void {
@@ -683,25 +682,25 @@ function drawBuffer(ctx: CanvasRenderingContext2D, session: Session): void {
   const slotW = Math.min(72, Math.floor((W - PAD * 2 - totalGap) / slots));
   const total = slotW * slots + totalGap;
   const ox = (W - total) / 2;
-  const y = 90;
+  const y = 102;
   const occupied = slots - session.remaining;
 
   ctx.fillStyle = theme.muted;
   ctx.font = "700 16px 'Chakra Petch', sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("BUFFER", PAD, y - 12);
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("BUFFER", PAD, 88);
 
   ctx.textAlign = "right";
-  ctx.fillText(`${session.remaining} LEFT`, W - PAD, y - 12);
+  ctx.fillText(`${session.remaining} LEFT`, W - PAD, 88);
 
   let tokenIndex = 0;
   for (let i = 0; i < slots; i++) {
     const x = ox + i * (slotW + gap);
-    roundRect(ctx, x, y, slotW, 52, 6);
+    roundRect(ctx, x, y, slotW, 48, 6);
     const filled = i < occupied;
     const tok = filled ? session.buffer[tokenIndex] : undefined;
     if (filled && tok !== undefined) tokenIndex += 1;
-    // Sticky may occupy an extra slot without a second token — show dim fill.
     ctx.fillStyle = filled ? (tok ? theme.accent : "#6a9e78") : theme.bg2;
     ctx.fill();
     if (tok) {
@@ -709,40 +708,52 @@ function drawBuffer(ctx: CanvasRenderingContext2D, session: Session): void {
       ctx.font = "700 20px 'JetBrains Mono', monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(tok, x + slotW / 2, y + 27);
+      ctx.fillText(tok, x + slotW / 2, y + 25);
     } else if (filled) {
       ctx.fillStyle = theme.bg0;
       ctx.font = "700 14px 'Chakra Petch', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("×2", x + slotW / 2, y + 27);
+      ctx.fillText("×2", x + slotW / 2, y + 25);
     }
   }
 }
 
 function drawDaemons(ctx: CanvasRenderingContext2D, session: Session): void {
-  const y0 = 160;
+  const y0 = 168;
   const flashes = new Set(getFlashes().map((f) => f.id));
-  const tierLabel = ["Basic", "Advanced", "Expert"] as const;
+  // Fixed columns: name | codes (stacked) | rewards
+  const nameX = PAD;
+  const seqX0 = PAD + 168;
+  const rewardX = PAD + 400;
+  const tokStep = 44;
+
   session.daemons.forEach((d, i) => {
-    const x = PAD;
     const y = y0 + i * 36;
     const pay = DATAMINE_PAYOUT[d.tier];
     const chips: string[] = [];
     if (pay.scrap > 0) chips.push(`+${pay.scrap} SCRAP`);
     if (pay.components > 0) chips.push(`+${pay.components} COMP`);
-    const label = `${d.name} ${tierLabel[d.tier - 1]}`;
+
     ctx.fillStyle = d.completed
       ? theme.ok
       : flashes.has(d.id)
         ? theme.warn
         : theme.muted;
-    ctx.font = "700 18px 'Chakra Petch', sans-serif";
+    ctx.font = "700 16px 'Chakra Petch', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(label, x, y);
+    ctx.fillText(d.name, nameX, y);
 
-    let chipX = x + 220;
+    d.sequence.forEach((tok, si) => {
+      const lit = d.completed || si < d.matched;
+      ctx.fillStyle = lit ? theme.accent : theme.dim;
+      ctx.font = "700 18px 'JetBrains Mono', monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(tok, seqX0 + si * tokStep, y);
+    });
+
+    let chipX = rewardX;
     ctx.font = "700 12px 'Chakra Petch', sans-serif";
     for (const chip of chips) {
       const chipW = ctx.measureText(chip).width + 16;
@@ -755,16 +766,6 @@ function drawDaemons(ctx: CanvasRenderingContext2D, session: Session): void {
       ctx.fillText(chip, chipX + chipW / 2, y + 1);
       chipX += chipW + 8;
     }
-
-    let seqX = chipX + 8;
-    d.sequence.forEach((tok, si) => {
-      const lit = d.completed || si < d.matched;
-      ctx.fillStyle = lit ? theme.accent : theme.dim;
-      ctx.font = "700 16px 'JetBrains Mono', monospace";
-      ctx.textAlign = "left";
-      ctx.fillText(tok, seqX, y);
-      seqX += 40;
-    });
   });
 }
 
