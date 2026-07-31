@@ -1,0 +1,11 @@
+# Paper Riot SFX sources
+#
+# cascade, peel, crack, powers, win/lose, VO: ElevenLabs (see scripts/sfx-catalog.mjs)
+#
+# Movement / craft desk family (shared with Riot Cube, Mixkit License):
+#   ui-tap / select / mute-on ← rustle — Mixkit "Page turn single" (1104)
+#   swap                      ← slide  — Mixkit "Big paper page turn" (1105)
+#   drop                      ← sticker place (ElevenLabs, Riot Cube pack)
+#   match                     ← flutter — Mixkit "Page turn single" (1104), clear sting
+#
+# Softened with light EQ to sit with the cascade chime.
