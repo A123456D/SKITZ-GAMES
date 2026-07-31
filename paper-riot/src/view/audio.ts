@@ -47,7 +47,7 @@ const FILES: Record<SfxId, string> = {
 
 const MUTE_KEY = "paper-riot-muted";
 /** Bump when regenerating mp3s so clients skip stale cache. */
-const SFX_VERSION = 14;
+const SFX_VERSION = 15;
 
 /** Button / place clips sit near cascade loudness; leave unity. */
 const DEFAULT_VOL: Partial<Record<SfxId, number>> = {};

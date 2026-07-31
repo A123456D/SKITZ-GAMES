@@ -36,8 +36,8 @@ export const SFX_CATALOG = [
   {
     id: "cascade",
     file: "cascade.mp3",
-    duration: 0.5,
-    text: "Soft paper cascade chime, gentle sparkle paper bits, bright but quiet short pleasant",
+    duration: 0.55,
+    text: "Very satisfying puzzle cascade reward chime, warm bright sparkle success tone rising slightly, juicy cute cozy match chain payoff, clear musical pop with gentle shimmer, short and sweet, no paper, no rustle, no rip, no scrape, no cyber beep",
   },
   {
     id: "drop",
