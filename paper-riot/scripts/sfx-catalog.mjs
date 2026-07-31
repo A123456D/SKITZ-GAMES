@@ -6,32 +6,32 @@ export const SFX_CATALOG = [
   {
     id: "ui-tap",
     file: "ui-tap.mp3",
-    duration: 0.4,
-    text: "Soft paper UI tap like a scrapbook page tick, gentle paper chime sparkle bit, warm bright quiet short pleasant, same soft classroom paper family as a cascade chime, no digital beep, no cyber click, no synth",
+    duration: 0.35,
+    text: "Soft pleasant UI button tone, warm gentle blip chime, cute cozy game menu tap, short and sweet, clean and musical, no paper, no rustle, no rip, no scrape, no plastic click, no cyber beep",
   },
   {
     id: "select",
     file: "select.mp3",
-    duration: 0.45,
-    text: "Soft sticker pick-up on a desk, gentle paper lift with a tiny sparkle paper chime, warm bright quiet short pleasant, cozy classroom craft, no digital beep",
+    duration: 0.4,
+    text: "Soft pleasant select chime, warm gentle sparkle tone, cute cozy game pick sound, short and sweet, clean musical, no paper, no rustle, no peel, no sticky, no scrape",
   },
   {
     id: "swap",
     file: "swap.mp3",
-    duration: 0.5,
-    text: "Two soft paper stickers sliding past each other on a desk, gentle paper whoosh with a tiny sparkle chime, warm bright quiet short pleasant, scrapbook craft, no harsh scrape",
+    duration: 0.45,
+    text: "Soft pleasant swap whoosh tone, warm gentle musical glide between two notes, cute cozy puzzle move, short and sweet, clean and smooth, no paper, no rustle, no slide scrape, no whoosh of cardboard",
   },
   {
     id: "swap-fail",
     file: "swap-fail.mp3",
-    duration: 0.45,
-    text: "Soft muted paper bump reject, gentle dull scrapbook tap, quiet short pleasant, not harsh",
+    duration: 0.4,
+    text: "Soft muted reject tone, gentle low polite boop, short cozy puzzle deny, clean musical, no paper, no rustle, no bump thud",
   },
   {
     id: "match",
     file: "match.mp3",
     duration: 0.55,
-    text: "Soft satisfying paper tear pop, gentle scrapbook shred chime, warm pleasant candy match, soft not loud",
+    text: "Soft satisfying clear chime, warm bright sparkle pop success, cute cozy puzzle match reward, pleasant and juicy short, clean musical like a gentle cascade chime, no paper, no tear, no rip, no rustle",
   },
   {
     id: "cascade",
@@ -42,8 +42,8 @@ export const SFX_CATALOG = [
   {
     id: "drop",
     file: "drop.mp3",
-    duration: 0.45,
-    text: "Soft stickers placing down on a felt desk, gentle paper land with a tiny sparkle chime, warm bright quiet short pleasant, cozy placement settle",
+    duration: 0.4,
+    text: "Soft pleasant place tone, warm gentle settle chime, cute cozy tile land, short and sweet, clean musical, no paper, no rustle, no thud, no slap",
   },
   {
     id: "peel",
@@ -108,8 +108,8 @@ export const SFX_CATALOG = [
   {
     id: "mute-on",
     file: "mute-on.mp3",
-    duration: 0.4,
-    text: "Soft paper page flap mute, gentle scrapbook tick with a tiny sparkle paper chime, warm bright quiet short pleasant, no digital beep",
+    duration: 0.35,
+    text: "Soft pleasant mute tone, warm gentle quiet blip, short cozy UI, clean musical, no paper, no rustle, no click",
   },
   {
     id: "oops",
