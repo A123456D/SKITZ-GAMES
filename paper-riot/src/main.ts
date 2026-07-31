@@ -7,12 +7,15 @@ import {
   crushWave,
   currentMatches,
   peekSwap,
+  planPowerClear,
+  planeLandingSpot,
+  commitPowerClear,
   startSession,
   usePlaneFerry,
-  usePower,
   type Session,
 } from "./core/session";
 import type { Pos, PowerUpKind, Progress, ZoneId } from "./core/types";
+import { ROWS } from "./core/types";
 import {
   W,
   H,
@@ -50,6 +53,7 @@ import {
 } from "./view/draw";
 import {
   clearMotion,
+  getVisual,
   motionBusy,
   punchClearing,
   syncBoardMotion,
@@ -63,6 +67,16 @@ import {
   styleForTile,
   updateParticles,
 } from "./view/particles";
+import {
+  powerFxBusy,
+  startBombPulse,
+  startDiscoParty,
+  startMagnetPull,
+  startPlaneFlight,
+  startRocketFlight,
+  startStaplerRip,
+  updatePowerFx,
+} from "./view/powerFx";
 import { loadGameArt, reloadThemeArt } from "./view/stickers";
 import {
   loadSfx,
@@ -114,7 +128,7 @@ let selectedLevel = Math.min(progress.unlocked, 40);
 let session: Session = startSession(selectedLevel);
 let selected: Pos | null = null;
 let armedPower: PowerUpKind | null = null;
-/** First pick for the paper-plane swap. */
+/** First pick for the paper-plane ferry. */
 let planeFrom: Pos | null = null;
 let busy = false;
 let clearing = new Set<string>();
@@ -380,7 +394,8 @@ function isAnimating(): boolean {
     (popFx != null && popFx.t < 1) ||
     (oopsFx != null && oopsFx.t < 1) ||
     (noiceFx != null && noiceFx.t < 1) ||
-    (winFx != null && winFx.t < 1)
+    (winFx != null && winFx.t < 1) ||
+    powerFxBusy()
   );
 }
 
@@ -430,6 +445,7 @@ function tick(ts: number): void {
     winFx.t = (ts - winFx.started) / 1600;
     if (winFx.t >= 1) winFx = null;
   }
+  if (updatePowerFx(ts)) markDirty();
   if (updateParticles(dt)) markDirty();
   if (updateMotion(dt)) markDirty();
   if (screen === "play") markDirty();
@@ -641,53 +657,58 @@ async function playFailedSwap(a: Pos, b: Pos): Promise<void> {
   markDirty();
 }
 
-async function handlePlaneFerry(from: Pos, to: Pos): Promise<void> {
+async function handlePlaneFerry(from: Pos, beside: Pos): Promise<void> {
   if (busy || session.status !== "playing") return;
   busy = true;
 
-  const result = usePlaneFerry(session, from, to);
-  if (!result.ok) {
-    // Bounce the attempted swap so the miss is obvious; keep the plane armed.
-    if (result.reason === "no-match") {
-      const layout = boardLayout();
-      const midA = cellCenter(layout, from.c, from.r);
-      const midB = cellCenter(layout, to.c, to.r);
-      oopsFx = {
-        x: (midA.x + midB.x) / 2,
-        y: (midA.y + midB.y) / 2 - layout.cell * 0.15,
-        t: 0,
-        started: performance.now(),
-      };
-      swapCells(session.board, from, to);
-      syncVisuals(false);
-      playSfx("swap-fail");
-      markDirty();
-      await waitMotion();
-      swapCells(session.board, from, to);
-      syncVisuals(false);
-      markDirty();
-      await waitMotion();
-    } else {
-      playSfx("swap-fail");
-    }
+  const landed = planeLandingSpot(session, from, beside);
+  if (!landed) {
+    const layout = boardLayout();
+    const midA = cellCenter(layout, from.c, from.r);
+    const midB = cellCenter(layout, beside.c, beside.r);
+    oopsFx = {
+      x: (midA.x + midB.x) / 2,
+      y: (midA.y + midB.y) / 2 - layout.cell * 0.15,
+      t: 0,
+      started: performance.now(),
+    };
+    playSfx("swap-fail");
     planeFrom = null;
     busy = false;
     markDirty();
     return;
   }
 
+  const layout = boardLayout();
+  const fromMid = cellCenter(layout, from.c, from.r);
+  const landMid = cellCenter(layout, landed.c, landed.r);
+  const passenger = session.board[from.c]![from.r]!;
+  playSfx(powerSfx("plane"), { vary: false });
+
+  await startPlaneFlight({
+    x0: fromMid.x,
+    y0: fromMid.y,
+    x1: landMid.x,
+    y1: landMid.y,
+    passengerKind: passenger.kind,
+    hideId: passenger.id,
+  });
+
+  const result = usePlaneFerry(session, from, beside);
   planeFrom = null;
   armedPower = null;
   selected = null;
+  if (!result.ok) {
+    playSfx("swap-fail");
+    busy = false;
+    markDirty();
+    return;
+  }
 
-  const layout = boardLayout();
-  const fromMid = cellCenter(layout, from.c, from.r);
-  const toMid = cellCenter(layout, to.c, to.r);
   const pstyle = styleForPower("plane");
-  stampFx(fromMid.x, fromMid.y, pstyle);
-  stampFx(toMid.x, toMid.y, pstyle);
-  popFx = { x: toMid.x, y: toMid.y, t: 0, started: performance.now() };
-  playSfx(powerSfx("plane"), { vary: false });
+  stampFx(landMid.x, landMid.y, pstyle);
+  popFx = { x: landMid.x, y: landMid.y, t: 0, started: performance.now() };
+  burstAt(landMid.x, landMid.y, 8, pstyle);
 
   syncVisuals(false);
   markDirty();
@@ -737,27 +758,84 @@ async function handlePlaneFerry(from: Pos, to: Pos): Promise<void> {
 
 async function handlePower(kind: PowerUpKind, target: Pos): Promise<void> {
   if (kind === "plane") return;
-  if (busy) return;
+  if (busy || session.status !== "playing") return;
   busy = true;
-  const layout = boardLayout();
-  const center = cellCenter(layout, target.c, target.r);
-  const pstyle = styleForPower(kind);
-  stampFx(center.x, center.y, pstyle);
-  popFx = { x: center.x, y: center.y, t: 0, started: performance.now() };
-  playSfx(powerSfx(kind), { vary: false });
 
-  const result = usePower(session, kind, target);
-  armedPower = null;
-  planeFrom = null;
-  selected = null;
-  if (!result.ok) {
+  const planned = planPowerClear(session, kind, target);
+  if (!planned.ok) {
+    playSfx("swap-fail");
     busy = false;
     markDirty();
     return;
   }
-  for (const p of result.cleared) {
+
+  const layout = boardLayout();
+  const center = cellCenter(layout, target.c, target.r);
+  const cells = planned.cleared.map((p) => cellCenter(layout, p.c, p.r));
+  playSfx(powerSfx(kind), { vary: false });
+
+  if (kind === "bomb") {
+    await startBombPulse({ x: center.x, y: center.y });
+    stampFx(center.x, center.y, "bomb");
+    for (const mid of cells) burstAt(mid.x, mid.y, 6, "bomb");
+  } else if (kind === "rocket") {
+    const bottom = cellCenter(layout, target.c, ROWS - 1);
+    const top = cellCenter(layout, target.c, 0);
+    await startRocketFlight({
+      x: center.x,
+      y0: bottom.y + layout.cell * 0.4,
+      y1: top.y - layout.cell * 0.6,
+      rowH: layout.cell + layout.gap,
+    });
+    stampFx(top.x, top.y, "bits");
+    for (const mid of cells) burstAt(mid.x, mid.y, 4, "splat");
+  } else if (kind === "magnet") {
+    await startMagnetPull({ x: center.x, y: center.y, pulls: cells });
+    for (const p of planned.cleared) {
+      const cell = session.board[p.c]![p.r];
+      if (!cell) continue;
+      const v = getVisual(cell.id);
+      if (v) {
+        v.tx = center.x;
+        v.ty = center.y;
+        v.tScale = 0.55;
+      }
+    }
+    markDirty();
+    await waitMotion();
+    stampFx(center.x, center.y, "star");
+    burstAt(center.x, center.y, 14, "star");
+  } else if (kind === "stapler") {
+    await startStaplerRip({ cells });
+    for (const mid of cells) burstAt(mid.x, mid.y, 5, "bits");
+    stampFx(center.x, center.y, "bits");
+  } else if (kind === "disco") {
+    await startDiscoParty({ cells });
+    stampFx(center.x, center.y, "bomb");
+    popFx = { x: center.x, y: center.y - 40, t: 0, started: performance.now() };
+  } else {
+    stampFx(center.x, center.y, styleForPower(kind));
+  }
+
+  const ids = planned.cleared
+    .map((p) => session.board[p.c]![p.r]?.id)
+    .filter((id): id is number => id != null);
+  punchClearing(ids);
+  popFx = popFx ?? {
+    x: center.x,
+    y: center.y,
+    t: 0,
+    started: performance.now(),
+  };
+
+  commitPowerClear(session, kind, planned.cleared);
+  armedPower = null;
+  planeFrom = null;
+  selected = null;
+
+  for (const p of planned.cleared) {
     const mid = cellCenter(layout, p.c, p.r);
-    burstAt(mid.x, mid.y, 4, pstyle);
+    burstAt(mid.x, mid.y, 4, styleForPower(kind));
   }
   await settleStickers();
   busy = false;

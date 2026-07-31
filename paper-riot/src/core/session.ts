@@ -257,6 +257,18 @@ export function usePower(
   kind: PowerUpKind,
   target: Pos,
 ): { ok: true; cleared: Pos[] } | { ok: false; reason: string } {
+  const planned = planPowerClear(session, kind, target);
+  if (!planned.ok) return planned;
+  commitPowerClear(session, kind, planned.cleared);
+  return { ok: true, cleared: planned.cleared };
+}
+
+/** Preview which cells a power would clear (no board mutation). */
+export function planPowerClear(
+  session: Session,
+  kind: PowerUpKind,
+  target: Pos,
+): { ok: true; cleared: Pos[] } | { ok: false; reason: string } {
   if (session.status !== "playing") return { ok: false, reason: "busy" };
   if ((session.powers[kind] ?? 0) <= 0) return { ok: false, reason: "empty" };
   if (!isPlayable(session.mask, target.c, target.r)) {
@@ -281,10 +293,8 @@ export function usePower(
   } else if (kind === "plane") {
     return { ok: false, reason: "use-plane-ferry" };
   } else if (kind === "rocket") {
-    // Rocket launches straight up the column.
     for (let r = 0; r < ROWS; r++) add(target.c, r);
   } else if (kind === "magnet") {
-    // Magnet pulls every sticker of the tapped type.
     const kindTile = session.board[target.c]![target.r]?.kind;
     if (!kindTile) return { ok: false, reason: "empty-cell" };
     for (let c = 0; c < COLS; c++) {
@@ -293,7 +303,6 @@ export function usePower(
       }
     }
   } else if (kind === "stapler") {
-    // Staple a 2×2 paper packet and rip the stack off the desk.
     let c0 = Math.min(target.c, COLS - 2);
     let r0 = Math.min(target.r, ROWS - 2);
     c0 = Math.max(0, c0);
@@ -302,7 +311,6 @@ export function usePower(
       for (let dr = 0; dr <= 1; dr++) add(c0 + dc, r0 + dr);
     }
   } else if (kind === "disco") {
-    // Disco bomb: party pop on the board + bank +5 moves (matches the +5 badge).
     add(target.c, target.r);
     let n = 0;
     let guard = 0;
@@ -313,30 +321,19 @@ export function usePower(
       add(c, r);
       if (cleared.length > before) n++;
     }
-    applyGoalTiles(session, cleared);
-    for (const p of cleared) {
-      const cell = session.board[p.c]![p.r];
-      if (cell) {
-        delete cell.obstacle;
-        delete cell.hits;
-      }
-    }
-    const nCleared = clearPositions(
-      session.board,
-      session.mask,
-      cleared,
-      session.palette,
-    );
-    session.score += nCleared * 15;
-    session.powers[kind] -= 1;
-    session.movesLeft += 5;
-    syncClearGoals(session);
-    resolveCascades(session);
-    return { ok: true, cleared };
   } else {
     return { ok: false, reason: "unknown" };
   }
 
+  return { ok: true, cleared };
+}
+
+/** Apply a planned power clear (mutates board + spend charge). */
+export function commitPowerClear(
+  session: Session,
+  kind: PowerUpKind,
+  cleared: Pos[],
+): void {
   applyGoalTiles(session, cleared);
   for (const p of cleared) {
     const cell = session.board[p.c]![p.r];
@@ -353,51 +350,81 @@ export function usePower(
   );
   session.score += n * 15;
   session.powers[kind] -= 1;
-  session.movesLeft -= 1;
+  if (kind === "disco") session.movesLeft += 5;
+  else session.movesLeft -= 1;
   syncClearGoals(session);
   resolveCascades(session);
-  return { ok: true, cleared };
 }
 
 /**
- * Paper plane: swap the two selected stickers exactly (any distance).
- * Only succeeds when that swap creates a match — otherwise the board is unchanged.
+ * Pick the landing cell beside `beside` — prefer the near side toward `from`,
+ * and only accept a spot that creates a match when the passenger lands there.
+ */
+export function planeLandingSpot(
+  session: Session,
+  from: Pos,
+  beside: Pos,
+): Pos | null {
+  if (
+    !isPlayable(session.mask, from.c, from.r) ||
+    !isPlayable(session.mask, beside.c, beside.r)
+  ) {
+    return null;
+  }
+  const passenger = session.board[from.c]![from.r];
+  if (!passenger || !canSwapCell(passenger)) return null;
+  if (!session.board[beside.c]![beside.r]) return null;
+
+  const candidates: Pos[] = [];
+  for (const [dc, dr] of [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ] as const) {
+    const p = { c: beside.c + dc, r: beside.r + dr };
+    if (!isPlayable(session.mask, p.c, p.r)) continue;
+    if (p.c === from.c && p.r === from.r) continue;
+    if (!canSwapCell(session.board[p.c]![p.r])) continue;
+    candidates.push(p);
+  }
+  if (!candidates.length) return null;
+
+  candidates.sort((a, b) => {
+    const da = (a.c - from.c) ** 2 + (a.r - from.r) ** 2;
+    const db = (b.c - from.c) ** 2 + (b.r - from.r) ** 2;
+    return da - db;
+  });
+
+  for (const p of candidates) {
+    if (swapCreatesMatch(session.board, session.mask, from, p)) return p;
+  }
+  return null;
+}
+
+/**
+ * Paper plane ferry: fly `from` so it lands orthogonally beside `beside`.
+ * Lands on the near-side cell when that creates a match; otherwise fails.
  */
 export function usePlaneFerry(
   session: Session,
   from: Pos,
-  to: Pos,
+  beside: Pos,
 ): { ok: true; landed: Pos } | { ok: false; reason: string } {
   if (session.status !== "playing") return { ok: false, reason: "busy" };
   if ((session.powers.plane ?? 0) <= 0) return { ok: false, reason: "empty" };
-  if (
-    !isPlayable(session.mask, from.c, from.r) ||
-    !isPlayable(session.mask, to.c, to.r)
-  ) {
-    return { ok: false, reason: "bad-target" };
-  }
-  if (from.c === to.c && from.r === to.r) {
+  if (from.c === beside.c && from.r === beside.r) {
     return { ok: false, reason: "same-cell" };
   }
 
-  const passenger = session.board[from.c]![from.r];
-  const target = session.board[to.c]![to.r];
-  if (!passenger || !canSwapCell(passenger)) {
-    return { ok: false, reason: "blocked-from" };
-  }
-  if (!target || !canSwapCell(target)) {
-    return { ok: false, reason: "blocked-to" };
-  }
+  const landed = planeLandingSpot(session, from, beside);
+  if (!landed) return { ok: false, reason: "no-match" };
 
-  if (!swapCreatesMatch(session.board, session.mask, from, to)) {
-    return { ok: false, reason: "no-match" };
-  }
-
-  swapCells(session.board, from, to);
+  swapCells(session.board, from, landed);
   session.powers.plane -= 1;
   session.movesLeft -= 1;
   session.score += 20;
-  return { ok: true, landed: to };
+  return { ok: true, landed };
 }
 
 export function trySwap(

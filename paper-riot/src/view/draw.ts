@@ -18,6 +18,7 @@ import {
 } from "./stickers";
 import { Palette, THEME_LABELS, getTheme } from "./theme";
 import { drawParticles } from "./particles";
+import { drawPowerFx, powerFxHideId } from "./powerFx";
 import { floatPose, getVisual } from "./motion";
 import { audioModeLabel, getAudioMode } from "./audioMode";
 
@@ -805,6 +806,7 @@ export function drawPlay(
       const key = `${c},${r}`;
       const cell = session.board[c]![r];
       if (!cell) continue;
+      if (powerFxHideId() === cell.id) continue;
       const clearing = opts.clearing.has(key);
       const selected =
         !!opts.selected && opts.selected.c === c && opts.selected.r === r;
@@ -948,6 +950,7 @@ export function drawPlay(
   }
 
   drawParticles(ctx);
+  drawPowerFx(ctx);
 
   const dock = powerDockFor(session.level.id);
   for (const slot of dock) {
@@ -1006,7 +1009,7 @@ export function drawPlay(
     const blurb =
       opts.armedPower === "plane"
         ? opts.planeFrom
-          ? "PLANE — tap the sticker to swap with"
+          ? "PLANE — tap who it lands beside"
           : "PLANE — tap a sticker to fly"
         : POWER_BLURBS[opts.armedPower];
     ctx.fillText(blurb, W / 2, 1090);

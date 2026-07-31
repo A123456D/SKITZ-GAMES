@@ -6,8 +6,8 @@ export const SFX_CATALOG = [
   {
     id: "ui-tap",
     file: "ui-tap.mp3",
-    duration: 0.5,
-    text: "Very soft quiet paper UI tap, gentle scrapbook tick, tiny warm short, pleasant no harsh punch",
+    duration: 0.35,
+    text: "Extremely soft quiet paper button press, gentle fingertip tap on scrapbook cardstock, tiny warm paper thud, cozy craft desk, organic and natural, no digital beep, no UI click, no cyber blip, no synth, no electronic tick",
   },
   {
     id: "select",
@@ -108,8 +108,8 @@ export const SFX_CATALOG = [
   {
     id: "mute-on",
     file: "mute-on.mp3",
-    duration: 0.5,
-    text: "Tiny soft mute click, quiet volume off UI, very short gentle",
+    duration: 0.35,
+    text: "Very soft quiet paper page turn, gentle scrapbook flap mute, tiny warm organic short, no digital beep, no cyber click, no electronic switch",
   },
   {
     id: "oops",

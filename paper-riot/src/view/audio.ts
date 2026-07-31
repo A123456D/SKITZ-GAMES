@@ -47,7 +47,13 @@ const FILES: Record<SfxId, string> = {
 
 const MUTE_KEY = "paper-riot-muted";
 /** Bump when regenerating mp3s so clients skip stale cache. */
-const SFX_VERSION = 10;
+const SFX_VERSION = 11;
+
+/** Soften button taps so they stay craft-paper, not loud UI. */
+const DEFAULT_VOL: Partial<Record<SfxId, number>> = {
+  "ui-tap": 0.7,
+  "mute-on": 0.65,
+};
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -174,7 +180,7 @@ export function playSfx(
   const buf = buffers.get(id);
   if (!buf || !master) {
     // Fallback if WebAudio decode missed this clip (cache / race).
-    void playHtmlFallback(id, opts?.volume ?? 1);
+    void playHtmlFallback(id, opts?.volume ?? DEFAULT_VOL[id] ?? 1);
     return;
   }
   if (audio.state === "suspended") void audio.resume();
@@ -188,13 +194,13 @@ export function playSfx(
     : base;
 
   const gain = audio.createGain();
-  gain.gain.value = opts?.volume ?? 1;
+  gain.gain.value = opts?.volume ?? DEFAULT_VOL[id] ?? 1;
   src.connect(gain);
   gain.connect(master);
   try {
     src.start(0);
   } catch {
-    void playHtmlFallback(id, opts?.volume ?? 1);
+    void playHtmlFallback(id, opts?.volume ?? DEFAULT_VOL[id] ?? 1);
   }
 }
 
