@@ -14,7 +14,7 @@ import {
 } from "./board";
 import { shapeMask } from "./shapes";
 import { getLevel, LEVELS } from "./levels";
-import { startSession, trySwap, usePlaneFerry, usePower, chargeFailedSwap, planeLandingSpot } from "./session";
+import { startSession, trySwap, usePlaneFerry, usePower, chargeFailedSwap, planeLandingSpot, earnPowersFromMatches } from "./session";
 import { paletteForLevel, type Board, type BoardMask } from "./types";
 
 function fullMask(): BoardMask {
@@ -249,13 +249,30 @@ describe("levels", () => {
 });
 
 describe("session", () => {
-  it("starts with level powers and goals", () => {
+  it("starts with empty powers and level goals", () => {
     const s = startSession(1);
     expect(s.movesLeft).toBe(getLevel(1).moves);
     expect(s.goals.length).toBeGreaterThanOrEqual(2);
-    expect(s.powers.bomb).toBeGreaterThan(0);
+    expect(s.powers.bomb).toBe(0);
     expect(s.powers.disco).toBe(0);
     expect(s.status).toBe("playing");
+  });
+
+  it("earns a bomb from a match of 4", () => {
+    const s = startSession(1);
+    const earned = earnPowersFromMatches(s, [
+      {
+        cells: [
+          { c: 0, r: 0 },
+          { c: 1, r: 0 },
+          { c: 2, r: 0 },
+          { c: 3, r: 0 },
+        ],
+        kind: "star",
+      },
+    ]);
+    expect(earned).toEqual(["bomb"]);
+    expect(s.powers.bomb).toBe(1);
   });
 
   it("trySwap returns a result", () => {

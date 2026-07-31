@@ -102,12 +102,12 @@ export const POWERUP_KINDS = [
 export type PowerUpKind = (typeof POWERUP_KINDS)[number];
 
 export const POWER_BLURBS: Record<PowerUpKind, string> = {
-  bomb: "BOMB — explode a 3×3 cluster",
-  plane: "PLANE — fly a sticker beside another (must match)",
-  rocket: "ROCKET — blast up the whole column",
+  bomb: "BOMB — explode a 3×3 (earn with a match of 4)",
+  plane: "PLANE — fly a sticker beside another (earn with a match of 5)",
+  rocket: "ROCKET — blast a column (earn with a match of 5)",
   magnet: "MAGNET — pull every sticker of that type",
   stapler: "STAPLER — staple a 2×2 packet and rip it off",
-  disco: "DISCO — party clear + bank 5 moves",
+  disco: "DISCO — party clear + bank 5 moves (earn with a match of 6+)",
 };
 
 export const OBSTACLE_HITS: Record<ObstacleKind, number> = {
@@ -211,7 +211,7 @@ export type LevelDef = {
   /** Optional explicit palette; otherwise first N of TILE_KINDS + goals. */
   palette?: TileKind[];
   obstaclePlan: ObstacleSpec[];
-  /** Starting power charges for this level (missing = 0). */
+  /** Featured powers for this level (legacy starting counts ignored — earned in play). */
   powers: Partial<Record<PowerUpKind, number>>;
   /** Map node position 0..1 within zone path. */
   mapT: number;

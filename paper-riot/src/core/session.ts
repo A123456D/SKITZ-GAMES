@@ -14,7 +14,7 @@ import {
   canSwapCell,
 } from "./board";
 import { countObstacles, isLineImmune } from "./obstacles";
-import { getLevel } from "./levels";
+import { getLevel, unlockedPowers } from "./levels";
 import type {
   Goal,
   GoalDef,
@@ -66,12 +66,56 @@ function hydrateGoals(defs: GoalDef[]): Goal[] {
   );
 }
 
-function powersFromLevel(def: LevelDef): PowerInventory {
-  const p = emptyPowers();
-  for (const k of POWERUP_KINDS) {
-    p[k] = def.powers[k] ?? 0;
+function powersFromLevel(_def: LevelDef): PowerInventory {
+  // Powers are earned in-play (match 4+). Levels no longer hand out free charges.
+  return emptyPowers();
+}
+
+/** Soft cap so earned charges don't pile up endlessly. */
+const POWER_CHARGE_CAP = 3;
+
+function pickEarnable(
+  unlocked: PowerUpKind[],
+  preference: PowerUpKind[],
+): PowerUpKind | null {
+  for (const k of preference) {
+    if (unlocked.includes(k)) return k;
   }
-  return p;
+  return unlocked[0] ?? null;
+}
+
+/** Which power a match of this size should grant (null if too small). */
+export function powerForMatchSize(
+  size: number,
+  levelId: number,
+): PowerUpKind | null {
+  if (size < 4) return null;
+  const unlocked = unlockedPowers(levelId);
+  if (!unlocked.length) return null;
+  if (size >= 6) {
+    return pickEarnable(unlocked, ["disco", "magnet", "rocket", "bomb"]);
+  }
+  if (size >= 5) {
+    return pickEarnable(unlocked, ["rocket", "plane", "magnet", "bomb"]);
+  }
+  return pickEarnable(unlocked, ["bomb", "stapler", "plane"]);
+}
+
+/** Grant charges from big matches. Returns what was earned this wave. */
+export function earnPowersFromMatches(
+  session: Session,
+  groups: MatchGroup[],
+): PowerUpKind[] {
+  const earned: PowerUpKind[] = [];
+  for (const g of groups) {
+    const kind = powerForMatchSize(g.cells.length, session.level.id);
+    if (!kind) continue;
+    const next = Math.min(POWER_CHARGE_CAP, (session.powers[kind] ?? 0) + 1);
+    if (next === (session.powers[kind] ?? 0)) continue;
+    session.powers[kind] = next;
+    earned.push(kind);
+  }
+  return earned;
 }
 
 export function startSession(level: LevelDef | number = 1): Session {
@@ -189,8 +233,12 @@ export function currentMatches(session: Session): MatchGroup[] {
   return findMatches(session.board, session.mask);
 }
 
-export function crushWave(session: Session, groups: MatchGroup[]): void {
-  if (!groups.length) return;
+export function crushWave(
+  session: Session,
+  groups: MatchGroup[],
+): PowerUpKind[] {
+  if (!groups.length) return [];
+  const earned = earnPowersFromMatches(session, groups);
   applyGoalProgress(session, groups);
   damageAdjacentObstacles(session.board, session.mask, groups);
   const cleared = crushAndRefill(
@@ -201,6 +249,7 @@ export function crushWave(session: Session, groups: MatchGroup[]): void {
   );
   session.score += cleared * 10;
   checkEnd(session);
+  return earned;
 }
 
 export function peekSwap(session: Session, a: Pos, b: Pos): boolean {

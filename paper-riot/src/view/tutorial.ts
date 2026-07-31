@@ -58,9 +58,9 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     title: "POWERS",
     lines: [
-      "Power stickers live under the board.",
+      "Match 4+ to earn power charges under the board.",
       "Tap a charged power, then tap a sticker to use it.",
-      "Arm the bomb the hand is pointing at.",
+      "Arm the practice bomb the hand is pointing at.",
     ],
     action: "power",
     hint: "Tap the bomb — follow the hand",

@@ -163,6 +163,7 @@ function beginTutorial(from: "home" | "play" | "menu"): void {
   selectedLevel = 1;
   syncZoneFromLevel(1);
   session = startSession(1);
+  session.powers.bomb = 1;
   selected = null;
   armedPower = null;
   planeFrom = null;
