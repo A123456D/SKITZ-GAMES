@@ -6,6 +6,7 @@ import {
   saveProgress,
   tryBuyAlmostIn,
   tryBuyBuffer,
+  tryBuyCompTime,
   tryBuyTime,
   tryUnlockDistrict,
 } from "./core/save";
@@ -161,6 +162,15 @@ function onPointer(clientX: number, clientY: number): void {
     }
     if (id === "deck-almost") {
       const next = tryBuyAlmostIn(progress);
+      if (next) {
+        progress = next;
+        saveProgress(progress);
+        playComplete();
+      } else playIllegal();
+      return;
+    }
+    if (id === "deck-comp-time") {
+      const next = tryBuyCompTime(progress);
       if (next) {
         progress = next;
         saveProgress(progress);

@@ -46,7 +46,7 @@ export type Session = {
 };
 
 export function startSession(level: LevelDef, deck: Deck): Session {
-  const bufferSize = effectiveBuffer(level.buffer, deck);
+  const bufferSize = effectiveBuffer(level.buffer, deck, level.district);
   const timeLimit = effectiveTimeLimit(level.timeLimit, deck);
   const playLevel: LevelDef = {
     ...level,
@@ -60,6 +60,13 @@ export function startSession(level: LevelDef, deck: Deck): Session {
     matched: 0,
     completed: false,
   }));
+  const expert = level.datamines.find((d) => d.tier === 3);
+  let coach = level.twists.coach ?? null;
+  if (expert && expert.sequence.length + 2 > bufferSize) {
+    coach =
+      (coach ? coach + " " : "") +
+      "Expert may need a longer buffer — upgrade the Deck after Watson.";
+  }
   return {
     level: playLevel,
     matrix,
@@ -76,7 +83,7 @@ export function startSession(level: LevelDef, deck: Deck): Session {
     loot: { scrap: 0, components: 0 },
     scrambleAt: 0,
     rng: mulberry32(level.seed ^ 0x9e3779b9),
-    coach: level.twists.coach ?? null,
+    coach,
     timerStarted: false,
     timeLeft: timeLimit,
     timedOut: false,
@@ -149,6 +156,9 @@ export function tryPick(session: Session, pos: Pos): PickResult {
 
   if (remaining === 0 || currentLegal(next).length === 0) {
     next = resolveRound(next);
+  } else if (next.daemons.every((d) => d.completed)) {
+    // All Datamines uploaded — don't force junk filler picks.
+    next = resolveRound(next);
   }
 
   return { ok: true, session: next, scrambled };
@@ -176,10 +186,14 @@ export function expireTimer(session: Session): Session {
   };
 }
 
+/** Cash out after at least one Datamine is complete. */
+export function canConfirm(session: Session): boolean {
+  if (session.ended || session.buffer.length === 0) return false;
+  return session.daemons.some((d) => d.completed);
+}
+
 export function confirmEarly(session: Session): Session {
-  if (session.ended) return session;
-  if (!session.level.twists.earlyConfirm) return session;
-  if (session.buffer.length === 0) return session;
+  if (!canConfirm(session)) return session;
   return resolveRound(session);
 }
 

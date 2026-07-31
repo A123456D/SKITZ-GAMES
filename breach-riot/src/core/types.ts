@@ -89,6 +89,8 @@ export type Deck = {
   timeBonus: number;
   /** Almost In perk purchased once (+5s flat when owned). */
   almostIn: boolean;
+  /** Comp-bought flat +2s (stacks with timeBonus). */
+  compTime: number;
 };
 
 export type Progress = {

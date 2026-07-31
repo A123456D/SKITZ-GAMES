@@ -32,13 +32,20 @@ export function lootForClears(daemons: DatamineProgress[]): Loot {
   return { scrap, components };
 }
 
-export function effectiveBuffer(base: number, deck: Deck): number {
-  return Math.min(8, base + deck.bufferBonus);
+export function effectiveBuffer(
+  base: number,
+  deck: Deck,
+  /** Watson (0) ignores buffer upgrades so teaching levels stay tight. */
+  district = 0,
+): number {
+  const bonus = district === 0 ? 0 : deck.bufferBonus;
+  return Math.min(8, base + bonus);
 }
 
 export function effectiveTimeLimit(base: number, deck: Deck): number {
   const almost = deck.almostIn ? ALMOST_IN_SECONDS : 0;
-  return base + deck.timeBonus + almost;
+  const comp = deck.compTime ?? 0;
+  return base + deck.timeBonus + almost + comp;
 }
 
 /** Scrap cost for next buffer upgrade (0-indexed current bonus). */
@@ -55,7 +62,11 @@ export function timeUpgradeCost(currentBonus: number): number | null {
 }
 
 /** One-time Almost In perk (components). */
-export const ALMOST_IN_COST = 6;
+export const ALMOST_IN_COST = 4;
+
+/** Small mid-game Comp sink — +2s breach time. */
+export const COMP_TIME_COST = 2;
+export const COMP_TIME_SECONDS = 2;
 
 /** Scrap to unlock district N (1-based next district index). */
 export function districtUnlockCost(nextDistrict: number): number {

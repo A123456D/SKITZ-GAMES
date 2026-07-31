@@ -5,6 +5,8 @@ import {
   DISTRICT_LAST_LEVEL,
   districtUnlockCost,
   timeUpgradeCost,
+  COMP_TIME_COST,
+  COMP_TIME_SECONDS,
 } from "./economy";
 import type { Deck, Progress } from "./types";
 import { MAX_BUFFER_BONUS, MAX_TIME_BONUS } from "./types";
@@ -15,6 +17,7 @@ const DEFAULT_DECK: Deck = {
   bufferBonus: 0,
   timeBonus: 0,
   almostIn: false,
+  compTime: 0,
 };
 
 const DEFAULT: Progress = {
@@ -38,6 +41,7 @@ function normalizeDeck(raw: Partial<Deck> | undefined): Deck {
       Math.min(MAX_TIME_BONUS, Number(raw?.timeBonus) || 0),
     ),
     almostIn: raw?.almostIn === true,
+    compTime: Math.max(0, Number(raw?.compTime) || 0),
   };
 }
 
@@ -77,7 +81,9 @@ export function applyWin(
   const prev = progress.stars[levelId] ?? 0;
   const nextStars = { ...progress.stars, [levelId]: Math.max(prev, stars) };
   let unlocked = progress.unlocked;
-  if (stars > 0) {
+  // L1 can advance on a single Datamine; after that need V1+V2 (2★).
+  const need = levelId <= 1 ? 1 : 2;
+  if (stars >= need) {
     unlocked = Math.max(unlocked, Math.min(levelCount, levelId + 1));
   }
 
@@ -103,7 +109,7 @@ export function tryUnlockDistrict(progress: Progress): Progress | null {
   const next = progress.district + 1;
   if (next >= DISTRICT_LAST_LEVEL.length) return null;
   const gateLevel = DISTRICT_LAST_LEVEL[progress.district]!;
-  const cleared = (progress.stars[gateLevel] ?? 0) >= 1;
+  const cleared = (progress.stars[gateLevel] ?? 0) >= 2;
   if (!cleared) return null;
   const cost = districtUnlockCost(next);
   if (progress.scrap < cost) return null;
@@ -126,7 +132,7 @@ export function canUnlockDistrict(progress: Progress): {
     return { ok: false, cost: 0, reason: "max" };
   }
   const gateLevel = DISTRICT_LAST_LEVEL[progress.district]!;
-  const cleared = (progress.stars[gateLevel] ?? 0) >= 1;
+  const cleared = (progress.stars[gateLevel] ?? 0) >= 2;
   const cost = districtUnlockCost(next);
   if (!cleared) return { ok: false, cost, reason: "clear" };
   if (progress.scrap < cost) return { ok: false, cost, reason: "scrap" };
@@ -170,9 +176,23 @@ export function tryBuyAlmostIn(progress: Progress): Progress | null {
   };
 }
 
+export function tryBuyCompTime(progress: Progress): Progress | null {
+  if (progress.components < COMP_TIME_COST) return null;
+  return {
+    ...progress,
+    components: progress.components - COMP_TIME_COST,
+    deck: {
+      ...progress.deck,
+      compTime: (progress.deck.compTime ?? 0) + COMP_TIME_SECONDS,
+    },
+  };
+}
+
 export {
   districtForLevel,
   bufferUpgradeCost,
   timeUpgradeCost,
   ALMOST_IN_COST,
+  COMP_TIME_COST,
+  COMP_TIME_SECONDS,
 };

@@ -1,7 +1,10 @@
 import type { Session } from "../core/session";
+import { canConfirm } from "../core/session";
 import { LEVELS } from "../core/levels";
 import {
   ALMOST_IN_COST,
+  COMP_TIME_COST,
+  COMP_TIME_SECONDS,
   bufferUpgradeCost,
   DATAMINE_PAYOUT,
   DISTRICT_NAMES,
@@ -194,7 +197,7 @@ const HOW_PANELS = [
   },
   {
     title: "REWARDS",
-    body: "Spend Scrap in the Deck to upgrade buffer and time. Spend Scrap on the Access Map to unlock the next district.",
+    body: "Spend Scrap in the Deck to upgrade buffer and time. Clear at least two Datamines to advance. Spend Scrap on the Access Map to unlock the next district (gate needs 2★).",
   },
 ];
 
@@ -381,9 +384,9 @@ export function drawMap(
 
 export function deckButtons(progress: Progress): UiButton[] {
   const bw = W - PAD * 2;
-  const bh = 64;
+  const bh = 56;
   const cx = PAD;
-  let y = 520;
+  let y = 480;
   const bufCost = bufferUpgradeCost(progress.deck.bufferBonus);
   const timeCost = timeUpgradeCost(progress.deck.timeBonus);
   return [
@@ -398,15 +401,23 @@ export function deckButtons(progress: Progress): UiButton[] {
     {
       id: "deck-time",
       x: cx,
-      y: (y += bh + 16),
+      y: (y += bh + 12),
       w: bw,
       h: bh,
       label: timeCost !== null ? `TIME +3s (${timeCost} SCRAP)` : "TIME MAX",
     },
     {
+      id: "deck-comp-time",
+      x: cx,
+      y: (y += bh + 12),
+      w: bw,
+      h: bh,
+      label: `TIME +${COMP_TIME_SECONDS}s (${COMP_TIME_COST} COMP)`,
+    },
+    {
       id: "deck-almost",
       x: cx,
-      y: (y += bh + 16),
+      y: (y += bh + 12),
       w: bw,
       h: bh,
       label: progress.deck.almostIn
@@ -416,7 +427,7 @@ export function deckButtons(progress: Progress): UiButton[] {
     {
       id: "deck-back",
       x: cx,
-      y: (y += bh + 16),
+      y: (y += bh + 12),
       w: bw,
       h: bh,
       label: "BACK",
@@ -444,10 +455,18 @@ export function drawDeck(
   ctx.fillText(`BUFFER BONUS  +${progress.deck.bufferBonus}`, PAD, 220);
   ctx.fillText(`TIME BONUS  +${progress.deck.timeBonus}s`, PAD, 260);
   ctx.fillText(
-    `ALMOST IN  ${progress.deck.almostIn ? "OWNED (+5s)" : "LOCKED"}`,
+    `COMP TIME  +${progress.deck.compTime ?? 0}s`,
     PAD,
     300,
   );
+  ctx.fillText(
+    `ALMOST IN  ${progress.deck.almostIn ? "OWNED (+5s)" : "LOCKED"}`,
+    PAD,
+    340,
+  );
+  ctx.fillStyle = theme.dim;
+  ctx.font = "600 16px 'Chakra Petch', sans-serif";
+  ctx.fillText("Buffer upgrades apply after Watson district.", PAD, 380);
   ctx.textAlign = "right";
   ctx.fillText(`SCRAP  ${progress.scrap}`, W - PAD, 220);
   ctx.fillText(`COMP  ${progress.components}`, W - PAD, 260);
@@ -457,8 +476,12 @@ export function drawDeck(
     const muted =
       (b.id === "deck-buffer" && bufferUpgradeCost(progress.deck.bufferBonus) === null) ||
       (b.id === "deck-time" && timeUpgradeCost(progress.deck.timeBonus) === null) ||
-      (b.id === "deck-almost" && progress.deck.almostIn);
-    drawButton(ctx, b, { primary: b.id.startsWith("deck-") && b.id !== "deck-back", muted });
+      (b.id === "deck-almost" && progress.deck.almostIn) ||
+      (b.id === "deck-comp-time" && progress.components < COMP_TIME_COST);
+    drawButton(ctx, b, {
+      primary: b.id !== "deck-back",
+      muted,
+    });
   }
   return buttons;
 }
@@ -504,14 +527,14 @@ export function playButtons(session: Session): UiButton[] {
   const buttons: UiButton[] = [
     { id: "play-menu", x: W - PAD - 120, y: 24, w: 120, h: 48, label: "MAP" },
   ];
-  if (session.level.twists.earlyConfirm && !session.ended && session.buffer.length > 0) {
+  if (canConfirm(session)) {
     buttons.push({
       id: "confirm",
       x: W - PAD - 340,
       y: 24,
       w: 200,
       h: 48,
-      label: "CONFIRM",
+      label: "UPLOAD",
     });
   }
   return buttons;

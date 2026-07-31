@@ -13,11 +13,23 @@ import {
   nextAxis,
   matrixFromFixed,
 } from "./matrix";
-import { startSession, tryPick, starsFor, tickTimer } from "./session";
+import {
+  startSession,
+  tryPick,
+  starsFor,
+  tickTimer,
+  canConfirm,
+  confirmEarly,
+} from "./session";
 import { LEVELS } from "./levels";
 import type { DatamineProgress, Token } from "./types";
 
-const emptyDeck = { bufferBonus: 0, timeBonus: 0, almostIn: false };
+const emptyDeck = {
+  bufferBonus: 0,
+  timeBonus: 0,
+  almostIn: false,
+  compTime: 0,
+};
 
 describe("buffer matching", () => {
   it("matches contiguous subsequence anywhere", () => {
@@ -45,12 +57,12 @@ describe("path rules", () => {
   ]);
 
   it("first pick top-row only in CP mode", () => {
-    expect(isLegalPick(m, { c: 1, r: 1 }, null, null, { firstRowOnly: true })).toBe(
-      false,
-    );
-    expect(isLegalPick(m, { c: 1, r: 0 }, null, null, { firstRowOnly: true })).toBe(
-      true,
-    );
+    expect(
+      isLegalPick(m, { c: 1, r: 1 }, null, null, { firstRowOnly: true }),
+    ).toBe(false);
+    expect(
+      isLegalPick(m, { c: 1, r: 0 }, null, null, { firstRowOnly: true }),
+    ).toBe(true);
   });
 
   it("alternates row then col", () => {
@@ -149,6 +161,29 @@ describe("breach timer", () => {
     expect(session.timedOut).toBe(true);
     expect(session.loot.scrap).toBe(0);
     expect(starsFor(session)).toBe(0);
+  });
+});
+
+describe("confirm and upload", () => {
+  it("allows UPLOAD after first Datamine and pays loot", () => {
+    const level = LEVELS[0]!;
+    let session = startSession(level, emptyDeck);
+    expect(canConfirm(session)).toBe(false);
+    const r1 = tryPick(session, { c: 0, r: 0 });
+    expect(r1.ok).toBe(true);
+    if (!r1.ok) return;
+    session = r1.session;
+    const r2 = tryPick(session, { c: 2, r: 0 });
+    expect(r2.ok).toBe(true);
+    if (!r2.ok) return;
+    session = r2.session;
+    expect(session.daemons[0]!.completed).toBe(true);
+    expect(canConfirm(session)).toBe(true);
+    if (!session.ended) {
+      session = confirmEarly(session);
+    }
+    expect(session.ended).toBe(true);
+    expect(session.loot.scrap).toBeGreaterThan(0);
   });
 });
 
