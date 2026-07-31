@@ -264,6 +264,12 @@ function syncVisuals(dropIn = false): void {
   syncBoardMotion(session.board, session.mask, boardLayout(), { dropIn });
 }
 
+/** Gravity / refill settle — plays the sticker land clip (was registered but never triggered). */
+function settleStickers(): void {
+  syncVisuals(true);
+  playSfx("drop", { volume: 1.35 });
+}
+
 function syncZoneFromLevel(id: number): void {
   const zi = Math.floor((id - 1) / 10);
   mapZone = ZONES[Math.max(0, Math.min(3, zi))]!.id;
@@ -591,8 +597,7 @@ async function handleSwap(a: Pos, b: Pos): Promise<void> {
     crushWave(session, groups);
     const peeled = beforeObs - countAllObstacles();
     if (peeled > 0) playSfx(peeled > 2 ? "crack" : "peel");
-    else playSfx("select", { rate: 0.92 });
-    syncVisuals(true);
+    settleStickers();
     markDirty();
     await waitMotion();
     wave++;
@@ -660,7 +665,7 @@ async function handlePlaneFerry(from: Pos, beside: Pos): Promise<void> {
   }
   const land = cellCenter(layout, result.landed.c, result.landed.r);
   burstAt(land.x, land.y, 6, pstyle);
-  syncVisuals(true);
+  settleStickers();
   markDirty();
   await waitMotion();
   busy = false;
@@ -693,7 +698,7 @@ async function handlePower(kind: PowerUpKind, target: Pos): Promise<void> {
     const mid = cellCenter(layout, p.c, p.r);
     burstAt(mid.x, mid.y, 4, pstyle);
   }
-  syncVisuals(true);
+  settleStickers();
   markDirty();
   await waitMotion();
   busy = false;
