@@ -35,6 +35,11 @@ export type Session = {
   scrambleAt: number;
   rng: () => number;
   coach: string | null;
+  /** False until first pick — CP2077: plan freely, then the clock runs. */
+  timerStarted: boolean;
+  /** Seconds left once the clock is running (or full limit while waiting). */
+  timeLeft: number;
+  timedOut: boolean;
 };
 
 export function startSession(level: LevelDef): Session {
@@ -59,6 +64,9 @@ export function startSession(level: LevelDef): Session {
     scrambleAt: 0,
     rng: mulberry32(level.seed ^ 0x9e3779b9),
     coach: level.twists.coach ?? null,
+    timerStarted: false,
+    timeLeft: level.timeLimit,
+    timedOut: false,
   };
 }
 
@@ -102,6 +110,9 @@ export function tryPick(session: Session, pos: Pos): PickResult {
   const daemons = refreshDaemons(buffer, session.daemons);
   const axis = nextAxis(picks.length);
 
+  // CP2077: breach time starts the moment you commit the first code.
+  const timerStarted = true;
+
   let next: Session = {
     ...session,
     matrix,
@@ -112,6 +123,7 @@ export function tryPick(session: Session, pos: Pos): PickResult {
     daemons,
     picks,
     coach: null,
+    timerStarted,
   };
 
   let scrambled: Pos[] = [];
@@ -129,6 +141,28 @@ export function tryPick(session: Session, pos: Pos): PickResult {
   }
 
   return { ok: true, session: next, scrambled };
+}
+
+/** Advance breach clock after first pick. Returns same session if not running. */
+export function tickTimer(session: Session, dt: number): Session {
+  if (session.ended || !session.timerStarted) return session;
+  const timeLeft = Math.max(0, session.timeLeft - dt);
+  if (timeLeft <= 0) return expireTimer({ ...session, timeLeft: 0 });
+  return { ...session, timeLeft };
+}
+
+/** Time expired — breach locks out (no upload), same as CP2077. */
+export function expireTimer(session: Session): Session {
+  if (session.ended) return session;
+  return {
+    ...session,
+    ended: true,
+    outcome: "fail",
+    score: 0,
+    timedOut: true,
+    timeLeft: 0,
+    timerStarted: true,
+  };
 }
 
 export function confirmEarly(session: Session): Session {

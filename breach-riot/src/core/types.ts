@@ -56,6 +56,8 @@ export type LevelDef = {
   brief: string;
   size: number;
   buffer: number;
+  /** Breach time remaining (seconds). Clock starts on first pick, like CP2077. */
+  timeLimit: number;
   daemons: DaemonDef[];
   /** Seed for reproducible generation. */
   seed: number;

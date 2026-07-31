@@ -20,6 +20,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Pick codes. Stay on the lit axis.",
     size: 5,
     buffer: 4,
+    timeLimit: 35,
     seed: 101,
     twists: {
       firstRowOnly: true,
@@ -42,6 +43,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Each pick fills the buffer. Don't waste slots.",
     size: 5,
     buffer: 5,
+    timeLimit: 35,
     seed: 102,
     twists: {
       firstRowOnly: true,
@@ -64,6 +66,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Two required daemons. Chain them in one path.",
     size: 5,
     buffer: 5,
+    timeLimit: 28,
     seed: 103,
     twists: {
       firstRowOnly: true,
@@ -80,6 +83,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Bigger matrix. Same path rules.",
     size: 6,
     buffer: 5,
+    timeLimit: 28,
     seed: 104,
     twists: { firstRowOnly: true },
     daemons: [
@@ -93,6 +97,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Jammed cells are dead. Plan around them.",
     size: 6,
     buffer: 5,
+    timeLimit: 24,
     seed: 105,
     twists: {
       jam: true,
@@ -109,6 +114,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Sticky glyphs cost two buffer slots.",
     size: 6,
     buffer: 6,
+    timeLimit: 24,
     seed: 106,
     twists: {
       sticky: true,
@@ -125,6 +131,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Detours and costly glyphs.",
     size: 6,
     buffer: 6,
+    timeLimit: 24,
     seed: 107,
     twists: { jam: true, sticky: true, hazardScale: 1.15 },
     daemons: [
@@ -138,6 +145,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Unused cells mutate. Commit fast.",
     size: 6,
     buffer: 6,
+    timeLimit: 20,
     seed: 108,
     twists: {
       scramble: true,
@@ -155,6 +163,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Optional fork shares a prefix — greed or safety.",
     size: 6,
     buffer: 6,
+    timeLimit: 20,
     seed: 109,
     twists: {
       fork: true,
@@ -173,6 +182,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Full 7×7 grid. No spare buffer.",
     size: 7,
     buffer: 6,
+    timeLimit: 20,
     seed: 110,
     twists: { jam: true, hazardScale: 1.2 },
     daemons: [
@@ -187,6 +197,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Hard scramble under jam pressure.",
     size: 7,
     buffer: 6,
+    timeLimit: 16,
     seed: 111,
     twists: {
       jam: true,
@@ -205,6 +216,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Sticky everywhere that matters.",
     size: 7,
     buffer: 6,
+    timeLimit: 16,
     seed: 112,
     twists: { sticky: true, jam: true, hazardScale: 1.3 },
     daemons: [
@@ -218,6 +230,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Three required daemons. No early out.",
     size: 7,
     buffer: 7,
+    timeLimit: 16,
     seed: 113,
     twists: { jam: true, fork: true, hazardScale: 1.2 },
     daemons: [
@@ -232,6 +245,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Every twist on the board.",
     size: 7,
     buffer: 7,
+    timeLimit: 12,
     seed: 114,
     twists: {
       jam: true,
@@ -254,6 +268,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Long sequences. Almost no slack.",
     size: 7,
     buffer: 7,
+    timeLimit: 12,
     seed: 115,
     twists: {
       jam: true,
@@ -272,6 +287,7 @@ export const LEVELS: LevelDef[] = [
     brief: "Final access point.",
     size: 7,
     buffer: 7,
+    timeLimit: 12,
     seed: 116,
     twists: {
       jam: true,

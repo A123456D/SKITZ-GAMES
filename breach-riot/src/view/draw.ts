@@ -160,7 +160,11 @@ export function drawHome(
 const HOW_PANELS = [
   {
     title: "PATH",
-    body: "Pick any opening code. After that, alternate: stay on the same ROW, then the same COLUMN. Each cell once.",
+    body: "Plan freely first. Opening pick is often on the top row. Then alternate: same ROW, then same COLUMN. Each cell once.",
+  },
+  {
+    title: "TIME",
+    body: "Breach time remaining only starts after your first pick — same as Cyberpunk. Study the matrix, then commit fast.",
   },
   {
     title: "BUFFER",
@@ -370,12 +374,12 @@ export function cellCenter(layout: BoardLayout, pos: Pos): { x: number; y: numbe
 
 export function playButtons(session: Session): UiButton[] {
   const buttons: UiButton[] = [
-    { id: "play-menu", x: PAD, y: 24, w: 120, h: 48, label: "MAP" },
+    { id: "play-menu", x: W - PAD - 120, y: 24, w: 120, h: 48, label: "MAP" },
   ];
   if (session.level.twists.earlyConfirm && !session.ended && session.buffer.length > 0) {
     buttons.push({
       id: "confirm",
-      x: W - PAD - 200,
+      x: W - PAD - 340,
       y: 24,
       w: 200,
       h: 48,
@@ -399,10 +403,12 @@ export function drawPlay(
   }
 
   const level = session.level;
+  drawBreachTimer(ctx, session);
+
   ctx.fillStyle = theme.muted;
   ctx.font = "700 18px 'Chakra Petch', sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText(`L${level.id}  ${level.name}`, PAD + 140, 54);
+  ctx.textAlign = "center";
+  ctx.fillText(`L${level.id}  ${level.name}`, W / 2, 54);
 
   // Buffer strip
   drawBuffer(ctx, session);
@@ -502,6 +508,42 @@ export function drawPlay(
 
   if (shake > 0) ctx.restore();
   return { buttons, layout };
+}
+
+function drawBreachTimer(ctx: CanvasRenderingContext2D, session: Session): void {
+  const running = session.timerStarted && !session.ended;
+  const urgent = session.timeLeft <= 5;
+  const label = session.timerStarted ? "BREACH TIME REMAINING" : "BREACH TIME — PLAN";
+  const secs = Math.max(0, session.timeLeft);
+  const text = secs.toFixed(2);
+
+  ctx.fillStyle = !session.timerStarted
+    ? theme.muted
+    : urgent
+      ? theme.fail
+      : theme.accent;
+  ctx.font = "700 14px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(label, PAD, 28);
+
+  ctx.font = "800 36px 'JetBrains Mono', monospace";
+  ctx.fillStyle = !session.timerStarted
+    ? theme.text
+    : urgent
+      ? theme.fail
+      : running
+        ? theme.accent
+        : theme.dim;
+  ctx.fillText(text, PAD, 62);
+
+  // Thin bar under the clock
+  const barW = 160;
+  const pct = session.level.timeLimit > 0 ? secs / session.level.timeLimit : 0;
+  ctx.fillStyle = theme.bg2;
+  ctx.fillRect(PAD, 72, barW, 4);
+  ctx.fillStyle = urgent ? theme.fail : theme.accent;
+  ctx.fillRect(PAD, 72, Math.max(0, barW * pct), 4);
 }
 
 function drawBuffer(ctx: CanvasRenderingContext2D, session: Session): void {
@@ -608,17 +650,19 @@ export function drawResult(
   drawBackground(ctx, t);
 
   const title =
-    session.outcome === "breach"
-      ? "BREACHED"
-      : session.outcome === "partial"
-        ? "PARTIAL"
-        : "LOCKED OUT";
+    session.timedOut
+      ? "TIME OUT"
+      : session.outcome === "breach"
+        ? "BREACHED"
+        : session.outcome === "partial"
+          ? "PARTIAL"
+          : "LOCKED OUT";
   const color =
-    session.outcome === "breach"
-      ? theme.ok
-      : session.outcome === "partial"
-        ? theme.warn
-        : theme.fail;
+    session.timedOut || session.outcome === "fail"
+      ? theme.fail
+      : session.outcome === "breach"
+        ? theme.ok
+        : theme.warn;
 
   ctx.fillStyle = color;
   ctx.font = "800 64px 'Chakra Petch', sans-serif";

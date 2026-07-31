@@ -5,6 +5,7 @@ import {
   currentLegal,
   startSession,
   starsFor,
+  tickTimer,
   tryPick,
   type Session,
 } from "./core/session";
@@ -113,7 +114,7 @@ function onPointer(clientX: number, clientY: number): void {
       return;
     }
     if (id === "how-next") {
-      if (howPage >= 2) {
+      if (howPage >= 3) {
         startLevel(1);
       } else howPage += 1;
       return;
@@ -246,6 +247,11 @@ function frame(now: number): void {
     mapNodes = layoutMap.nodes;
     layout = null;
   } else if (screen === "play" && session) {
+    const beforeEnded = session.ended;
+    session = tickTimer(session, dt);
+    if (!beforeEnded && session.ended) {
+      finishRound();
+    }
     const legal = currentLegal(session);
     const drawn = drawPlay(ctx, time, session, legal);
     buttons = drawn.buttons;

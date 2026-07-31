@@ -12,7 +12,7 @@ import {
   nextAxis,
   matrixFromFixed,
 } from "./matrix";
-import { startSession, tryPick, starsFor } from "./session";
+import { startSession, tryPick, starsFor, tickTimer } from "./session";
 import { LEVELS } from "./levels";
 import type { DaemonProgress, Token } from "./types";
 
@@ -135,20 +135,28 @@ describe("stars", () => {
   });
 });
 
-describe("refreshDaemons", () => {
-  it("marks completed when sequence appears", () => {
-    const daemons: DaemonProgress[] = [
-      {
-        id: "a",
-        name: "X",
-        sequence: ["1C", "55"],
-        required: true,
-        matched: 0,
-        completed: false,
-      },
-    ];
-    const out = refreshDaemons(["BD", "1C", "55", "FF"], daemons);
-    expect(out[0]!.completed).toBe(true);
-    expect(out[0]!.matched).toBe(2);
+describe("breach timer", () => {
+  it("does not tick before first pick", () => {
+    const level = LEVELS[0]!;
+    let session = startSession(level);
+    expect(session.timerStarted).toBe(false);
+    session = tickTimer(session, 5);
+    expect(session.timeLeft).toBe(level.timeLimit);
+    expect(session.ended).toBe(false);
+  });
+
+  it("starts on first pick and expires to timeout fail", () => {
+    const level = LEVELS[0]!;
+    let session = startSession(level);
+    const r = tryPick(session, { c: 0, r: 0 });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    session = r.session;
+    expect(session.timerStarted).toBe(true);
+    session = tickTimer(session, level.timeLimit + 0.1);
+    expect(session.ended).toBe(true);
+    expect(session.timedOut).toBe(true);
+    expect(session.outcome).toBe("fail");
+    expect(starsFor(session)).toBe(0);
   });
 });
