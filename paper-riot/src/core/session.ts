@@ -360,64 +360,44 @@ export function usePower(
 }
 
 /**
- * Paper plane ferry: move `from` so it sits orthogonally next to `beside`.
- * On a full board this swaps `from` with the best swappable neighbor of `beside`
- * (prefers a landing that creates a match).
+ * Paper plane: swap the two selected stickers exactly (any distance).
+ * Only succeeds when that swap creates a match — otherwise the board is unchanged.
  */
 export function usePlaneFerry(
   session: Session,
   from: Pos,
-  beside: Pos,
+  to: Pos,
 ): { ok: true; landed: Pos } | { ok: false; reason: string } {
   if (session.status !== "playing") return { ok: false, reason: "busy" };
   if ((session.powers.plane ?? 0) <= 0) return { ok: false, reason: "empty" };
   if (
     !isPlayable(session.mask, from.c, from.r) ||
-    !isPlayable(session.mask, beside.c, beside.r)
+    !isPlayable(session.mask, to.c, to.r)
   ) {
     return { ok: false, reason: "bad-target" };
   }
-  if (from.c === beside.c && from.r === beside.r) {
+  if (from.c === to.c && from.r === to.r) {
     return { ok: false, reason: "same-cell" };
   }
 
   const passenger = session.board[from.c]![from.r];
-  const anchor = session.board[beside.c]![beside.r];
+  const target = session.board[to.c]![to.r];
   if (!passenger || !canSwapCell(passenger)) {
     return { ok: false, reason: "blocked-from" };
   }
-  if (!anchor) return { ok: false, reason: "empty-beside" };
-
-  const neighbors: Pos[] = [];
-  for (const [dc, dr] of [
-    [1, 0],
-    [-1, 0],
-    [0, 1],
-    [0, -1],
-  ] as const) {
-    const p = { c: beside.c + dc, r: beside.r + dr };
-    if (!isPlayable(session.mask, p.c, p.r)) continue;
-    if (p.c === from.c && p.r === from.r) continue;
-    const cell = session.board[p.c]![p.r];
-    if (!canSwapCell(cell)) continue;
-    neighbors.push(p);
-  }
-  if (!neighbors.length) return { ok: false, reason: "no-landing" };
-
-  let landed = neighbors[0]!;
-  for (const p of neighbors) {
-    if (swapCreatesMatch(session.board, session.mask, from, p)) {
-      landed = p;
-      break;
-    }
+  if (!target || !canSwapCell(target)) {
+    return { ok: false, reason: "blocked-to" };
   }
 
-  swapCells(session.board, from, landed);
+  if (!swapCreatesMatch(session.board, session.mask, from, to)) {
+    return { ok: false, reason: "no-match" };
+  }
+
+  swapCells(session.board, from, to);
   session.powers.plane -= 1;
   session.movesLeft -= 1;
   session.score += 20;
-  resolveCascades(session);
-  return { ok: true, landed };
+  return { ok: true, landed: to };
 }
 
 export function trySwap(

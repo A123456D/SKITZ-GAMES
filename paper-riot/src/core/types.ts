@@ -84,7 +84,7 @@ export const LOCK_MIN_MATCH = 4;
 /**
  * Power-ups — mechanics match the classroom tool fantasy.
  * bomb: explode a 3×3 cluster
- * plane: fly one sticker next to another sticker of your choice
+ * plane: swap any two stickers; only clears if that swap makes a match
  * rocket: launch up a full column
  * magnet: pull every sticker of the tapped type
  * stapler: staple a 2×2 paper packet and rip it off the board
@@ -103,7 +103,7 @@ export type PowerUpKind = (typeof POWERUP_KINDS)[number];
 
 export const POWER_BLURBS: Record<PowerUpKind, string> = {
   bomb: "BOMB — explode a 3×3 cluster",
-  plane: "PLANE — fly a sticker next to another",
+  plane: "PLANE — swap two stickers (must match)",
   rocket: "ROCKET — blast up the whole column",
   magnet: "MAGNET — pull every sticker of that type",
   stapler: "STAPLER — staple a 2×2 packet and rip it off",

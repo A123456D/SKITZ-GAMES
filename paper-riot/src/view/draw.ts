@@ -1006,7 +1006,7 @@ export function drawPlay(
     const blurb =
       opts.armedPower === "plane"
         ? opts.planeFrom
-          ? "PLANE — tap who it lands next to"
+          ? "PLANE — tap the sticker to swap with"
           : "PLANE — tap a sticker to fly"
         : POWER_BLURBS[opts.armedPower];
     ctx.fillText(blurb, W / 2, 1090);

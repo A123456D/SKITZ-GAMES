@@ -114,7 +114,7 @@ let selectedLevel = Math.min(progress.unlocked, 40);
 let session: Session = startSession(selectedLevel);
 let selected: Pos | null = null;
 let armedPower: PowerUpKind | null = null;
-/** First pick for the paper-plane ferry. */
+/** First pick for the paper-plane swap. */
 let planeFrom: Pos | null = null;
 let busy = false;
 let clearing = new Set<string>();
@@ -641,31 +641,94 @@ async function playFailedSwap(a: Pos, b: Pos): Promise<void> {
   markDirty();
 }
 
-async function handlePlaneFerry(from: Pos, beside: Pos): Promise<void> {
-  if (busy) return;
+async function handlePlaneFerry(from: Pos, to: Pos): Promise<void> {
+  if (busy || session.status !== "playing") return;
   busy = true;
-  const layout = boardLayout();
-  const fromMid = cellCenter(layout, from.c, from.r);
-  const besideMid = cellCenter(layout, beside.c, beside.r);
-  const pstyle = styleForPower("plane");
-  stampFx(fromMid.x, fromMid.y, pstyle);
-  stampFx(besideMid.x, besideMid.y, pstyle);
-  popFx = { x: besideMid.x, y: besideMid.y, t: 0, started: performance.now() };
-  playSfx(powerSfx("plane"), { vary: false });
 
-  const result = usePlaneFerry(session, from, beside);
-  planeFrom = null;
-  armedPower = null;
-  selected = null;
+  const result = usePlaneFerry(session, from, to);
   if (!result.ok) {
-    playSfx("swap-fail");
+    // Bounce the attempted swap so the miss is obvious; keep the plane armed.
+    if (result.reason === "no-match") {
+      const layout = boardLayout();
+      const midA = cellCenter(layout, from.c, from.r);
+      const midB = cellCenter(layout, to.c, to.r);
+      oopsFx = {
+        x: (midA.x + midB.x) / 2,
+        y: (midA.y + midB.y) / 2 - layout.cell * 0.15,
+        t: 0,
+        started: performance.now(),
+      };
+      swapCells(session.board, from, to);
+      syncVisuals(false);
+      playSfx("swap-fail");
+      markDirty();
+      await waitMotion();
+      swapCells(session.board, from, to);
+      syncVisuals(false);
+      markDirty();
+      await waitMotion();
+    } else {
+      playSfx("swap-fail");
+    }
+    planeFrom = null;
     busy = false;
     markDirty();
     return;
   }
-  const land = cellCenter(layout, result.landed.c, result.landed.r);
-  burstAt(land.x, land.y, 6, pstyle);
-  await settleStickers();
+
+  planeFrom = null;
+  armedPower = null;
+  selected = null;
+
+  const layout = boardLayout();
+  const fromMid = cellCenter(layout, from.c, from.r);
+  const toMid = cellCenter(layout, to.c, to.r);
+  const pstyle = styleForPower("plane");
+  stampFx(fromMid.x, fromMid.y, pstyle);
+  stampFx(toMid.x, toMid.y, pstyle);
+  popFx = { x: toMid.x, y: toMid.y, t: 0, started: performance.now() };
+  playSfx(powerSfx("plane"), { vary: false });
+
+  syncVisuals(false);
+  markDirty();
+  await waitMotion();
+
+  let guard = 0;
+  let wave = 0;
+  while (guard++ < 40) {
+    if (session.status !== "playing") break;
+    const groups = currentMatches(session);
+    if (!groups.length) break;
+    const keys = groups.flatMap((g) => g.cells.map((p) => `${p.c},${p.r}`));
+    const hint = groups[0]?.kind;
+    if (wave === 0) playSfx("match");
+    else {
+      playSfx("cascade");
+      let sx = 0;
+      let sy = 0;
+      for (const key of keys) {
+        const [c, r] = key.split(",").map(Number);
+        const mid = cellCenter(layout, c!, r!);
+        sx += mid.x;
+        sy += mid.y;
+      }
+      const n = Math.max(1, keys.length);
+      noiceFx = {
+        x: sx / n,
+        y: sy / n - 24,
+        t: 0,
+        started: performance.now(),
+      };
+    }
+    const beforeObs = countAllObstacles();
+    await playMatchBurst(keys, hint);
+    crushWave(session, groups);
+    const peeled = beforeObs - countAllObstacles();
+    if (peeled > 0) playSfx(peeled > 2 ? "crack" : "peel");
+    await settleStickers();
+    wave++;
+  }
+
   busy = false;
   playEndSting();
   recordWinIfCleared();
@@ -924,7 +987,7 @@ function onTap(x: number, y: number): void {
       markDirty();
       return;
     }
-    if (!cell) {
+    if (!cell || !canSwapCell(cell)) {
       playSfx("swap-fail");
       markDirty();
       return;

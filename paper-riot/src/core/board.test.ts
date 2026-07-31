@@ -339,7 +339,7 @@ describe("session", () => {
     expect(s.powers.plane).toBe(1);
   });
 
-  it("plane ferries a sticker beside another", () => {
+  it("plane swaps the exact selected stickers when that creates a match", () => {
     const s = startSession(1);
     s.powers.plane = 1;
     const beforeMoves = s.movesLeft;
@@ -353,21 +353,57 @@ describe("session", () => {
       }
     }
 
-    const from = { c: 0, r: 0 };
-    const beside = { c: 4, r: 4 };
-    expect(s.mask[from.c]![from.r]).toBe(true);
-    expect(s.mask[beside.c]![beside.r]).toBe(true);
-    expect(canSwapCell(s.board[from.c]![from.r]!)).toBe(true);
+    // A A B / . . A  — flying the lone A onto B makes AAA.
+    const from = { c: 2, r: 1 };
+    const to = { c: 2, r: 0 };
+    s.board[0]![0]!.kind = "skull";
+    s.board[1]![0]!.kind = "skull";
+    s.board[2]![0]!.kind = "star";
+    s.board[2]![1]!.kind = "skull";
+    const passengerId = s.board[from.c]![from.r]!.id;
+    const targetId = s.board[to.c]![to.r]!.id;
 
-    const result = usePlaneFerry(s, from, beside);
+    expect(swapCreatesMatch(s.board, s.mask, from, to)).toBe(true);
+    const result = usePlaneFerry(s, from, to);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(
-      Math.abs(result.landed.c - beside.c) +
-        Math.abs(result.landed.r - beside.r),
-    ).toBe(1);
+    expect(result.landed).toEqual(to);
+    expect(s.board[to.c]![to.r]!.id).toBe(passengerId);
+    expect(s.board[from.c]![from.r]!.id).toBe(targetId);
     expect(s.powers.plane).toBe(0);
     expect(s.movesLeft).toBe(beforeMoves - 1);
+  });
+
+  it("plane refuses a swap that creates no match", () => {
+    const s = startSession(1);
+    s.powers.plane = 1;
+    const beforeMoves = s.movesLeft;
+
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        const cell = s.board[c]![r];
+        if (!cell) continue;
+        cell.obstacle = undefined;
+        cell.hits = 0;
+        // Checker so no accidental matches after a distant swap.
+        cell.kind = (c + r) % 2 === 0 ? "skull" : "star";
+      }
+    }
+
+    const from = { c: 0, r: 0 };
+    const to = { c: 4, r: 4 };
+    const fromId = s.board[from.c]![from.r]!.id;
+    const toId = s.board[to.c]![to.r]!.id;
+    expect(swapCreatesMatch(s.board, s.mask, from, to)).toBe(false);
+
+    const result = usePlaneFerry(s, from, to);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe("no-match");
+    expect(s.board[from.c]![from.r]!.id).toBe(fromId);
+    expect(s.board[to.c]![to.r]!.id).toBe(toId);
+    expect(s.powers.plane).toBe(1);
+    expect(s.movesLeft).toBe(beforeMoves);
   });
 });
 
