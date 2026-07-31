@@ -47,7 +47,7 @@ const FILES: Record<SfxId, string> = {
 
 const MUTE_KEY = "paper-riot-muted";
 /** Bump when regenerating mp3s so clients skip stale cache. */
-const SFX_VERSION = 9;
+const SFX_VERSION = 10;
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
