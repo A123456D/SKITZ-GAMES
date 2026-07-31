@@ -47,13 +47,10 @@ const FILES: Record<SfxId, string> = {
 
 const MUTE_KEY = "paper-riot-muted";
 /** Bump when regenerating mp3s so clients skip stale cache. */
-const SFX_VERSION = 11;
+const SFX_VERSION = 12;
 
-/** Soften button taps so they stay craft-paper, not loud UI. */
-const DEFAULT_VOL: Partial<Record<SfxId, number>> = {
-  "ui-tap": 0.7,
-  "mute-on": 0.65,
-};
+/** Button / place clips sit near cascade loudness; leave unity. */
+const DEFAULT_VOL: Partial<Record<SfxId, number>> = {};
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;

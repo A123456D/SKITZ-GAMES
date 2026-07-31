@@ -6,26 +6,26 @@ export const SFX_CATALOG = [
   {
     id: "ui-tap",
     file: "ui-tap.mp3",
-    duration: 0.35,
-    text: "Extremely soft quiet paper button press, gentle fingertip tap on scrapbook cardstock, tiny warm paper thud, cozy craft desk, organic and natural, no digital beep, no UI click, no cyber blip, no synth, no electronic tick",
+    duration: 0.4,
+    text: "Soft paper UI tap like a scrapbook page tick, gentle paper chime sparkle bit, warm bright quiet short pleasant, same soft classroom paper family as a cascade chime, no digital beep, no cyber click, no synth",
   },
   {
     id: "select",
     file: "select.mp3",
-    duration: 0.5,
-    text: "Soft gentle sticker peel lift, quiet sticky paper whisper, warm playful short, pleasant soft",
+    duration: 0.45,
+    text: "Soft sticker pick-up on a desk, gentle paper lift with a tiny sparkle paper chime, warm bright quiet short pleasant, cozy classroom craft, no digital beep",
   },
   {
     id: "swap",
     file: "swap.mp3",
     duration: 0.5,
-    text: "Two soft paper stickers sliding gently, quiet desk scrape, warm cozy short, pleasant soft",
+    text: "Two soft paper stickers sliding past each other on a desk, gentle paper whoosh with a tiny sparkle chime, warm bright quiet short pleasant, scrapbook craft, no harsh scrape",
   },
   {
     id: "swap-fail",
     file: "swap-fail.mp3",
-    duration: 0.5,
-    text: "Soft muted rubber bump reject, gentle dull tap, quiet short, not harsh",
+    duration: 0.45,
+    text: "Soft muted paper bump reject, gentle dull scrapbook tap, quiet short pleasant, not harsh",
   },
   {
     id: "match",
@@ -42,8 +42,8 @@ export const SFX_CATALOG = [
   {
     id: "drop",
     file: "drop.mp3",
-    duration: 0.5,
-    text: "Soft stickers settle on felt desk, quiet paper land, gentle warm short, pleasant soft",
+    duration: 0.45,
+    text: "Soft stickers placing down on a felt desk, gentle paper land with a tiny sparkle chime, warm bright quiet short pleasant, cozy placement settle",
   },
   {
     id: "peel",
@@ -108,8 +108,8 @@ export const SFX_CATALOG = [
   {
     id: "mute-on",
     file: "mute-on.mp3",
-    duration: 0.35,
-    text: "Very soft quiet paper page turn, gentle scrapbook flap mute, tiny warm organic short, no digital beep, no cyber click, no electronic switch",
+    duration: 0.4,
+    text: "Soft paper page flap mute, gentle scrapbook tick with a tiny sparkle paper chime, warm bright quiet short pleasant, no digital beep",
   },
   {
     id: "oops",
