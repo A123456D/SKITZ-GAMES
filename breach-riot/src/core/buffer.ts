@@ -1,4 +1,4 @@
-import type { DaemonProgress, Token } from "./types";
+import type { DatamineProgress, Token } from "./types";
 
 /** Contiguous subsequence match: longest prefix of seq that is a suffix of buffer. */
 export function matchProgress(buffer: Token[], seq: Token[]): number {
@@ -31,8 +31,8 @@ export function sequenceCompleted(buffer: Token[], seq: Token[]): boolean {
 
 export function refreshDaemons(
   buffer: Token[],
-  daemons: DaemonProgress[],
-): DaemonProgress[] {
+  daemons: DatamineProgress[],
+): DatamineProgress[] {
   return daemons.map((d) => {
     const completed = d.completed || sequenceCompleted(buffer, d.sequence);
     return {

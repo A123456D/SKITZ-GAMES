@@ -1,12 +1,20 @@
 import type { Session } from "../core/session";
 import { LEVELS } from "../core/levels";
+import {
+  ALMOST_IN_COST,
+  bufferUpgradeCost,
+  DATAMINE_PAYOUT,
+  DISTRICT_NAMES,
+  timeUpgradeCost,
+} from "../core/economy";
+import { canUnlockDistrict } from "../core/save";
 import type { Pos, Progress } from "../core/types";
 import { getFlashes, getPunches, getShake } from "./motion";
 import { H, W, theme } from "./theme";
 
 export { W, H };
 
-export type Screen = "home" | "how" | "map" | "play" | "result";
+export type Screen = "home" | "how" | "map" | "deck" | "play" | "result";
 
 export type UiButton = {
   id: string;
@@ -89,7 +97,15 @@ export function drawButton(
   ctx.restore();
 }
 
-export function homeButtons(soundOn: boolean): UiButton[] {
+function drawResourceHud(ctx: CanvasRenderingContext2D, progress: Progress, y: number): void {
+  ctx.fillStyle = theme.muted;
+  ctx.font = "700 18px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(`SCRAP ${progress.scrap}   COMP ${progress.components}`, W / 2, y);
+}
+
+export function homeButtons(progress: Progress): UiButton[] {
   const bw = W - PAD * 2;
   const bh = 64;
   const cx = PAD;
@@ -97,6 +113,7 @@ export function homeButtons(soundOn: boolean): UiButton[] {
   return [
     { id: "play", x: cx, y, w: bw, h: bh, label: "PLAY" },
     { id: "map", x: cx, y: (y += bh + 16), w: bw, h: bh, label: "ACCESS MAP" },
+    { id: "deck", x: cx, y: (y += bh + 16), w: bw, h: bh, label: "DECK" },
     { id: "how", x: cx, y: (y += bh + 16), w: bw, h: bh, label: "HOW TO BREACH" },
     {
       id: "sound",
@@ -104,7 +121,7 @@ export function homeButtons(soundOn: boolean): UiButton[] {
       y: (y += bh + 16),
       w: bw,
       h: bh,
-      label: soundOn ? "SOUND: ON" : "SOUND: OFF",
+      label: progress.sound ? "SOUND: ON" : "SOUND: OFF",
     },
   ];
 }
@@ -112,7 +129,7 @@ export function homeButtons(soundOn: boolean): UiButton[] {
 export function drawHome(
   ctx: CanvasRenderingContext2D,
   t: number,
-  soundOn: boolean,
+  progress: Progress,
 ): UiButton[] {
   drawBackground(ctx, t);
 
@@ -133,6 +150,7 @@ export function drawHome(
   ctx.fillStyle = theme.muted;
   ctx.font = "600 22px 'Chakra Petch', sans-serif";
   ctx.fillText("TRACE. CRACK. OVERRIDE.", W / 2, 440);
+  drawResourceHud(ctx, progress, 478);
 
   // Decorative matrix strip
   ctx.font = "700 18px 'JetBrains Mono', monospace";
@@ -150,7 +168,7 @@ export function drawHome(
   });
   ctx.restore();
 
-  const buttons = homeButtons(soundOn);
+  const buttons = homeButtons(progress);
   for (const b of buttons) {
     drawButton(ctx, b, { primary: b.id === "play" });
   }
@@ -160,19 +178,23 @@ export function drawHome(
 const HOW_PANELS = [
   {
     title: "PATH",
-    body: "Plan freely first. Opening pick is often on the top row. Then alternate: same ROW, then same COLUMN. Each cell once.",
+    body: "First pick must be on the top row. Then alternate: same ROW, then same COLUMN. Each cell once — picked cells blank out.",
   },
   {
     title: "TIME",
-    body: "Breach time remaining only starts after your first pick — same as Cyberpunk. Study the matrix, then commit fast.",
+    body: "The breach clock only starts after your first pick. Study the matrix, plan your route, then commit fast.",
   },
   {
     title: "BUFFER",
     body: "Every pick fills your buffer. When it is full, the breach resolves. Sticky glyphs cost two slots.",
   },
   {
-    title: "DAEMONS",
-    body: "Complete each required sequence as a contiguous run in your buffer. Optional forks are bonus stars.",
+    title: "DATAMINES",
+    body: "V1 Basic, V2 Advanced, V3 Expert — each pays Scrap and Components. Clear more Datamines in one breach to stack loot.",
+  },
+  {
+    title: "REWARDS",
+    body: "Spend Scrap in the Deck to upgrade buffer and time. Spend Scrap on the Access Map to unlock the next district.",
   },
 ];
 
@@ -269,15 +291,28 @@ export function mapButtons(
   }
   const buttons: UiButton[] = [
     { id: "map-back", x: PAD, y: H - 120, w: 200, h: 64, label: "HOME" },
-    {
-      id: "map-play",
+  ];
+  const unlock = canUnlockDistrict(progress);
+  if (unlock.ok) {
+    buttons.push({
+      id: "map-unlock",
       x: PAD + 220,
       y: H - 120,
-      w: W - PAD * 2 - 220,
+      w: 280,
       h: 64,
-      label: `BREACH ${selected}`,
-    },
-  ];
+      label: `UNLOCK DISTRICT (${unlock.cost})`,
+    });
+  }
+  const playX = unlock.ok ? PAD + 520 : PAD + 220;
+  const playW = unlock.ok ? W - PAD - playX : W - PAD * 2 - 220;
+  buttons.push({
+    id: "map-play",
+    x: playX,
+    y: H - 120,
+    w: playW,
+    h: 64,
+    label: `BREACH ${selected}`,
+  });
   return { buttons, nodes };
 }
 
@@ -292,6 +327,16 @@ export function drawMap(
   ctx.font = "800 42px 'Chakra Petch', sans-serif";
   ctx.textAlign = "center";
   ctx.fillText("ACCESS MAP", W / 2, 110);
+
+  drawResourceHud(ctx, progress, 148);
+
+  const selectedLevel = LEVELS.find((l) => l.id === selected);
+  const districtName = selectedLevel
+    ? DISTRICT_NAMES[selectedLevel.district] ?? "UNKNOWN"
+    : DISTRICT_NAMES[progress.district] ?? "UNKNOWN";
+  ctx.fillStyle = theme.accent;
+  ctx.font = "700 22px 'Chakra Petch', sans-serif";
+  ctx.fillText(districtName, W / 2, 178);
 
   const layout = mapButtons(progress, selected);
   for (const n of layout.nodes) {
@@ -317,22 +362,105 @@ export function drawMap(
     }
   }
 
-  const level = LEVELS.find((l) => l.id === selected);
-  if (level) {
+  if (selectedLevel) {
     ctx.fillStyle = theme.muted;
     ctx.font = "600 20px 'Chakra Petch', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(level.name, W / 2, H - 200);
-    ctx.fillText(level.brief, W / 2, H - 168);
+    ctx.fillText(selectedLevel.name, W / 2, H - 200);
+    ctx.fillText(selectedLevel.brief, W / 2, H - 168);
   }
 
   for (const b of layout.buttons) {
     drawButton(ctx, b, {
-      primary: b.id === "map-play",
+      primary: b.id === "map-play" || b.id === "map-unlock",
       muted: b.id === "map-play" && selected > progress.unlocked,
     });
   }
   return layout;
+}
+
+export function deckButtons(progress: Progress): UiButton[] {
+  const bw = W - PAD * 2;
+  const bh = 64;
+  const cx = PAD;
+  let y = 520;
+  const bufCost = bufferUpgradeCost(progress.deck.bufferBonus);
+  const timeCost = timeUpgradeCost(progress.deck.timeBonus);
+  return [
+    {
+      id: "deck-buffer",
+      x: cx,
+      y,
+      w: bw,
+      h: bh,
+      label: bufCost !== null ? `BUFFER +1 (${bufCost} SCRAP)` : "BUFFER MAX",
+    },
+    {
+      id: "deck-time",
+      x: cx,
+      y: (y += bh + 16),
+      w: bw,
+      h: bh,
+      label: timeCost !== null ? `TIME +3s (${timeCost} SCRAP)` : "TIME MAX",
+    },
+    {
+      id: "deck-almost",
+      x: cx,
+      y: (y += bh + 16),
+      w: bw,
+      h: bh,
+      label: progress.deck.almostIn
+        ? "ALMOST IN — OWNED"
+        : `ALMOST IN (${ALMOST_IN_COST} COMP)`,
+    },
+    {
+      id: "deck-back",
+      x: cx,
+      y: (y += bh + 16),
+      w: bw,
+      h: bh,
+      label: "BACK",
+    },
+  ];
+}
+
+export function drawDeck(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  progress: Progress,
+): UiButton[] {
+  drawBackground(ctx, t);
+
+  ctx.fillStyle = theme.text;
+  ctx.font = "800 42px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("DECK", W / 2, 110);
+
+  drawResourceHud(ctx, progress, 148);
+
+  ctx.fillStyle = theme.muted;
+  ctx.font = "600 22px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(`BUFFER BONUS  +${progress.deck.bufferBonus}`, PAD, 220);
+  ctx.fillText(`TIME BONUS  +${progress.deck.timeBonus}s`, PAD, 260);
+  ctx.fillText(
+    `ALMOST IN  ${progress.deck.almostIn ? "OWNED (+5s)" : "LOCKED"}`,
+    PAD,
+    300,
+  );
+  ctx.textAlign = "right";
+  ctx.fillText(`SCRAP  ${progress.scrap}`, W - PAD, 220);
+  ctx.fillText(`COMP  ${progress.components}`, W - PAD, 260);
+
+  const buttons = deckButtons(progress);
+  for (const b of buttons) {
+    const muted =
+      (b.id === "deck-buffer" && bufferUpgradeCost(progress.deck.bufferBonus) === null) ||
+      (b.id === "deck-time" && timeUpgradeCost(progress.deck.timeBonus) === null) ||
+      (b.id === "deck-almost" && progress.deck.almostIn);
+    drawButton(ctx, b, { primary: b.id.startsWith("deck-") && b.id !== "deck-back", muted });
+  }
+  return buttons;
 }
 
 export type BoardLayout = {
@@ -444,17 +572,17 @@ export function drawPlay(
       const isLegal = legalSet.has(key);
 
       roundRect(ctx, x, y, layout.cell, layout.cell, 8);
-      if (cell.kind === "jam") {
-        ctx.fillStyle = theme.jam;
-      } else if (cell.used) {
+      if (cell.used) {
         ctx.fillStyle = theme.used;
+      } else if (cell.kind === "jam") {
+        ctx.fillStyle = theme.jam;
       } else if (cell.kind === "sticky") {
         ctx.fillStyle = "#3a241c";
       } else {
         ctx.fillStyle = isLegal ? "#243830" : theme.bg2;
       }
       ctx.fill();
-      if (isLegal) {
+      if (isLegal && !cell.used) {
         ctx.strokeStyle = theme.accent;
         ctx.lineWidth = 2;
         ctx.stroke();
@@ -464,18 +592,20 @@ export function drawPlay(
         ctx.stroke();
       }
 
-      if (cell.kind !== "jam") {
-        ctx.fillStyle = cell.used ? theme.dim : theme.text;
-        ctx.font = `700 ${Math.floor(layout.cell * 0.32)}px 'JetBrains Mono', monospace`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(cell.token, x + layout.cell / 2, y + layout.cell / 2 + 1);
-      } else {
+      if (cell.used) {
+        // CP blank-out — dim empty socket, no token text.
+      } else if (cell.kind === "jam") {
         ctx.fillStyle = theme.fail;
         ctx.font = `700 ${Math.floor(layout.cell * 0.22)}px 'Chakra Petch', sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText("JAM", x + layout.cell / 2, y + layout.cell / 2);
+      } else {
+        ctx.fillStyle = theme.text;
+        ctx.font = `700 ${Math.floor(layout.cell * 0.32)}px 'JetBrains Mono', monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(cell.token, x + layout.cell / 2, y + layout.cell / 2 + 1);
       }
 
       if (cell.kind === "sticky" && !cell.used) {
@@ -593,10 +723,15 @@ function drawBuffer(ctx: CanvasRenderingContext2D, session: Session): void {
 function drawDaemons(ctx: CanvasRenderingContext2D, session: Session): void {
   const y0 = 160;
   const flashes = new Set(getFlashes().map((f) => f.id));
+  const tierLabel = ["Basic", "Advanced", "Expert"] as const;
   session.daemons.forEach((d, i) => {
     const x = PAD;
     const y = y0 + i * 36;
-    const label = d.required ? d.name : `${d.name} ★`;
+    const pay = DATAMINE_PAYOUT[d.tier];
+    const chips: string[] = [];
+    if (pay.scrap > 0) chips.push(`+${pay.scrap} SCRAP`);
+    if (pay.components > 0) chips.push(`+${pay.components} COMP`);
+    const label = `${d.name} ${tierLabel[d.tier - 1]}`;
     ctx.fillStyle = d.completed
       ? theme.ok
       : flashes.has(d.id)
@@ -607,11 +742,26 @@ function drawDaemons(ctx: CanvasRenderingContext2D, session: Session): void {
     ctx.textBaseline = "middle";
     ctx.fillText(label, x, y);
 
-    let seqX = x + 160;
+    let chipX = x + 220;
+    ctx.font = "700 12px 'Chakra Petch', sans-serif";
+    for (const chip of chips) {
+      const chipW = ctx.measureText(chip).width + 16;
+      roundRect(ctx, chipX, y - 12, chipW, 24, 4);
+      ctx.fillStyle = d.completed ? theme.accent : theme.bg2;
+      ctx.fill();
+      ctx.fillStyle = d.completed ? theme.bg0 : theme.muted;
+      ctx.font = "700 12px 'Chakra Petch', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(chip, chipX + chipW / 2, y + 1);
+      chipX += chipW + 8;
+    }
+
+    let seqX = chipX + 8;
     d.sequence.forEach((tok, si) => {
       const lit = d.completed || si < d.matched;
       ctx.fillStyle = lit ? theme.accent : theme.dim;
       ctx.font = "700 16px 'JetBrains Mono', monospace";
+      ctx.textAlign = "left";
       ctx.fillText(tok, seqX, y);
       seqX += 40;
     });
@@ -620,7 +770,7 @@ function drawDaemons(ctx: CanvasRenderingContext2D, session: Session): void {
 
 export function resultButtons(session: Session, progress: Progress): UiButton[] {
   const bw = (W - PAD * 2 - 16) / 2;
-  const y = H - 200;
+  const y = H - 280;
   const nextId = session.level.id + 1;
   const canNext =
     session.outcome !== "fail" &&
@@ -636,7 +786,22 @@ export function resultButtons(session: Session, progress: Progress): UiButton[] 
       h: 64,
       label: canNext ? "NEXT" : "MAP",
     },
-    { id: "result-home", x: PAD, y: y + 80, w: W - PAD * 2, h: 56, label: "HOME" },
+    {
+      id: "result-deck",
+      x: PAD,
+      y: y + 80,
+      w: bw,
+      h: 56,
+      label: "DECK",
+    },
+    {
+      id: "result-home",
+      x: PAD + bw + 16,
+      y: y + 80,
+      w: bw,
+      h: 56,
+      label: "HOME",
+    },
   ];
 }
 
@@ -649,47 +814,61 @@ export function drawResult(
 ): UiButton[] {
   drawBackground(ctx, t);
 
-  const title =
-    session.timedOut
+  const { loot } = session;
+  const title = loot.scrap > 0
+    ? "UPLOADED"
+    : session.timedOut
       ? "TIME OUT"
-      : session.outcome === "breach"
-        ? "BREACHED"
+      : session.outcome === "fail"
+        ? "LOCKED OUT"
         : session.outcome === "partial"
           ? "PARTIAL"
-          : "LOCKED OUT";
+          : "BREACHED";
   const color =
-    session.timedOut || session.outcome === "fail"
-      ? theme.fail
-      : session.outcome === "breach"
-        ? theme.ok
-        : theme.warn;
+    loot.scrap > 0
+      ? theme.ok
+      : session.timedOut || session.outcome === "fail"
+        ? theme.fail
+        : session.outcome === "breach"
+          ? theme.ok
+          : theme.warn;
 
   ctx.fillStyle = color;
   ctx.font = "800 64px 'Chakra Petch', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(title, W / 2, 280);
+  ctx.fillText(title, W / 2, 220);
 
   ctx.fillStyle = theme.warn;
-  ctx.font = "700 36px 'Chakra Petch', sans-serif";
-  ctx.fillText(stars > 0 ? "★".repeat(stars) : "—", W / 2, 360);
-
-  ctx.fillStyle = theme.text;
   ctx.font = "700 28px 'Chakra Petch', sans-serif";
-  ctx.fillText(`SCORE ${session.score}`, W / 2, 430);
+  ctx.fillText(stars > 0 ? "★".repeat(stars) : "—", W / 2, 280);
+
+  let lootY = 330;
+  if (loot.scrap > 0 || loot.components > 0) {
+    ctx.fillStyle = theme.text;
+    ctx.font = "700 24px 'Chakra Petch', sans-serif";
+    if (loot.scrap > 0) {
+      ctx.fillText(`SCRAP  +${loot.scrap}`, W / 2, lootY);
+      lootY += 32;
+    }
+    if (loot.components > 0) {
+      ctx.fillText(`COMP  +${loot.components}`, W / 2, lootY);
+      lootY += 32;
+    }
+  }
 
   session.daemons.forEach((d, i) => {
     ctx.fillStyle = d.completed ? theme.ok : theme.dim;
     ctx.font = "600 22px 'Chakra Petch', sans-serif";
     ctx.fillText(
-      `${d.completed ? "✓" : "✗"}  ${d.name}${d.required ? "" : " (opt)"}`,
+      `${d.completed ? "✓" : "✗"}  ${d.name}`,
       W / 2,
-      500 + i * 36,
+      lootY + 20 + i * 36,
     );
   });
 
   const buttons = resultButtons(session, progress);
   for (const b of buttons) {
-    drawButton(ctx, b, { primary: b.id === "next" });
+    drawButton(ctx, b, { primary: b.id === "next" || b.id === "result-deck" });
   }
   return buttons;
 }

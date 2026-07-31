@@ -1,7 +1,7 @@
 ---
 title: Breach Riot
 tagline: Trace. Crack. Override.
-summary: A sticker-punk hacking puzzle — snake through a code matrix, fill your buffer, and complete daemon sequences before the breach locks. Free in the browser.
+summary: A sticker-punk Breach Protocol puzzle — snake the code matrix, clear Datamine V1–V3 for Scrap, upgrade your cyberdeck, and unlock districts. Free in the browser.
 cover: /images/breach-riot-logo.svg
 preview: /images/previews/breach-riot.svg
 screenshots: []
@@ -19,6 +19,6 @@ webPlayPath: web/index.html
 downloads: {}
 ---
 
-**Breach Riot** is a SKITZ Breach Protocol–style hacking puzzle: pick codes on alternating rows and columns, fill a limited buffer, and complete required daemon sequences in one path.
+**Breach Riot** is a SKITZ take on Cyberpunk-style access-point hacking: top-row start, blanking codes, breach timer after first pick, and three Datamine sequences that stack Scrap and Components.
 
-**Free to play** online. Climb a 16-level access map with jams, sticky glyphs, live scramble, and fork daemons.
+**Free to play** online. Spend loot on cyberdeck buffer/time upgrades and unlock the next district on the access map.

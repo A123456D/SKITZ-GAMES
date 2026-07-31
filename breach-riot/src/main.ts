@@ -1,5 +1,14 @@
 import { LEVELS, LEVEL_COUNT, levelById } from "./core/levels";
-import { applyWin, loadProgress, saveProgress } from "./core/save";
+import {
+  applyWin,
+  canUnlockDistrict,
+  loadProgress,
+  saveProgress,
+  tryBuyAlmostIn,
+  tryBuyBuffer,
+  tryBuyTime,
+  tryUnlockDistrict,
+} from "./core/save";
 import {
   confirmEarly,
   currentLegal,
@@ -22,6 +31,7 @@ import {
 import {
   cellAt,
   cellCenter,
+  drawDeck,
   drawHome,
   drawHow,
   drawMap,
@@ -63,8 +73,9 @@ function startLevel(id: number): void {
   const level = levelById(id);
   if (!level) return;
   if (id > progress.unlocked) return;
+  if (level.district > progress.district) return;
   selectedLevel = id;
-  session = startSession(level);
+  session = startSession(level, progress.deck);
   prevCompleted = new Set();
   clearMotion();
   screen = "play";
@@ -94,6 +105,10 @@ function onPointer(clientX: number, clientY: number): void {
       screen = "map";
       return;
     }
+    if (id === "deck") {
+      screen = "deck";
+      return;
+    }
     if (id === "how") {
       howPage = 0;
       screen = "how";
@@ -114,9 +129,43 @@ function onPointer(clientX: number, clientY: number): void {
       return;
     }
     if (id === "how-next") {
-      if (howPage >= 3) {
+      if (howPage >= 4) {
         startLevel(1);
       } else howPage += 1;
+      return;
+    }
+  }
+
+  if (screen === "deck") {
+    if (id === "deck-back") {
+      screen = "home";
+      return;
+    }
+    if (id === "deck-buffer") {
+      const next = tryBuyBuffer(progress);
+      if (next) {
+        progress = next;
+        saveProgress(progress);
+        playComplete();
+      } else playIllegal();
+      return;
+    }
+    if (id === "deck-time") {
+      const next = tryBuyTime(progress);
+      if (next) {
+        progress = next;
+        saveProgress(progress);
+        playComplete();
+      } else playIllegal();
+      return;
+    }
+    if (id === "deck-almost") {
+      const next = tryBuyAlmostIn(progress);
+      if (next) {
+        progress = next;
+        saveProgress(progress);
+        playComplete();
+      } else playIllegal();
       return;
     }
   }
@@ -124,7 +173,10 @@ function onPointer(clientX: number, clientY: number): void {
   if (screen === "map") {
     const node = hitMapNode(mapNodes, x, y);
     if (node !== null && node <= progress.unlocked) {
-      selectedLevel = node;
+      const level = levelById(node);
+      if (level && level.district <= progress.district) {
+        selectedLevel = node;
+      }
       return;
     }
     if (id === "map-back") {
@@ -133,6 +185,24 @@ function onPointer(clientX: number, clientY: number): void {
     }
     if (id === "map-play") {
       startLevel(selectedLevel);
+      return;
+    }
+    if (id === "map-unlock") {
+      const gate = canUnlockDistrict(progress);
+      if (!gate.ok) {
+        playIllegal();
+        return;
+      }
+      const next = tryUnlockDistrict(progress);
+      if (next) {
+        progress = next;
+        saveProgress(progress);
+        playWin();
+      } else playIllegal();
+      return;
+    }
+    if (id === "map-deck") {
+      screen = "deck";
       return;
     }
   }
@@ -182,14 +252,21 @@ function onPointer(clientX: number, clientY: number): void {
     if (id === "next") {
       const nextId = session.level.id + 1;
       if (
-        session.outcome !== "fail" &&
+        resultStars > 0 &&
         nextId <= LEVEL_COUNT &&
         nextId <= progress.unlocked
       ) {
-        startLevel(nextId);
-      } else {
-        screen = "map";
+        const nextLevel = levelById(nextId);
+        if (nextLevel && nextLevel.district <= progress.district) {
+          startLevel(nextId);
+          return;
+        }
       }
+      screen = "map";
+      return;
+    }
+    if (id === "result-deck") {
+      screen = "deck";
       return;
     }
     if (id === "result-home") {
@@ -202,8 +279,14 @@ function onPointer(clientX: number, clientY: number): void {
 function finishRound(): void {
   if (!session) return;
   resultStars = starsFor(session);
-  if (resultStars > 0) {
-    progress = applyWin(progress, session.level.id, resultStars, LEVEL_COUNT);
+  if (resultStars > 0 && !session.timedOut) {
+    progress = applyWin(
+      progress,
+      session.level.id,
+      resultStars,
+      session.loot,
+      LEVEL_COUNT,
+    );
     saveProgress(progress);
     playWin();
   } else {
@@ -234,11 +317,15 @@ function frame(now: number): void {
   ctx.clearRect(0, 0, W, H);
 
   if (screen === "home") {
-    buttons = drawHome(ctx, time, progress.sound);
+    buttons = drawHome(ctx, time, progress);
     mapNodes = [];
     layout = null;
   } else if (screen === "how") {
     buttons = drawHow(ctx, time, howPage);
+    mapNodes = [];
+    layout = null;
+  } else if (screen === "deck") {
+    buttons = drawDeck(ctx, time, progress);
     mapNodes = [];
     layout = null;
   } else if (screen === "map") {
@@ -266,7 +353,6 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
 }
 
-// Touch scroll lock
 document.body.addEventListener(
   "touchmove",
   (e) => e.preventDefault(),
@@ -275,5 +361,5 @@ document.body.addEventListener(
 
 requestAnimationFrame(frame);
 
-// Ensure LEVELS referenced for tree-shaking peace
 void LEVELS.length;
+void H;

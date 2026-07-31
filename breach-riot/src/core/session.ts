@@ -1,4 +1,5 @@
 import { bufferCost, refreshDaemons } from "./buffer";
+import { effectiveBuffer, effectiveTimeLimit, lootForClears } from "./economy";
 import {
   canAfford,
   cloneMatrix,
@@ -11,8 +12,10 @@ import {
 } from "./matrix";
 import type {
   Axis,
-  DaemonProgress,
+  DatamineProgress,
+  Deck,
   LevelDef,
+  Loot,
   Matrix,
   Outcome,
   Pos,
@@ -23,37 +26,46 @@ export type Session = {
   level: LevelDef;
   matrix: Matrix;
   buffer: Token[];
-  /** Buffer slots remaining (sticky costs 2). */
   remaining: number;
+  /** Effective buffer size this round (base + deck). */
+  bufferSize: number;
   last: Pos | null;
   axis: Axis;
-  daemons: DaemonProgress[];
+  daemons: DatamineProgress[];
   picks: Pos[];
   ended: boolean;
   outcome: Outcome | null;
   score: number;
+  loot: Loot;
   scrambleAt: number;
   rng: () => number;
   coach: string | null;
-  /** False until first pick — CP2077: plan freely, then the clock runs. */
   timerStarted: boolean;
-  /** Seconds left once the clock is running (or full limit while waiting). */
   timeLeft: number;
   timedOut: boolean;
 };
 
-export function startSession(level: LevelDef): Session {
-  const { matrix } = generatePuzzle(level);
-  const daemons: DaemonProgress[] = level.daemons.map((d) => ({
+export function startSession(level: LevelDef, deck: Deck): Session {
+  const bufferSize = effectiveBuffer(level.buffer, deck);
+  const timeLimit = effectiveTimeLimit(level.timeLimit, deck);
+  const playLevel: LevelDef = {
+    ...level,
+    buffer: bufferSize,
+    timeLimit,
+    twists: { ...level.twists, firstRowOnly: true },
+  };
+  const { matrix } = generatePuzzle(playLevel);
+  const daemons: DatamineProgress[] = level.datamines.map((d) => ({
     ...d,
     matched: 0,
     completed: false,
   }));
   return {
-    level,
+    level: playLevel,
     matrix,
     buffer: [],
-    remaining: level.buffer,
+    remaining: bufferSize,
+    bufferSize,
     last: null,
     axis: null,
     daemons,
@@ -61,11 +73,12 @@ export function startSession(level: LevelDef): Session {
     ended: false,
     outcome: null,
     score: 0,
+    loot: { scrap: 0, components: 0 },
     scrambleAt: 0,
     rng: mulberry32(level.seed ^ 0x9e3779b9),
     coach: level.twists.coach ?? null,
     timerStarted: false,
-    timeLeft: level.timeLimit,
+    timeLeft: timeLimit,
     timedOut: false,
   };
 }
@@ -73,7 +86,7 @@ export function startSession(level: LevelDef): Session {
 export function currentLegal(session: Session): Pos[] {
   if (session.ended) return [];
   return legalPicks(session.matrix, session.last, session.axis, {
-    firstRowOnly: session.level.twists.firstRowOnly,
+    firstRowOnly: true,
   }).filter((p) => {
     const kind = session.matrix[p.r]![p.c]!.kind;
     return canAfford(session.remaining, kind);
@@ -90,7 +103,7 @@ export function tryPick(session: Session, pos: Pos): PickResult {
   }
   if (
     !isLegalPick(session.matrix, pos, session.last, session.axis, {
-      firstRowOnly: session.level.twists.firstRowOnly,
+      firstRowOnly: true,
     })
   ) {
     return { ok: false, reason: "illegal", session };
@@ -102,6 +115,7 @@ export function tryPick(session: Session, pos: Pos): PickResult {
   }
 
   const matrix = cloneMatrix(session.matrix);
+  // Blank the cell (CP2077 — code disappears).
   matrix[pos.r]![pos.c]!.used = true;
 
   const buffer = [...session.buffer, cell.token];
@@ -109,9 +123,6 @@ export function tryPick(session: Session, pos: Pos): PickResult {
   const picks = [...session.picks, pos];
   const daemons = refreshDaemons(buffer, session.daemons);
   const axis = nextAxis(picks.length);
-
-  // CP2077: breach time starts the moment you commit the first code.
-  const timerStarted = true;
 
   let next: Session = {
     ...session,
@@ -123,7 +134,7 @@ export function tryPick(session: Session, pos: Pos): PickResult {
     daemons,
     picks,
     coach: null,
-    timerStarted,
+    timerStarted: true,
   };
 
   let scrambled: Pos[] = [];
@@ -143,7 +154,6 @@ export function tryPick(session: Session, pos: Pos): PickResult {
   return { ok: true, session: next, scrambled };
 }
 
-/** Advance breach clock after first pick. Returns same session if not running. */
 export function tickTimer(session: Session, dt: number): Session {
   if (session.ended || !session.timerStarted) return session;
   const timeLeft = Math.max(0, session.timeLeft - dt);
@@ -151,7 +161,7 @@ export function tickTimer(session: Session, dt: number): Session {
   return { ...session, timeLeft };
 }
 
-/** Time expired — breach locks out (no upload), same as CP2077. */
+/** Timeout — no loot uploaded. */
 export function expireTimer(session: Session): Session {
   if (session.ended) return session;
   return {
@@ -159,6 +169,7 @@ export function expireTimer(session: Session): Session {
     ended: true,
     outcome: "fail",
     score: 0,
+    loot: { scrap: 0, components: 0 },
     timedOut: true,
     timeLeft: 0,
     timerStarted: true,
@@ -173,44 +184,28 @@ export function confirmEarly(session: Session): Session {
 }
 
 export function resolveRound(session: Session): Session {
-  const required = session.daemons.filter((d) => d.required);
-  const optional = session.daemons.filter((d) => !d.required);
-  const reqDone = required.filter((d) => d.completed).length;
-  const optDone = optional.filter((d) => d.completed).length;
-  const allReq = required.length > 0 && reqDone === required.length;
-  const anyReq = reqDone > 0;
+  const clears = session.daemons.filter((d) => d.completed).length;
+  const loot = lootForClears(session.daemons);
 
   let outcome: Outcome;
-  if (allReq) outcome = "breach";
-  else if (anyReq || optDone > 0) outcome = "partial";
+  if (clears >= 3) outcome = "breach";
+  else if (clears >= 1) outcome = "partial";
   else outcome = "fail";
 
-  const clears = reqDone + optDone;
-  let score = reqDone * 100 + optDone * 50;
-  // Breach score multiplier after tutorial (level id > 2).
-  if (session.level.id > 2 && clears >= 2) {
-    score = Math.round(score * (1 + 0.5 * (clears - 1)));
-  }
+  const score = loot.scrap * 2 + loot.components * 25;
 
   return {
     ...session,
     ended: true,
     outcome,
     score,
+    loot,
   };
 }
 
-/** Stars: 1 = any required, 2 = all required, 3 = all required + all optional. */
+/** Stars = number of Datamines cleared (0–3). */
 export function starsFor(session: Session): number {
+  if (session.timedOut) return 0;
   if (!session.outcome || session.outcome === "fail") return 0;
-  const required = session.daemons.filter((d) => d.required);
-  const optional = session.daemons.filter((d) => !d.required);
-  const reqDone = required.every((d) => d.completed);
-  const optDone =
-    optional.length === 0 || optional.every((d) => d.completed);
-  if (reqDone && optDone) return 3;
-  if (reqDone) return 2;
-  if (required.some((d) => d.completed)) return 1;
-  if (session.outcome === "partial") return 1;
-  return 0;
+  return session.daemons.filter((d) => d.completed).length;
 }

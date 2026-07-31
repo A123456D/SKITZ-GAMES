@@ -3,7 +3,7 @@ import type {
   Axis,
   Cell,
   CellKind,
-  DaemonDef,
+  DatamineDef,
   LevelDef,
   Matrix,
   Pos,
@@ -160,8 +160,8 @@ export function randomPath(
 }
 
 /**
- * Build a solvable matrix: plant a path that realizes required daemon sequences
- * (concatenated / overlapping), fill noise, optionally place jam/sticky.
+ * Build a solvable matrix: plant a path covering Datamine sequences
+ * (chained / overlapping), fill noise, optionally place jam/sticky ICE.
  */
 export function generatePuzzle(level: LevelDef): {
   matrix: Matrix;
@@ -177,28 +177,23 @@ export function generatePuzzle(level: LevelDef): {
   const rng = mulberry32(level.seed);
   const size = level.size;
   const matrix = emptyMatrix(size);
-  const required = level.daemons.filter((d) => d.required);
-  const optional = level.daemons.filter((d) => !d.required);
+  const mines = [...level.datamines].sort((a, b) => a.tier - b.tier);
+  const firstRowOnly = true;
 
-  // Flatten required sequences into a buffer footprint (prefer shared prefix fork).
+  // Plant V1+V2 always; include V3 in footprint only if it fits buffer (greedy expert).
   let footprint: Token[] = [];
-  for (const d of required) {
-    footprint = mergeSequence(footprint, d.sequence);
-  }
-  if (level.twists.fork && optional.length) {
-    // Optional already designed to share prefix in level defs; still ensure plantable.
-    for (const d of optional) {
-      if (footprint.length + d.sequence.length <= level.buffer) {
-        footprint = mergeSequence(footprint, d.sequence);
-      }
+  for (const d of mines) {
+    if (d.tier === 3) {
+      const merged = mergeSequence(footprint, d.sequence);
+      if (merged.length <= level.buffer) footprint = merged;
+      continue;
     }
+    footprint = mergeSequence(footprint, d.sequence);
   }
 
   const pathLen = Math.min(level.buffer, Math.max(footprint.length, 1));
-  // Ensure footprint fits buffer (truncate only noise padding later).
   while (footprint.length > level.buffer) footprint.pop();
 
-  // Fill random tokens first.
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size; c++) {
       matrix[r]![c]!.token = pickToken(rng);
@@ -207,7 +202,6 @@ export function generatePuzzle(level: LevelDef): {
     }
   }
 
-  // Place jams before path search so path avoids them.
   if (level.twists.jam) {
     const scale = level.twists.hazardScale ?? 1;
     const jamCount = Math.max(2, Math.floor(size * size * 0.18 * scale));
@@ -216,7 +210,7 @@ export function generatePuzzle(level: LevelDef): {
     while (placed < jamCount && guard++ < 400) {
       const c = Math.floor(rng() * size);
       const r = Math.floor(rng() * size);
-      if (level.twists.firstRowOnly && r === 0) continue;
+      if (r === 0) continue;
       if (matrix[r]![c]!.kind === "jam") continue;
       matrix[r]![c]!.kind = "jam";
       placed++;
@@ -225,24 +219,17 @@ export function generatePuzzle(level: LevelDef): {
 
   let path: Pos[] | null = null;
   for (let attempt = 0; attempt < 80; attempt++) {
-    path = randomPath(matrix, pathLen, rng, {
-      firstRowOnly: level.twists.firstRowOnly,
-    });
+    path = randomPath(matrix, pathLen, rng, { firstRowOnly });
     if (path) break;
   }
   if (!path) {
-    // Fallback: clear jams and retry.
     for (const row of matrix) for (const cell of row) cell.kind = "code";
-    path = randomPath(matrix, pathLen, rng, {
-      firstRowOnly: level.twists.firstRowOnly,
-    });
+    path = randomPath(matrix, pathLen, rng, { firstRowOnly });
   }
   if (!path) {
-    // Guaranteed straight path on row 0 then snake.
-    path = forcedSnakePath(size, pathLen, level.twists.firstRowOnly);
+    path = forcedSnakePath(size, pathLen, firstRowOnly);
   }
 
-  // Plant footprint tokens along path.
   for (let i = 0; i < path.length; i++) {
     const p = path[i]!;
     const token = i < footprint.length ? footprint[i]! : pickToken(rng);
@@ -250,8 +237,7 @@ export function generatePuzzle(level: LevelDef): {
     matrix[p.r]![p.c]!.kind = "code";
   }
 
-  // Decoy prefixes: sprinkle sequence starts off-path so wrong routes look tempting.
-  plantDecoys(matrix, path, required, rng);
+  plantDecoys(matrix, path, mines, rng);
 
   if (level.twists.sticky) {
     const scale = level.twists.hazardScale ?? 1;
@@ -276,12 +262,12 @@ export function generatePuzzle(level: LevelDef): {
 function plantDecoys(
   matrix: Matrix,
   path: Pos[],
-  required: DaemonDef[],
+  mines: { sequence: Token[] }[],
   rng: () => number,
 ): void {
-  if (required.length === 0) return;
+  if (mines.length === 0) return;
   const pathSet = new Set(path.map((p) => `${p.c},${p.r}`));
-  const prefixes = required.map((d) => d.sequence[0]!).filter(Boolean);
+  const prefixes = mines.map((d) => d.sequence[0]!).filter(Boolean);
   for (let r = 0; r < matrix.length; r++) {
     for (let c = 0; c < matrix.length; c++) {
       if (pathSet.has(`${c},${r}`)) continue;
@@ -379,15 +365,15 @@ export function scrambleUnused(
   return changed;
 }
 
-export function daemonNames(): string[] {
-  return ["DATAMINE", "ICEPICK", "SOULKILLER", "OVERCLOCK", "GHOST", "RAZOR"];
-}
-
-export function makeDaemon(
+export function makeDatamine(
   id: string,
-  name: string,
+  tier: 1 | 2 | 3,
   sequence: Token[],
-  required: boolean,
-): DaemonDef {
-  return { id, name, sequence, required, optional: !required };
+): DatamineDef {
+  return {
+    id,
+    name: `DATAMINE V${tier}`,
+    tier,
+    sequence,
+  };
 }
