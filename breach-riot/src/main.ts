@@ -371,5 +371,11 @@ document.body.addEventListener(
 
 requestAnimationFrame(frame);
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+
 void LEVELS.length;
 void H;

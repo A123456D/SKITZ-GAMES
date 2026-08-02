@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
+    />
+    <meta name="theme-color" content="#07090f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="CHAIN REACTOR" />
+    <meta name="apple-mobile-web-app-title" content="CHAIN REACTOR" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <title>CHAIN REACTOR — Build 01 Prototype</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #07090f;
+        color: #e8f0ff;
+      }
+      #boot-error {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        padding: 24px;
+        font: 14px/1.45 ui-monospace, monospace;
+        white-space: pre-wrap;
+        background: #07090f;
+        color: #ff6b8a;
+      }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <script type="module" crossorigin src="./assets/index-DFXNX1wm.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BxDw959f.css">
+  </head>
+  <body>
+    <div id="boot-error"></div>
+    <div id="app">
+      <canvas id="game" width="720" height="1280"></canvas>
+    </div>
+  </body>
+</html>

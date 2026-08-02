@@ -1,0 +1,6 @@
+.godot/
+export/
+*.translation
+.mono/
+_*.txt
+_check_scripts.gd
