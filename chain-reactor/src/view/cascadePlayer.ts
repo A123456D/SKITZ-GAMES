@@ -151,7 +151,7 @@ export class CascadePlayer {
     this.pushBanner(text, sub, color, life);
   }
 
-  draw(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+  draw(ctx: CanvasRenderingContext2D, W: number, H: number, reduced = false): void {
     for (const b of this.banners) {
       const t = b.life / b.max;
       ctx.save();
@@ -159,8 +159,10 @@ export class CascadePlayer {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillStyle = b.color;
-      ctx.shadowColor = b.color;
-      ctx.shadowBlur = 18;
+      if (!reduced) {
+        ctx.shadowColor = b.color;
+        ctx.shadowBlur = 18;
+      }
       ctx.font = "800 36px Orbitron, sans-serif";
       ctx.fillText(b.text, W / 2, H * 0.36);
       if (b.sub) {

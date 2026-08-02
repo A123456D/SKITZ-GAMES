@@ -23,6 +23,7 @@ import {
 import { getCardArt } from "./cardArt";
 import { Motion } from "./motion";
 import { getPrefs, type Prefs } from "./prefs";
+import { glowBlur, onRenderCacheClear, useGlow } from "./renderPerf";
 import { H, W, theme } from "./theme";
 import { drawNineSlice, factionSymbol, ui } from "./uiArt";
 
@@ -191,8 +192,11 @@ function drawArrow(
 ): void {
   ctx.save();
   ctx.fillStyle = color;
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 10;
+  const blur = glowBlur(10);
+  if (blur) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = blur;
+  }
   ctx.translate(cx, cy);
   const rot =
     dir === "up" ? 0 : dir === "right" ? Math.PI / 2 : dir === "down" ? Math.PI : -Math.PI / 2;
@@ -296,51 +300,82 @@ function factionAccent(faction: string): string {
   }
 }
 
+let backdropCache: HTMLCanvasElement | null = null;
+let backdropCacheKey = "";
+
+const cardFaceCache = new Map<string, HTMLCanvasElement>();
+const CARD_CACHE_MAX = 64;
+
+onRenderCacheClear(() => {
+  backdropCache = null;
+  backdropCacheKey = "";
+  cardFaceCache.clear();
+});
+
 function drawBackdrop(ctx: CanvasRenderingContext2D): void {
   const bgImg = ui("ui-bg-chamber.png");
-  if (bgImg) {
-    ctx.drawImage(bgImg, 0, 0, W, H);
-    ctx.fillStyle = "rgba(5,8,14,0.35)";
-    ctx.fillRect(0, 0, W, H);
-  } else {
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, theme.bgGradTop);
-    bg.addColorStop(1, theme.bgGradBot);
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, H);
+  const key = bgImg ? `img:${bgImg.naturalWidth}x${bgImg.naturalHeight}` : "grad";
+  if (!backdropCache || backdropCacheKey !== key) {
+    const off = document.createElement("canvas");
+    off.width = W;
+    off.height = H;
+    const octx = off.getContext("2d")!;
+    if (bgImg) {
+      octx.drawImage(bgImg, 0, 0, W, H);
+      octx.fillStyle = "rgba(5,8,14,0.35)";
+      octx.fillRect(0, 0, W, H);
+    } else {
+      const bg = octx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, theme.bgGradTop);
+      bg.addColorStop(1, theme.bgGradBot);
+      octx.fillStyle = bg;
+      octx.fillRect(0, 0, W, H);
+    }
+    backdropCache = off;
+    backdropCacheKey = key;
   }
+  ctx.drawImage(backdropCache, 0, 0, W, H);
 }
 
-export function drawCardFace(
+type CardFaceOpts = {
+  owner?: "player" | "enemy";
+  power?: number;
+  selected?: boolean;
+  dimmed?: boolean;
+  compact?: boolean;
+};
+
+function paintCardFace(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   w: number,
   h: number,
   defId: string,
-  opts: {
-    owner?: "player" | "enemy";
-    power?: number;
-    selected?: boolean;
-    dimmed?: boolean;
-    compact?: boolean;
-  } = {},
+  opts: CardFaceOpts,
 ): void {
   const def = getCard(defId);
   const accent = opts.owner ? ownerColor(opts.owner) : factionAccent(def.faction);
   const power = opts.power ?? def.power;
   const art = getCardArt(defId);
   const frame = ui("ui-card-frame.png");
-  const cosmeticFrame = opts.owner === "player" || !opts.owner ? loadMeta().cosmetics.frame : "default";
+  const cosmeticFrame =
+    opts.owner === "player" || !opts.owner ? loadMeta().cosmetics.frame : "default";
   const frameAccent = frameStrokeFor(cosmeticFrame);
+  const glow = useGlow();
 
   ctx.save();
-  if (opts.dimmed) ctx.globalAlpha = 0.42;
 
-  // Drop shadow
-  ctx.shadowColor = "rgba(0,0,0,0.65)";
-  ctx.shadowBlur = 18;
-  ctx.shadowOffsetY = 8;
+  // Drop shadow (skip expensive blur when reduced)
+  if (glow) {
+    ctx.shadowColor = "rgba(0,0,0,0.65)";
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 8;
+  } else {
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    roundRect(ctx, x + 3, y + 6, w, h, 16);
+    ctx.fill();
+  }
   roundRect(ctx, x, y, w, h, 16);
   ctx.fillStyle = "#0a1018";
   ctx.fill();
@@ -382,14 +417,16 @@ export function drawCardFace(
   ctx.strokeStyle = opts.selected
     ? accent
     : frameAccent ?? "rgba(160,185,220,0.4)";
-  ctx.shadowColor = opts.selected ? accent : frameAccent ?? "transparent";
-  ctx.shadowBlur = opts.selected ? 16 : frameAccent ? 10 : 0;
+  if (glow) {
+    ctx.shadowColor = opts.selected ? accent : frameAccent ?? "transparent";
+    ctx.shadowBlur = opts.selected ? 16 : frameAccent ? 10 : 0;
+  }
   roundRect(ctx, x, y, w, h, 16);
   ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // Premium frame overlay (subtle)
-  if (frame) {
+  // Premium frame overlay (subtle) — skip nine-slice when reduced FX
+  if (frame && glow) {
     ctx.save();
     ctx.globalAlpha = 0.55;
     drawNineSlice(ctx, frame, x - 2, y - 2, w + 4, h + 4, 56);
@@ -496,6 +533,70 @@ export function drawCardFace(
   ctx.restore();
 }
 
+export function drawCardFace(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  defId: string,
+  opts: CardFaceOpts = {},
+): void {
+  const iw = Math.round(w);
+  const ih = Math.round(h);
+  if (iw < 8 || ih < 8) {
+    paintCardFace(ctx, x, y, w, h, defId, opts);
+    return;
+  }
+
+  const cosmeticFrame =
+    opts.owner === "player" || !opts.owner ? loadMeta().cosmetics.frame : "default";
+  const art = getCardArt(defId);
+  // Don't cache until art is ready (avoids sticky blank art windows).
+  if (!art) {
+    paintCardFace(ctx, x, y, w, h, defId, opts);
+    return;
+  }
+
+  const key = [
+    defId,
+    opts.owner ?? "-",
+    opts.power ?? "d",
+    opts.selected ? "1" : "0",
+    opts.compact ? "c" : "f",
+    cosmeticFrame,
+    useGlow() ? "g" : "n",
+    iw,
+    ih,
+  ].join("|");
+
+  let bmp = cardFaceCache.get(key);
+  if (!bmp) {
+    bmp = document.createElement("canvas");
+    // Padding for drop shadow so it isn't clipped
+    const pad = useGlow() ? 14 : 8;
+    bmp.width = iw + pad * 2;
+    bmp.height = ih + pad * 2;
+    const octx = bmp.getContext("2d")!;
+    paintCardFace(octx, pad, pad, iw, ih, defId, {
+      ...opts,
+      dimmed: false,
+      selected: opts.selected,
+    });
+    if (cardFaceCache.size >= CARD_CACHE_MAX) {
+      const first = cardFaceCache.keys().next().value;
+      if (first !== undefined) cardFaceCache.delete(first);
+    }
+    cardFaceCache.set(key, bmp);
+  }
+
+  ctx.save();
+  if (opts.dimmed) ctx.globalAlpha = 0.42;
+  const pad = (bmp.width - iw) / 2;
+  ctx.drawImage(bmp, x - pad, y - pad);
+  ctx.restore();
+}
+
 function drawBoardCard(
   ctx: CanvasRenderingContext2D,
   layout: Layout,
@@ -526,8 +627,11 @@ function drawPlacementPreview(
   roundRect(ctx, r.x, r.y, r.w, r.h, 12);
   ctx.strokeStyle = preview.ok ? theme.player : theme.danger;
   ctx.lineWidth = 3;
-  ctx.shadowColor = preview.ok ? theme.player : theme.danger;
-  ctx.shadowBlur = 16;
+  const tileBlur = glowBlur(16);
+  if (tileBlur) {
+    ctx.shadowColor = preview.ok ? theme.player : theme.danger;
+    ctx.shadowBlur = tileBlur;
+  }
   ctx.stroke();
   ctx.shadowBlur = 0;
 
@@ -568,8 +672,11 @@ function drawPlacementPreview(
       ctx.save();
       ctx.globalAlpha = 0.75;
       ctx.strokeStyle = e.beam.kind === "miss" ? theme.muted : theme.gridCyan;
-      ctx.shadowColor = theme.gridCyan;
-      ctx.shadowBlur = 12;
+      const beamBlur = glowBlur(12);
+      if (beamBlur) {
+        ctx.shadowColor = theme.gridCyan;
+        ctx.shadowBlur = beamBlur;
+      }
       ctx.lineWidth = 3;
       ctx.setLineDash(e.beam.kind === "miss" ? [6, 6] : []);
       ctx.beginPath();
@@ -595,8 +702,11 @@ function drawPlacementPreview(
       roundRect(ctx, c.x + 4, c.y + 4, c.w - 8, c.h - 8, 10);
       ctx.strokeStyle = theme.player;
       ctx.lineWidth = 3;
-      ctx.shadowColor = theme.player;
-      ctx.shadowBlur = 14;
+      const capBlur = glowBlur(14);
+      if (capBlur) {
+        ctx.shadowColor = theme.player;
+        ctx.shadowBlur = capBlur;
+      }
       ctx.stroke();
       ctx.shadowBlur = 0;
       ctx.fillStyle = theme.player;
@@ -667,8 +777,11 @@ function drawUiButton(
   ctx.font = "800 18px Orbitron, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 10;
+  const labelBlur = glowBlur(10);
+  if (labelBlur) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = labelBlur;
+  }
   ctx.fillText(label, x + w / 2, y + h / 2);
   ctx.shadowBlur = 0;
 }
@@ -689,7 +802,7 @@ export function drawFrame(
     drawMenu(ctx, state);
     drawChromeButtons(ctx, state);
     if (uiState.overlay === "settings") drawSettingsOverlay(ctx, uiState.prefs);
-    motion.draw(ctx, W, H);
+    motion.draw(ctx, W, H, uiState.prefs.reducedFx);
     return;
   }
 
@@ -697,7 +810,7 @@ export function drawFrame(
     drawCampaignMap(ctx);
     drawChromeButtons(ctx, state);
     if (uiState.overlay === "settings") drawSettingsOverlay(ctx, uiState.prefs);
-    motion.draw(ctx, W, H);
+    motion.draw(ctx, W, H, uiState.prefs.reducedFx);
     return;
   }
 
@@ -865,8 +978,11 @@ export function drawFrame(
         ctx.strokeStyle = theme.energy;
         ctx.globalAlpha = 0.95;
         ctx.lineWidth = 3;
-        ctx.shadowColor = theme.energy;
-        ctx.shadowBlur = 14;
+        const tutBlur = glowBlur(14);
+        if (tutBlur) {
+          ctx.shadowColor = theme.energy;
+          ctx.shadowBlur = tutBlur;
+        }
         roundRect(ctx, r.x + 2, r.y + 2, r.w - 4, r.h - 4, 10);
         ctx.stroke();
         ctx.shadowBlur = 0;
@@ -881,8 +997,11 @@ export function drawFrame(
         ctx.strokeStyle = theme.gridPurple;
         ctx.globalAlpha = 0.9;
         ctx.lineWidth = 3;
-        ctx.shadowColor = theme.gridPurple;
-        ctx.shadowBlur = 12;
+        const sigBlur = glowBlur(12);
+        if (sigBlur) {
+          ctx.shadowColor = theme.gridPurple;
+          ctx.shadowBlur = sigBlur;
+        }
         roundRect(ctx, r.x + 2, r.y + 2, r.w - 4, r.h - 4, 10);
         ctx.stroke();
         ctx.shadowBlur = 0;
@@ -916,8 +1035,11 @@ export function drawFrame(
   if (fillW > 0) {
     roundRect(ctx, barX + 12, layout.energyBarY + 4, fillW, 12, 6);
     ctx.fillStyle = theme.energy;
-    ctx.shadowColor = theme.energy;
-    ctx.shadowBlur = 12;
+    const enBlur = glowBlur(12);
+    if (enBlur) {
+      ctx.shadowColor = theme.energy;
+      ctx.shadowBlur = enBlur;
+    }
     ctx.fill();
     ctx.shadowBlur = 0;
   }
@@ -1245,7 +1367,7 @@ export function drawFrame(
   if (uiState.overlay === "pause") drawPauseOverlay(ctx);
   if (uiState.overlay === "settings") drawSettingsOverlay(ctx, uiState.prefs);
 
-  motion.draw(ctx, W, H);
+  motion.draw(ctx, W, H, uiState.prefs.reducedFx);
 }
 
 function drawTutorialArrows(
@@ -1533,8 +1655,11 @@ function drawMenu(ctx: CanvasRenderingContext2D, state: MatchState): void {
       ctx.fill();
       ctx.strokeStyle = f.color;
       ctx.lineWidth = 2;
-      ctx.shadowColor = f.color;
-      ctx.shadowBlur = 12;
+      const facBlur = glowBlur(12);
+      if (facBlur) {
+        ctx.shadowColor = f.color;
+        ctx.shadowBlur = facBlur;
+      }
       ctx.stroke();
       ctx.shadowBlur = 0;
 

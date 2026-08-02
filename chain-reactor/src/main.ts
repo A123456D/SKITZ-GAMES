@@ -68,14 +68,31 @@ import {
 } from "./view/draw";
 import { Motion } from "./view/motion";
 import { cycleDifficulty, getPrefs, togglePref } from "./view/prefs";
+import {
+  FpsSampler,
+  applyMobilePrefDefaults,
+  clearRenderCaches,
+  effectiveDpr,
+} from "./view/renderPerf";
 import { H, W, theme } from "./view/theme";
 import { preloadUiArt } from "./view/uiArt";
 
+applyMobilePrefDefaults();
+
 const canvas = document.getElementById("game") as HTMLCanvasElement;
-const ctx = canvas.getContext("2d")!;
+const ctx =
+  canvas.getContext("2d", { alpha: false, desynchronized: true }) ??
+  canvas.getContext("2d")!;
 const layout = computeLayout();
 const motion = new Motion();
 const cascadePlayer = new CascadePlayer();
+const fpsSampler = new FpsSampler();
+
+/** Cached threat coach — avoid running AI search every rAF. */
+let threatCache: {
+  key: string;
+  value: ReturnType<typeof forecastThreat>;
+} | null = null;
 
 let state: MatchState = createMenuState();
 let selectedHand: number | null = null;
@@ -258,7 +275,7 @@ function tutorialLine(): string | null {
 }
 
 function resize(): void {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const dpr = effectiveDpr();
   const stage = canvas.parentElement!;
   const sw = stage.clientWidth;
   const sh = stage.clientHeight;
@@ -267,9 +284,47 @@ function resize(): void {
   const cssH = Math.floor(H * scale);
   canvas.style.width = `${cssW}px`;
   canvas.style.height = `${cssH}px`;
-  canvas.width = Math.floor(W * dpr);
-  canvas.height = Math.floor(H * dpr);
+  const bw = Math.floor(W * dpr);
+  const bh = Math.floor(H * dpr);
+  if (canvas.width !== bw || canvas.height !== bh) {
+    canvas.width = bw;
+    canvas.height = bh;
+    clearRenderCaches();
+  }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function threatKey(s: MatchState): string {
+  const p = s.players.player;
+  const e = s.players.enemy;
+  let board = "";
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 3; c++) {
+      const cell = s.board[r][c];
+      board += cell
+        ? `${cell.defId}:${cell.owner}:${cell.power}|`
+        : ".;";
+    }
+  }
+  return [
+    s.phase,
+    s.active,
+    s.round,
+    s.energy,
+    p.hand.join(","),
+    e.hand.join(","),
+    matchDifficulty(),
+    board,
+  ].join("#");
+}
+
+function cachedThreat(): ReturnType<typeof forecastThreat> {
+  if (state.phase !== "playing" || state.tutorial) return null;
+  const key = threatKey(state);
+  if (threatCache?.key === key) return threatCache.value;
+  const value = forecastThreat(state, matchDifficulty());
+  threatCache = { key, value };
+  return value;
 }
 
 /** Instant FX for AI / reduced paths (no turn deferral). */
@@ -415,6 +470,8 @@ function onPointerDown(ev: PointerEvent): void {
     }
     if (hit === "fx") {
       togglePref("reducedFx");
+      clearRenderCaches();
+      resize();
       playSfx(sfx.select);
       return;
     }
@@ -740,6 +797,8 @@ function frame(now: number): void {
   const dt = Math.min(0.05, (now - lastT) / 1000);
   lastT = now;
 
+  if (fpsSampler.tick(dt)) resize();
+
   setMusicBed(musicBedForPhase(state.phase));
 
   if (howtoFlash > 0) howtoFlash = Math.max(0, howtoFlash - dt);
@@ -852,16 +911,14 @@ function frame(now: number): void {
     showDailyCta: showDailyCta(),
     replayingChain,
     threat:
-      state.phase === "playing" && !state.tutorial
-        ? forecastThreat(state, matchDifficulty())
-        : null,
+      state.phase === "playing" && !state.tutorial ? cachedThreat() : null,
     aiIntent: state.phase === "ai_thinking" ? aiIntent : null,
     inspect: inspected,
     nextCampaignNodeId: nextNodeIdForEnd(),
     dailySummary: dailySummaryForUi(),
   });
 
-  cascadePlayer.draw(ctx, W, H);
+  cascadePlayer.draw(ctx, W, H, getPrefs().reducedFx);
 
   if (howtoFlash > 0) {
     ctx.fillStyle = `rgba(0,0,0,${Math.min(0.85, howtoFlash / 4)})`;

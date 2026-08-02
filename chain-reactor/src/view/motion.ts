@@ -116,8 +116,9 @@ export class Motion {
     });
   }
 
-  draw(ctx: CanvasRenderingContext2D, W = 720, H = 1280): void {
-    if (this.chainGlow > 0.02) {
+  draw(ctx: CanvasRenderingContext2D, W = 720, H = 1280, reduced = false): void {
+    const glow = !reduced;
+    if (this.chainGlow > 0.02 && glow) {
       ctx.save();
       ctx.globalAlpha = this.chainGlow * 0.22;
       const g = ctx.createRadialGradient(W / 2, H * 0.4, 40, W / 2, H * 0.4, W * 0.55);
@@ -133,8 +134,10 @@ export class Motion {
       ctx.save();
       ctx.globalAlpha = Math.min(1, t * 1.4);
       ctx.strokeStyle = b.color;
-      ctx.shadowColor = b.color;
-      ctx.shadowBlur = 18 + b.width * 2;
+      if (glow) {
+        ctx.shadowColor = b.color;
+        ctx.shadowBlur = 18 + b.width * 2;
+      }
       ctx.lineWidth = b.width + 3 * t;
       ctx.beginPath();
       ctx.moveTo(b.x1, b.y1);
@@ -148,8 +151,10 @@ export class Motion {
       ctx.save();
       ctx.globalAlpha = Math.max(0, (1 - t) * 0.9);
       ctx.strokeStyle = r.color;
-      ctx.shadowColor = r.color;
-      ctx.shadowBlur = 20;
+      if (glow) {
+        ctx.shadowColor = r.color;
+        ctx.shadowBlur = 20;
+      }
       ctx.lineWidth = 3 + 4 * (1 - t);
       ctx.beginPath();
       ctx.arc(r.x, r.y, r.radius * (0.35 + t * 1.1), 0, Math.PI * 2);
@@ -169,7 +174,7 @@ export class Motion {
 
     if (this.flash > 0.01) {
       ctx.save();
-      ctx.globalAlpha = this.flash * 0.45;
+      ctx.globalAlpha = this.flash * (glow ? 0.45 : 0.25);
       ctx.fillStyle = this.flashColor;
       ctx.fillRect(0, 0, W, H);
       ctx.restore();
