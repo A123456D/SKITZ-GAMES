@@ -2,8 +2,8 @@
 title: Chain Reactor
 tagline: Place. Chain. Overthrow.
 summary: A cyberpunk grid card battler — plant vector nodes on a 3×4 board, fire neon beams, and overthrow enemy tiles in cascading chain reactions. Free in the browser.
-cover: /images/chain-reactor-logo.svg
-preview: /images/previews/chain-reactor.svg
+cover: /images/chain-reactor-logo.png
+preview: /images/previews/chain-reactor.gif
 screenshots: []
 featured: true
 released: false
