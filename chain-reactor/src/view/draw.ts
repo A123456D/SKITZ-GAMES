@@ -300,6 +300,48 @@ function factionAccent(faction: string): string {
   }
 }
 
+/** Circular faction mark on card art (Volt / Prismatic / Void / Neutral). */
+function drawFactionBadge(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  faction: string,
+): void {
+  const accent = factionAccent(faction);
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  const r = size / 2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(4,8,14,0.92)";
+  ctx.fill();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = Math.max(1.5, size * 0.06);
+  const blur = glowBlur(8);
+  if (blur) {
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = blur;
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  const sym = factionSymbol(faction);
+  if (sym) {
+    const inset = size * 0.12;
+    ctx.drawImage(sym, x + inset, y + inset, size - inset * 2, size - inset * 2);
+  } else {
+    ctx.fillStyle = accent;
+    ctx.font = `800 ${Math.floor(size * 0.42)}px Orbitron, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(faction === "neutral" ? "N" : "?", cx, cy + 1);
+  }
+  ctx.restore();
+}
+
 let backdropCache: HTMLCanvasElement | null = null;
 let backdropCacheKey = "";
 
@@ -474,6 +516,16 @@ function paintCardFace(
     drawArrow(ctx, ax + ox, ay + oy, d, accent, opts.compact ? 11 : 13);
   }
 
+  // Faction emblem — readable on hand + board tiles
+  const badgeSize = opts.compact ? Math.min(28, w * 0.22) : Math.min(36, w * 0.2);
+  drawFactionBadge(
+    ctx,
+    artBox.x + 4,
+    artBox.y + artBox.h - badgeSize - 4,
+    badgeSize,
+    def.faction,
+  );
+
   // Cost gem
   roundRect(ctx, x + 10, y + 10, 34, 28, 8);
   const costGrad = ctx.createLinearGradient(x + 10, y + 10, x + 44, y + 38);
@@ -552,8 +604,10 @@ export function drawCardFace(
   const cosmeticFrame =
     opts.owner === "player" || !opts.owner ? loadMeta().cosmetics.frame : "default";
   const art = getCardArt(defId);
-  // Don't cache until art is ready (avoids sticky blank art windows).
-  if (!art) {
+  // Don't cache until art (+ faction emblem for syndicate cards) is ready.
+  const def = getCard(defId);
+  const needsFactionArt = def.faction !== "neutral";
+  if (!art || (needsFactionArt && !factionSymbol(def.faction))) {
     paintCardFace(ctx, x, y, w, h, defId, opts);
     return;
   }
@@ -602,13 +656,71 @@ function drawBoardCard(
   layout: Layout,
   pos: Pos,
   bc: BoardCard,
+  pulse = 0,
 ): void {
   const r = cellRect(layout, pos);
-  drawCardFace(ctx, r.x + 3, r.y + 3, r.w - 6, r.h - 6, bc.defId, {
+  const ownerCol = ownerColor(bc.owner);
+  const id = `${String.fromCharCode(65 + pos.col)}${pos.row + 1}`;
+
+  // Occupancy aura — makes it obvious who holds the block
+  ctx.save();
+  roundRect(ctx, r.x, r.y, r.w, r.h, 12);
+  ctx.fillStyle = ownerCol;
+  ctx.globalAlpha = 0.14 + pulse * 0.1;
+  ctx.fill();
+  ctx.globalAlpha = 0.55 + pulse * 0.35;
+  ctx.strokeStyle = ownerCol;
+  ctx.lineWidth = 3;
+  const blur = glowBlur(12 + pulse * 8);
+  if (blur) {
+    ctx.shadowColor = ownerCol;
+    ctx.shadowBlur = blur;
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, r.x + 5, r.y + 5, r.w - 10, r.h - 10, 10);
+  ctx.stroke();
+  ctx.restore();
+
+  drawCardFace(ctx, r.x + 3, r.y + 3, r.w - 6, r.h - 22, bc.defId, {
     owner: bc.owner,
     power: bc.power,
     compact: true,
   });
+
+  // Ownership + block id strip under the card
+  const barY = r.y + r.h - 18;
+  roundRect(ctx, r.x + 6, barY, r.w - 12, 14, 5);
+  ctx.fillStyle = ownerCol;
+  ctx.globalAlpha = 0.95;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#041018";
+  ctx.font = "800 9px Orbitron, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(
+    `${bc.owner === "player" ? "YOU" : "OPP"} · ${id}`,
+    r.x + r.w / 2,
+    barY + 7.5,
+  );
+}
+
+function drawEmptyTileChrome(
+  ctx: CanvasRenderingContext2D,
+  r: { x: number; y: number; w: number; h: number },
+  pos: Pos,
+): void {
+  const id = `${String.fromCharCode(65 + pos.col)}${pos.row + 1}`;
+  ctx.save();
+  ctx.fillStyle = "rgba(122,136,159,0.55)";
+  ctx.font = "700 11px JetBrains Mono, monospace";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "top";
+  ctx.fillText(id, r.x + r.w - 8, r.y + 6);
+  ctx.restore();
 }
 
 function drawPlacementPreview(
@@ -924,6 +1036,7 @@ export function drawFrame(
   }
 
   const tileImg = ui("ui-tile-empty.png");
+  const occupyPulse = 0.5 + 0.5 * Math.sin(performance.now() / 520);
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < COLS; col++) {
       const pos = { col, row };
@@ -939,6 +1052,9 @@ export function drawFrame(
         ctx.globalAlpha = 1;
       }
 
+      const bc = state.board[row][col];
+      if (!bc) drawEmptyTileChrome(ctx, r, pos);
+
       if (
         hoverTile &&
         hoverTile.col === col &&
@@ -946,6 +1062,10 @@ export function drawFrame(
         !state.board[row][col] &&
         selectedHand !== null
       ) {
+        ctx.fillStyle = theme.player;
+        ctx.globalAlpha = 0.12 + 0.08 * occupyPulse;
+        roundRect(ctx, r.x + 2, r.y + 2, r.w - 4, r.h - 4, 10);
+        ctx.fill();
         ctx.strokeStyle = theme.player;
         ctx.globalAlpha = 0.85;
         ctx.lineWidth = 3;
@@ -1008,8 +1128,16 @@ export function drawFrame(
         ctx.globalAlpha = 1;
       }
 
-      const bc = state.board[row][col];
-      if (bc) drawBoardCard(ctx, layout, pos, bc);
+      const bcDraw = state.board[row][col];
+      if (bcDraw) {
+        const pulse =
+          uiState.prefs.reducedFx || state.phase === "cascading"
+            ? 0.35
+            : bcDraw.owner === "player"
+              ? occupyPulse
+              : 0.35 + 0.25 * occupyPulse;
+        drawBoardCard(ctx, layout, pos, bcDraw, pulse);
+      }
     }
   }
 

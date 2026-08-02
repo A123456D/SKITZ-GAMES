@@ -29,10 +29,22 @@ type RingFx = {
   radius: number;
 };
 
+type FloatText = {
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  life: number;
+  max: number;
+  size: number;
+  vy: number;
+};
+
 export class Motion {
   particles: Particle[] = [];
   beams: BeamFx[] = [];
   rings: RingFx[] = [];
+  floats: FloatText[] = [];
   shake = 0;
   /** Full-screen flash 0..1 */
   flash = 0;
@@ -51,6 +63,25 @@ export class Motion {
     width = 4,
   ): void {
     this.beams.push({ x1, y1, x2, y2, color, life: dur, max: dur, width });
+    // Travel sparks along the beam path
+    const n = Math.min(8, 3 + Math.floor(width));
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n;
+      const px = x1 + (x2 - x1) * t;
+      const py = y1 + (y2 - y1) * t;
+      const a = Math.atan2(y2 - y1, x2 - x1) + (Math.random() - 0.5) * 0.8;
+      const sp = 30 + Math.random() * 70;
+      this.particles.push({
+        x: px,
+        y: py,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        life: 0.2 + Math.random() * 0.25,
+        max: 0.45,
+        color,
+        size: 2 + Math.random() * 2,
+      });
+    }
   }
 
   burst(x: number, y: number, color: string, n = 10, size = 3): void {
@@ -74,13 +105,51 @@ export class Motion {
     this.rings.push({ x, y, color, radius, life: life, max: life });
   }
 
+  /** Rising combat / score callouts. */
+  floatText(
+    x: number,
+    y: number,
+    text: string,
+    color: string,
+    opts: { size?: number; life?: number; rise?: number } = {},
+  ): void {
+    const life = opts.life ?? 0.85;
+    this.floats.push({
+      x,
+      y,
+      text,
+      color,
+      life,
+      max: life,
+      size: opts.size ?? 22,
+      vy: opts.rise ?? -55,
+    });
+  }
+
+  /** Satisfying thud when a card lands on a tile. */
+  placeImpact(x: number, y: number, color: string, reduced = false): void {
+    this.ring(x, y, color, reduced ? 36 : 58, 0.38);
+    this.burst(x, y, color, reduced ? 6 : 14, reduced ? 2.5 : 3.5);
+    this.hitShake(reduced ? 2 : 4);
+    if (!reduced) {
+      this.floatText(x, y - 18, "LOCK", color, { size: 14, life: 0.45, rise: -40 });
+    }
+  }
+
   /** Capture spectacle: flash + ring + dense burst. */
   captureBlast(x: number, y: number, color: string, reduced = false): void {
     this.flash = reduced ? 0.35 : 0.7;
     this.flashColor = color;
     this.hitShake(reduced ? 4 : 9);
     this.ring(x, y, color, reduced ? 50 : 90, 0.55);
+    this.ring(x, y, "#ffffff", reduced ? 28 : 48, 0.35);
     this.burst(x, y, color, reduced ? 10 : 28, reduced ? 3 : 5);
+    this.burst(x, y, "#ffffff", reduced ? 4 : 10, 2);
+    this.floatText(x, y - 10, "OVERTHROW", color, {
+      size: reduced ? 18 : 26,
+      life: 1.05,
+      rise: -48,
+    });
   }
 
   /** Sell deep chains visually. */
@@ -114,6 +183,12 @@ export class Motion {
       p.vy *= 0.92;
       return p.life > 0;
     });
+    this.floats = this.floats.filter((f) => {
+      f.life -= dt;
+      f.y += f.vy * dt;
+      f.vy *= 0.96;
+      return f.life > 0;
+    });
   }
 
   draw(ctx: CanvasRenderingContext2D, W = 720, H = 1280, reduced = false): void {
@@ -133,12 +208,23 @@ export class Motion {
       const t = b.life / b.max;
       ctx.save();
       ctx.globalAlpha = Math.min(1, t * 1.4);
+      // Outer glow stroke
       ctx.strokeStyle = b.color;
       if (glow) {
         ctx.shadowColor = b.color;
         ctx.shadowBlur = 18 + b.width * 2;
       }
       ctx.lineWidth = b.width + 3 * t;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(b.x1, b.y1);
+      ctx.lineTo(b.x2, b.y2);
+      ctx.stroke();
+      // Hot core
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "#ffffff";
+      ctx.globalAlpha = Math.min(1, t * 1.1) * 0.85;
+      ctx.lineWidth = Math.max(1.5, b.width * 0.35);
       ctx.beginPath();
       ctx.moveTo(b.x1, b.y1);
       ctx.lineTo(b.x2, b.y2);
@@ -169,6 +255,22 @@ export class Motion {
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size ?? 3, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
+    }
+
+    for (const f of this.floats) {
+      const t = f.life / f.max;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, t * 1.8);
+      ctx.fillStyle = f.color;
+      ctx.font = `800 ${f.size}px Orbitron, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      if (glow) {
+        ctx.shadowColor = f.color;
+        ctx.shadowBlur = 12;
+      }
+      ctx.fillText(f.text, f.x, f.y);
       ctx.restore();
     }
 

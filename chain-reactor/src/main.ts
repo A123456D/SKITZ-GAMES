@@ -359,6 +359,11 @@ function playCascadeFx(events: CascadeEvent[]): void {
     if (e.type === "damage" && e.pos && !reduced) {
       const c = cellCenter(layout, e.pos);
       motion.burst(c.x, c.y, theme.enemy, 6);
+      motion.floatText(c.x, c.y - 8, `-${e.amount}`, theme.danger, { size: 16, life: 0.55 });
+    }
+    if (e.type === "relay" && e.pos && !reduced) {
+      const c = cellCenter(layout, e.pos);
+      motion.burst(c.x, c.y, theme.energy, 4, 2);
     }
   }
 }
@@ -407,6 +412,8 @@ function tryPlay(handIndex: number, tile: Pos): boolean {
     playSfx(sfx.place);
     selectedHand = null;
     clearDrag();
+    const c = cellCenter(layout, tile);
+    motion.placeImpact(c.x, c.y, activeBeamColor(), getPrefs().reducedFx);
     if (result.signatureVerb) {
       cascadePlayer.announce(
         `SIGNATURE: ${result.signatureVerb}`,
@@ -414,6 +421,11 @@ function tryPlay(handIndex: number, tile: Pos): boolean {
         theme.gridPurple,
         1.15,
       );
+      motion.floatText(c.x, c.y - 48, result.signatureVerb, theme.gridPurple, {
+        size: 28,
+        life: 1.1,
+        rise: -36,
+      });
     }
     beginPlayerCascade(result.events);
     return true;

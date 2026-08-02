@@ -111,6 +111,11 @@ export class CascadePlayer {
     if (e.type === "damage") {
       const c = cellCenter(layout, e.pos);
       motion.burst(c.x, c.y, theme.danger, this.reduced ? 4 : 8);
+      motion.floatText(c.x, c.y - 8, `-${e.amount}`, theme.danger, {
+        size: this.reduced ? 16 : 22,
+        life: 0.7,
+      });
+      motion.hitShake(this.reduced ? 1.5 : 3);
       this.pushBanner(`HIT -${e.amount}`, undefined, theme.danger, 0.45);
     }
     if (e.type === "capture") {
@@ -122,15 +127,30 @@ export class CascadePlayer {
       this.pushBanner("OVERTHROW", powerLine, this.beamColor, 0.95);
     }
     if (e.type === "relay") {
+      const c = cellCenter(layout, e.pos);
+      motion.burst(c.x, c.y, theme.energy, this.reduced ? 3 : 7, 2.5);
+      motion.floatText(c.x, c.y, "CHAIN", theme.energy, { size: 14, life: 0.5 });
       this.pushBanner("CHAIN", undefined, theme.energy, 0.4);
     }
     if (e.type === "split") {
+      const c = cellCenter(layout, e.pos);
+      motion.ring(c.x, c.y, theme.energy, 40, 0.35);
+      motion.floatText(c.x, c.y + 6, "SPLIT", theme.energy, { size: 14, life: 0.5 });
       this.pushBanner("SPLIT", undefined, theme.energy, 0.4);
     }
     if (e.type === "reflect") {
+      const c = cellCenter(layout, e.pos);
+      motion.ring(c.x, c.y, theme.gridPurple, 44, 0.4);
+      motion.floatText(c.x, c.y - 6, `+${e.bonus}`, theme.gridPurple, { size: 18 });
       this.pushBanner(`REFLECT +${e.bonus}`, undefined, theme.gridPurple, 0.4);
     }
     if (e.type === "overkill") {
+      const c = cellCenter(layout, e.pos);
+      motion.burst(c.x, c.y, theme.gridPurple, this.reduced ? 6 : 14);
+      motion.floatText(c.x, c.y - 12, `OVERKILL +${e.bonus}`, theme.gridPurple, {
+        size: 18,
+        life: 0.95,
+      });
       this.pushBanner(`INVERT +${e.bonus}`, "Stolen Power boosted", theme.gridPurple, 0.7);
     }
     if (e.type === "fire") {
