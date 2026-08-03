@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
+    />
+    <meta name="theme-color" content="#1a1420" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="application-name" content="OCULUM beta" />
+    <meta name="apple-mobile-web-app-title" content="OCULUM beta" />
+    <meta name="description" content="Veil. Witness. Ascend. — OCULUM beta" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <title>OCULUM beta</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script type="module" crossorigin src="./assets/index-BLWa1vdV.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CfCh_8kW.css">
+  </head>
+  <body class="on-menu">
+    <div id="app">
+      <canvas id="stage" width="720" height="1280"></canvas>
+      <div id="hud" aria-live="polite">
+        <header id="topbar">
+          <div class="topbar-left">
+            <button type="button" id="btn-hud-menu" class="hud-icon" hidden aria-label="Menu">
+              <span class="btn-label">Menu</span>
+            </button>
+            <div id="brand" aria-label="OCULUM beta">
+              <img class="brand-seal" src="./assets/ui/seal-eye.png" alt="" draggable="false" />
+            </div>
+          </div>
+          <div id="meters" hidden>
+            <div class="meter essence" title="Essence">
+              <span class="meter-label">ESS</span>
+              <span id="m-essence" class="meter-val">0</span>
+            </div>
+            <div class="meter sight" title="Sight">
+              <span class="meter-label">SIGHT</span>
+              <span id="m-sight" class="meter-val">0</span>
+            </div>
+            <div class="meter turn" title="Turn">
+              <span class="meter-label">T</span>
+              <span id="m-turn" class="meter-val">1</span>
+            </div>
+            <button type="button" id="btn-hud-settings" class="hud-icon" hidden aria-label="Settings">
+              <span class="btn-label">Set</span>
+            </button>
+          </div>
+        </header>
+
+        <div id="willrow" hidden>
+          <div class="will-side you">
+            <span class="will-label">YOU</span>
+            <div class="will-track">
+              <div class="will-fill-wrap">
+                <div id="will-you" class="will-fill"></div>
+              </div>
+            </div>
+            <span id="will-you-n" class="will-n">15</span>
+          </div>
+          <div class="center-pips">
+            <div class="ecl-pip" title="Eclipse">
+              <span id="ecl-you">0</span>
+              <span class="ecl-sep">·</span>
+              <span id="ecl-foe">0</span>
+            </div>
+            <div id="law-chip" hidden title="Unblinking Law — Witness 3 schools, then Pass">
+              <span class="law-label">LAW</span>
+              <span id="law-progress">0/3</span>
+            </div>
+          </div>
+          <div class="will-side foe">
+            <span id="will-foe-n" class="will-n">15</span>
+            <div class="will-track">
+              <div class="will-fill-wrap foe">
+                <div id="will-foe" class="will-fill will-fill--foe"></div>
+              </div>
+            </div>
+            <span class="will-label">FOE</span>
+          </div>
+        </div>
+
+        <div id="toast" hidden>
+          <span id="toast-text"></span>
+        </div>
+
+        <div id="altitudes" aria-label="Altitudes">
+          <button type="button" class="alt-hit" data-alt="0" aria-label="High">
+            <span class="alt-tag">HIGH</span>
+            <span class="alt-meta">
+              <span class="alt-stance" data-stance="0"></span>
+              <span class="alt-pow" data-pow="0">
+                <span class="alt-pow-n">0–0</span>
+              </span>
+            </span>
+          </button>
+          <button type="button" class="alt-hit" data-alt="1" aria-label="Mid">
+            <span class="alt-tag">MID</span>
+            <span class="alt-meta">
+              <span class="alt-stance" data-stance="1"></span>
+              <span class="alt-pow" data-pow="1">
+                <span class="alt-pow-n">0–0</span>
+              </span>
+            </span>
+          </button>
+          <button type="button" class="alt-hit" data-alt="2" aria-label="Low">
+            <span class="alt-tag">LOW</span>
+            <span class="alt-meta">
+              <span class="alt-stance" data-stance="2"></span>
+              <span class="alt-pow" data-pow="2">
+                <span class="alt-pow-n">0–0</span>
+              </span>
+            </span>
+          </button>
+        </div>
+
+        <div id="hand-area" hidden>
+          <div id="hand"></div>
+        </div>
+
+        <div id="actions" hidden>
+          <button type="button" id="btn-witness" class="ghost" disabled>
+            <span class="btn-label"><span class="btn-kicker">Reveal</span>Witness</span>
+          </button>
+          <button type="button" id="btn-stance" class="ghost" disabled>
+            <span class="btn-label"><span class="btn-kicker">Flip</span>Stance</span>
+          </button>
+          <button type="button" id="btn-pass" class="ghost" disabled>
+            <span class="btn-label"><span class="btn-kicker">End</span>Pass</span>
+          </button>
+        </div>
+
+        <div id="menu" class="panel sheet">
+          <div class="sheet-content">
+            <img class="menu-seal" src="./assets/ui/seal-eye.png" alt="" draggable="false" />
+            <h1 class="menu-wordmark">OCULUM <span class="wordmark-beta">beta</span></h1>
+            <p class="tag">VEIL · WITNESS · ASCEND</p>
+            <p class="blurb">Things only fully exist when seen.</p>
+            <button type="button" id="btn-play" class="cta">
+              <span class="btn-label">Enter the Gaze</span>
+            </button>
+            <button type="button" id="btn-builder" class="ghost">
+              <span class="btn-label">Build Deck</span>
+            </button>
+            <button type="button" id="btn-codex" class="ghost">
+              <span class="btn-label">Card Codex</span>
+            </button>
+            <button type="button" id="btn-tutorial" class="ghost">
+              <span class="btn-label">First Gaze (Tutorial)</span>
+            </button>
+            <button type="button" id="btn-settings" class="ghost">
+              <span class="btn-label">Settings</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="pause" class="panel sheet" hidden>
+          <div class="sheet-content">
+            <p class="tag">PAUSED</p>
+            <p class="blurb">The Gaze holds still.</p>
+            <button type="button" id="pause-resume" class="cta">
+              <span class="btn-label">Resume</span>
+            </button>
+            <button type="button" id="pause-settings" class="ghost">
+              <span class="btn-label">Settings</span>
+            </button>
+            <button type="button" id="pause-menu" class="ghost">
+              <span class="btn-label">Quit to Menu</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="settings" class="panel sheet" hidden>
+          <div class="sheet-content settings-content">
+            <button type="button" id="settings-back" class="ghost mini panel-back">
+              <span class="btn-label">Back</span>
+            </button>
+            <p class="tag">SETTINGS</p>
+            <label class="settings-row">
+              <span class="settings-label">Reduce motion</span>
+              <input type="checkbox" id="settings-motion" />
+            </label>
+            <label class="settings-row">
+              <span class="settings-label">AI difficulty</span>
+              <select id="settings-difficulty" class="settings-select">
+                <option value="easy">Easy</option>
+                <option value="normal" selected>Normal</option>
+                <option value="hard">Hard</option>
+              </select>
+            </label>
+            <p class="settings-hint">Tap any card to inspect. Tap altitudes to play.</p>
+            <p class="settings-hint">Constructed: 30 cards · ≤2 copies · ≤1 premium · ≤1 prophecy.</p>
+            <p class="settings-hint">First Gaze explains why Witness matters, how you win, then altitudes, combos, Gaze, Stance, Rites, Law &amp; Resolve.</p>
+            <button type="button" id="settings-close" class="ghost">
+              <span class="btn-label">Back</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="deck-builder" class="panel sheet codex builder" hidden>
+          <div class="sheet-content builder-content">
+            <div class="builder-top">
+              <button type="button" id="builder-back" class="ghost mini panel-back">
+                <span class="btn-label">Back</span>
+              </button>
+              <p class="tag">CONSTRUCTED · <span id="builder-count">0/30</span></p>
+            </div>
+            <p id="builder-issues" class="builder-issues">Build a 30-card deck.</p>
+            <div class="builder-preview">
+              <div id="builder-foil" class="foil-card foil-card--codex foil-card--builder">
+                <div class="foil-stack">
+                  <img id="builder-face" class="codex-face foil-face" alt="" draggable="false" />
+                  <div class="foil-sheen" aria-hidden="true"></div>
+                  <div class="foil-glare" aria-hidden="true"></div>
+                </div>
+              </div>
+              <div class="builder-preview-side">
+                <div id="builder-meta" class="codex-meta"></div>
+                <div class="builder-edit-row">
+                  <button type="button" id="builder-add" class="ghost mini">
+                    <span class="btn-label">Add</span>
+                  </button>
+                  <button type="button" id="builder-remove" class="ghost mini">
+                    <span class="btn-label">Remove</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="builder-deck-wrap">
+              <p class="builder-label">Your deck <span class="hint">hold card to inspect</span></p>
+              <div id="builder-deck" class="builder-deck"></div>
+            </div>
+            <div class="builder-filter-row">
+              <label for="builder-filter">School</label>
+              <select id="builder-filter">
+                <option value="all">All</option>
+                <option value="cube">Cube</option>
+                <option value="deal">Deal</option>
+                <option value="many">Many</option>
+                <option value="graft">Graft</option>
+                <option value="hollow">Hollow</option>
+                <option value="coral">Coral</option>
+                <option value="shell">Shell</option>
+                <option value="deep">Deep</option>
+                <option value="ring">Ring</option>
+                <option value="neutral">Neutral</option>
+              </select>
+            </div>
+            <div id="builder-pool" class="builder-pool"></div>
+            <div class="builder-actions">
+              <button type="button" id="builder-play" class="cta" disabled>
+                <span class="btn-label">Play Constructed</span>
+              </button>
+              <div class="builder-tools">
+                <button type="button" id="builder-save" class="ghost mini">
+                  <span class="btn-label">Save</span>
+                </button>
+                <button type="button" id="builder-auto" class="ghost mini">
+                  <span class="btn-label">Auto</span>
+                </button>
+                <button type="button" id="builder-teach" class="ghost mini">
+                  <span class="btn-label">Teach</span>
+                </button>
+                <button type="button" id="builder-clear" class="ghost mini">
+                  <span class="btn-label">Clear</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="card-inspect" class="card-inspect" hidden>
+          <div class="inspect-backdrop" aria-hidden="true"></div>
+          <div class="inspect-sheet">
+            <div id="inspect-foil" class="foil-card foil-card--codex foil-card--inspect">
+              <div class="foil-stack">
+                <img id="inspect-face" class="codex-face foil-face" alt="" draggable="false" />
+                <div class="foil-sheen" aria-hidden="true"></div>
+                <div class="foil-glare" aria-hidden="true"></div>
+              </div>
+            </div>
+            <div id="inspect-meta" class="codex-meta inspect-meta"></div>
+            <button type="button" id="inspect-close" class="ghost">
+              <span class="btn-label">Close</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="codex" class="panel sheet codex" hidden>
+          <div class="sheet-content codex-content">
+            <button type="button" id="codex-back" class="ghost mini panel-back">
+              <span class="btn-label">Back</span>
+            </button>
+            <p class="tag">CARD CODEX</p>
+            <div class="codex-stage">
+              <button type="button" id="codex-prev" class="codex-nav" aria-label="Previous card">‹</button>
+              <div id="codex-foil" class="foil-card foil-card--codex">
+                <div class="foil-stack">
+                  <img id="codex-face" class="codex-face foil-face" alt="" draggable="false" />
+                  <div class="foil-sheen" aria-hidden="true"></div>
+                  <div class="foil-glare" aria-hidden="true"></div>
+                </div>
+              </div>
+              <button type="button" id="codex-next" class="codex-nav" aria-label="Next card">›</button>
+            </div>
+            <div id="codex-meta" class="codex-meta"></div>
+            <div id="codex-thumbs" class="codex-thumbs"></div>
+            <button type="button" id="codex-close" class="ghost">
+              <span class="btn-label">Back</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="end" class="panel sheet" hidden>
+          <div class="sheet-content">
+            <h2 id="end-title">You Ascend</h2>
+            <p id="end-detail"></p>
+            <button type="button" id="btn-again" class="cta">
+              <span class="btn-label">Rematch</span>
+            </button>
+            <button type="button" id="btn-menu" class="ghost">
+              <span class="btn-label">Menu</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="unsupported" class="panel sheet" hidden>
+          <div class="sheet-content">
+            <h2>WebGL2 required</h2>
+            <p>OCULUM beta needs GPU rendering on this device.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
