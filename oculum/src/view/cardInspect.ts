@@ -1,3 +1,8 @@
+/**
+ * Hold opens inspect; short tap calls onTap.
+ * With inspectOnTap, short tap opens inspect too.
+ * Uses pointer capture so mobile scroll/cancel still completes the gesture.
+ */
 import { getCard } from "../core/cards";
 import { handCardSrc } from "./cardBake";
 import { cardMetaHtml } from "./cardMeta";
@@ -68,13 +73,13 @@ export function initCardInspect(root: HTMLElement): CardInspectApi {
 }
 
 const LONG_MS = 420;
+const MOVE_CANCEL_PX = 18;
 
 export type LiftInspectOpts = {
   /** Short tap opens inspect (then onTap). Default: hold to inspect. */
   inspectOnTap?: boolean;
 };
 
-/** Hold opens inspect; short tap calls onTap. With inspectOnTap, short tap opens inspect too. */
 export function bindLiftInspect(
   el: HTMLElement,
   getId: () => string | null,
@@ -84,10 +89,13 @@ export function bindLiftInspect(
 ): () => void {
   let timer: number | null = null;
   let longFired = false;
+  let tracking = false;
   let startX = 0;
   let startY = 0;
+  let movedFar = false;
+  let activePointer: number | null = null;
 
-  const clear = (): void => {
+  const clearTimer = (): void => {
     if (timer != null) {
       window.clearTimeout(timer);
       timer = null;
@@ -102,11 +110,33 @@ export function bindLiftInspect(
     window.setTimeout(() => el.classList.remove("lift-armed"), 200);
   };
 
-  const onDown = (clientX: number, clientY: number): void => {
+  const finish = (): void => {
+    if (!tracking) return;
+    tracking = false;
+    const wasLong = longFired;
+    const far = movedFar;
+    clearTimer();
+    activePointer = null;
+    if (wasLong) return;
+    if (far) return;
+    if (opts?.inspectOnTap) openInspect();
+    onTap?.();
+  };
+
+  const onPointerDown = (ev: PointerEvent): void => {
+    if (ev.button != null && ev.button !== 0) return;
+    tracking = true;
     longFired = false;
-    startX = clientX;
-    startY = clientY;
-    clear();
+    movedFar = false;
+    startX = ev.clientX;
+    startY = ev.clientY;
+    activePointer = ev.pointerId;
+    clearTimer();
+    try {
+      el.setPointerCapture(ev.pointerId);
+    } catch {
+      /* ignore */
+    }
     if (opts?.inspectOnTap) return;
     timer = window.setTimeout(() => {
       timer = null;
@@ -115,25 +145,25 @@ export function bindLiftInspect(
     }, LONG_MS);
   };
 
-  const onUp = (): void => {
-    const wasLong = longFired;
-    clear();
-    if (wasLong) return;
-    if (opts?.inspectOnTap) openInspect();
-    onTap?.();
+  const onPointerMove = (ev: PointerEvent): void => {
+    if (!tracking) return;
+    if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > MOVE_CANCEL_PX) {
+      movedFar = true;
+      clearTimer();
+    }
   };
 
-  const onMove = (clientX: number, clientY: number): void => {
-    if (Math.hypot(clientX - startX, clientY - startY) > 12) clear();
+  const onPointerUp = (ev: PointerEvent): void => {
+    if (activePointer != null && ev.pointerId !== activePointer) return;
+    finish();
   };
 
-  const onPointerDown = (ev: PointerEvent): void => {
-    if (ev.button != null && ev.button !== 0) return;
-    onDown(ev.clientX, ev.clientY);
+  const onPointerCancel = (ev: PointerEvent): void => {
+    if (activePointer != null && ev.pointerId !== activePointer) return;
+    // Mobile often cancels on tiny scroll — still treat as tap if we barely moved
+    finish();
   };
-  const onPointerUp = (): void => onUp();
-  const onPointerCancel = (): void => clear();
-  const onPointerMove = (ev: PointerEvent): void => onMove(ev.clientX, ev.clientY);
+
   const onContextMenu = (ev: Event): void => {
     if (longFired || timer != null || opts?.inspectOnTap) ev.preventDefault();
   };
@@ -142,16 +172,14 @@ export function bindLiftInspect(
   el.addEventListener("pointerup", onPointerUp);
   el.addEventListener("pointercancel", onPointerCancel);
   el.addEventListener("pointermove", onPointerMove);
-  el.addEventListener("pointerleave", clear);
   el.addEventListener("contextmenu", onContextMenu);
 
   return () => {
-    clear();
+    clearTimer();
     el.removeEventListener("pointerdown", onPointerDown);
     el.removeEventListener("pointerup", onPointerUp);
     el.removeEventListener("pointercancel", onPointerCancel);
     el.removeEventListener("pointermove", onPointerMove);
-    el.removeEventListener("pointerleave", clear);
     el.removeEventListener("contextmenu", onContextMenu);
   };
 }

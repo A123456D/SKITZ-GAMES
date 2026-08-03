@@ -87,6 +87,7 @@ export type MatchPhase = "menu" | "play" | "end";
 export type TutorialStep =
   | "intro"
   | "goal"
+  | "read"
   | "play"
   | "site"
   | "witness"

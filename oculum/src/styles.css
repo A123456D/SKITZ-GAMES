@@ -71,14 +71,16 @@ img {
     auto
     auto
     auto
-    minmax(0, 1.15fr)
-    122px
+    auto
+    auto
+    minmax(0, 1.1fr)
+    168px
     52px;
   padding: calc(6px + env(safe-area-inset-top, 0px)) var(--pad)
     calc(8px + env(safe-area-inset-bottom, 0px));
   gap: 4px;
   z-index: 2;
-  overflow: hidden;
+  overflow: visible;
   min-width: 0;
 }
 
@@ -497,6 +499,79 @@ body.paused #altitudes {
   box-shadow: inset 0 0 0 1px rgba(62, 207, 192, 0.35);
 }
 
+.alt-hit.drop-target {
+  background: rgba(62, 207, 192, 0.18);
+  box-shadow:
+    inset 0 0 0 2px rgba(62, 207, 192, 0.75),
+    0 0 22px rgba(62, 207, 192, 0.25);
+}
+
+.alt-hit.drop-target .alt-tag {
+  color: var(--sigil);
+}
+
+body.dragging-card {
+  cursor: grabbing;
+}
+
+body.dragging-card #hand-area {
+  z-index: 8;
+}
+
+body.dragging-card .alt-hit {
+  pointer-events: none;
+}
+
+body.dragging-card .alt-hit.legal {
+  pointer-events: auto;
+}
+
+.hand-card.dragging {
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+
+#drag-layer {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+#drag-layer[hidden] {
+  display: none !important;
+}
+
+#drag-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 86px;
+  height: 129px;
+  transform: translate(-50%, -58%) rotate(-4deg) scale(1.06);
+  transform-origin: 50% 60%;
+  will-change: left, top, transform;
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.65));
+  z-index: 1;
+}
+
+#drag-ghost.is-dropping {
+  pointer-events: none;
+}
+
+#drag-card {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 5px;
+  display: block;
+}
+
+body.reduce-motion #drag-ghost {
+  transition: none !important;
+}
+
 .alt-tag,
 .alt-pow,
 .alt-stance,
@@ -596,12 +671,6 @@ body.paused #altitudes {
   box-shadow: inset 0 0 0 1px rgba(62, 207, 192, 0.45);
 }
 
-.hand-card.teach img.face {
-  outline: 2px solid var(--gold);
-  outline-offset: 1px;
-  animation: teach-pulse 1.2s ease-in-out infinite;
-}
-
 #btn-witness.pulse,
 #btn-stance.pulse,
 #btn-pass.pulse {
@@ -625,70 +694,206 @@ body.enemy-turn #toast-text {
 
 #hand-area {
   pointer-events: none;
+  position: relative;
   width: 100%;
   min-width: 0;
   height: 100%;
   overflow: visible;
   display: flex;
   align-items: flex-end;
+  justify-content: center;
+  z-index: 6;
 }
 
-#hand {
-  pointer-events: auto;
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: flex-end;
-  gap: 8px;
+#hand,
+.hand-fan {
+  pointer-events: none;
+  position: relative;
   width: 100%;
-  height: 118px;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: visible;
-  padding: 0 2px 2px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  touch-action: pan-x;
-}
-
-#hand::-webkit-scrollbar {
-  display: none;
+  max-width: 420px;
+  height: 158px;
+  margin: 0 auto;
+  overflow: visible;
+  touch-action: manipulation;
 }
 
 .hand-card {
-  flex: 0 0 84px;
-  width: 84px;
-  height: 126px;
+  --slot-x: 50%;
+  --slot-y: 28px;
+  --slot-rot: 0deg;
+  pointer-events: auto;
+  position: absolute;
+  left: var(--slot-x);
+  bottom: 4px;
+  width: 78px;
+  height: 117px;
+  margin: 0;
   appearance: none;
   border: none;
   background: transparent;
   padding: 0;
-  position: relative;
-  transition: transform 0.15s ease;
+  cursor: pointer;
+  transform-origin: 50% 110%;
+  transform: translate(-50%, 0) translateY(var(--slot-y)) rotate(var(--slot-rot));
+  transition: transform 0.16s ease, filter 0.12s ease, opacity 0.12s ease;
+  z-index: calc(2 + var(--i, 0));
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .hand-card img.face {
-  width: 74px;
-  height: 111px;
+  width: 78px;
+  height: 117px;
   object-fit: cover;
   object-position: center center;
-  border-radius: 4px;
-  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.55));
+  border-radius: 5px;
+  pointer-events: none;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.62));
+}
+
+/* Fan slots — held like a CCG grip */
+.hand-fan[data-n="1"] .hand-card[data-slot="0"] {
+  --slot-x: 50%;
+  --slot-y: 10px;
+  --slot-rot: 0deg;
+}
+.hand-fan[data-n="2"] .hand-card[data-slot="0"] {
+  --slot-x: 38%;
+  --slot-y: 18px;
+  --slot-rot: -10deg;
+}
+.hand-fan[data-n="2"] .hand-card[data-slot="1"] {
+  --slot-x: 62%;
+  --slot-y: 18px;
+  --slot-rot: 10deg;
+}
+.hand-fan[data-n="3"] .hand-card[data-slot="0"] {
+  --slot-x: 28%;
+  --slot-y: 28px;
+  --slot-rot: -16deg;
+}
+.hand-fan[data-n="3"] .hand-card[data-slot="1"] {
+  --slot-x: 50%;
+  --slot-y: 12px;
+  --slot-rot: 0deg;
+}
+.hand-fan[data-n="3"] .hand-card[data-slot="2"] {
+  --slot-x: 72%;
+  --slot-y: 28px;
+  --slot-rot: 16deg;
+}
+.hand-fan[data-n="4"] .hand-card[data-slot="0"] {
+  --slot-x: 20%;
+  --slot-y: 34px;
+  --slot-rot: -20deg;
+}
+.hand-fan[data-n="4"] .hand-card[data-slot="1"] {
+  --slot-x: 40%;
+  --slot-y: 16px;
+  --slot-rot: -7deg;
+}
+.hand-fan[data-n="4"] .hand-card[data-slot="2"] {
+  --slot-x: 60%;
+  --slot-y: 16px;
+  --slot-rot: 7deg;
+}
+.hand-fan[data-n="4"] .hand-card[data-slot="3"] {
+  --slot-x: 80%;
+  --slot-y: 34px;
+  --slot-rot: 20deg;
+}
+.hand-fan[data-n="5"] .hand-card[data-slot="0"] {
+  --slot-x: 16%;
+  --slot-y: 40px;
+  --slot-rot: -24deg;
+}
+.hand-fan[data-n="5"] .hand-card[data-slot="1"] {
+  --slot-x: 33%;
+  --slot-y: 22px;
+  --slot-rot: -12deg;
+}
+.hand-fan[data-n="5"] .hand-card[data-slot="2"] {
+  --slot-x: 50%;
+  --slot-y: 10px;
+  --slot-rot: 0deg;
+}
+.hand-fan[data-n="5"] .hand-card[data-slot="3"] {
+  --slot-x: 67%;
+  --slot-y: 22px;
+  --slot-rot: 12deg;
+}
+.hand-fan[data-n="5"] .hand-card[data-slot="4"] {
+  --slot-x: 84%;
+  --slot-y: 40px;
+  --slot-rot: 24deg;
 }
 
 .hand-card.selected {
-  transform: translateY(-10px);
-  z-index: 2;
+  z-index: 30;
+  transform: translate(-50%, 0) translateY(-18px) rotate(0deg) scale(1.08);
 }
 
 .hand-card.selected img.face {
   outline: 2px solid var(--sigil);
   outline-offset: 1px;
+  filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.7));
 }
 
 .hand-card.disabled {
-  opacity: 0.45;
+  opacity: 0.5;
   filter: saturate(0.65);
+}
+
+.hand-card.teach img.face {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+  animation: teach-pulse 1.2s ease-in-out infinite;
+}
+
+#coach {
+  pointer-events: none;
+  justify-self: center;
+  width: min(100%, 380px);
+  max-width: 100%;
+  padding: 10px 12px 8px;
+  background: rgba(10, 8, 14, 0.82);
+  box-shadow: inset 0 0 0 1px var(--plate-line), var(--plate-shadow);
+  border-radius: var(--plate-radius);
+  border-left: 2px solid var(--gold);
+  z-index: 5;
+}
+
+#coach[hidden] {
+  display: none !important;
+}
+
+.coach-title {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #e6c98a;
+  text-shadow: 0 1px 3px #000;
+}
+
+.coach-body {
+  margin: 0 0 6px;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: rgba(237, 228, 212, 0.92);
+  text-shadow: 0 1px 3px #000;
+}
+
+.coach-action {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sigil);
+  text-shadow: 0 1px 3px #000;
 }
 
 #actions {
@@ -1300,15 +1505,16 @@ body.on-menu #altitudes {
     width: 44px;
   }
   #hud {
-    grid-template-rows: auto auto auto minmax(0, 1fr) 112px 48px;
+    grid-template-rows: auto auto auto auto auto minmax(0, 1fr) 148px 48px;
   }
   .hand-card,
   .hand-card img.face {
-    width: 64px;
-    height: 96px;
-  }
-  #hand {
+    width: 68px;
     height: 102px;
+  }
+  #hand,
+  .hand-fan {
+    height: 140px;
   }
 }
 

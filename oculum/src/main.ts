@@ -1,12 +1,14 @@
-import { chooseAiMove } from "./core/ai";
+﻿import { chooseAiMove } from "./core/ai";
 import { getCard } from "./core/cards";
 import { catalogOrder } from "./core/catalog";
 import { applyIntent, createMatch, lawSchoolProgress, legalIntents, unitPower } from "./core/match";
 import {
+  tutorialCoach,
   tutorialHint,
   tutorialSelectHandIndex,
   tutorialTeachCard,
   tutorialUiMode,
+  isTutorialSoftPass,
 } from "./core/tutorial";
 import {
   START_WILL,
@@ -21,6 +23,15 @@ import {
   handCardSrc,
   preloadCardChrome,
 } from "./view/cardBake";
+import {
+  isMusicMuted,
+  isMuted,
+  playSfx,
+  setMusicBed,
+  setMusicMuted,
+  setMuted,
+  unlockAudio,
+} from "./view/audio";
 import { OculusStage } from "./view/gl/stage";
 import { FpsSampler } from "./view/perf";
 import { bindFoilStage, mountFoilCard } from "./view/foilCard";
@@ -42,6 +53,13 @@ const settingsPanel = document.getElementById("settings")!;
 const unsupported = document.getElementById("unsupported")!;
 const toastEl = document.getElementById("toast")!;
 const toastText = document.getElementById("toast-text")!;
+const coachEl = document.getElementById("coach")!;
+const coachTitle = document.getElementById("coach-title")!;
+const coachBody = document.getElementById("coach-body")!;
+const coachAction = document.getElementById("coach-action")!;
+const dragLayer = document.getElementById("drag-layer")!;
+const dragGhost = document.getElementById("drag-ghost")!;
+const dragCardImg = document.getElementById("drag-card") as HTMLImageElement;
 const handEl = document.getElementById("hand")!;
 const handArea = document.getElementById("hand-area")!;
 const actionsEl = document.getElementById("actions")!;
@@ -50,6 +68,8 @@ const willrowEl = document.getElementById("willrow")!;
 const btnHudMenu = document.getElementById("btn-hud-menu") as HTMLButtonElement;
 const btnHudSettings = document.getElementById("btn-hud-settings") as HTMLButtonElement;
 const settingsMotion = document.getElementById("settings-motion") as HTMLInputElement;
+const settingsMuteSfx = document.getElementById("settings-mute-sfx") as HTMLInputElement;
+const settingsMuteMusic = document.getElementById("settings-mute-music") as HTMLInputElement;
 const settingsDifficulty = document.getElementById("settings-difficulty") as HTMLSelectElement;
 const endTitle = document.getElementById("end-title")!;
 const endDetail = document.getElementById("end-detail")!;
@@ -97,6 +117,18 @@ try {
 let state: MatchState | null = null;
 let selectedHand: number | null = null;
 let mode: "play" | "witness" | "stance" = "play";
+
+type DragState = {
+  handIndex: number;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  active: boolean;
+  cardSrc: string;
+  dropping?: boolean;
+};
+let drag: DragState | null = null;
+const DRAG_THRESHOLD = 12;
 let last = performance.now();
 const fps = new FpsSampler();
 let flashTimer = 0;
@@ -139,6 +171,8 @@ function applySettings(s: AppSettings): void {
   document.body.classList.toggle("reduce-motion", s.reduceMotion);
   settingsMotion.checked = s.reduceMotion;
   settingsDifficulty.value = s.aiDifficulty;
+  settingsMuteSfx.checked = isMuted();
+  settingsMuteMusic.checked = isMusicMuted();
 }
 
 applySettings(loadSettings());
@@ -165,6 +199,7 @@ function goToMenu(): void {
   state = null;
   uiPaused = false;
   document.body.classList.remove("paused");
+  setMusicBed("menu");
   hideAllSheets();
   menu.hidden = false;
   setMenuMode(true);
@@ -328,6 +363,8 @@ function startMatch(tutorial: boolean, constructedDeck?: string[]): void {
   mode = "play";
   setMenuMode(false);
   setEnemyTurn(false);
+  setMusicBed("match");
+  void unlockAudio();
   if (tutorial) {
     const hi = tutorialSelectHandIndex(state);
     selectedHand = hi ?? 0;
@@ -335,6 +372,18 @@ function startMatch(tutorial: boolean, constructedDeck?: string[]): void {
     if (um) mode = um;
   }
   syncHud();
+}
+
+function syncCoach(s: MatchState | null): void {
+  const coach = s?.tutorial && s.tutorialStep !== "done" ? tutorialCoach(s.tutorialStep) : null;
+  if (!coach) {
+    coachEl.hidden = true;
+    return;
+  }
+  coachEl.hidden = false;
+  coachTitle.textContent = coach.title;
+  coachBody.textContent = coach.body;
+  coachAction.textContent = coach.action;
 }
 
 function hint(s: MatchState): string {
@@ -353,10 +402,10 @@ function hint(s: MatchState): string {
   if (mode === "stance") return "Tap a Third Face figure — A printed / B swapped powers.";
   if (selectedHand !== null) {
     const def = getCard(s.hand[selectedHand]);
-    if (def.type === "rite") return "Choose an altitude to Blind.";
-    if (def.type === "relic") return "Graft onto a Figure — tap its altitude.";
-    if (def.type === "site" || def.type === "sigil") return "Place this landmark on an altitude.";
-    return "Play Veiled into High, Mid, or Low.";
+    if (def.type === "rite") return "Drag onto an altitude to Blind.";
+    if (def.type === "relic") return "Drag onto a Figure lane to Graft.";
+    if (def.type === "site" || def.type === "sigil") return "Drag this landmark onto an altitude.";
+    return "Drag onto High, Mid, or Low — or tap a lane.";
   }
   const lawN = lawSchoolProgress(s);
   if (s.prophecies.includes("unblinking_law") && lawN >= 3) {
@@ -396,6 +445,7 @@ function syncHud(): void {
     }
     lawChip.hidden = true;
     if (!state) showToast(null);
+    syncCoach(null);
     return;
   }
 
@@ -450,7 +500,11 @@ function syncHud(): void {
     lawChip.classList.toggle("ready", n >= 3 && state.active === "player");
   }
 
-  if (flashTimer <= 0) showToast(hint(state));
+  if (flashTimer <= 0) {
+    if (state.tutorial && state.tutorialStep !== "done") showToast(null);
+    else showToast(hint(state));
+  }
+  syncCoach(state);
 
   const intents = legalIntents(state);
 
@@ -495,6 +549,7 @@ function syncHud(): void {
     state.tutorial &&
     (state.tutorialStep === "intro" ||
       state.tutorialStep === "goal" ||
+      state.tutorialStep === "read" ||
       state.tutorialStep === "resolve");
   btnWitness.classList.toggle(
     "pulse",
@@ -504,6 +559,14 @@ function syncHud(): void {
   );
   btnStance.classList.toggle("pulse", teachStance && canStance);
   btnPass.classList.toggle("pulse", teachPass && canPass);
+  const passLabel = btnPass.querySelector(".btn-label");
+  if (passLabel) {
+    if (state.tutorial && isTutorialSoftPass(state.tutorialStep)) {
+      passLabel.innerHTML = '<span class="btn-kicker">OK</span>Got it';
+    } else {
+      passLabel.innerHTML = '<span class="btn-kicker">End</span>Pass';
+    }
+  }
 
   for (const hit of altHits) {
     const alt = Number(hit.dataset.alt) as Altitude;
@@ -537,11 +600,14 @@ function syncHud(): void {
   }
 
   handEl.innerHTML = "";
+  handEl.dataset.n = String(state.hand.length);
   state.hand.forEach((id, index) => {
     const def = getCard(id);
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "hand-card";
+    btn.dataset.slot = String(index);
+    btn.style.setProperty("--i", String(index));
     const playable = intents.some(
       (i) =>
         (i.kind === "play" || i.kind === "graft" || i.kind === "rite") && i.handIndex === index,
@@ -556,26 +622,51 @@ function syncHud(): void {
     ) {
       btn.classList.add("teach");
     }
+    if (drag?.active && drag.handIndex === index) btn.classList.add("dragging");
 
     const img = document.createElement("img");
     img.className = "face";
     img.alt = def.name;
     img.draggable = false;
-    img.width = 84;
-    img.height = 126;
+    img.width = 78;
+    img.height = 117;
     img.src = handCardSrc(id);
     btn.appendChild(img);
     mountFoilCard(img, { premium: !!def.premium });
-    btn.title = `${def.name} · ${def.essence}E · tap to inspect`;
+    btn.title = `${def.name} · ${def.essence}E · drag to an altitude or tap to inspect`;
+    if (canSelect) {
+      btn.addEventListener("pointerdown", (ev) => {
+        if (ev.button != null && ev.button !== 0) return;
+        if (uiPaused || drag?.dropping) return;
+        selectedHand = index;
+        mode = "play";
+        drag = {
+          handIndex: index,
+          pointerId: ev.pointerId,
+          startX: ev.clientX,
+          startY: ev.clientY,
+          active: false,
+          cardSrc: img.src,
+        };
+        playSfx("select");
+        highlightAltitudesForHand(index);
+        for (const el of handEl.querySelectorAll(".hand-card")) {
+          el.classList.toggle("selected", el === btn);
+        }
+        if (flashTimer <= 0) showToast("Drag onto HIGH / MID / LOW — or tap to inspect.");
+      });
+    }
     bindLiftInspect(
       btn,
       () => id,
       cardInspect,
       () => {
+        if (drag?.active || drag?.dropping) return;
+        playSfx("select");
         if (!canSelect) return;
         selectedHand = index;
         mode = "play";
-        syncHud();
+        window.requestAnimationFrame(() => syncHud());
       },
       { inspectOnTap: true },
     );
@@ -587,17 +678,22 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
   for (const ev of events) {
     if (ev.type === "witness") {
       const def = getCard(ev.cardId);
+      playSfx(ev.enemyTarget ? "gaze" : "witness");
       flashToast(ev.enemyTarget ? `Gaze — Witnessed their ${def.name}!` : `Witnessed — ${def.name}!`, 1400);
       // Witness pulse is GPU-only — CSS filter on #stage causes tear/flash bands
     } else if (ev.type === "stance") {
+      playSfx("stance");
       flashToast(ev.stanceB ? "Stance B — powers swapped" : "Stance A — printed powers", 1200);
     } else if (ev.type === "law") {
+      playSfx("law");
       flashToast(`Unblinking Law — +${ev.eclipseGain} Eclipse`, 1800);
     } else if (ev.type === "resolve") {
       const { player, enemy } = ev.damages;
+      playSfx("resolve");
       if (player || enemy) flashToast(`Resolve — you ${enemy} · foe ${player}`, 1800);
       else flashToast("Resolve — no damage", 1200);
     } else if (ev.type === "turn" && ev.side === "enemy") {
+      playSfx("enemy");
       flashToast("Enemy turn", 900);
     } else if (ev.type === "turn" && ev.side === "player" && ev.turn > 1) {
       flashToast(`Your turn ${ev.turn}`, 900);
@@ -615,6 +711,11 @@ function afterPlayer(events: ReturnType<typeof applyIntent>): void {
     selectedHand = tutorialSelectHandIndex(state);
   }
   syncHud();
+  if (state?.tutorial && state.tutorialStep === "read" && state.hand[0]) {
+    cardInspect.open(state.hand[0]);
+  } else if (state?.tutorial && state.tutorialStep === "play") {
+    cardInspect.close();
+  }
   if (state!.winner != null) {
     showEnd();
     return;
@@ -650,6 +751,8 @@ function runEnemy(): void {
 }
 
 function showEnd(): void {
+  if (state?.winner === "player") playSfx("win");
+  else playSfx("lose");
   if (!state) return;
   uiPaused = false;
   hideAllSheets();
@@ -665,6 +768,101 @@ function showEnd(): void {
   btnStance.disabled = true;
   btnPass.disabled = true;
   syncHud();
+}
+
+function highlightAltitudesForHand(handIndex: number): void {
+  if (!state) return;
+  const intents = legalIntents(state);
+  for (const hit of altHits) {
+    const alt = Number(hit.dataset.alt) as Altitude;
+    const def = getCard(state.hand[handIndex]);
+    let legal = false;
+    if (def.type === "rite") {
+      legal = intents.some((i) => i.kind === "rite" && i.handIndex === handIndex && i.altitude === alt);
+    } else if (def.type === "relic") {
+      legal = intents.some((i) => i.kind === "graft" && i.handIndex === handIndex && i.altitude === alt);
+    } else {
+      legal = intents.some((i) => i.kind === "play" && i.handIndex === handIndex && i.altitude === alt);
+    }
+    hit.classList.toggle("legal", legal);
+    hit.classList.toggle("disabled", !legal);
+    hit.setAttribute("aria-disabled", legal ? "false" : "true");
+  }
+}
+
+function moveDragGhost(x: number, y: number): void {
+  dragGhost.style.left = `${x}px`;
+  dragGhost.style.top = `${y}px`;
+}
+
+function beginDragVisual(d: DragState): void {
+  d.active = true;
+  cardInspect.close();
+  dragCardImg.src = d.cardSrc;
+  dragCardImg.alt = "Dragging card";
+  dragLayer.hidden = false;
+  document.body.classList.add("dragging-card");
+  const btn = handEl.querySelectorAll(".hand-card")[d.handIndex];
+  btn?.classList.add("dragging");
+  dragGhost.classList.remove("is-dropping");
+  dragGhost.style.transition = "none";
+  dragGhost.style.transform = "translate(-50%, -58%) rotate(-4deg) scale(1.06)";
+  moveDragGhost(d.startX, d.startY);
+}
+
+function endDragVisual(): void {
+  dragLayer.hidden = true;
+  document.body.classList.remove("dragging-card");
+  dragGhost.classList.remove("is-dropping");
+  dragGhost.style.transition = "";
+  dragGhost.style.transform = "";
+  for (const hit of altHits) hit.classList.remove("drop-target");
+  drag = null;
+}
+
+function altitudeAtPoint(clientX: number, clientY: number): Altitude | null {
+  for (const hit of altHits) {
+    if (!hit.classList.contains("legal")) continue;
+    const r = hit.getBoundingClientRect();
+    if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
+      return Number(hit.dataset.alt) as Altitude;
+    }
+  }
+  const canvasRect = canvas.getBoundingClientRect();
+  if (
+    clientX >= canvasRect.left &&
+    clientX <= canvasRect.right &&
+    clientY >= canvasRect.top &&
+    clientY <= canvasRect.bottom
+  ) {
+    const alt = stage.hitAltitude(clientX - canvasRect.left, clientY - canvasRect.top);
+    if (alt === null) return null;
+    const hit = altHits.find((h) => Number(h.dataset.alt) === alt);
+    if (hit?.classList.contains("legal")) return alt;
+  }
+  return null;
+}
+
+function animateDropToAltitude(alt: Altitude): Promise<void> {
+  return new Promise((resolve) => {
+    const hit = altHits.find((h) => Number(h.dataset.alt) === alt);
+    if (!hit || document.body.classList.contains("reduce-motion")) {
+      resolve();
+      return;
+    }
+    const r = hit.getBoundingClientRect();
+    const tx = r.left + r.width / 2;
+    const ty = r.top + r.height * 0.38;
+    dragGhost.classList.add("is-dropping");
+    dragGhost.style.transition =
+      "left 0.24s cubic-bezier(0.18, 0.9, 0.22, 1), top 0.24s cubic-bezier(0.18, 0.9, 0.22, 1), transform 0.24s cubic-bezier(0.18, 0.9, 0.22, 1), filter 0.24s ease";
+    void dragGhost.offsetWidth;
+    dragGhost.style.left = `${tx}px`;
+    dragGhost.style.top = `${ty}px`;
+    dragGhost.style.transform = "translate(-50%, -50%) scale(0.38) rotate(0deg)";
+    dragGhost.style.filter = "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))";
+    window.setTimeout(() => resolve(), 250);
+  });
 }
 
 function tryAltitude(alt: Altitude): boolean {
@@ -698,6 +896,10 @@ function tryAltitude(alt: Altitude): boolean {
   }
 
   if (!intent) return false;
+  if (intent.kind === "play") playSfx("play");
+  else if (intent.kind === "graft") playSfx("graft");
+  else if (intent.kind === "rite") playSfx("rite");
+  else if (intent.kind === "stance") playSfx("stance");
   const events = applyIntent(state, intent);
   selectedHand = null;
   mode = "play";
@@ -705,8 +907,13 @@ function tryAltitude(alt: Altitude): boolean {
   return true;
 }
 
-document.getElementById("btn-play")!.addEventListener("click", () => startMatch(false));
-document.getElementById("btn-tutorial")!.addEventListener("click", () => startMatch(true));
+const unlockAnd = (fn: () => void) => () => {
+  void unlockAudio();
+  playSfx("ui-tap");
+  fn();
+};
+document.getElementById("btn-play")!.addEventListener("click", unlockAnd(() => startMatch(false)));
+document.getElementById("btn-tutorial")!.addEventListener("click", unlockAnd(() => startMatch(true)));
 document.getElementById("btn-codex")!.addEventListener("click", () => openCodex());
 document.getElementById("btn-builder")!.addEventListener("click", () => openBuilder());
 document.getElementById("btn-settings")!.addEventListener("click", () => openSettings("menu"));
@@ -744,6 +951,14 @@ settingsDifficulty.addEventListener("change", () => {
   saveSettings(next);
   applySettings(next);
 });
+settingsMuteSfx.addEventListener("change", () => {
+  void unlockAudio();
+  setMuted(settingsMuteSfx.checked);
+});
+settingsMuteMusic.addEventListener("change", () => {
+  void unlockAudio();
+  setMusicMuted(settingsMuteMusic.checked);
+});
 
 bindLiftInspect(
   codexFoil,
@@ -760,6 +975,7 @@ for (const hit of altHits) {
     return slot.player?.cardId ?? slot.enemy?.cardId ?? slot.playerSite ?? slot.enemySite ?? null;
   };
   bindLiftInspect(hit, boardCardId, cardInspect, () => {
+    if (drag?.active || drag?.dropping) return;
     if (tryAltitude(alt)) return;
     const id = boardCardId();
     if (id) cardInspect.open(id);
@@ -803,14 +1019,62 @@ btnStance.addEventListener("click", () => {
 btnPass.addEventListener("click", () => {
   if (uiPaused) return;
   if (!state || state.active !== "player") return;
+  playSfx("pass");
   const events = applyIntent(state, { kind: "pass" });
   mode = "play";
   selectedHand = null;
   afterPlayer(events);
 });
 
+window.addEventListener("pointermove", (ev) => {
+  if (!drag || ev.pointerId !== drag.pointerId || drag.dropping) return;
+  const dx = ev.clientX - drag.startX;
+  const dy = ev.clientY - drag.startY;
+  if (!drag.active && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+    beginDragVisual(drag);
+  }
+  if (drag.active) {
+    moveDragGhost(ev.clientX, ev.clientY);
+    const alt = altitudeAtPoint(ev.clientX, ev.clientY);
+    for (const hit of altHits) {
+      hit.classList.toggle("drop-target", alt !== null && Number(hit.dataset.alt) === alt);
+    }
+  }
+});
+
+window.addEventListener("pointerup", (ev) => {
+  void (async () => {
+    if (!drag || ev.pointerId !== drag.pointerId) return;
+    if (drag.dropping) return;
+    const wasDragging = drag.active;
+    const handIndex = drag.handIndex;
+    const alt = wasDragging ? altitudeAtPoint(ev.clientX, ev.clientY) : null;
+    for (const hit of altHits) hit.classList.remove("drop-target");
+    if (wasDragging && alt !== null) {
+      drag.dropping = true;
+      selectedHand = handIndex;
+      mode = "play";
+      await animateDropToAltitude(alt);
+      endDragVisual();
+      tryAltitude(alt);
+      return;
+    }
+    endDragVisual();
+    if (wasDragging) {
+      selectedHand = handIndex;
+      syncHud();
+    }
+  })();
+});
+
+window.addEventListener("pointercancel", (ev) => {
+  if (!drag || ev.pointerId !== drag.pointerId) return;
+  endDragVisual();
+  syncHud();
+});
+
 canvas.addEventListener("pointerdown", (ev) => {
-  if (uiPaused) return;
+  if (uiPaused || drag?.active || drag?.dropping) return;
   if (!state || state.phase !== "play") return;
   const rect = canvas.getBoundingClientRect();
   const alt = stage.hitAltitude(ev.clientX - rect.left, ev.clientY - rect.top);

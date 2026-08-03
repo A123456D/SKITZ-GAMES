@@ -91,6 +91,12 @@
           <span id="toast-text"></span>
         </div>
 
+        <div id="coach" hidden>
+          <p id="coach-title" class="coach-title"></p>
+          <p id="coach-body" class="coach-body"></p>
+          <p id="coach-action" class="coach-action"></p>
+        </div>
+
         <div id="altitudes" aria-label="Altitudes">
           <button type="button" class="alt-hit" data-alt="0" aria-label="High">
             <span class="alt-tag">HIGH</span>
@@ -122,7 +128,7 @@
         </div>
 
         <div id="hand-area" hidden>
-          <div id="hand"></div>
+          <div id="hand" class="hand-fan" data-n="0"></div>
         </div>
 
         <div id="actions" hidden>
@@ -188,6 +194,14 @@
               <input type="checkbox" id="settings-motion" />
             </label>
             <label class="settings-row">
+              <span class="settings-label">Mute SFX</span>
+              <input type="checkbox" id="settings-mute-sfx" />
+            </label>
+            <label class="settings-row">
+              <span class="settings-label">Mute music</span>
+              <input type="checkbox" id="settings-mute-music" />
+            </label>
+            <label class="settings-row">
               <span class="settings-label">AI difficulty</span>
               <select id="settings-difficulty" class="settings-select">
                 <option value="easy">Easy</option>
@@ -195,9 +209,9 @@
                 <option value="hard">Hard</option>
               </select>
             </label>
-            <p class="settings-hint">Tap any card to inspect. Tap altitudes to play.</p>
+            <p class="settings-hint">Tap any card to inspect. Drag hand cards onto altitudes to play.</p>
             <p class="settings-hint">Constructed: 30 cards · ≤2 copies · ≤1 premium · ≤1 prophecy.</p>
-            <p class="settings-hint">First Gaze explains why Witness matters, how you win, then altitudes, combos, Gaze, Stance, Rites, Law &amp; Resolve.</p>
+            <p class="settings-hint">First Gaze walks card anatomy, wins, altitudes, Witness, combos, Gaze, Stance, Rites, Law &amp; Resolve.</p>
             <button type="button" id="settings-close" class="ghost">
               <span class="btn-label">Back</span>
             </button>
@@ -273,6 +287,12 @@
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div id="drag-layer" hidden>
+          <div id="drag-ghost">
+            <img id="drag-card" alt="" draggable="false" />
           </div>
         </div>
 
