@@ -518,6 +518,29 @@ body.dragging-card #hand-area {
   z-index: 8;
 }
 
+/* Witness / Stance: tuck hand so Ace & friends don't block altitude taps on mobile */
+body.board-target #hand-area {
+  z-index: 2;
+}
+
+body.board-target #altitudes {
+  z-index: 7;
+}
+
+body.board-target .hand-card,
+body.board-target .hand-card.selected {
+  pointer-events: none;
+  opacity: 0.4;
+  filter: saturate(0.7);
+  transform: translate(-50%, 0) translateY(calc(var(--slot-y) + 78px)) rotate(var(--slot-rot))
+    scale(0.88);
+}
+
+body.board-target .hand-card.selected img.face {
+  outline: none;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
+}
+
 body.dragging-card .alt-hit {
   pointer-events: none;
 }

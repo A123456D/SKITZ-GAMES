@@ -421,6 +421,8 @@ function syncHud(): void {
   const inMatch = !!(state && state.phase === "play" && !uiPaused && pausePanel.hidden && settingsPanel.hidden);
   btnHudMenu.hidden = !(state && state.phase === "play");
   btnHudSettings.hidden = !(state && state.phase === "play");
+  const boardTarget = inMatch && (mode === "witness" || mode === "stance");
+  document.body.classList.toggle("board-target", boardTarget);
 
   if (!state || state.phase !== "play") {
     handEl.innerHTML = "";
@@ -431,6 +433,7 @@ function syncHud(): void {
     btnWitness.disabled = true;
     btnStance.disabled = true;
     btnPass.disabled = true;
+    document.body.classList.remove("board-target");
     setEnemyTurn(false);
     for (const hit of altHits) {
       hit.disabled = true;
