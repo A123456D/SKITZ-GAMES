@@ -44,7 +44,7 @@ const MUSIC_FILES: Record<MusicBed, string> = {
 
 const MUTE_KEY = "oculum.muted";
 const MUSIC_MUTE_KEY = "oculum.musicMuted";
-const SFX_VERSION = 1;
+const SFX_VERSION = 2;
 const MUSIC_VOLUME = 0.32;
 
 const DEFAULT_VOL: Partial<Record<SfxId, number>> = {
