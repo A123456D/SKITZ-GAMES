@@ -1,20 +1,43 @@
 import type { Altitude, BoardUnit, Intent, MatchState, TutorialStep } from "./types";
 
-/** Ordered First Gaze lessons (excluding `done`). */
+/**
+ * First Gaze: each action has a follow-up "see" beat so players read the board
+ * before the next tap (do → see → do → see …).
+ */
 export const TUTORIAL_LESSONS: Exclude<TutorialStep, "done">[] = [
   "intro",
   "read",
   "play",
+  "see_play",
   "site",
+  "see_site",
   "witness",
+  "see_witness",
   "graft",
+  "see_graft",
   "gaze",
+  "see_gaze",
   "stance",
+  "see_stance",
   "rite",
+  "see_rite",
   "law",
+  "see_law",
 ];
 
-const SOFT_PASS_STEPS = new Set<TutorialStep>(["intro", "read"]);
+const SOFT_PASS_STEPS = new Set<TutorialStep>([
+  "intro",
+  "read",
+  "see_play",
+  "see_site",
+  "see_witness",
+  "see_graft",
+  "see_gaze",
+  "see_stance",
+  "see_rite",
+  "see_law",
+]);
+
 /** Full board rebuild when entering these steps. */
 const SCENE_STEPS = new Set<TutorialStep>(["intro", "read", "play", "gaze", "stance", "rite", "law"]);
 
@@ -59,7 +82,7 @@ export type TutorialCoach = {
   cta: string | null;
 };
 
-/** Full coach panel copy — short, action-first for mobile. */
+/** Coach copy — explain before the tap, then explain what changed after. */
 export function tutorialCoach(step: TutorialStep): TutorialCoach | null {
   const n = lessonIndex(step);
   const total = TUTORIAL_LESSONS.length;
@@ -67,73 +90,129 @@ export function tutorialCoach(step: TutorialStep): TutorialCoach | null {
   switch (step) {
     case "intro":
       return {
-        title: `The Gaze · ${tag}`,
-        body: "Cards enter Veiled (half-real). Spend Sight to Witness them — they become real and hit harder. Win by draining Will, or by Eclipse (5).",
-        action: "Next — read a card",
+        title: `The idea · ${tag}`,
+        body: "In OCULUM, cards start Veiled (half-real, usually weaker). Spending Sight to Witness them makes them real — bigger power, plus a one-time Revelation bonus. You win by draining Will, or by Eclipse (5).",
+        action: "Next",
         cta: "Got it",
       };
     case "read":
       return {
-        title: `Read a card · ${tag}`,
-        body: "Cliff Seeker: Essence to play · Sight to Witness · Veiled power / Witnessed power. Hold the card to inspect.",
-        action: "Hold card optional · then Got it",
+        title: `Card numbers · ${tag}`,
+        body: "Hold Cliff Seeker if you want. Essence = cost to play. Witness cost = Sight to make it real. Veiled power / Witnessed power = combat before and after Witness. Witnessed is a state — not just the bigger number.",
+        action: "Hold optional · then continue",
         cta: "Got it",
       };
     case "play":
       return {
-        title: `Three lanes · ${tag}`,
-        body: "Board has three lanes. HIGH: winners deal +1 damage, and Sites here give more Sight. MID: normal. LOW: your Veiled figures get +1 power. Play Cliff Seeker onto MID.",
-        action: "Tap MID",
+        title: `Play a Figure · ${tag}`,
+        body: "Three lanes: HIGH (winners deal +1 damage), MID (normal), LOW (Veiled figures +1 power). You're going to spend Essence and put Cliff Seeker on MID — still Veiled.",
+        action: "Tap glowing MID",
         cta: null,
+      };
+    case "see_play":
+      return {
+        title: `What just happened · ${tag}`,
+        body: "Look at MID: Cliff Seeker is on the board, Veiled (misty). Check ESS — you spent Essence. Power chip is the Veiled number. Nothing is fully real yet.",
+        action: "Look at MID · then continue",
+        cta: "Got it",
       };
     case "site":
       return {
-        title: `Site · ${tag}`,
-        body: "Sites are landmarks on a lane (not fighters). Veil Banner: +1 power to your Veiled figure on this lane.",
-        action: "Tap MID",
+        title: `Play a Site · ${tag}`,
+        body: "Sites are landmarks, not fighters. Veil Banner will sit on MID and give +1 power to your Veiled figure there. Watch the power chip after.",
+        action: "Tap glowing MID",
         cta: null,
+      };
+    case "see_site":
+      return {
+        title: `What just happened · ${tag}`,
+        body: "The seal on MID is Veil Banner. Cliff Seeker is still Veiled, so Banner's +1 applies — power should be higher than before. Sites don't fight; they change the lane.",
+        action: "Check the power chip · continue",
+        cta: "Got it",
       };
     case "witness":
       return {
-        title: `Witness · ${tag}`,
-        body: "Spend Sight to Witness your own Veiled card — it becomes real, uses its bigger power, and fires a one-time Revelation.",
-        action: "Tap MID",
+        title: `Witness your card · ${tag}`,
+        body: "Now spend Sight to Witness Cliff Seeker. It becomes real: uses Witnessed power, fires Revelation (Cliff Seeker gains Sight), and loses the Banner's Veiled-only bonus.",
+        action: "Tap glowing MID",
         cta: null,
+      };
+    case "see_witness":
+      return {
+        title: `What just happened · ${tag}`,
+        body: "Mist is gone — Witnessed. Check SIGHT (you paid). Power changed to the Witnessed number. Revelation already fired (+Sight). Banner no longer buffs this figure.",
+        action: "Compare power & Sight · continue",
+        cta: "Got it",
       };
     case "graft":
       return {
-        title: `Graft · ${tag}`,
-        body: "Relics attach onto a Figure you already control. Ace of Hollows adds power while that Figure is Witnessed.",
-        action: "Tap MID",
+        title: `Graft a Relic · ${tag}`,
+        body: "Relics attach to a Figure you control. Ace of Hollows will graft onto Cliff Seeker and add power while Witnessed. Watch for a charm seal on the figure.",
+        action: "Tap glowing MID",
         cta: null,
+      };
+    case "see_graft":
+      return {
+        title: `What just happened · ${tag}`,
+        body: "Ace is attached (small seal on Cliff Seeker). Power went up again. Grafts ride with the host — they're not a separate lane fighter.",
+        action: "Find the charm seal · continue",
+        cta: "Got it",
       };
     case "gaze":
       return {
-        title: `Gaze · ${tag}`,
-        body: "Gaze = Witness an enemy's Veiled card (steal their Revelation). You need a Gaze landmark on that lane — Ring Gaze is on HIGH. Same Witness button, their lane.",
-        action: "Tap HIGH",
+        title: `Gaze (enemy Witness) · ${tag}`,
+        body: "Gaze = Witness their Veiled card to steal its Revelation. Ring Gaze (your landmark) is on HIGH with an enemy Cliff Seeker. Same Witness action — their lane.",
+        action: "Tap glowing HIGH",
         cta: null,
+      };
+    case "see_gaze":
+      return {
+        title: `What just happened · ${tag}`,
+        body: "You Witnessed their card. You got the Revelation bonus, not them. Gaze needs a Gaze landmark on that lane — without it, you can only Witness your own cards.",
+        action: "Remember: Gaze steals · continue",
+        cta: "Got it",
       };
     case "stance":
       return {
-        title: `Stance · ${tag}`,
-        body: "Third Face is a sigil on this lane. Stance swaps the figure's two power numbers (Veiled ↔ Witnessed) once per turn — useful if you want the bigger number while still Veiled.",
-        action: "Tap MID",
+        title: `Stance flip · ${tag}`,
+        body: "Third Face (sigil) lets you swap a figure's Veiled and Witnessed power numbers once per turn. Useful if you want the bigger number while still Veiled.",
+        action: "Tap glowing MID",
         cta: null,
+      };
+    case "see_stance":
+      return {
+        title: `What just happened · ${tag}`,
+        body: "The A/B chip flipped. Powers swapped. You can flip back next turn (once per turn). Stance is optional tech — not required every game.",
+        action: "Note the A/B chip · continue",
+        cta: "Got it",
       };
     case "rite":
       return {
-        title: `Rite · ${tag}`,
-        body: "Rites Blind a lane — no Sight income there. Starve Sight to push Eclipse.",
-        action: "Tap MID",
+        title: `Rite · Blind · ${tag}`,
+        body: "Rites Blind a lane for the turn — that lane won't give Sight income. Starving Sight helps you push Eclipse (win if they end turns at 0 Sight).",
+        action: "Tap glowing MID",
         cta: null,
+      };
+    case "see_rite":
+      return {
+        title: `What just happened · ${tag}`,
+        body: "MID is Blinded this turn. Use Rites to cut their Sight engine, then pressure Eclipse — or just win on Will damage at Resolve.",
+        action: "Blind = no Sight here · continue",
+        cta: "Got it",
       };
     case "law":
       return {
-        title: `Law · ${tag}`,
-        body: "Unblinking Law: Witness 3 schools in one turn, then Pass for Eclipse. Finish by Witnessing Inkdrip.",
-        action: "Tap MID",
+        title: `Law setup · ${tag}`,
+        body: "Unblinking Law: Witness 3 different schools in one turn, then Pass for Eclipse. You already have Cube + Deal progress — Witness Inkdrip (Hollow) on MID to finish the set.",
+        action: "Tap glowing MID",
         cta: null,
+      };
+    case "see_law":
+      return {
+        title: `First Gaze complete · ${tag}`,
+        body: "Law track would be ready after Pass in a real game. You now know: play Veiled → Sites help → Witness to reveal → Gaze steals → Resolve hits Will. Free play starts next — try Enter the Gaze anytime.",
+        action: "Finish tutorial",
+        cta: "Play free",
       };
     default:
       return null;
@@ -182,6 +261,17 @@ function applyHandForStep(state: MatchState, step: TutorialStep): void {
       break;
     case "graft":
       state.hand = ["ace_of_hollows"];
+      break;
+    case "see_play":
+    case "see_site":
+    case "see_witness":
+    case "see_graft":
+    case "see_gaze":
+    case "see_stance":
+    case "see_rite":
+    case "see_law":
+      // Keep board as-is; clear hand noise so focus stays on the lane.
+      state.hand = [];
       break;
     default:
       break;
@@ -269,10 +359,10 @@ export function setupTutorialScene(state: MatchState, step: TutorialStep): void 
 
 export function filterTutorialIntents(state: MatchState, intents: Intent[]): Intent[] {
   if (!state.tutorial || state.tutorialStep === "done") return intents;
+  if (SOFT_PASS_STEPS.has(state.tutorialStep)) {
+    return intents.filter((i) => i.kind === "pass");
+  }
   switch (state.tutorialStep) {
-    case "intro":
-    case "read":
-      return intents.filter((i) => i.kind === "pass");
     case "play":
       return intents.filter(
         (i) =>
@@ -327,28 +417,52 @@ export function advanceTutorial(state: MatchState, intent: Intent): boolean {
       if (intent.kind === "pass") next = "play";
       break;
     case "play":
-      if (intent.kind === "play") next = "site";
+      if (intent.kind === "play") next = "see_play";
+      break;
+    case "see_play":
+      if (intent.kind === "pass") next = "site";
       break;
     case "site":
-      if (intent.kind === "play") next = "witness";
+      if (intent.kind === "play") next = "see_site";
+      break;
+    case "see_site":
+      if (intent.kind === "pass") next = "witness";
       break;
     case "witness":
-      if (intent.kind === "witness" && !intent.enemy) next = "graft";
+      if (intent.kind === "witness" && !intent.enemy) next = "see_witness";
+      break;
+    case "see_witness":
+      if (intent.kind === "pass") next = "graft";
       break;
     case "graft":
-      if (intent.kind === "graft") next = "gaze";
+      if (intent.kind === "graft") next = "see_graft";
+      break;
+    case "see_graft":
+      if (intent.kind === "pass") next = "gaze";
       break;
     case "gaze":
-      if (intent.kind === "witness" && intent.enemy) next = "stance";
+      if (intent.kind === "witness" && intent.enemy) next = "see_gaze";
+      break;
+    case "see_gaze":
+      if (intent.kind === "pass") next = "stance";
       break;
     case "stance":
-      if (intent.kind === "stance") next = "rite";
+      if (intent.kind === "stance") next = "see_stance";
+      break;
+    case "see_stance":
+      if (intent.kind === "pass") next = "rite";
       break;
     case "rite":
-      if (intent.kind === "rite") next = "law";
+      if (intent.kind === "rite") next = "see_rite";
+      break;
+    case "see_rite":
+      if (intent.kind === "pass") next = "law";
       break;
     case "law":
-      if (intent.kind === "witness" && !intent.enemy) next = "done";
+      if (intent.kind === "witness" && !intent.enemy) next = "see_law";
+      break;
+    case "see_law":
+      if (intent.kind === "pass") next = "done";
       break;
   }
 

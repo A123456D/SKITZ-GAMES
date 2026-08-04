@@ -88,13 +88,21 @@ export type TutorialStep =
   | "intro"
   | "read"
   | "play"
+  | "see_play"
   | "site"
+  | "see_site"
   | "witness"
+  | "see_witness"
   | "graft"
+  | "see_graft"
   | "gaze"
+  | "see_gaze"
   | "stance"
+  | "see_stance"
   | "rite"
+  | "see_rite"
   | "law"
+  | "see_law"
   | "done";
 
 export type AiDifficulty = "easy" | "normal" | "hard";

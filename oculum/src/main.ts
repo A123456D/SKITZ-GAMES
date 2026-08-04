@@ -776,28 +776,31 @@ function syncHud(): void {
 }
 
 function narrateEvents(events: ReturnType<typeof applyIntent>): void {
+  const inTutorial = !!(state?.tutorial && state.tutorialStep !== "done");
   for (const ev of events) {
     if (ev.type === "play") {
       const def = getCard(ev.cardId);
       punchAltitude(ev.altitude, "play");
-      flashToast(`Played ${def.name}`, 900, "play");
+      if (!inTutorial) flashToast(`Played ${def.name}`, 900, "play");
     } else if (ev.type === "witness") {
       const def = getCard(ev.cardId);
       playSfx(ev.enemyTarget ? "gaze" : "witness");
       punchAltitude(ev.altitude, ev.enemyTarget ? "gaze" : "witness");
-      flashToast(
-        ev.enemyTarget ? `Gaze — stole ${def.name}'s Revelation!` : `Witnessed — ${def.name}!`,
-        1400,
-        ev.enemyTarget ? "gaze" : "witness",
-      );
+      if (!inTutorial) {
+        flashToast(
+          ev.enemyTarget ? `Gaze — stole ${def.name}'s Revelation!` : `Witnessed — ${def.name}!`,
+          1400,
+          ev.enemyTarget ? "gaze" : "witness",
+        );
+      }
     } else if (ev.type === "graft") {
       const def = getCard(ev.relicId);
       punchAltitude(ev.altitude, "play");
-      flashToast(`Grafted ${def.name}`, 1000, "graft");
+      if (!inTutorial) flashToast(`Grafted ${def.name}`, 1000, "graft");
     } else if (ev.type === "rite") {
       const def = getCard(ev.cardId);
       if (ev.altitude != null) punchAltitude(ev.altitude, "resolve");
-      flashToast(`Rite — ${def.name}`, 1100, "rite");
+      if (!inTutorial) flashToast(`Rite — ${def.name}`, 1100, "rite");
     } else if (ev.type === "stance") {
       playSfx("stance");
       punchAltitude(ev.altitude, "stance");
@@ -809,10 +812,12 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         void (stanceEl as HTMLElement).offsetWidth;
         stanceEl.classList.add("flip");
       }
-      flashToast(ev.stanceB ? "Stance B — powers swapped" : "Stance A — printed powers", 1200, "stance");
+      if (!inTutorial) {
+        flashToast(ev.stanceB ? "Stance B — powers swapped" : "Stance A — printed powers", 1200, "stance");
+      }
     } else if (ev.type === "law") {
       playSfx("law");
-      flashToast(`Unblinking Law — +${ev.eclipseGain} Eclipse`, 1800, "law");
+      if (!inTutorial) flashToast(`Unblinking Law — +${ev.eclipseGain} Eclipse`, 1800, "law");
     } else if (ev.type === "resolve") {
       const { player, enemy } = ev.damages;
       playSfx("resolve");
@@ -822,13 +827,15 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       }, 520);
       if (player > 0) punchWill("you");
       if (enemy > 0) punchWill("foe");
-      if (player || enemy) flashToast(`Resolve — you ${enemy} · foe ${player}`, 1800, "resolve");
-      else flashToast("Resolve — no damage", 1200, "resolve");
+      if (!inTutorial) {
+        if (player || enemy) flashToast(`Resolve — you ${enemy} · foe ${player}`, 1800, "resolve");
+        else flashToast("Resolve — no damage", 1200, "resolve");
+      }
     } else if (ev.type === "turn" && ev.side === "enemy") {
       playSfx("enemy");
-      flashToast("Enemy turn", 900);
+      if (!inTutorial) flashToast("Enemy turn", 900);
     } else if (ev.type === "turn" && ev.side === "player" && ev.turn > 1) {
-      flashToast(`Your turn ${ev.turn}`, 900);
+      if (!inTutorial) flashToast(`Your turn ${ev.turn}`, 900);
     }
   }
 }
