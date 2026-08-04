@@ -57,6 +57,7 @@ const coachEl = document.getElementById("coach")!;
 const coachTitle = document.getElementById("coach-title")!;
 const coachBody = document.getElementById("coach-body")!;
 const coachAction = document.getElementById("coach-action")!;
+const coachCta = document.getElementById("coach-cta") as HTMLButtonElement;
 const dragLayer = document.getElementById("drag-layer")!;
 const dragGhost = document.getElementById("drag-ghost")!;
 const dragCardImg = document.getElementById("drag-card") as HTMLImageElement;
@@ -378,12 +379,22 @@ function syncCoach(s: MatchState | null): void {
   const coach = s?.tutorial && s.tutorialStep !== "done" ? tutorialCoach(s.tutorialStep) : null;
   if (!coach) {
     coachEl.hidden = true;
+    coachCta.hidden = true;
+    document.body.classList.remove("tutorial-soft");
     return;
   }
   coachEl.hidden = false;
   coachTitle.textContent = coach.title;
   coachBody.textContent = coach.body;
   coachAction.textContent = coach.action;
+  const soft = !!coach.cta;
+  document.body.classList.toggle("tutorial-soft", soft);
+  if (soft && coach.cta) {
+    coachCta.hidden = false;
+    coachCta.textContent = coach.cta;
+  } else {
+    coachCta.hidden = true;
+  }
 }
 
 function hint(s: MatchState): string {
@@ -433,7 +444,7 @@ function syncHud(): void {
     btnWitness.disabled = true;
     btnStance.disabled = true;
     btnPass.disabled = true;
-    document.body.classList.remove("board-target");
+    document.body.classList.remove("board-target", "tutorial-soft");
     setEnemyTurn(false);
     for (const hit of altHits) {
       hit.disabled = true;
@@ -548,12 +559,7 @@ function syncHud(): void {
     state.tutorial &&
     (state.tutorialStep === "witness" || state.tutorialStep === "gaze" || state.tutorialStep === "law");
   const teachStance = state.tutorial && state.tutorialStep === "stance";
-  const teachPass =
-    state.tutorial &&
-    (state.tutorialStep === "intro" ||
-      state.tutorialStep === "goal" ||
-      state.tutorialStep === "read" ||
-      state.tutorialStep === "resolve");
+  const teachPass = false;
   btnWitness.classList.toggle(
     "pulse",
     canWitness &&
@@ -564,11 +570,7 @@ function syncHud(): void {
   btnPass.classList.toggle("pulse", teachPass && canPass);
   const passLabel = btnPass.querySelector(".btn-label");
   if (passLabel) {
-    if (state.tutorial && isTutorialSoftPass(state.tutorialStep)) {
-      passLabel.innerHTML = '<span class="btn-kicker">OK</span>Got it';
-    } else {
-      passLabel.innerHTML = '<span class="btn-kicker">End</span>Pass';
-    }
+    passLabel.innerHTML = '<span class="btn-kicker">End</span>Pass';
   }
 
   for (const hit of altHits) {
@@ -656,7 +658,9 @@ function syncHud(): void {
         for (const el of handEl.querySelectorAll(".hand-card")) {
           el.classList.toggle("selected", el === btn);
         }
-        if (flashTimer <= 0) showToast("Drag onto HIGH / MID / LOW — or tap to inspect.");
+        if (flashTimer <= 0 && !state?.tutorial) {
+          showToast("Drag onto HIGH / MID / LOW — or tap to inspect.");
+        }
       });
     }
     bindLiftInspect(
@@ -671,7 +675,7 @@ function syncHud(): void {
         mode = "play";
         window.requestAnimationFrame(() => syncHud());
       },
-      { inspectOnTap: true },
+      { inspectOnTap: !(state?.tutorial) },
     );
     handEl.appendChild(btn);
   });
@@ -714,8 +718,8 @@ function afterPlayer(events: ReturnType<typeof applyIntent>): void {
     selectedHand = tutorialSelectHandIndex(state);
   }
   syncHud();
-  if (state?.tutorial && state.tutorialStep === "read" && state.hand[0]) {
-    cardInspect.open(state.hand[0]);
+  if (state?.tutorial && state.tutorialStep === "done") {
+    flashToast("First Gaze complete — free play", 1600);
   } else if (state?.tutorial && state.tutorialStep === "play") {
     cardInspect.close();
   }
@@ -1023,6 +1027,17 @@ btnPass.addEventListener("click", () => {
   if (uiPaused) return;
   if (!state || state.active !== "player") return;
   playSfx("pass");
+  const events = applyIntent(state, { kind: "pass" });
+  mode = "play";
+  selectedHand = null;
+  afterPlayer(events);
+});
+
+coachCta.addEventListener("click", () => {
+  if (uiPaused || !state || !state.tutorial) return;
+  if (!isTutorialSoftPass(state.tutorialStep)) return;
+  playSfx("ui-tap");
+  cardInspect.close();
   const events = applyIntent(state, { kind: "pass" });
   mode = "play";
   selectedHand = null;

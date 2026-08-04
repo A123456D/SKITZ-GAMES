@@ -70,18 +70,41 @@ img {
   grid-template-rows:
     auto
     auto
-    auto
-    auto
-    auto
     minmax(0, 1.1fr)
-    168px
+    158px
     52px;
+  grid-template-areas:
+    "top"
+    "will"
+    "board"
+    "hand"
+    "actions";
   padding: calc(6px + env(safe-area-inset-top, 0px)) var(--pad)
     calc(8px + env(safe-area-inset-bottom, 0px));
   gap: 4px;
   z-index: 2;
   overflow: visible;
   min-width: 0;
+}
+
+#topbar {
+  grid-area: top;
+}
+
+#willrow {
+  grid-area: will;
+}
+
+#altitudes {
+  grid-area: board;
+}
+
+#hand-area {
+  grid-area: hand;
+}
+
+#actions {
+  grid-area: actions;
 }
 
 #topbar {
@@ -422,9 +445,11 @@ body.paused #altitudes {
 }
 
 #toast {
-  position: relative;
-  justify-self: center;
-  width: min(100%, 360px);
+  position: absolute;
+  left: 50%;
+  top: calc(6px + env(safe-area-inset-top, 0px) + 78px);
+  transform: translateX(-50%);
+  width: min(calc(100% - 2 * var(--pad)), 360px);
   max-width: 100%;
   max-height: 64px;
   min-height: 0;
@@ -435,6 +460,8 @@ body.paused #altitudes {
   box-shadow: inset 0 0 0 1px var(--plate-line), var(--plate-shadow);
   border-radius: var(--plate-radius);
   border-left: 2px solid var(--gold);
+  z-index: 9;
+  pointer-events: none;
 }
 
 #toast[hidden] {
@@ -876,15 +903,18 @@ body.enemy-turn #toast-text {
 
 #coach {
   pointer-events: none;
-  justify-self: center;
-  width: min(100%, 380px);
+  position: absolute;
+  left: 50%;
+  top: calc(6px + env(safe-area-inset-top, 0px) + 72px);
+  transform: translateX(-50%);
+  width: min(calc(100% - 2 * var(--pad)), 380px);
   max-width: 100%;
-  padding: 10px 12px 8px;
-  background: rgba(10, 8, 14, 0.82);
+  padding: 10px 12px 10px;
+  background: rgba(10, 8, 14, 0.9);
   box-shadow: inset 0 0 0 1px var(--plate-line), var(--plate-shadow);
   border-radius: var(--plate-radius);
   border-left: 2px solid var(--gold);
-  z-index: 5;
+  z-index: 10;
 }
 
 #coach[hidden] {
@@ -903,20 +933,54 @@ body.enemy-turn #toast-text {
 
 .coach-body {
   margin: 0 0 6px;
-  font-size: 0.74rem;
-  line-height: 1.35;
+  font-size: 0.78rem;
+  line-height: 1.3;
   color: rgba(237, 228, 212, 0.92);
   text-shadow: 0 1px 3px #000;
 }
 
 .coach-action {
-  margin: 0;
-  font-size: 0.68rem;
+  margin: 0 0 8px;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--sigil);
   text-shadow: 0 1px 3px #000;
+}
+
+#coach-cta {
+  pointer-events: auto;
+  appearance: none;
+  border: none;
+  width: 100%;
+  min-height: 42px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--plate-radius);
+  background: rgba(62, 207, 192, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(62, 207, 192, 0.55);
+  color: var(--bone);
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 3px #000;
+  cursor: pointer;
+}
+
+#coach-cta[hidden] {
+  display: none !important;
+}
+
+#coach-cta:active {
+  transform: scale(0.98);
+  background: rgba(62, 207, 192, 0.34);
+}
+
+body.tutorial-soft #actions {
+  visibility: hidden;
 }
 
 #actions {
@@ -1528,7 +1592,7 @@ body.on-menu #altitudes {
     width: 44px;
   }
   #hud {
-    grid-template-rows: auto auto auto auto auto minmax(0, 1fr) 148px 48px;
+    grid-template-rows: auto auto minmax(0, 1fr) 140px 48px;
   }
   .hand-card,
   .hand-card img.face {

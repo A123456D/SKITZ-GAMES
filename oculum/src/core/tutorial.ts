@@ -3,7 +3,6 @@ import type { Altitude, BoardUnit, Intent, MatchState, TutorialStep } from "./ty
 /** Ordered First Gaze lessons (excluding `done`). */
 export const TUTORIAL_LESSONS: Exclude<TutorialStep, "done">[] = [
   "intro",
-  "goal",
   "read",
   "play",
   "site",
@@ -13,11 +12,11 @@ export const TUTORIAL_LESSONS: Exclude<TutorialStep, "done">[] = [
   "stance",
   "rite",
   "law",
-  "resolve",
 ];
 
-const SOFT_PASS_STEPS = new Set<TutorialStep>(["intro", "goal", "read"]);
-const SCENE_STEPS = new Set<TutorialStep>(["read", "play", "gaze", "stance", "rite", "law", "resolve"]);
+const SOFT_PASS_STEPS = new Set<TutorialStep>(["intro", "read"]);
+/** Full board rebuild when entering these steps. */
+const SCENE_STEPS = new Set<TutorialStep>(["intro", "read", "play", "gaze", "stance", "rite", "law"]);
 
 function clearBoard(state: MatchState): void {
   for (const slot of state.altitudes) {
@@ -56,9 +55,11 @@ export type TutorialCoach = {
   title: string;
   body: string;
   action: string;
+  /** Soft-step button label; null for action lessons. */
+  cta: string | null;
 };
 
-/** Full coach panel copy — designed to teach the game, not just the button. */
+/** Full coach panel copy — short, action-first for mobile. */
 export function tutorialCoach(step: TutorialStep): TutorialCoach | null {
   const n = lessonIndex(step);
   const total = TUTORIAL_LESSONS.length;
@@ -67,74 +68,72 @@ export function tutorialCoach(step: TutorialStep): TutorialCoach | null {
     case "intro":
       return {
         title: `The Gaze · ${tag}`,
-        body: "OCULUM's world: things only fully exist when Witnessed. Cards enter Veiled (half-real, weaker). Spend Sight to Witness them — they become real, fire a one-time Revelation, and usually hit harder.",
-        action: "Pass = Got it",
-      };
-    case "goal":
-      return {
-        title: `How you win · ${tag}`,
-        body: "Break: reduce enemy Will to 0. Eclipse: if they end a turn at 0 Sight, you gain Eclipse — 5 Eclipse wins. Or after 10 rounds, highest Will wins. Essence plays cards; Sight Witnesses.",
-        action: "Pass = Next — read a card",
+        body: "Cards enter Veiled (half-real). Spend Sight to Witness them — they become real and hit harder. Win by draining Will, or by Eclipse (5).",
+        action: "Next — read a card",
+        cta: "Got it",
       };
     case "read":
       return {
         title: `Read a card · ${tag}`,
-        body: "Cliff Seeker face: Essence 1 — pay to play. Witness cost 1 Sight — pay to make it Witnessed (real). Veiled power 1 — combat while half-real. Witnessed power 2 — combat once Witnessed. Tap the card, then Got it.",
-        action: "Tap Cliff Seeker → Got it",
+        body: "Cliff Seeker: Essence to play · Sight to Witness · Veiled power / Witnessed power. Hold the card to inspect.",
+        action: "Hold card optional · then Got it",
+        cta: "Got it",
       };
     case "play":
       return {
-        title: `Altitudes · ${tag}`,
-        body: "Three lanes: HIGH (extra Sight & damage), MID (default), LOW (Veiled figures stronger). Spend Essence to play a Figure Veiled into a lane. Drag or tap Cliff Seeker onto MID.",
-        action: "Play Cliff Seeker → MID",
+        title: `Play · ${tag}`,
+        body: "Spend Essence to play a Figure Veiled into a lane. HIGH / MID / LOW are altitudes.",
+        action: "Tap MID",
+        cta: null,
       };
     case "site":
       return {
-        title: `Sites combo · ${tag}`,
-        body: "Sites are landmarks on a lane (not Figures). Veil Banner: your Veiled figures on that lane get +1 power. Combo: Banner + Veiled Cliff Seeker. Play Veil Banner on MID.",
-        action: "Play Veil Banner → MID",
+        title: `Site · ${tag}`,
+        body: "Sites are landmarks. Veil Banner gives +1 to your Veiled figures here.",
+        action: "Tap MID",
+        cta: null,
       };
     case "witness":
       return {
         title: `Witness · ${tag}`,
-        body: "This is the core verb. Tap Witness, then MID. You spend Sight; Cliff Seeker becomes real, fires Revelation, and uses witnessed power. Banner only buffs Veiled — so after Witness the Banner bonus drops.",
-        action: "Witness → MID",
+        body: "Spend Sight to make Cliff Seeker real. It fires a Revelation and uses Witnessed power.",
+        action: "Tap MID",
+        cta: null,
       };
     case "graft":
       return {
-        title: `Graft combo · ${tag}`,
-        body: "Relics graft onto Figures. Ace of Hollows: +1 power while the host is Witnessed, and draw when they Witness. Tap Ace, then MID (your Figure).",
-        action: "Graft Ace → MID",
+        title: `Graft · ${tag}`,
+        body: "Relics attach to Figures. Ace of Hollows boosts a Witnessed host.",
+        action: "Tap MID",
+        cta: null,
       };
     case "gaze":
       return {
         title: `Gaze · ${tag}`,
-        body: "Gaze lets you Witness an enemy's Veiled card and steal its Revelation. You need a Gaze landmark (Ring Gaze here on HIGH). Tap Witness, then HIGH on their card.",
-        action: "Witness (Gaze) → HIGH",
+        body: "With Ring Gaze, Witness an enemy's Veiled card and steal its Revelation.",
+        action: "Tap HIGH",
+        cta: null,
       };
     case "stance":
       return {
         title: `Stance · ${tag}`,
-        body: "Third Face (sigil) lets you flip a Figure between Stance A (printed powers) and B (swapped veiled/witnessed powers) once per turn. Tap Stance, then MID.",
-        action: "Stance → MID",
+        body: "Third Face lets you flip A/B powers once per turn.",
+        action: "Tap MID",
+        cta: null,
       };
     case "rite":
       return {
-        title: `Rites · ${tag}`,
-        body: "Rites Blind a lane for the turn — no Sight income from there. Starve their Sight to push Eclipse. Tap Pale Silence, then MID.",
-        action: "Rite → MID",
+        title: `Rite · ${tag}`,
+        body: "Rites Blind a lane — no Sight income there. Starve Sight to push Eclipse.",
+        action: "Tap MID",
+        cta: null,
       };
     case "law":
       return {
         title: `Law · ${tag}`,
-        body: "Unblinking Law (prophecy): Witness 3 different schools in one turn, then Pass for Eclipse. You've got Cube + Deal already — Witness Inkdrip (Hollow) on MID.",
-        action: "Witness → MID",
-      };
-    case "resolve":
-      return {
-        title: `Resolve · ${tag}`,
-        body: "Pass ends your window (Law can fire now). When both players Pass, each lane compares power — winners deal Will damage (HIGH winners deal +1). Then free play begins.",
-        action: "Pass to finish lesson",
+        body: "Unblinking Law: Witness 3 schools in one turn, then Pass for Eclipse. Finish by Witnessing Inkdrip.",
+        action: "Tap MID",
+        cta: null,
       };
     default:
       return null;
@@ -145,7 +144,7 @@ export function tutorialCoach(step: TutorialStep): TutorialCoach | null {
 export function tutorialHint(step: TutorialStep): string {
   const c = tutorialCoach(step);
   if (!c) return "Select a card — or Witness / Stance / Pass.";
-  return `${c.title}: ${c.action}`;
+  return c.action;
 }
 
 export function tutorialTeachCard(step: TutorialStep): string | null {
@@ -168,6 +167,25 @@ export function setupTutorial(state: MatchState): void {
   state.tutorial = true;
   state.tutorialStep = "intro";
   setupTutorialScene(state, "intro");
+}
+
+/** Trim hand when continuing a board between linked lessons. */
+function applyHandForStep(state: MatchState, step: TutorialStep): void {
+  switch (step) {
+    case "site":
+      state.hand = ["veil_banner"];
+      state.essence = Math.max(state.essence, 2);
+      break;
+    case "witness":
+      state.hand = [];
+      state.sight = Math.max(state.sight, 2);
+      break;
+    case "graft":
+      state.hand = ["ace_of_hollows"];
+      break;
+    default:
+      break;
+  }
 }
 
 export function setupTutorialScene(state: MatchState, step: TutorialStep): void {
@@ -195,8 +213,7 @@ export function setupTutorialScene(state: MatchState, step: TutorialStep): void 
   clearBoard(state);
 
   switch (step) {
-    case "intro":
-    case "goal": {
+    case "intro": {
       state.hand = [];
       state.essence = 0;
       state.sight = 3;
@@ -208,19 +225,14 @@ export function setupTutorialScene(state: MatchState, step: TutorialStep): void 
       state.sight = 4;
       break;
     }
-    case "play":
-    case "site":
-    case "witness":
-    case "graft": {
-      if (step === "play") {
-        state.hand = ["cliff_seeker", "veil_banner", "ace_of_hollows"];
-        state.essence = 5;
-        state.sight = 4;
-      }
+    case "play": {
+      state.hand = ["cliff_seeker"];
+      state.essence = 5;
+      state.sight = 4;
       break;
     }
     case "gaze": {
-      state.hand = ["root_chassis"];
+      state.hand = [];
       state.essence = 0;
       state.sight = 4;
       state.altitudes[0].playerSite = "ring_gaze";
@@ -250,17 +262,6 @@ export function setupTutorialScene(state: MatchState, step: TutorialStep): void 
       state.witnessedSchoolsThisTurn = ["cube", "deal"];
       break;
     }
-    case "resolve": {
-      state.hand = ["veil_banner"];
-      state.essence = 0;
-      state.sight = 2;
-      state.altitudes[1].player = mkUnit(state, "hatline_trickster", false, {
-        grafts: [{ instanceId: `t${state.nextId++}`, cardId: "ace_of_hollows" }],
-      });
-      state.altitudes[1].enemy = mkUnit(state, "cliff_seeker", true);
-      state.witnessedSchoolsThisTurn = ["cube", "deal", "hollow"];
-      break;
-    }
     default:
       break;
   }
@@ -270,9 +271,7 @@ export function filterTutorialIntents(state: MatchState, intents: Intent[]): Int
   if (!state.tutorial || state.tutorialStep === "done") return intents;
   switch (state.tutorialStep) {
     case "intro":
-    case "goal":
     case "read":
-    case "resolve":
       return intents.filter((i) => i.kind === "pass");
     case "play":
       return intents.filter(
@@ -322,9 +321,6 @@ export function advanceTutorial(state: MatchState, intent: Intent): boolean {
 
   switch (prev) {
     case "intro":
-      if (intent.kind === "pass") next = "goal";
-      break;
-    case "goal":
       if (intent.kind === "pass") next = "read";
       break;
     case "read":
@@ -352,20 +348,19 @@ export function advanceTutorial(state: MatchState, intent: Intent): boolean {
       if (intent.kind === "rite") next = "law";
       break;
     case "law":
-      if (intent.kind === "witness" && !intent.enemy) next = "resolve";
-      break;
-    case "resolve":
-      if (intent.kind === "pass") next = "done";
+      if (intent.kind === "witness" && !intent.enemy) next = "done";
       break;
   }
 
   if (!next) return false;
   state.tutorialStep = next;
+  if (next === "done") return false;
   if (SCENE_STEPS.has(next)) {
     setupTutorialScene(state, next);
     return true;
   }
-  return false;
+  applyHandForStep(state, next);
+  return true;
 }
 
 export function tutorialSelectHandIndex(state: MatchState): number | null {

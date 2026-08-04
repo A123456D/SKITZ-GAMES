@@ -86,7 +86,6 @@ export type MatchPhase = "menu" | "play" | "end";
 
 export type TutorialStep =
   | "intro"
-  | "goal"
   | "read"
   | "play"
   | "site"
@@ -96,7 +95,6 @@ export type TutorialStep =
   | "stance"
   | "rite"
   | "law"
-  | "resolve"
   | "done";
 
 export type AiDifficulty = "easy" | "normal" | "hard";

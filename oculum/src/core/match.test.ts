@@ -45,23 +45,23 @@ describe("oculum match", () => {
     expect(s.tutorialStep).toBe("intro");
     expect(legalIntents(s).every((i) => i.kind === "pass")).toBe(true);
     applyIntent(s, { kind: "pass" });
-    expect(s.tutorialStep).toBe("goal");
-    expect(s.active).toBe("player");
-    applyIntent(s, { kind: "pass" });
     expect(s.tutorialStep).toBe("read");
     expect(s.hand[0]).toBe("cliff_seeker");
     expect(legalIntents(s).every((i) => i.kind === "pass")).toBe(true);
     applyIntent(s, { kind: "pass" });
     expect(s.tutorialStep).toBe("play");
-    expect(s.hand[0]).toBe("cliff_seeker");
+    expect(s.hand).toEqual(["cliff_seeker"]);
     expect(legalIntents(s).every((i) => i.kind === "play" && i.altitude === 1)).toBe(true);
     applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
     expect(s.tutorialStep).toBe("site");
+    expect(s.hand).toEqual(["veil_banner"]);
     applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
     expect(s.tutorialStep).toBe("witness");
+    expect(s.hand).toEqual([]);
     expect(s.altitudes[1].playerSite).toBe("veil_banner");
     applyIntent(s, { kind: "witness", altitude: 1 });
     expect(s.tutorialStep).toBe("graft");
+    expect(s.hand).toEqual(["ace_of_hollows"]);
     applyIntent(s, { kind: "graft", handIndex: 0, altitude: 1 });
     expect(s.tutorialStep).toBe("gaze");
     expect(s.altitudes[0].playerSite).toBe("ring_gaze");
@@ -72,11 +72,8 @@ describe("oculum match", () => {
     applyIntent(s, { kind: "rite", handIndex: 0, altitude: 1 });
     expect(s.tutorialStep).toBe("law");
     applyIntent(s, { kind: "witness", altitude: 1 });
-    expect(s.tutorialStep).toBe("resolve");
-    expect(legalIntents(s).every((i) => i.kind === "pass")).toBe(true);
-    applyIntent(s, { kind: "pass" });
     expect(s.tutorialStep).toBe("done");
-    expect(s.active).toBe("enemy");
+    expect(s.active).toBe("player");
   });
 
   it("enemy gets a full beginTurn after player passes", () => {
