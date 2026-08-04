@@ -689,7 +689,7 @@ function syncHud(): void {
     img.src = handCardSrc(id);
     btn.appendChild(img);
     mountFoilCard(img, { premium: !!def.premium });
-    btn.title = `${def.name} · ${def.essence}E · drag to an altitude or tap to inspect`;
+    btn.title = `${def.name} · ${def.essence}E · drag to play · hold to inspect`;
     if (canSelect) {
       btn.addEventListener("pointerdown", (ev) => {
         if (ev.button != null && ev.button !== 0) return;
@@ -710,7 +710,7 @@ function syncHud(): void {
           el.classList.toggle("selected", el === btn);
         }
         if (flashTimer <= 0 && !state?.tutorial) {
-          showToast("Drag onto HIGH / MID / LOW — or tap to inspect.");
+          showToast("Drag onto HIGH / MID / LOW — or hold to inspect.");
         }
       });
     }
@@ -726,7 +726,9 @@ function syncHud(): void {
         mode = "play";
         window.requestAnimationFrame(() => syncHud());
       },
-      { inspectOnTap: !(state?.tutorial) },
+      // Free play: short tap also inspects when the card isn't being played.
+      // Hold always inspects (see cardInspect). Tutorial: hold only — tap selects.
+      { inspectOnTap: !(state?.tutorial) && !canSelect },
     );
     handEl.appendChild(btn);
   });
@@ -1031,10 +1033,36 @@ bindLiftInspect(
 
 for (const hit of altHits) {
   const alt = Number(hit.dataset.alt) as Altitude;
+  let lastPointerY = 0;
+  hit.addEventListener(
+    "pointerdown",
+    (ev) => {
+      lastPointerY = ev.clientY;
+    },
+    { capture: true },
+  );
   const boardCardId = (): string | null => {
     if (!state) return null;
     const slot = state.altitudes[alt];
-    return slot.player?.cardId ?? slot.enemy?.cardId ?? slot.playerSite ?? slot.enemySite ?? null;
+    const rect = hit.getBoundingClientRect();
+    const topHalf = lastPointerY < rect.top + rect.height * 0.5;
+    // Enemy figures draw in the top of the lane; yours in the bottom.
+    if (topHalf) {
+      return (
+        slot.enemy?.cardId ??
+        slot.enemySite ??
+        slot.player?.cardId ??
+        slot.playerSite ??
+        null
+      );
+    }
+    return (
+      slot.player?.cardId ??
+      slot.playerSite ??
+      slot.enemy?.cardId ??
+      slot.enemySite ??
+      null
+    );
   };
   bindLiftInspect(hit, boardCardId, cardInspect, () => {
     if (drag?.active || drag?.dropping) return;

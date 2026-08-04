@@ -73,7 +73,7 @@ export function initCardInspect(root: HTMLElement): CardInspectApi {
 }
 
 const LONG_MS = 420;
-const MOVE_CANCEL_PX = 18;
+const MOVE_CANCEL_PX = 12;
 
 export type LiftInspectOpts = {
   /** Short tap opens inspect (then onTap). Default: hold to inspect. */
@@ -137,9 +137,10 @@ export function bindLiftInspect(
     } catch {
       /* ignore */
     }
-    if (opts?.inspectOnTap) return;
+    // Always allow hold-to-inspect (even when short-tap also inspects).
     timer = window.setTimeout(() => {
       timer = null;
+      if (!tracking || movedFar) return;
       longFired = true;
       openInspect();
     }, LONG_MS);
