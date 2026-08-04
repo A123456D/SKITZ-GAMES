@@ -1,4 +1,5 @@
 import { getCard, schoolColor } from "../core/cards";
+import type { CardDef } from "../core/types";
 
 const cache = new Map<string, HTMLCanvasElement>();
 const fullCardImgs = new Map<string, HTMLImageElement>();
@@ -290,4 +291,158 @@ export function getCachedCardFace(cardId: string, veiled: boolean): HTMLCanvasEl
 
 export function clearCardFaceCache(): void {
   cache.clear();
+  tokenCache.clear();
+}
+
+const tokenCache = new Map<string, HTMLCanvasElement>();
+
+function typeAccent(type: CardDef["type"]): { rim: string; badge: string; label: string } {
+  switch (type) {
+    case "site":
+      return { rim: "#d4af37", badge: "#3ecfc0", label: "SITE" };
+    case "sigil":
+      return { rim: "#e6c98a", badge: "#d4af37", label: "SIGIL" };
+    case "relic":
+      return { rim: "#c49a6c", badge: "#b07cff", label: "RELIC" };
+    default:
+      return { rim: "#d4af37", badge: "#3ecfc0", label: type.toUpperCase() };
+  }
+}
+
+/**
+ * Circular lane seal for Sites / Sigils / Relics — not a shrunken card face.
+ */
+export function bakeLaneToken(cardId: string): HTMLCanvasElement {
+  const hit = tokenCache.get(cardId);
+  if (hit) return hit;
+
+  const size = 160;
+  const c = document.createElement("canvas");
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext("2d")!;
+  const def = getCard(cardId);
+  const [sr, sg, sb] = schoolColor(def.school);
+  const accent = typeAccent(def.type);
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size * 0.46;
+
+  ctx.clearRect(0, 0, size, size);
+
+  // Drop shadow
+  ctx.beginPath();
+  ctx.arc(cx + 2, cy + 3, r, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fill();
+
+  // Outer plate
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  const plate = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.1, cx, cy, r);
+  plate.addColorStop(0, "#2a221c");
+  plate.addColorStop(0.55, "#141018");
+  plate.addColorStop(1, "#0a080e");
+  ctx.fillStyle = plate;
+  ctx.fill();
+
+  // School wash
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.92, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(${Math.floor(sr * 255)}, ${Math.floor(sg * 255)}, ${Math.floor(sb * 255)}, 0.28)`;
+  ctx.fill();
+
+  // Art disc (crop card center / upper art)
+  const full = fullCardImgs.get(cardId);
+  const artR = r * 0.72;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy - size * 0.02, artR, 0, Math.PI * 2);
+  ctx.clip();
+  if (full?.complete && full.naturalWidth > 0) {
+    const iw = full.naturalWidth;
+    const ih = full.naturalHeight;
+    // Prefer upper-mid art region of the 2:3 card
+    const srcW = iw * 0.72;
+    const srcH = srcW;
+    const sx = (iw - srcW) / 2;
+    const sy = ih * 0.12;
+    ctx.drawImage(full, sx, sy, srcW, srcH, cx - artR, cy - artR - size * 0.02, artR * 2, artR * 2);
+    ctx.fillStyle = "rgba(10,8,14,0.18)";
+    ctx.fillRect(cx - artR, cy - artR - size * 0.02, artR * 2, artR * 2);
+  } else {
+    ctx.fillStyle = `rgb(${Math.floor(sr * 200)}, ${Math.floor(sg * 200)}, ${Math.floor(sb * 200)})`;
+    ctx.fillRect(cx - artR, cy - artR, artR * 2, artR * 2);
+  }
+  ctx.restore();
+
+  // Inner gold ring
+  ctx.beginPath();
+  ctx.arc(cx, cy - size * 0.02, artR + 1, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(212,175,55,0.55)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Outer rim
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 1, 0, Math.PI * 2);
+  ctx.strokeStyle = accent.rim;
+  ctx.lineWidth = 3.5;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 5, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(237,228,212,0.22)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Type badge ribbon
+  const bw = size * 0.62;
+  const bh = size * 0.16;
+  const bx = cx - bw / 2;
+  const by = size * 0.72;
+  ctx.fillStyle = "rgba(10,8,14,0.88)";
+  ctx.strokeStyle = accent.badge;
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, bx, by, bw, bh, 4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = accent.badge;
+  ctx.font = "700 13px 'Barlow Condensed', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(accent.label, cx, by + bh / 2 + 0.5);
+
+  // Gaze eye pip for Gaze landmarks
+  if (cardId === "ring_gaze" || cardId === "parasol_path" || def.text.toLowerCase().includes("gaze")) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - size * 0.06, size * 0.1, size * 0.06, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(62,207,192,0.95)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy - size * 0.06, size * 0.028, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(62,207,192,0.95)";
+    ctx.fill();
+  }
+
+  tokenCache.set(cardId, c);
+  return c;
+}
+
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rad: number,
+): void {
+  const r = Math.min(rad, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }

@@ -1,5 +1,5 @@
 import type { Altitude, MatchState, OculusEvent, Side } from "../../core/types";
-import { bakeCardFace } from "../cardBake";
+import { bakeCardFace, bakeLaneToken } from "../cardBake";
 import { effectiveDpr } from "../perf";
 
 const VERT = `#version 300 es
@@ -311,6 +311,41 @@ export class OculusStage {
     return t;
   }
 
+  private texForToken(cardId: string): TexEntry {
+    const key = `token:${cardId}`;
+    let t = this.texCache.get(key);
+    if (t) return t;
+    const baked = bakeLaneToken(cardId);
+    t = uploadImage(this.gl, baked, baked.width, baked.height);
+    this.texCache.set(key, t);
+    return t;
+  }
+
+  private drawToken(
+    cardId: string,
+    x: number,
+    y: number,
+    size: number,
+    opts: { pulse: number; alpha: number; z: number; fxColor: [number, number, number] },
+  ): void {
+    const tex = this.texForToken(cardId);
+    this.drawCardQuad(x + 2, y + 3, size, size, tex, {
+      veil: 0,
+      pulse: 0,
+      tint: [0, 0, 0],
+      alpha: 0.4 * opts.alpha,
+      z: opts.z + 0.01,
+    });
+    this.drawCardQuad(x, y, size, size, tex, {
+      veil: 0,
+      pulse: opts.pulse,
+      tint: [1, 1, 1],
+      alpha: opts.alpha,
+      z: opts.z,
+      fxColor: opts.fxColor,
+    });
+  }
+
   invalidateCardTextures(): void {
     for (const t of this.texCache.values()) {
       this.gl.deleteTexture(t.tex);
@@ -499,31 +534,43 @@ export class OculusStage {
         z: top ? 0.2 : 0.1,
         fxColor,
       });
+
+      // Grafted relics as charm seals on the figure
+      if (u.grafts.length > 0) {
+        const ts = Math.min(cardW * 0.34, lane.w * 0.22);
+        const maxShow = Math.min(u.grafts.length, 3);
+        for (let i = 0; i < maxShow; i++) {
+          const g = u.grafts[i];
+          const gx = cx + cardW - ts - 1 - i * (ts * 0.42);
+          const gy = top ? cy + cardH - ts * 0.85 : cy - ts * 0.15;
+          this.drawToken(g.cardId, gx, gy, ts, {
+            pulse: pulse * 0.55,
+            alpha: 1,
+            z: top ? 0.08 : 0.04,
+            fxColor,
+          });
+        }
+      }
     }
 
     if (site) {
-      const tex = this.texFor(site, false);
-      const bw = Math.min(cardW * 0.24, lane.w * 0.26) * (1 + pop * 0.25);
-      const bh = bw * (450 / 300);
-      // Dock in mid gutter, lane-right — clear of host face and center power chip
-      const bx = lane.x + lane.w - bw - Math.max(2, lane.w * 0.03);
+      // Landmark / sigil seal — never a shrunken card
+      const size = u
+        ? Math.min(cardW * 0.42, lane.w * 0.34) * (1 + pop * 0.2)
+        : Math.min(lane.w * 0.48, lane.h * 0.26) * (1 + pop * 0.2);
+      const bx = u
+        ? lane.x + lane.w - size - Math.max(2, lane.w * 0.02)
+        : lane.x + (lane.w - size) / 2;
       const gutterMid = lane.y + lane.h * 0.5;
       const by = u
         ? top
-          ? Math.min(cy + cardH + 4, gutterMid - bh - 1)
-          : Math.max(cy - bh - 4, gutterMid + 1)
-        : gutterMid - bh * 0.5;
-      this.drawCardQuad(bx + 2, by + 2, bw, bh, tex, {
-        veil: 0,
-        pulse: 0,
-        tint: [0, 0, 0],
-        alpha: 0.35,
-        z: 0.06,
-      });
-      this.drawCardQuad(bx, by, bw, bh, tex, {
-        veil: 0,
-        pulse: pulse * 0.7,
-        tint: [0.95, 0.96, 1.0],
+          ? Math.min(cy + cardH + 2, gutterMid - size * 0.55)
+          : Math.max(cy - size - 2, gutterMid - size * 0.45)
+        : top
+          ? lane.y + lane.h * 0.12
+          : lane.y + lane.h - size - lane.h * 0.12;
+      this.drawToken(site, bx, by, size, {
+        pulse: pulse * 0.75,
         alpha: 1,
         z: 0.05,
         fxColor,
