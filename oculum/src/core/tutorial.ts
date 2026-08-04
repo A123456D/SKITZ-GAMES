@@ -81,43 +81,43 @@ export function tutorialCoach(step: TutorialStep): TutorialCoach | null {
       };
     case "play":
       return {
-        title: `Play · ${tag}`,
-        body: "Spend Essence to play a Figure Veiled into a lane. HIGH / MID / LOW are altitudes.",
+        title: `Three lanes · ${tag}`,
+        body: "Board has three lanes. HIGH: winners deal +1 damage, and Sites here give more Sight. MID: normal. LOW: your Veiled figures get +1 power. Play Cliff Seeker onto MID.",
         action: "Tap MID",
         cta: null,
       };
     case "site":
       return {
         title: `Site · ${tag}`,
-        body: "Sites are landmarks. Veil Banner gives +1 to your Veiled figures here.",
+        body: "Sites are landmarks on a lane (not fighters). Veil Banner: +1 power to your Veiled figure on this lane.",
         action: "Tap MID",
         cta: null,
       };
     case "witness":
       return {
         title: `Witness · ${tag}`,
-        body: "Spend Sight to make Cliff Seeker real. It fires a Revelation and uses Witnessed power.",
+        body: "Spend Sight to Witness your own Veiled card — it becomes real, uses its bigger power, and fires a one-time Revelation.",
         action: "Tap MID",
         cta: null,
       };
     case "graft":
       return {
         title: `Graft · ${tag}`,
-        body: "Relics attach to Figures. Ace of Hollows boosts a Witnessed host.",
+        body: "Relics attach onto a Figure you already control. Ace of Hollows adds power while that Figure is Witnessed.",
         action: "Tap MID",
         cta: null,
       };
     case "gaze":
       return {
         title: `Gaze · ${tag}`,
-        body: "With Ring Gaze, Witness an enemy's Veiled card and steal its Revelation.",
+        body: "Gaze = Witness an enemy's Veiled card (steal their Revelation). You need a Gaze landmark on that lane — Ring Gaze is on HIGH. Same Witness button, their lane.",
         action: "Tap HIGH",
         cta: null,
       };
     case "stance":
       return {
         title: `Stance · ${tag}`,
-        body: "Third Face lets you flip A/B powers once per turn.",
+        body: "Third Face is a sigil on this lane. Stance swaps the figure's two power numbers (Veiled ↔ Witnessed) once per turn — useful if you want the bigger number while still Veiled.",
         action: "Tap MID",
         cta: null,
       };
