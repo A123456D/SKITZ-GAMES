@@ -191,6 +191,61 @@ img {
   align-items: stretch;
 }
 
+.howto-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+  max-height: calc(100dvh - 48px);
+}
+
+.howto-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 2px;
+  text-align: left;
+}
+
+.howto-block {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--plate-radius);
+  background: var(--plate);
+  box-shadow: inset 0 0 0 1px var(--plate-line);
+}
+
+.howto-block h3 {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #e6c98a;
+  text-shadow: 0 1px 3px #000;
+}
+
+.howto-block p {
+  margin: 0 0 6px;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  color: rgba(242, 235, 224, 0.95);
+  text-shadow: 0 1px 2px #000;
+}
+
+.howto-block p:last-child {
+  margin-bottom: 0;
+}
+
+.howto-block strong {
+  color: var(--sigil);
+  font-weight: 700;
+}
+
 .settings-row {
   display: flex;
   align-items: center;
@@ -1096,7 +1151,8 @@ button.ghost:active,
 #pause .sheet-content,
 #end .sheet-content,
 #unsupported .sheet-content,
-#settings .sheet-content {
+#settings .sheet-content,
+#howto .sheet-content {
   background: var(--plate-strong);
   box-shadow: inset 0 0 0 1px var(--plate-line), var(--plate-shadow);
   padding: 22px 18px 18px;

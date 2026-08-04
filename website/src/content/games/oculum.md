@@ -21,4 +21,4 @@ downloads: {}
 
 **OCULUM** is a SKITZ fantasy card battler: things only fully exist when **Witnessed**. Play Veiled into three altitudes, spend Sight to reveal Revelations, graft relics, Gaze enemy secrets, and win by breaking Will or reaching Eclipse.
 
-**Free to play** online (beta). Start with **First Gaze** — short tap-the-lane lessons — then **Enter the Gaze** or build a Constructed 30.
+**Free to play** online (beta). Read **How to Play**, try **First Gaze**, then **Enter the Gaze** or build a Constructed 30.

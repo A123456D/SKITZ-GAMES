@@ -162,6 +162,9 @@
             <button type="button" id="btn-tutorial" class="ghost">
               <span class="btn-label">First Gaze (Tutorial)</span>
             </button>
+            <button type="button" id="btn-howto" class="ghost">
+              <span class="btn-label">How to Play</span>
+            </button>
             <button type="button" id="btn-settings" class="ghost">
               <span class="btn-label">Settings</span>
             </button>
@@ -175,11 +178,75 @@
             <button type="button" id="pause-resume" class="cta">
               <span class="btn-label">Resume</span>
             </button>
+            <button type="button" id="pause-howto" class="ghost">
+              <span class="btn-label">How to Play</span>
+            </button>
             <button type="button" id="pause-settings" class="ghost">
               <span class="btn-label">Settings</span>
             </button>
             <button type="button" id="pause-menu" class="ghost">
               <span class="btn-label">Quit to Menu</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="howto" class="panel sheet" hidden>
+          <div class="sheet-content howto-content">
+            <button type="button" id="howto-back" class="ghost mini panel-back">
+              <span class="btn-label">Back</span>
+            </button>
+            <p class="tag">HOW TO PLAY</p>
+            <div class="howto-scroll">
+              <section class="howto-block">
+                <h3>The idea</h3>
+                <p>Things only fully exist when <strong>Witnessed</strong>. Figures enter <strong>Veiled</strong> (half-real, usually weaker). Spend <strong>Sight</strong> to Witness them — they become real, often hit harder, and fire a one-time <strong>Revelation</strong>.</p>
+              </section>
+              <section class="howto-block">
+                <h3>Resources</h3>
+                <p><strong>Essence</strong> — pay to play cards from hand.</p>
+                <p><strong>Sight</strong> — pay to Witness (yours or, with Gaze, an enemy's).</p>
+                <p><strong>Will</strong> — your life. Hit 0 and you lose by Break.</p>
+              </section>
+              <section class="howto-block">
+                <h3>Three lanes</h3>
+                <p>The board has three altitudes. Each side can hold one Figure (plus Sites/relics) per lane.</p>
+                <p><strong>HIGH</strong> — when you win this lane at Resolve, you deal +1 damage. Sites here also grant more Sight.</p>
+                <p><strong>MID</strong> — the default lane. No special bonus.</p>
+                <p><strong>LOW</strong> — your <em>Veiled</em> figures get +1 power here.</p>
+              </section>
+              <section class="howto-block">
+                <h3>Reading a card</h3>
+                <p><strong>Essence</strong> — cost to play it.</p>
+                <p><strong>Witness cost</strong> — Sight to make it Witnessed (the state of being real).</p>
+                <p><strong>Veiled power</strong> — combat number while half-real.</p>
+                <p><strong>Witnessed power</strong> — combat number once Witnessed. (Witnessed is a state; this number is separate.)</p>
+              </section>
+              <section class="howto-block">
+                <h3>Witness vs Gaze</h3>
+                <p><strong>Witness</strong> — spend Sight on <em>your</em> Veiled card to reveal it.</p>
+                <p><strong>Gaze</strong> — the same Witness action, but on an <em>enemy</em> Veiled card, so you steal their Revelation. You need a Gaze landmark on that lane (for example Ring Gaze).</p>
+              </section>
+              <section class="howto-block">
+                <h3>Sites, Graft, Stance, Rites</h3>
+                <p><strong>Sites</strong> — landmarks on a lane (not fighters). They enter already Witnessed and give ongoing effects.</p>
+                <p><strong>Graft</strong> — attach a Relic onto a Figure you control for extra power or triggers.</p>
+                <p><strong>Stance</strong> — with a Third Face sigil on the lane, once per turn you can swap a figure's Veiled and Witnessed power numbers. Useful if you want the bigger number while still Veiled.</p>
+                <p><strong>Rites</strong> — Blind a lane for the turn (no Sight income there). Starve their Sight to push Eclipse.</p>
+              </section>
+              <section class="howto-block">
+                <h3>How you win</h3>
+                <p><strong>Break</strong> — reduce enemy Will to 0.</p>
+                <p><strong>Eclipse</strong> — if they end a turn at 0 Sight, you gain Eclipse. Reach 5 Eclipse to win.</p>
+                <p><strong>Time</strong> — after 10 rounds, highest Will wins.</p>
+                <p>When both players Pass, lanes <strong>Resolve</strong>: higher power on each lane damages the loser.</p>
+              </section>
+              <section class="howto-block">
+                <h3>Controls</h3>
+                <p>Drag a hand card onto a lane, or select it and tap the lane. Hold a card to inspect. Use Witness / Stance, then tap a glowing lane. New? Try <strong>First Gaze</strong>.</p>
+              </section>
+            </div>
+            <button type="button" id="howto-close" class="ghost">
+              <span class="btn-label">Back</span>
             </button>
           </div>
         </div>

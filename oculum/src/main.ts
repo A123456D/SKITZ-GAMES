@@ -50,6 +50,7 @@ const builderPanel = document.getElementById("deck-builder")!;
 const inspectPanel = document.getElementById("card-inspect")!;
 const pausePanel = document.getElementById("pause")!;
 const settingsPanel = document.getElementById("settings")!;
+const howtoPanel = document.getElementById("howto")!;
 const unsupported = document.getElementById("unsupported")!;
 const toastEl = document.getElementById("toast")!;
 const toastText = document.getElementById("toast-text")!;
@@ -144,6 +145,7 @@ let dprHighFrames = 0;
 let uiPaused = false;
 type SettingsReturn = "menu" | "pause" | "play";
 let settingsReturn: SettingsReturn = "menu";
+let howtoReturn: SettingsReturn = "menu";
 const SETTINGS_KEY = "oculum.settings";
 const unbindCodexFoil = bindFoilStage(codexFoil);
 void unbindCodexFoil;
@@ -193,6 +195,7 @@ function hideAllSheets(): void {
   builderPanel.hidden = true;
   pausePanel.hidden = true;
   settingsPanel.hidden = true;
+  howtoPanel.hidden = true;
   cardInspect.close();
 }
 
@@ -213,6 +216,7 @@ function openPause(): void {
   uiPaused = true;
   cardInspect.close();
   settingsPanel.hidden = true;
+  howtoPanel.hidden = true;
   pausePanel.hidden = false;
   document.body.classList.add("paused");
   syncHud();
@@ -226,6 +230,7 @@ function resumeMatch(): void {
   uiPaused = false;
   pausePanel.hidden = true;
   settingsPanel.hidden = true;
+  howtoPanel.hidden = true;
   document.body.classList.remove("paused");
   setMenuMode(false);
   syncHud();
@@ -235,6 +240,7 @@ function resumeMatch(): void {
 function openSettings(from: SettingsReturn): void {
   settingsReturn = from;
   settingsPanel.hidden = false;
+  howtoPanel.hidden = true;
   menu.hidden = true;
   pausePanel.hidden = true;
   codexPanel.hidden = true;
@@ -251,6 +257,44 @@ function openSettings(from: SettingsReturn): void {
     setMenuMode(false);
   }
   syncHud();
+}
+
+function openHowto(from: SettingsReturn): void {
+  howtoReturn = from;
+  howtoPanel.hidden = false;
+  settingsPanel.hidden = true;
+  menu.hidden = true;
+  pausePanel.hidden = true;
+  codexPanel.hidden = true;
+  builderPanel.hidden = true;
+  endPanel.hidden = true;
+  cardInspect.close();
+  if (from === "menu") {
+    document.body.classList.remove("paused");
+    setMenuMode(true);
+  } else {
+    uiPaused = true;
+    document.body.classList.add("paused");
+    setMenuMode(false);
+  }
+  syncHud();
+}
+
+function closeHowto(): void {
+  howtoPanel.hidden = true;
+  if (howtoReturn === "menu") {
+    menu.hidden = false;
+    document.body.classList.remove("paused");
+    setMenuMode(true);
+    syncHud();
+  } else if (howtoReturn === "pause") {
+    pausePanel.hidden = false;
+    document.body.classList.add("paused");
+    setMenuMode(false);
+    syncHud();
+  } else {
+    resumeMatch();
+  }
 }
 
 function closeSettings(): void {
@@ -429,7 +473,14 @@ function hint(s: MatchState): string {
 }
 
 function syncHud(): void {
-  const inMatch = !!(state && state.phase === "play" && !uiPaused && pausePanel.hidden && settingsPanel.hidden);
+  const inMatch = !!(
+    state &&
+    state.phase === "play" &&
+    !uiPaused &&
+    pausePanel.hidden &&
+    settingsPanel.hidden &&
+    howtoPanel.hidden
+  );
   btnHudMenu.hidden = !(state && state.phase === "play");
   btnHudSettings.hidden = !(state && state.phase === "play");
   const boardTarget = inMatch && (mode === "witness" || mode === "stance");
@@ -923,7 +974,11 @@ document.getElementById("btn-play")!.addEventListener("click", unlockAnd(() => s
 document.getElementById("btn-tutorial")!.addEventListener("click", unlockAnd(() => startMatch(true)));
 document.getElementById("btn-codex")!.addEventListener("click", () => openCodex());
 document.getElementById("btn-builder")!.addEventListener("click", () => openBuilder());
+document.getElementById("btn-howto")!.addEventListener("click", () => openHowto("menu"));
 document.getElementById("btn-settings")!.addEventListener("click", () => openSettings("menu"));
+document.getElementById("howto-back")!.addEventListener("click", () => closeHowto());
+document.getElementById("howto-close")!.addEventListener("click", () => closeHowto());
+document.getElementById("pause-howto")!.addEventListener("click", () => openHowto("pause"));
 document.getElementById("codex-close")!.addEventListener("click", () => closeCodex());
 document.getElementById("codex-back")!.addEventListener("click", () => closeCodex());
 document.getElementById("codex-prev")!.addEventListener("click", () => showCodexCard(codexIndex - 1));
