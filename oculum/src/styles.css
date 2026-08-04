@@ -517,6 +517,36 @@ body.paused #altitudes {
   border-left: 2px solid var(--gold);
   z-index: 9;
   pointer-events: none;
+  transition: border-color 0.15s ease;
+}
+
+#toast.toast-witness {
+  border-left-color: var(--gold);
+}
+
+#toast.toast-gaze {
+  border-left-color: #e89078;
+}
+
+#toast.toast-resolve {
+  border-left-color: #d4886a;
+}
+
+#toast.toast-law {
+  border-left-color: var(--sigil);
+}
+
+#toast.toast-play,
+#toast.toast-graft {
+  border-left-color: #c9a84c;
+}
+
+#toast.toast-stance {
+  border-left-color: #e6c98a;
+}
+
+#toast.toast-rite {
+  border-left-color: #8aa0c8;
 }
 
 #toast[hidden] {
@@ -579,6 +609,103 @@ body.paused #altitudes {
   color: var(--sigil);
   background: rgba(10, 8, 14, 0.28);
   box-shadow: inset 0 0 0 1px rgba(62, 207, 192, 0.35);
+}
+
+.alt-hit.gaze-ready {
+  box-shadow: inset 0 0 0 1px rgba(232, 160, 144, 0.45);
+  background: rgba(40, 16, 14, 0.22);
+}
+
+.alt-hit.gaze-ready.legal {
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 160, 144, 0.55),
+    inset 0 0 18px rgba(232, 160, 144, 0.12);
+}
+
+.alt-hit.fx-flash {
+  animation: lane-fx 0.45s ease-out;
+}
+
+.alt-hit.fx-gaze {
+  box-shadow:
+    inset 0 0 0 2px rgba(232, 140, 120, 0.7),
+    0 0 18px rgba(180, 70, 50, 0.22);
+}
+
+.alt-hit.fx-witness,
+.alt-hit.fx-play {
+  box-shadow:
+    inset 0 0 0 2px rgba(212, 175, 55, 0.55),
+    0 0 16px rgba(212, 175, 55, 0.18);
+}
+
+.alt-hit.fx-stance {
+  box-shadow:
+    inset 0 0 0 2px rgba(220, 200, 140, 0.6),
+    0 0 14px rgba(180, 150, 70, 0.2);
+}
+
+.alt-hit.fx-resolve {
+  animation: lane-resolve 0.5s ease-out;
+}
+
+@keyframes lane-fx {
+  0% {
+    filter: brightness(1.2);
+  }
+  100% {
+    filter: none;
+  }
+}
+
+@keyframes lane-resolve {
+  0% {
+    background: rgba(80, 40, 20, 0.28);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.alt-stance.flip {
+  animation: stance-flip 0.4s ease;
+}
+
+@keyframes stance-flip {
+  0% {
+    transform: scaleY(1);
+  }
+  40% {
+    transform: scaleY(0.15);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.will-fill.will-hit {
+  animation: will-hit 0.4s ease;
+}
+
+@keyframes will-hit {
+  0% {
+    filter: brightness(1.55);
+  }
+  35% {
+    filter: brightness(0.75);
+  }
+  100% {
+    filter: none;
+  }
+}
+
+body.reduce-motion .alt-hit.fx-flash,
+body.reduce-motion .alt-hit.fx-resolve,
+body.reduce-motion .alt-stance.flip,
+body.reduce-motion .will-fill.will-hit {
+  animation: none;
 }
 
 .alt-hit.drop-target {

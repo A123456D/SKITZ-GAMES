@@ -28,16 +28,16 @@ uniform sampler2D u_tex;
 uniform vec3 u_tint;
 uniform float u_pulse;
 uniform float u_alpha;
+uniform vec3 u_fxColor;
 out vec4 outColor;
 void main() {
   vec4 c = texture(u_tex, v_uv);
   // Soft veiled cool-down — no cyan fringe
   c.rgb = mix(c.rgb, c.rgb * vec3(0.90, 0.91, 0.96), v_veil * 0.18);
   c.rgb *= u_tint;
-  // Warm Witness pulse, premultiply-safe (texture is uploaded premultiplied)
-  float pulse = clamp(u_pulse, 0.0, 1.5) * (1.0 - v_veil);
-  vec3 warm = vec3(0.55, 0.38, 0.14);
-  c.rgb += warm * pulse * 0.55 * max(c.a, 0.001);
+  // Event pulse — color driven (Witness warm / Gaze coral / play gold)
+  float pulse = clamp(u_pulse, 0.0, 1.5);
+  c.rgb += u_fxColor * pulse * 0.62 * max(c.a, 0.001);
   c *= u_alpha;
   if (c.a < 0.06) discard;
   outColor = c;
@@ -84,6 +84,13 @@ type CardLocs = {
   uTint: WebGLUniformLocation;
   uPulse: WebGLUniformLocation;
   uAlpha: WebGLUniformLocation;
+  uFxColor: WebGLUniformLocation;
+};
+
+type SlotFx = {
+  amount: number;
+  color: [number, number, number];
+  pop: number;
 };
 
 type BgLocs = {
@@ -160,7 +167,13 @@ export class OculusStage {
   private bgTex: TexEntry | null = null;
   private dprCap = 2;
   private time = 0;
-  private pulse = 0;
+  private reduceMotion = false;
+  private fx: [{ player: SlotFx | null; enemy: SlotFx | null }, { player: SlotFx | null; enemy: SlotFx | null }, { player: SlotFx | null; enemy: SlotFx | null }] = [
+    { player: null, enemy: null },
+    { player: null, enemy: null },
+    { player: null, enemy: null },
+  ];
+  private resolveFlash = 0;
   private lastBw = 0;
   private lastBh = 0;
   layout: StageLayout = { cssW: 1, cssH: 1, laneRects: [] };
@@ -190,6 +203,7 @@ export class OculusStage {
       uTint: gl.getUniformLocation(this.cardProg, "u_tint")!,
       uPulse: gl.getUniformLocation(this.cardProg, "u_pulse")!,
       uAlpha: gl.getUniformLocation(this.cardProg, "u_alpha")!,
+      uFxColor: gl.getUniformLocation(this.cardProg, "u_fxColor")!,
     };
     this.bgLoc = {
       aPos: gl.getAttribLocation(this.bgProg, "a_pos"),
@@ -304,10 +318,52 @@ export class OculusStage {
     this.texCache.clear();
   }
 
+  setReduceMotion(on: boolean): void {
+    this.reduceMotion = on;
+  }
+
+  private bump(
+    alt: Altitude,
+    side: Side,
+    amount: number,
+    color: [number, number, number],
+    pop = 0,
+  ): void {
+    const slot = this.fx[alt];
+    const next: SlotFx = {
+      amount: Math.max(slot[side]?.amount ?? 0, amount),
+      color,
+      pop: Math.max(slot[side]?.pop ?? 0, pop),
+    };
+    slot[side] = next;
+  }
+
   onEvents(events: OculusEvent[]): void {
+    const soft = this.reduceMotion ? 0.55 : 1;
     for (const ev of events) {
-      if (ev.type === "witness") this.pulse = 1.0;
-      if (ev.type === "resolve") this.pulse = Math.max(this.pulse, 0.45);
+      if (ev.type === "witness") {
+        const color: [number, number, number] = ev.enemyTarget
+          ? [0.72, 0.32, 0.28]
+          : [0.55, 0.4, 0.14];
+        this.bump(ev.altitude, ev.enemyTarget ? (ev.side === "player" ? "enemy" : "player") : ev.side, 1.15 * soft, color, 0.08 * soft);
+      } else if (ev.type === "play") {
+        this.bump(ev.altitude, ev.side, 0.85 * soft, [0.5, 0.42, 0.22], 0.12 * soft);
+      } else if (ev.type === "graft") {
+        this.bump(ev.altitude, ev.side, 0.7 * soft, [0.45, 0.55, 0.62], 0.06 * soft);
+      } else if (ev.type === "stance") {
+        this.bump(ev.altitude, ev.side, 0.75 * soft, [0.55, 0.48, 0.28], 0.1 * soft);
+      } else if (ev.type === "rite" && ev.altitude != null) {
+        this.bump(ev.altitude, "player", 0.55 * soft, [0.35, 0.4, 0.55], 0);
+        this.bump(ev.altitude, "enemy", 0.55 * soft, [0.35, 0.4, 0.55], 0);
+      } else if (ev.type === "resolve") {
+        this.resolveFlash = Math.max(this.resolveFlash, 0.9 * soft);
+        for (let a = 0; a < 3; a++) {
+          this.bump(a as Altitude, "player", 0.55 * soft, [0.5, 0.3, 0.16], 0.04 * soft);
+          this.bump(a as Altitude, "enemy", 0.55 * soft, [0.5, 0.3, 0.16], 0.04 * soft);
+        }
+      } else if (ev.type === "law") {
+        this.resolveFlash = Math.max(this.resolveFlash, 0.7 * soft);
+      }
     }
   }
 
@@ -323,7 +379,17 @@ export class OculusStage {
 
   draw(state: MatchState, dt: number): void {
     this.time += dt;
-    this.pulse = Math.max(0, this.pulse - dt * 1.8);
+    const decay = this.reduceMotion ? 3.2 : 2.1;
+    for (const lane of this.fx) {
+      for (const side of ["player", "enemy"] as const) {
+        const fx = lane[side];
+        if (!fx) continue;
+        fx.amount = Math.max(0, fx.amount - dt * decay);
+        fx.pop = Math.max(0, fx.pop - dt * decay * 1.4);
+        if (fx.amount <= 0.02 && fx.pop <= 0.01) lane[side] = null;
+      }
+    }
+    this.resolveFlash = Math.max(0, this.resolveFlash - dt * 2.4);
     const gl = this.gl;
     const { cssW, cssH, laneRects } = this.layout;
     const L = this.cardLoc;
@@ -363,10 +429,18 @@ export class OculusStage {
     cardW: number,
     cardH: number,
     tex: TexEntry,
-    opts: { veil: number; pulse: number; tint: number[]; alpha: number; z: number },
+    opts: {
+      veil: number;
+      pulse: number;
+      tint: number[];
+      alpha: number;
+      z: number;
+      fxColor?: [number, number, number];
+    },
   ): void {
     const gl = this.gl;
     const L = this.cardLoc;
+    const fx = opts.fxColor ?? [0.55, 0.38, 0.14];
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, tex.tex);
     gl.uniform1i(L.uTex, 0);
@@ -376,6 +450,7 @@ export class OculusStage {
     gl.uniform1f(L.uPulse, opts.pulse);
     gl.uniform1f(L.uAlpha, opts.alpha);
     gl.uniform3f(L.uTint, opts.tint[0], opts.tint[1], opts.tint[2]);
+    gl.uniform3f(L.uFxColor, fx[0], fx[1], fx[2]);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
@@ -389,9 +464,18 @@ export class OculusStage {
     const slot = state.altitudes[alt];
     const u = side === "player" ? slot.player : slot.enemy;
     const site = side === "player" ? slot.playerSite : slot.enemySite;
+    const fx = this.fx[alt][side];
+    const pulse = fx?.amount ?? 0;
+    const pop = fx?.pop ?? 0;
+    const fxColor = fx?.color ?? ([0.55, 0.38, 0.14] as [number, number, number]);
     // Compact heroes leave a mid-lane gutter for power chips + site tokens
-    const cardH = Math.min(lane.h * 0.32, lane.w * 1.18);
-    const cardW = cardH * (300 / 450);
+    let cardH = Math.min(lane.h * 0.32, lane.w * 1.18);
+    let cardW = cardH * (300 / 450);
+    if (pop > 0) {
+      const s = 1 + pop * 0.55;
+      cardW *= s;
+      cardH *= s;
+    }
     const cx = lane.x + (lane.w - cardW) / 2;
     const cy = top ? lane.y + lane.h * 0.08 : lane.y + lane.h - cardH - lane.h * 0.08;
 
@@ -406,18 +490,20 @@ export class OculusStage {
         z: top ? 0.22 : 0.12,
       });
       const tint = side === "player" ? [1, 1, 1] : [1, 0.94, 0.93];
+      const resolveBoost = this.resolveFlash * 0.35;
       this.drawCardQuad(cx, cy, cardW, cardH, tex, {
         veil: u.veiled ? 1 : 0,
-        pulse: this.pulse,
+        pulse: Math.min(1.4, pulse + resolveBoost),
         tint,
         alpha: 1,
         z: top ? 0.2 : 0.1,
+        fxColor,
       });
     }
 
     if (site) {
       const tex = this.texFor(site, false);
-      const bw = Math.min(cardW * 0.24, lane.w * 0.26);
+      const bw = Math.min(cardW * 0.24, lane.w * 0.26) * (1 + pop * 0.25);
       const bh = bw * (450 / 300);
       // Dock in mid gutter, lane-right — clear of host face and center power chip
       const bx = lane.x + lane.w - bw - Math.max(2, lane.w * 0.03);
@@ -436,10 +522,11 @@ export class OculusStage {
       });
       this.drawCardQuad(bx, by, bw, bh, tex, {
         veil: 0,
-        pulse: 0,
+        pulse: pulse * 0.7,
         tint: [0.95, 0.96, 1.0],
         alpha: 1,
         z: 0.05,
+        fxColor,
       });
     }
   }

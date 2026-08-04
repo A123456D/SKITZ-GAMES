@@ -173,6 +173,7 @@ function saveSettings(s: AppSettings): void {
 function applySettings(s: AppSettings): void {
   document.body.classList.toggle("reduce-motion", s.reduceMotion);
   settingsMotion.checked = s.reduceMotion;
+  stage.setReduceMotion(s.reduceMotion);
   settingsDifficulty.value = s.aiDifficulty;
   settingsMuteSfx.checked = isMuted();
   settingsMuteMusic.checked = isMusicMuted();
@@ -314,19 +315,59 @@ function closeSettings(): void {
   }
 }
 
-function showToast(msg: string | null): void {
+function showToast(msg: string | null, kind: string | null = null): void {
   if (!msg) {
     toastEl.hidden = true;
     toastText.textContent = "";
+    toastEl.classList.remove(
+      "toast-witness",
+      "toast-gaze",
+      "toast-resolve",
+      "toast-law",
+      "toast-play",
+      "toast-stance",
+      "toast-graft",
+      "toast-rite",
+    );
     return;
   }
   toastEl.hidden = false;
   toastText.textContent = msg;
+  toastEl.classList.remove(
+    "toast-witness",
+    "toast-gaze",
+    "toast-resolve",
+    "toast-law",
+    "toast-play",
+    "toast-stance",
+    "toast-graft",
+    "toast-rite",
+  );
+  if (kind) toastEl.classList.add(`toast-${kind}`);
 }
 
-function flashToast(msg: string, ms = 1600): void {
-  showToast(msg);
+function flashToast(msg: string, ms = 1600, kind: string | null = null): void {
+  showToast(msg, kind);
   flashTimer = ms;
+}
+
+function punchWill(side: "you" | "foe"): void {
+  const el = side === "you" ? willYou : willFoe;
+  el.classList.remove("will-hit");
+  void el.offsetWidth;
+  el.classList.add("will-hit");
+  window.setTimeout(() => el.classList.remove("will-hit"), 420);
+}
+
+function punchAltitude(alt: Altitude, kind: string): void {
+  const hit = altHits.find((h) => Number(h.dataset.alt) === alt);
+  if (!hit) return;
+  hit.classList.remove("fx-flash", "fx-gaze", "fx-play", "fx-stance", "fx-resolve");
+  void hit.offsetWidth;
+  hit.classList.add("fx-flash", `fx-${kind}`);
+  window.setTimeout(() => {
+    hit.classList.remove("fx-flash", `fx-${kind}`);
+  }, 480);
 }
 
 function buildCodexThumbs(): void {
@@ -736,22 +777,53 @@ function syncHud(): void {
 
 function narrateEvents(events: ReturnType<typeof applyIntent>): void {
   for (const ev of events) {
-    if (ev.type === "witness") {
+    if (ev.type === "play") {
+      const def = getCard(ev.cardId);
+      punchAltitude(ev.altitude, "play");
+      flashToast(`Played ${def.name}`, 900, "play");
+    } else if (ev.type === "witness") {
       const def = getCard(ev.cardId);
       playSfx(ev.enemyTarget ? "gaze" : "witness");
-      flashToast(ev.enemyTarget ? `Gaze — Witnessed their ${def.name}!` : `Witnessed — ${def.name}!`, 1400);
-      // Witness pulse is GPU-only — CSS filter on #stage causes tear/flash bands
+      punchAltitude(ev.altitude, ev.enemyTarget ? "gaze" : "witness");
+      flashToast(
+        ev.enemyTarget ? `Gaze — stole ${def.name}'s Revelation!` : `Witnessed — ${def.name}!`,
+        1400,
+        ev.enemyTarget ? "gaze" : "witness",
+      );
+    } else if (ev.type === "graft") {
+      const def = getCard(ev.relicId);
+      punchAltitude(ev.altitude, "play");
+      flashToast(`Grafted ${def.name}`, 1000, "graft");
+    } else if (ev.type === "rite") {
+      const def = getCard(ev.cardId);
+      if (ev.altitude != null) punchAltitude(ev.altitude, "resolve");
+      flashToast(`Rite — ${def.name}`, 1100, "rite");
     } else if (ev.type === "stance") {
       playSfx("stance");
-      flashToast(ev.stanceB ? "Stance B — powers swapped" : "Stance A — printed powers", 1200);
+      punchAltitude(ev.altitude, "stance");
+      const stanceEl = altHits
+        .find((h) => Number(h.dataset.alt) === ev.altitude)
+        ?.querySelector(".alt-stance");
+      if (stanceEl) {
+        stanceEl.classList.remove("flip");
+        void (stanceEl as HTMLElement).offsetWidth;
+        stanceEl.classList.add("flip");
+      }
+      flashToast(ev.stanceB ? "Stance B — powers swapped" : "Stance A — printed powers", 1200, "stance");
     } else if (ev.type === "law") {
       playSfx("law");
-      flashToast(`Unblinking Law — +${ev.eclipseGain} Eclipse`, 1800);
+      flashToast(`Unblinking Law — +${ev.eclipseGain} Eclipse`, 1800, "law");
     } else if (ev.type === "resolve") {
       const { player, enemy } = ev.damages;
       playSfx("resolve");
-      if (player || enemy) flashToast(`Resolve — you ${enemy} · foe ${player}`, 1800);
-      else flashToast("Resolve — no damage", 1200);
+      for (const hit of altHits) hit.classList.add("fx-resolve");
+      window.setTimeout(() => {
+        for (const hit of altHits) hit.classList.remove("fx-resolve");
+      }, 520);
+      if (player > 0) punchWill("you");
+      if (enemy > 0) punchWill("foe");
+      if (player || enemy) flashToast(`Resolve — you ${enemy} · foe ${player}`, 1800, "resolve");
+      else flashToast("Resolve — no damage", 1200, "resolve");
     } else if (ev.type === "turn" && ev.side === "enemy") {
       playSfx("enemy");
       flashToast("Enemy turn", 900);
