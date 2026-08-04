@@ -72,12 +72,15 @@ export function initCardInspect(root: HTMLElement): CardInspectApi {
   };
 }
 
-const LONG_MS = 420;
-const MOVE_CANCEL_PX = 12;
+const LONG_MS = 380;
+/** Cancel hold only on a clear drag — must stay ≥ hand DRAG_THRESHOLD */
+const MOVE_CANCEL_PX = 28;
 
 export type LiftInspectOpts = {
   /** Short tap opens inspect (then onTap). Default: hold to inspect. */
   inspectOnTap?: boolean;
+  /** Fired when inspect opens (hold or tap). */
+  onInspectOpen?: () => void;
 };
 
 export function bindLiftInspect(
@@ -106,6 +109,7 @@ export function bindLiftInspect(
     const id = getId();
     if (!id) return;
     el.classList.add("lift-armed");
+    opts?.onInspectOpen?.();
     inspect.open(id);
     window.setTimeout(() => el.classList.remove("lift-armed"), 200);
   };
@@ -137,7 +141,7 @@ export function bindLiftInspect(
     } catch {
       /* ignore */
     }
-    // Always allow hold-to-inspect (even when short-tap also inspects).
+    // Hold-to-inspect — forgiving so finger jitter doesn't cancel
     timer = window.setTimeout(() => {
       timer = null;
       if (!tracking || movedFar) return;

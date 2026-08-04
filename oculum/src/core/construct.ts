@@ -131,29 +131,109 @@ function shuffleInPlace<T>(arr: T[], rng: () => number): void {
 
 type TypeQuota = { type: CardDef["type"]; target: number };
 
+/** Synergy clusters — pick 1–2 then fill quotas so Auto decks play real packages. */
+const SYNERGY_CLUSTERS: { school: CardDef["school"]; cards: string[] }[] = [
+  {
+    school: "cube",
+    cards: [
+      "cliff_seeker",
+      "veil_banner",
+      "ochre_dancer",
+      "stake_cache",
+      "mesa_bell",
+      "saltglass_courier",
+      "stake_field_pilgrim",
+      "ace_of_hollows",
+    ],
+  },
+  {
+    school: "ring",
+    cards: [
+      "ring_gaze",
+      "parasol_path",
+      "perforated_abbess",
+      "coral_crown",
+      "bell_debt_walker",
+      "bell_siren",
+      "ace_of_hollows",
+      "bone_wick_charm",
+    ],
+  },
+  {
+    school: "deal",
+    cards: [
+      "dust_ledger",
+      "stake_field_pilgrim",
+      "ledger_jackal",
+      "debt_coin",
+      "dusk_tithe",
+      "hatline_trickster",
+      "ochre_vanguard",
+      "ace_of_hollows",
+    ],
+  },
+  {
+    school: "graft",
+    cards: [
+      "suture_mill",
+      "key_shrine",
+      "ace_of_hollows",
+      "splice_token",
+      "canister_hound",
+      "keywright_scarecrow",
+      "sail_widow",
+      "coral_crown",
+    ],
+  },
+  {
+    school: "many",
+    cards: [
+      "third_face",
+      "twinspoke_banner",
+      "mask_gallery",
+      "echo_mask",
+      "horn_cantor",
+      "face_charm",
+      "ace_of_hollows",
+      "cliff_seeker",
+    ],
+  },
+  {
+    school: "coral",
+    cards: [
+      "branch_rune_reliquary",
+      "ribbon_bride",
+      "coral_crown",
+      "pillar_cantor",
+      "ace_of_hollows",
+      "ring_gaze",
+      "cliff_seeker",
+      "veil_banner",
+    ],
+  },
+  {
+    school: "hollow",
+    cards: [
+      "pale_arch",
+      "pale_silence",
+      "hole_choir",
+      "inkdrip_acolyte",
+      "perforated_abbess",
+      "ace_of_hollows",
+      "ring_gaze",
+      "cliff_seeker",
+    ],
+  },
+];
+
 /**
  * Build a legal Constructed 30 — curve + type mix, optional school bias, no premiums.
- * Prefer Gaze / combo staples when they fit.
+ * Seeds 1–2 synergy clusters so the list has real combo packages.
  */
 export function buildAutoDeck(opts?: { seed?: number; school?: CardDef["school"] | "all" }): string[] {
   const rng = mulberry32(opts?.seed ?? Date.now());
   const school = opts?.school && opts.school !== "all" ? opts.school : null;
   const deck: string[] = [];
-
-  const prefer = [
-    "cliff_seeker",
-    "veil_banner",
-    "ace_of_hollows",
-    "ring_gaze",
-    "coral_crown",
-    "third_face",
-    "unblinking_law",
-    "pale_silence",
-    "hatline_trickster",
-    "inkdrip_acolyte",
-    "root_chassis",
-    "bone_wick_charm",
-  ];
 
   const tryAdd = (id: string): boolean => {
     if (deck.length >= CONSTRUCTED_DECK_SIZE) return false;
@@ -164,10 +244,30 @@ export function buildAutoDeck(opts?: { seed?: number; school?: CardDef["school"]
     return true;
   };
 
-  // Seed staples (1–2 copies where legal)
-  for (const id of prefer) {
+  // Pick clusters (school-biased when requested)
+  let clusters = [...SYNERGY_CLUSTERS];
+  if (school) {
+    const matched = clusters.filter((c) => c.school === school);
+    const rest = clusters.filter((c) => c.school !== school);
+    shuffleInPlace(rest, rng);
+    clusters = matched.length ? [...matched, ...rest] : rest;
+  } else {
+    shuffleInPlace(clusters, rng);
+  }
+
+  const seedClusters = clusters.slice(0, school ? 2 : 2);
+  for (const cluster of seedClusters) {
+    for (const id of cluster.cards) {
+      tryAdd(id);
+      if (rng() > 0.5) tryAdd(id);
+    }
+  }
+
+  // Light staple glue
+  const glue = ["cliff_seeker", "ace_of_hollows", "unblinking_law", "pale_silence", "coral_crown"];
+  for (const id of glue) {
     tryAdd(id);
-    if (rng() > 0.45) tryAdd(id);
+    if (rng() > 0.55) tryAdd(id);
   }
 
   const quotas: TypeQuota[] = [
@@ -195,7 +295,6 @@ export function buildAutoDeck(opts?: { seed?: number; school?: CardDef["school"]
         return canAddToDeck(deck, id);
       });
       if (candidates.length === 0) break;
-      // Prefer lower essence early for curve
       candidates.sort((a, b) => {
         const da = tryGet(a)!;
         const db = tryGet(b)!;
@@ -206,7 +305,6 @@ export function buildAutoDeck(opts?: { seed?: number; school?: CardDef["school"]
     }
   }
 
-  // Fill remainder from full pool (school-biased then any)
   const fillPass = (strictSchool: boolean) => {
     const ids = [...pool];
     shuffleInPlace(ids, rng);
@@ -221,8 +319,7 @@ export function buildAutoDeck(opts?: { seed?: number; school?: CardDef["school"]
   fillPass(true);
   fillPass(false);
 
-  // Safety: if still short (unlikely), pad with cliff seekers / teach figures
-  const pads = ["cliff_seeker", "hatline_trickster", "root_chassis", "inkdrip_acolyte", "veil_banner"];
+  const pads = ["cliff_seeker", "hatline_trickster", "inkdrip_acolyte", "veil_banner", "ace_of_hollows"];
   let guard = 0;
   while (deck.length < CONSTRUCTED_DECK_SIZE && guard++ < 80) {
     const id = pads[guard % pads.length];

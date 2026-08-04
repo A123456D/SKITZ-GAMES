@@ -21,8 +21,8 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-B2BVMDab.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BTWeGStx.css">
+    <script type="module" crossorigin src="./assets/index-C9axwCp4.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CUZdF1-H.css">
   </head>
   <body class="on-menu">
     <div id="app">
@@ -145,30 +145,37 @@
           </button>
         </div>
 
-        <div id="menu" class="panel sheet">
-          <div class="sheet-content">
-            <img class="menu-seal" src="./assets/ui/seal-eye.png" alt="" draggable="false" />
-            <h1 class="menu-wordmark">OCULUM <span class="wordmark-beta">beta</span></h1>
-            <p class="tag">VEIL · WITNESS · ASCEND</p>
-            <p class="blurb">Things only fully exist when seen.</p>
-            <button type="button" id="btn-play" class="cta">
-              <span class="btn-label">Enter the Gaze</span>
-            </button>
-            <button type="button" id="btn-builder" class="ghost">
-              <span class="btn-label">Build Deck</span>
-            </button>
-            <button type="button" id="btn-codex" class="ghost">
-              <span class="btn-label">Card Codex</span>
-            </button>
-            <button type="button" id="btn-tutorial" class="ghost">
-              <span class="btn-label">First Gaze (Tutorial)</span>
-            </button>
-            <button type="button" id="btn-howto" class="ghost">
-              <span class="btn-label">How to Play</span>
-            </button>
-            <button type="button" id="btn-settings" class="ghost">
-              <span class="btn-label">Settings</span>
-            </button>
+        <div id="menu" class="panel sheet menu-home">
+          <div class="menu-veil" aria-hidden="true"></div>
+          <div class="sheet-content menu-home-content">
+            <header class="menu-hero">
+              <img class="menu-seal" src="./assets/ui/seal-eye.png" alt="" draggable="false" />
+              <h1 class="menu-wordmark">OCULUM <span class="wordmark-beta">beta</span></h1>
+              <p class="menu-tag">VEIL · WITNESS · ASCEND</p>
+              <p class="menu-blurb">Things only fully exist when seen.</p>
+            </header>
+            <nav class="menu-actions" aria-label="Main">
+              <button type="button" id="btn-play" class="cta menu-cta">
+                <span class="btn-label"><span class="btn-kicker">Play</span>Enter the Gaze</span>
+              </button>
+              <button type="button" id="btn-tutorial" class="ghost menu-secondary-cta">
+                <span class="btn-label">First Gaze · Tutorial</span>
+              </button>
+              <div class="menu-links">
+                <button type="button" id="btn-builder" class="menu-link">
+                  <span class="btn-label">Build Deck</span>
+                </button>
+                <button type="button" id="btn-codex" class="menu-link">
+                  <span class="btn-label">Card Codex</span>
+                </button>
+                <button type="button" id="btn-howto" class="menu-link">
+                  <span class="btn-label">How to Play</span>
+                </button>
+                <button type="button" id="btn-settings" class="menu-link">
+                  <span class="btn-label">Settings</span>
+                </button>
+              </div>
+            </nav>
           </div>
         </div>
 

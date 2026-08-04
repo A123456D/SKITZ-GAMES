@@ -31,10 +31,11 @@ import {
   setMusicMuted,
   setMuted,
   unlockAudio,
+  armUnlockOnGesture,
 } from "./view/audio";
 import { OculusStage } from "./view/gl/stage";
 import { FpsSampler } from "./view/perf";
-import { bindFoilStage, mountFoilCard } from "./view/foilCard";
+import { bindFoilStage } from "./view/foilCard";
 import { CARD_SKINS_ENABLED } from "./view/skins";
 import { hasArtLayers, setStackArtLayers } from "./view/cardLayers";
 import { cardMetaHtml } from "./view/cardMeta";
@@ -130,7 +131,7 @@ type DragState = {
   dropping?: boolean;
 };
 let drag: DragState | null = null;
-const DRAG_THRESHOLD = 12;
+const DRAG_THRESHOLD = 28;
 let last = performance.now();
 const fps = new FpsSampler();
 let flashTimer = 0;
@@ -183,6 +184,7 @@ applySettings(loadSettings());
 
 function setMenuMode(on: boolean): void {
   document.body.classList.toggle("on-menu", on);
+  stage.setMenuBackground(on);
 }
 
 function setEnemyTurn(on: boolean): void {
@@ -607,8 +609,7 @@ function syncHud(): void {
   }
 
   if (flashTimer <= 0) {
-    if (state.tutorial && state.tutorialStep !== "done") showToast(null);
-    else showToast(hint(state));
+    showToast(hint(state));
   }
   syncCoach(state);
 
@@ -647,11 +648,24 @@ function syncHud(): void {
   btnPass.disabled = state.active !== "player" || !canPass;
   btnWitness.classList.toggle("selected", mode === "witness");
   btnStance.classList.toggle("selected", mode === "stance");
-  const teachWitness =
-    state.tutorial &&
-    (state.tutorialStep === "witness" || state.tutorialStep === "gaze" || state.tutorialStep === "law");
-  const teachStance = state.tutorial && state.tutorialStep === "stance";
-  const teachPass = false;
+  const teachWitness = state.tutorial && state.tutorialStep === "witness";
+  const teachStance = false;
+  const teachPass =
+    state.tutorial && (state.tutorialStep === "pass1" || state.tutorialStep === "pass2");
+  // First Gaze: only show the action button the lesson needs
+  if (state.tutorial && state.tutorialStep !== "done") {
+    const step = state.tutorialStep;
+    const laneOnly = step === "play" || step === "site" || step === "graft";
+    btnWitness.style.visibility = step === "witness" ? "visible" : "hidden";
+    btnStance.style.visibility = "hidden";
+    btnPass.style.visibility = teachPass ? "visible" : "hidden";
+    actionsEl.style.visibility = laneOnly ? "hidden" : "";
+  } else {
+    btnWitness.style.visibility = "";
+    btnStance.style.visibility = "";
+    btnPass.style.visibility = "";
+    actionsEl.style.visibility = "";
+  }
   btnWitness.classList.toggle(
     "pulse",
     canWitness &&
@@ -725,16 +739,18 @@ function syncHud(): void {
     img.className = "face";
     img.alt = def.name;
     img.draggable = false;
-    img.width = 78;
-    img.height = 117;
+    img.width = 108;
+    img.height = 162;
     img.src = handCardSrc(id);
     btn.appendChild(img);
-    mountFoilCard(img, { premium: !!def.premium });
-    btn.title = `${def.name} · ${def.essence}E · drag to play · hold to inspect`;
+    // Hand stays flat + opaque (foil tilt reserved for inspect / codex)
+    btn.title = `${def.name} · ${def.essence}E · hold to inspect · drag to play`;
+    const wasSelected = selectedHand === index;
     if (canSelect) {
       btn.addEventListener("pointerdown", (ev) => {
         if (ev.button != null && ev.button !== 0) return;
         if (uiPaused || drag?.dropping) return;
+        if (cardInspect.isOpen()) cardInspect.close();
         selectedHand = index;
         mode = "play";
         drag = {
@@ -751,7 +767,7 @@ function syncHud(): void {
           el.classList.toggle("selected", el === btn);
         }
         if (flashTimer <= 0 && !state?.tutorial) {
-          showToast("Drag onto HIGH / MID / LOW — or hold to inspect.");
+          showToast("Hold to inspect · drag onto a lane to play.");
         }
       });
     }
@@ -761,46 +777,53 @@ function syncHud(): void {
       cardInspect,
       () => {
         if (drag?.active || drag?.dropping) return;
+        // Tutorial: short tap never opens inspect — hold only
+        if (!(state?.tutorial) && canSelect && wasSelected) {
+          cardInspect.open(id);
+          return;
+        }
         playSfx("select");
         if (!canSelect) return;
         selectedHand = index;
         mode = "play";
         window.requestAnimationFrame(() => syncHud());
       },
-      // Free play: short tap also inspects when the card isn't being played.
-      // Hold always inspects (see cardInspect). Tutorial: hold only — tap selects.
-      { inspectOnTap: !(state?.tutorial) && !canSelect },
+      {
+        // Hold-to-inspect always. Short tap inspect only outside tutorial, unplayable cards.
+        inspectOnTap: !(state?.tutorial) && !canSelect,
+        onInspectOpen: () => {
+          // Hold won over drag — disarm pending drag so release is clean
+          if (drag && !drag.active && drag.handIndex === index) drag = null;
+        },
+      },
     );
     handEl.appendChild(btn);
   });
 }
 
 function narrateEvents(events: ReturnType<typeof applyIntent>): void {
-  const inTutorial = !!(state?.tutorial && state.tutorialStep !== "done");
   for (const ev of events) {
     if (ev.type === "play") {
       const def = getCard(ev.cardId);
       punchAltitude(ev.altitude, "play");
-      if (!inTutorial) flashToast(`Played ${def.name}`, 900, "play");
+      flashToast(`Played ${def.name}`, 900, "play");
     } else if (ev.type === "witness") {
       const def = getCard(ev.cardId);
       playSfx(ev.enemyTarget ? "gaze" : "witness");
       punchAltitude(ev.altitude, ev.enemyTarget ? "gaze" : "witness");
-      if (!inTutorial) {
-        flashToast(
-          ev.enemyTarget ? `Gaze — stole ${def.name}'s Revelation!` : `Witnessed — ${def.name}!`,
-          1400,
-          ev.enemyTarget ? "gaze" : "witness",
-        );
-      }
+      flashToast(
+        ev.enemyTarget ? `Gaze — stole ${def.name}'s Revelation!` : `Witnessed — ${def.name}!`,
+        1400,
+        ev.enemyTarget ? "gaze" : "witness",
+      );
     } else if (ev.type === "graft") {
       const def = getCard(ev.relicId);
       punchAltitude(ev.altitude, "play");
-      if (!inTutorial) flashToast(`Grafted ${def.name}`, 1000, "graft");
+      flashToast(`Grafted ${def.name}`, 1000, "graft");
     } else if (ev.type === "rite") {
       const def = getCard(ev.cardId);
       if (ev.altitude != null) punchAltitude(ev.altitude, "resolve");
-      if (!inTutorial) flashToast(`Rite — ${def.name}`, 1100, "rite");
+      flashToast(`Rite — ${def.name}`, 1100, "rite");
     } else if (ev.type === "stance") {
       playSfx("stance");
       punchAltitude(ev.altitude, "stance");
@@ -812,12 +835,10 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         void (stanceEl as HTMLElement).offsetWidth;
         stanceEl.classList.add("flip");
       }
-      if (!inTutorial) {
-        flashToast(ev.stanceB ? "Stance B — powers swapped" : "Stance A — printed powers", 1200, "stance");
-      }
+      flashToast(ev.stanceB ? "Stance B — powers swapped" : "Stance A — printed powers", 1200, "stance");
     } else if (ev.type === "law") {
       playSfx("law");
-      if (!inTutorial) flashToast(`Unblinking Law — +${ev.eclipseGain} Eclipse`, 1800, "law");
+      flashToast(`Unblinking Law — +${ev.eclipseGain} Eclipse`, 1800, "law");
     } else if (ev.type === "resolve") {
       const { player, enemy } = ev.damages;
       playSfx("resolve");
@@ -827,15 +848,13 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       }, 520);
       if (player > 0) punchWill("you");
       if (enemy > 0) punchWill("foe");
-      if (!inTutorial) {
-        if (player || enemy) flashToast(`Resolve — you ${enemy} · foe ${player}`, 1800, "resolve");
-        else flashToast("Resolve — no damage", 1200, "resolve");
-      }
+      if (player || enemy) flashToast(`Resolve — you ${enemy} · foe ${player}`, 1800, "resolve");
+      else flashToast("Resolve — no damage", 1200, "resolve");
     } else if (ev.type === "turn" && ev.side === "enemy") {
       playSfx("enemy");
-      if (!inTutorial) flashToast("Enemy turn", 900);
+      flashToast("Enemy turn", 900);
     } else if (ev.type === "turn" && ev.side === "player" && ev.turn > 1) {
-      if (!inTutorial) flashToast(`Your turn ${ev.turn}`, 900);
+      flashToast(`Your turn ${ev.turn}`, 900);
     }
   }
 }
@@ -850,7 +869,7 @@ function afterPlayer(events: ReturnType<typeof applyIntent>): void {
     selectedHand = tutorialSelectHandIndex(state);
   }
   syncHud();
-  if (state?.tutorial && state.tutorialStep === "done") {
+  if (state?.tutorial && state.tutorialStep === "done" && state.winner == null) {
     flashToast("First Gaze complete — free play", 1600);
   } else if (state?.tutorial && state.tutorialStep === "play") {
     cardInspect.close();
@@ -1053,10 +1072,10 @@ const unlockAnd = (fn: () => void) => () => {
 };
 document.getElementById("btn-play")!.addEventListener("click", unlockAnd(() => startMatch(false)));
 document.getElementById("btn-tutorial")!.addEventListener("click", unlockAnd(() => startMatch(true)));
-document.getElementById("btn-codex")!.addEventListener("click", () => openCodex());
-document.getElementById("btn-builder")!.addEventListener("click", () => openBuilder());
-document.getElementById("btn-howto")!.addEventListener("click", () => openHowto("menu"));
-document.getElementById("btn-settings")!.addEventListener("click", () => openSettings("menu"));
+document.getElementById("btn-codex")!.addEventListener("click", unlockAnd(() => openCodex()));
+document.getElementById("btn-builder")!.addEventListener("click", unlockAnd(() => openBuilder()));
+document.getElementById("btn-howto")!.addEventListener("click", unlockAnd(() => openHowto("menu")));
+document.getElementById("btn-settings")!.addEventListener("click", unlockAnd(() => openSettings("menu")));
 document.getElementById("howto-back")!.addEventListener("click", () => closeHowto());
 document.getElementById("howto-close")!.addEventListener("click", () => closeHowto());
 document.getElementById("pause-howto")!.addEventListener("click", () => openHowto("pause"));
@@ -1211,6 +1230,11 @@ window.addEventListener("pointermove", (ev) => {
   const dx = ev.clientX - drag.startX;
   const dy = ev.clientY - drag.startY;
   if (!drag.active && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+    // Hold-to-inspect won — don't steal the gesture into a drag
+    if (cardInspect.isOpen()) {
+      drag = null;
+      return;
+    }
     beginDragVisual(drag);
   }
   if (drag.active) {
@@ -1334,6 +1358,8 @@ function frame(now: number): void {
 }
 
 setMenuMode(true);
+setMusicBed("menu");
+armUnlockOnGesture();
 syncHud();
 void preloadCardChrome().then(() => {
   clearCardFaceCache();

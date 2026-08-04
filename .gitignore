@@ -27,6 +27,10 @@ node_modules/
 web/dist/
 riot-cube/dist/
 nexus-chess/dist/
+oculum/dist/
+paper-craft/dist/
+breach-riot/dist/
+chain-reactor/dist/
 website/node_modules/
 website/dist/
 website/.astro/

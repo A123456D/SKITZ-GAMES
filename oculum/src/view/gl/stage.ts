@@ -58,15 +58,16 @@ precision mediump float;
 in vec2 v_uv;
 uniform sampler2D u_tex;
 uniform float u_time;
+uniform float u_menu;
 out vec4 outColor;
 void main() {
   vec2 uv = v_uv + vec2(sin(u_time * 0.12) * 0.003, cos(u_time * 0.09) * 0.002);
   vec4 c = texture(u_tex, clamp(uv, 0.0, 1.0));
   float vig = smoothstep(1.2, 0.35, length(v_uv - 0.5));
   c.rgb *= mix(0.68, 1.0, vig);
-  // Soft mid-board focus so cards read against the canyon
+  // Soft mid-board focus so cards read against the canyon (off on title screen)
   float band = smoothstep(0.18, 0.32, v_uv.y) * (1.0 - smoothstep(0.62, 0.78, v_uv.y));
-  c.rgb *= mix(1.0, 0.88, band * 0.55);
+  c.rgb *= mix(1.0, 0.88, band * 0.55 * (1.0 - u_menu));
   outColor = vec4(c.rgb, 1.0);
 }
 `;
@@ -97,6 +98,7 @@ type BgLocs = {
   aPos: number;
   uTex: WebGLUniformLocation;
   uTime: WebGLUniformLocation;
+  uMenu: WebGLUniformLocation;
 };
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLShader {
@@ -165,6 +167,9 @@ export class OculusStage {
   private bgQuad: WebGLBuffer;
   private texCache = new Map<string, TexEntry>();
   private bgTex: TexEntry | null = null;
+  private bgTexMatch: TexEntry | null = null;
+  private bgTexMenu: TexEntry | null = null;
+  private menuBg = true;
   private dprCap = 2;
   private time = 0;
   private reduceMotion = false;
@@ -209,6 +214,7 @@ export class OculusStage {
       aPos: gl.getAttribLocation(this.bgProg, "a_pos"),
       uTex: gl.getUniformLocation(this.bgProg, "u_tex")!,
       uTime: gl.getUniformLocation(this.bgProg, "u_time")!,
+      uMenu: gl.getUniformLocation(this.bgProg, "u_menu")!,
     };
     this.quad = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
@@ -228,11 +234,22 @@ export class OculusStage {
 
   private async loadBackground(): Promise<void> {
     try {
-      const img = await loadImage("./assets/ui/bg-canyon.jpg");
-      this.bgTex = uploadImage(this.gl, img, img.naturalWidth, img.naturalHeight);
+      const [matchImg, menuImg] = await Promise.all([
+        loadImage("./assets/ui/bg-canyon.jpg"),
+        loadImage("./assets/ui/bg-menu.jpg"),
+      ]);
+      this.bgTexMatch = uploadImage(this.gl, matchImg, matchImg.naturalWidth, matchImg.naturalHeight);
+      this.bgTexMenu = uploadImage(this.gl, menuImg, menuImg.naturalWidth, menuImg.naturalHeight);
+      this.bgTex = this.menuBg ? this.bgTexMenu : this.bgTexMatch;
     } catch (e) {
       console.warn(e);
     }
+  }
+
+  /** Title screen uses a distinct world plate from the match canyon. */
+  setMenuBackground(on: boolean): void {
+    this.menuBg = on;
+    this.bgTex = on ? this.bgTexMenu ?? this.bgTexMatch : this.bgTexMatch ?? this.bgTexMenu;
   }
 
   setDprCap(cap: number): void {
@@ -435,6 +452,7 @@ export class OculusStage {
     gl.enableVertexAttribArray(B.aPos);
     gl.vertexAttribPointer(B.aPos, 2, gl.FLOAT, false, 0, 0);
     gl.uniform1f(B.uTime, this.time);
+    gl.uniform1f(B.uMenu, this.menuBg ? 1 : 0);
     if (this.bgTex) {
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.bgTex.tex);

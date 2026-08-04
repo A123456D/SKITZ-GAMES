@@ -1548,39 +1548,47 @@ export function getCard(id: string): CardDef {
   return c;
 }
 
-/** Curated Teach deck (default Play / First Gaze) — 30 cards, no premiums. */
+/**
+ * Curated Teach deck (default Play / First Gaze) — 30 cards, no premiums.
+ * Built as real packages: Cube veil, Graft-before-Witness, Stance, Deal Eclipse, Gaze, Coral Site.
+ */
 export function teachDeck(): string[] {
   return [
+    // Cube veil / Break
     "cliff_seeker",
     "cliff_seeker",
     "veil_banner",
+    "ochre_dancer",
     "stake_field_pilgrim",
-    "ace_of_hollows",
-    "hatline_trickster",
-    "third_face",
-    "echo_mask",
-    "root_chassis",
-    "keywright_scarecrow",
-    "hole_choir",
-    "pale_silence",
-    "coral_crown",
-    "branch_rune_reliquary",
-    "ash_lantern",
-    "bone_wick_charm",
-    "parasol_path",
-    "perforated_abbess",
-    "ring_gaze",
-    "bell_debt_walker",
-    "mire_debtor",
-    "ledger_jackal",
-    "inkdrip_acolyte",
-    "canister_hound",
-    "ribbon_bride",
-    "saltglass_courier",
-    "unblinking_law",
     "stake_cache",
     "mesa_bell",
+    "saltglass_courier",
+    // Graft engine
+    "ace_of_hollows",
+    "bone_wick_charm",
+    "coral_crown",
+    "suture_mill",
+    "keywright_scarecrow",
+    "canister_hound",
+    "root_chassis",
+    // Stance (Many)
+    "third_face",
+    "echo_mask",
+    "twinspoke_banner",
     "horn_cantor",
+    // Deal Eclipse
+    "hatline_trickster",
+    "dust_ledger",
+    "debt_coin",
+    "ledger_jackal",
+    // Gaze / Coral / Hollow / Law
+    "ring_gaze",
+    "perforated_abbess",
+    "bell_debt_walker",
+    "branch_rune_reliquary",
+    "ribbon_bride",
+    "pale_silence",
+    "unblinking_law",
   ];
 }
 

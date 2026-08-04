@@ -129,17 +129,36 @@ export function loadSfx(): Promise<void> {
 }
 
 export async function unlockAudio(): Promise<void> {
+  unlocked = true;
   const audio = ensureCtx();
+  // Start HTML music while still inside the user-gesture turn (before any await).
+  syncMusic();
+  void loadSfx();
   if (audio.state === "suspended") {
     try {
       await audio.resume();
     } catch {
       /* ignore */
     }
+    syncMusic();
   }
-  unlocked = true;
-  void loadSfx();
-  syncMusic();
+}
+
+/** Browsers block Audio until a gesture — arm once, then start the desired bed. */
+export function armUnlockOnGesture(): void {
+  if (unlocked) {
+    syncMusic();
+    return;
+  }
+  const once = (): void => {
+    window.removeEventListener("pointerdown", once, true);
+    window.removeEventListener("touchstart", once, true);
+    window.removeEventListener("keydown", once, true);
+    void unlockAudio();
+  };
+  window.addEventListener("pointerdown", once, { capture: true });
+  window.addEventListener("touchstart", once, { capture: true, passive: true });
+  window.addEventListener("keydown", once, { capture: true });
 }
 
 export function isMuted(): boolean {
@@ -222,11 +241,9 @@ function playBed(bed: MusicBed): void {
     musicEl.src = `./sfx/${MUSIC_FILES[bed]}?v=${SFX_VERSION}`;
     currentBed = bed;
   }
-  if (musicEl.paused) {
-    void musicEl.play().catch(() => {
-      /* wait for gesture */
-    });
-  }
+  void musicEl.play().catch(() => {
+    /* wait for gesture */
+  });
 }
 
 export function stopMusic(): void {

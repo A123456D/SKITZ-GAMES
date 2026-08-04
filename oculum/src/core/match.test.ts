@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { chooseAiMove } from "./ai";
 import { applyIntent, altitudeHasGaze, createMatch, legalIntents, unitPower } from "./match";
 
 describe("oculum match", () => {
@@ -40,49 +41,49 @@ describe("oculum match", () => {
     expect(unitPower(s, 1, "player")).toBe(2);
   });
 
-  it("tutorial guides full First Gaze curriculum", () => {
+  it("tutorial guides a real short match to Break", () => {
     const s = createMatch({ seed: 9, tutorial: true });
     expect(s.tutorialStep).toBe("intro");
+    expect(s.enemyWill).toBe(5);
+    expect(s.hand).toEqual(["cliff_seeker"]);
     expect(legalIntents(s).every((i) => i.kind === "pass")).toBe(true);
-    applyIntent(s, { kind: "pass" });
-    expect(s.tutorialStep).toBe("read");
     applyIntent(s, { kind: "pass" });
     expect(s.tutorialStep).toBe("play");
     expect(s.hand).toEqual(["cliff_seeker"]);
+    expect(s.active).toBe("player");
     applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
-    expect(s.tutorialStep).toBe("see_play");
-    applyIntent(s, { kind: "pass" });
     expect(s.tutorialStep).toBe("site");
     expect(s.hand).toEqual(["veil_banner"]);
+    expect(s.altitudes[1].player?.cardId).toBe("cliff_seeker");
     applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
-    expect(s.tutorialStep).toBe("see_site");
+    expect(s.tutorialStep).toBe("pass1");
+    expect(s.hand).toEqual([]);
+    expect(s.altitudes[1].playerSite).toBe("veil_banner");
     applyIntent(s, { kind: "pass" });
     expect(s.tutorialStep).toBe("witness");
+    expect(s.hand).toEqual([]);
+    // Enemy acts then Resolve; player should get turn 2
+    let guard = 20;
+    while (s.active === "enemy" && guard-- > 0) {
+      applyIntent(s, chooseAiMove(s));
+    }
+    expect(s.active).toBe("player");
+    expect(s.enemyWill).toBeLessThan(5);
     applyIntent(s, { kind: "witness", altitude: 1 });
-    expect(s.tutorialStep).toBe("see_witness");
-    applyIntent(s, { kind: "pass" });
     expect(s.tutorialStep).toBe("graft");
+    expect(s.altitudes[1].player?.veiled).toBe(false);
+    expect(s.hand).toEqual(["ace_of_hollows"]);
     applyIntent(s, { kind: "graft", handIndex: 0, altitude: 1 });
-    expect(s.tutorialStep).toBe("see_graft");
-    applyIntent(s, { kind: "pass" });
-    expect(s.tutorialStep).toBe("gaze");
-    applyIntent(s, { kind: "witness", altitude: 0, enemy: true });
-    expect(s.tutorialStep).toBe("see_gaze");
-    applyIntent(s, { kind: "pass" });
-    expect(s.tutorialStep).toBe("stance");
-    applyIntent(s, { kind: "stance", altitude: 1 });
-    expect(s.tutorialStep).toBe("see_stance");
-    applyIntent(s, { kind: "pass" });
-    expect(s.tutorialStep).toBe("rite");
-    applyIntent(s, { kind: "rite", handIndex: 0, altitude: 1 });
-    expect(s.tutorialStep).toBe("see_rite");
-    applyIntent(s, { kind: "pass" });
-    expect(s.tutorialStep).toBe("law");
-    applyIntent(s, { kind: "witness", altitude: 1 });
-    expect(s.tutorialStep).toBe("see_law");
+    expect(s.tutorialStep).toBe("pass2");
+    expect(s.hand).toEqual([]);
     applyIntent(s, { kind: "pass" });
     expect(s.tutorialStep).toBe("done");
-    expect(s.active).toBe("player");
+    guard = 20;
+    while (s.active === "enemy" && s.winner == null && guard-- > 0) {
+      applyIntent(s, chooseAiMove(s));
+    }
+    expect(s.winner).toBe("player");
+    expect(s.endReason).toBe("break");
   });
 
   it("enemy gets a full beginTurn after player passes", () => {

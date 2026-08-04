@@ -21,7 +21,8 @@ CTA uses a slightly warmer plate + stronger gold edge. Ghost / HUD / meters shar
 
 | File | Role |
 |------|------|
-| `bg-canyon.jpg` | Full-bleed board (WebGL texture) |
+| `bg-canyon.jpg` | Full-bleed match board (WebGL texture) |
+| `bg-menu.jpg` | Full-bleed title screen (WebGL texture) |
 | `seal-eye.png` | Brand seal (menu + topbar) |
 | `card-frame.png` | Bake fallback only |
 | `card-veil.png` | Veiled mist overlay on full faces |

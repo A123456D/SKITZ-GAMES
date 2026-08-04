@@ -64,6 +64,7 @@ Same Eye faith. Different heresy. Infinite set space.
 |------|------|
 | **Teach** (default Play / First Gaze) | Fixed **30-card** recipe — see `teachDeck()` / CARD_TEXT. Pedagogy first; not bound by Constructed copy caps. |
 | **Constructed** | Custom **30** from the full Codex pool, validated below. |
+| **AI opponent** | Curated archetype decks (`src/core/decks.ts`) — never a mirror of the player's list. |
 
 The Codex lists the **full collectible pool**. That pool is **not** the default match deck.
 

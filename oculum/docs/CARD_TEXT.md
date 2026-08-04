@@ -1205,23 +1205,18 @@ One premium (Shell) — every school now has a premium. Pool ~82 with 9 premiums
 Fixed **30** for Play / First Gaze (`teachDeck()`). Full Codex pool is collectible only — see Constructed in [RULES.md](./RULES.md).
 
 ```
-cliff_seeker ×2, veil_banner, stake_field_pilgrim,
-ace_of_hollows, hatline_trickster,
-third_face, echo_mask,
-root_chassis, keywright_scarecrow,
-hole_choir, pale_silence,
-coral_crown, branch_rune_reliquary,
-ash_lantern, bone_wick_charm,
-parasol_path, perforated_abbess,
-ring_gaze, bell_debt_walker,
-mire_debtor, ledger_jackal,
-inkdrip_acolyte, canister_hound,
-ribbon_bride, saltglass_courier,
-unblinking_law, stake_cache,
-mesa_bell, horn_cantor
+cliff_seeker ×2, veil_banner, ochre_dancer, stake_field_pilgrim,
+stake_cache, mesa_bell, saltglass_courier,
+ace_of_hollows, bone_wick_charm, coral_crown,
+suture_mill, keywright_scarecrow, canister_hound, root_chassis,
+third_face, echo_mask, twinspoke_banner, horn_cantor,
+hatline_trickster, dust_ledger, debt_coin, ledger_jackal,
+ring_gaze, perforated_abbess, bell_debt_walker,
+branch_rune_reliquary, ribbon_bride, pale_silence,
+unblinking_law
 ```
 
-No premiums in Teach.
+No premiums in Teach. Packages: Cube veil, Graft-before-Witness, Stance, Deal Eclipse, Gaze, Coral Site.
 
 ## Witness cost summary
 

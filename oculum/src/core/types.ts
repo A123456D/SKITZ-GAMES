@@ -6,6 +6,9 @@ export const SIGHT_CARRY_CAP = 6;
 export const ESSENCE_CAP = 8;
 export const ECLIPSE_WIN = 5;
 
+/** Tutorial foe Will — Break climax after two guided Resolves. */
+export const TUTORIAL_ENEMY_WILL = 5;
+
 export type Side = "player" | "enemy";
 export type Altitude = 0 | 1 | 2; // High, Mid, Low
 export type School =
@@ -84,25 +87,18 @@ export type OculusEvent =
 
 export type MatchPhase = "menu" | "play" | "end";
 
+/**
+ * First Gaze — real guided match (not isolated lesson scenes).
+ * Soft CTA only on intro; later beats are legal match actions with real Pass/Resolve.
+ */
 export type TutorialStep =
   | "intro"
-  | "read"
   | "play"
-  | "see_play"
   | "site"
-  | "see_site"
+  | "pass1"
   | "witness"
-  | "see_witness"
   | "graft"
-  | "see_graft"
-  | "gaze"
-  | "see_gaze"
-  | "stance"
-  | "see_stance"
-  | "rite"
-  | "see_rite"
-  | "law"
-  | "see_law"
+  | "pass2"
   | "done";
 
 export type AiDifficulty = "easy" | "normal" | "hard";

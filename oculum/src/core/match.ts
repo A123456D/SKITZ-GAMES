@@ -1,5 +1,6 @@
 import { getCard, teachDeck } from "./cards";
 import { validateConstructedDeck } from "./construct";
+import { pickAiOpponentDeck } from "./decks";
 import {
   advanceTutorial,
   filterTutorialIntents,
@@ -1065,7 +1066,8 @@ export function createMatch(opts?: {
   const prophecies: string[] = [];
   const enemyProphecies: string[] = [];
   const playerSource = opts?.deck ?? teachDeck();
-  const enemySource = opts?.enemyDeck ?? opts?.deck ?? teachDeck();
+  // AI never mirrors the player's constructed list — curated rival archetypes.
+  const enemySource = opts?.enemyDeck ?? pickAiOpponentDeck(seed, playerSource);
   let deck = extractProphecies(shuffle([...playerSource], rng), prophecies);
   let enemyDeck = extractProphecies(shuffle([...enemySource], rng), enemyProphecies);
   const hand: string[] = [];
