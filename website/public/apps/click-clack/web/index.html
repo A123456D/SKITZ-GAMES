@@ -32,7 +32,7 @@
 				</a>
 				<div class="topbar__actions">
 					<button class="btn btn--green" type="button" id="btn-copy">Copy last key</button>
-					<button class="btn" type="button" id="btn-lock">Lock pointer</button>
+					<button class="btn btn--desk-only" type="button" id="btn-lock">Lock pointer</button>
 					<button class="btn btn--red" type="button" id="btn-clear">Clear</button>
 					<a class="btn" href="/apps/">SKITZ apps</a>
 				</div>
@@ -41,33 +41,53 @@
 			<main class="main">
 				<section class="panel mouse-panel" aria-labelledby="mouse-title">
 					<div class="panel__head">
-						<h2 class="panel__title" id="mouse-title">Mouse pad</h2>
-						<p class="panel__hint">Move · click · scroll here</p>
+						<h2 class="panel__title" id="mouse-title">Touch pad</h2>
+						<p class="panel__hint">Drag · tap · scroll</p>
 					</div>
 					<div
 						class="mouse-stage"
 						id="mouse-stage"
 						role="application"
-						aria-label="Mouse testing pad"
+						aria-label="Pointer testing pad"
 						tabindex="0"
 					>
 						<div class="crosshair" id="crosshair" aria-hidden="true"></div>
 					</div>
-					<div class="mouse-device" aria-hidden="true">
-						<div class="mouse-btn mouse-btn--left" data-mouse="left">L</div>
-						<div class="mouse-btn mouse-btn--right" data-mouse="right">R</div>
-						<div class="mouse-btn mouse-btn--middle" data-mouse="middle">M</div>
-						<div class="mouse-btn mouse-btn--wheel" data-mouse="wheel">Wheel</div>
+					<div class="mouse-device" aria-label="Mouse buttons">
+						<button class="mouse-btn mouse-btn--left" type="button" data-mouse="left">L</button>
+						<button class="mouse-btn mouse-btn--right" type="button" data-mouse="right">R</button>
+						<button class="mouse-btn mouse-btn--middle" type="button" data-mouse="middle">M</button>
+						<div class="mouse-btn mouse-btn--wheel" data-mouse="wheel">
+							<button class="wheel-hit" type="button" data-wheel="up">Wheel ↑</button>
+							<button class="wheel-hit wheel-hit--down" type="button" data-wheel="down">
+								Wheel ↓
+							</button>
+						</div>
 					</div>
 				</section>
 
 				<section class="panel keyboard-panel" aria-labelledby="kb-title">
 					<div class="panel__head">
 						<h2 class="panel__title" id="kb-title">Keyboard</h2>
-						<p class="panel__hint">Type anywhere — keys light up</p>
+						<p class="panel__hint">Tap keys or type below</p>
 					</div>
-					<div class="keyboard" id="keyboard" aria-hidden="true"></div>
-					<div class="mods" aria-label="Modifier keys">
+					<div class="type-catcher">
+						<label class="sr-only" for="type-catcher-input">Type here to open the soft keyboard</label>
+						<input
+							id="type-catcher-input"
+							class="type-catcher__input"
+							type="text"
+							autocomplete="off"
+							autocapitalize="off"
+							autocorrect="off"
+							spellcheck="false"
+							enterkeyhint="done"
+							placeholder="Tap here to type with your phone keyboard"
+						/>
+						<p class="type-catcher__hint">Opens your soft keyboard — keys light up as you type.</p>
+					</div>
+					<div class="keyboard" id="keyboard"></div>
+					<div class="mods" aria-label="modifier keys">
 						<span class="mod-chip" data-mod="ctrl">Ctrl</span>
 						<span class="mod-chip" data-mod="alt">Alt</span>
 						<span class="mod-chip" data-mod="shift">Shift</span>
