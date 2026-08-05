@@ -1,10 +1,9 @@
 package games.skitz.clickclack.ui
 
 import android.bluetooth.BluetoothDevice
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,13 +11,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier as UiMod
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,7 +27,6 @@ import games.skitz.clickclack.ui.theme.SkitzInk
 import games.skitz.clickclack.ui.theme.SkitzMuted
 import games.skitz.clickclack.ui.theme.SkitzRed
 import games.skitz.clickclack.ui.theme.SkitzYellow
-import androidx.compose.ui.Modifier as UiMod
 
 @Composable
 fun ConnectScreen(
@@ -48,49 +43,37 @@ fun ConnectScreen(
             UiMod
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("CLICK", fontSize = 42.sp, fontWeight = FontWeight.Black, color = SkitzRed, letterSpacing = (-1.5).sp)
+            Text("CLACK", fontSize = 42.sp, fontWeight = FontWeight.Black, color = SkitzBlue, letterSpacing = (-1.5).sp)
+        }
         Text(
-            "CLICK CLACK",
-            fontSize = 34.sp,
-            fontWeight = FontWeight.Black,
+            "Your phone is the mouse and keyboard.",
             color = SkitzInk,
-            letterSpacing = (-1).sp,
-        )
-        Text(
-            "Bluetooth mouse & keyboard for your PC",
-            color = SkitzMuted,
             fontFamily = FontFamily.Monospace,
             fontSize = 14.sp,
         )
 
         StatusCard(state)
 
-        StickerButton("Allow Bluetooth", SkitzRed, onRequestPermissions)
-        when (state.connection) {
-            HidConnectionState.BluetoothOff ->
-                StickerButton("Turn on Bluetooth", SkitzBlue, onRequestBluetooth)
-            else -> Unit
+        StickerAction("Allow Bluetooth", SkitzRed, onRequestPermissions)
+        if (state.connection == HidConnectionState.BluetoothOff) {
+            StickerAction("Turn on Bluetooth", SkitzBlue, onRequestBluetooth)
         }
-        StickerButton("Make phone discoverable", SkitzYellow, onRequestDiscoverable)
-        OutlinedButton(
-            onClick = onRestart,
-            modifier = UiMod.fillMaxWidth(),
-            shape = RectangleShape,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = SkitzInk),
-        ) {
-            Text("Restart HID", fontWeight = FontWeight.Bold)
-        }
+        StickerAction("Make phone discoverable", SkitzYellow, onRequestDiscoverable)
+        StickerAction("Restart HID", Color(0xFFBDB5A6), onRestart)
 
-        Text("Pair on your PC", fontWeight = FontWeight.Black, fontSize = 18.sp, color = SkitzInk)
-        Step("1", "On the PC: open Bluetooth settings - Add device")
-        Step("2", "On the phone: tap Make phone discoverable")
-        Step("3", "Select Click Clack on the PC and pair")
-        Step("4", "When status says Connected, use Pad / Keys tabs")
+        Text("PAIR ON YOUR PC", fontWeight = FontWeight.Black, fontSize = 18.sp, color = SkitzInk)
+        StepRow("1", "PC Bluetooth settings → Add device")
+        StepRow("2", "Phone → Make phone discoverable")
+        StepRow("3", "Select Click Clack and pair")
+        StepRow("4", "When Connected, use Pad / Keys")
 
         if (bonded.isNotEmpty()) {
-            Text("Known devices", fontWeight = FontWeight.Black, color = SkitzInk)
+            Text("KNOWN DEVICES", fontWeight = FontWeight.Black, color = SkitzInk)
             bonded.forEach { device ->
                 val label =
                     try {
@@ -98,13 +81,7 @@ fun ConnectScreen(
                     } catch (_: SecurityException) {
                         device.address
                     }
-                OutlinedButton(
-                    onClick = { onConnectBonded(device) },
-                    modifier = UiMod.fillMaxWidth(),
-                    shape = RectangleShape,
-                ) {
-                    Text("Connect: $label")
-                }
+                StickerAction("Connect: $label", SkitzBlue, { onConnectBonded(device) })
             }
         }
 
@@ -114,7 +91,7 @@ fun ConnectScreen(
             fontSize = 12.sp,
             fontFamily = FontFamily.Monospace,
         )
-        Spacer(modifier = UiMod.height(8.dp))
+        Spacer(modifier = UiMod.height(10.dp))
     }
 }
 
@@ -127,46 +104,24 @@ private fun StatusCard(state: HidUiState) {
             HidConnectionState.WaitingForHost, HidConnectionState.Registering -> SkitzBlue
             else -> SkitzYellow
         }
-    Column(
-        modifier =
-            UiMod
-                .fillMaxWidth()
-                .border(2.dp, SkitzInk)
-                .padding(14.dp),
-    ) {
+    StickerPanel(shadow = accent) {
         Text(
-            state.connection.name.replace('_', ' '),
+            state.connection.name.replace('_', ' ').uppercase(),
             fontWeight = FontWeight.Black,
             color = accent,
-            fontSize = 16.sp,
+            fontSize = 18.sp,
         )
         if (!state.hostName.isNullOrBlank()) {
-            Text(state.hostName, color = SkitzInk, fontFamily = FontFamily.Monospace)
+            Text(state.hostName, color = SkitzInk, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
         }
-        Text(state.message, color = SkitzMuted, fontSize = 13.sp)
+        Text(state.message, color = SkitzMuted, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
     }
 }
 
 @Composable
-private fun Step(n: String, text: String) {
-    Text("$n. $text", color = SkitzInk, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
-}
-
-@Composable
-fun StickerButton(label: String, shadow: Color, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = UiMod.fillMaxWidth(),
-        shape = RectangleShape,
-        colors =
-            ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFFFFEF9),
-                contentColor = SkitzInk,
-            ),
-        border = BorderStroke(2.dp, SkitzInk),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
-    ) {
-        Text(label, fontWeight = FontWeight.Bold)
+private fun StepRow(n: String, text: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = UiMod.fillMaxWidth()) {
+        Text(n, fontWeight = FontWeight.Black, color = SkitzRed, fontSize = 16.sp)
+        Text(text, color = SkitzInk, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
     }
 }
-

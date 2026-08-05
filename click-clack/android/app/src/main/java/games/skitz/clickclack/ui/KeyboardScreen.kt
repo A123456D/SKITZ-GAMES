@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier as UiMod
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +34,7 @@ import games.skitz.clickclack.ui.theme.SkitzGreen
 import games.skitz.clickclack.ui.theme.SkitzInk
 import games.skitz.clickclack.ui.theme.SkitzMuted
 import games.skitz.clickclack.ui.theme.SkitzRed
+import games.skitz.clickclack.ui.theme.SkitzYellow
 
 private data class KeyDef(
     val label: String,
@@ -72,64 +73,33 @@ fun KeyboardScreen(
     val rows =
         listOf(
             listOf(
-                KeyDef("1", HidKeys.NUM_1),
-                KeyDef("2", HidKeys.NUM_2),
-                KeyDef("3", HidKeys.NUM_3),
-                KeyDef("4", HidKeys.NUM_4),
-                KeyDef("5", HidKeys.NUM_5),
-                KeyDef("6", HidKeys.NUM_6),
-                KeyDef("7", HidKeys.NUM_7),
-                KeyDef("8", HidKeys.NUM_8),
-                KeyDef("9", HidKeys.NUM_9),
-                KeyDef("0", HidKeys.NUM_0),
-                KeyDef("⌫", HidKeys.BACKSPACE, 1.4f),
+                KeyDef("1", HidKeys.NUM_1), KeyDef("2", HidKeys.NUM_2), KeyDef("3", HidKeys.NUM_3),
+                KeyDef("4", HidKeys.NUM_4), KeyDef("5", HidKeys.NUM_5), KeyDef("6", HidKeys.NUM_6),
+                KeyDef("7", HidKeys.NUM_7), KeyDef("8", HidKeys.NUM_8), KeyDef("9", HidKeys.NUM_9),
+                KeyDef("0", HidKeys.NUM_0), KeyDef("⌫", HidKeys.BACKSPACE, 1.4f),
             ),
             listOf(
-                KeyDef("Q", HidKeys.Q),
-                KeyDef("W", HidKeys.W),
-                KeyDef("E", HidKeys.E),
-                KeyDef("R", HidKeys.R),
-                KeyDef("T", HidKeys.T),
-                KeyDef("Y", HidKeys.Y),
-                KeyDef("U", HidKeys.U),
-                KeyDef("I", HidKeys.I),
-                KeyDef("O", HidKeys.O),
-                KeyDef("P", HidKeys.P),
+                KeyDef("Q", HidKeys.Q), KeyDef("W", HidKeys.W), KeyDef("E", HidKeys.E), KeyDef("R", HidKeys.R),
+                KeyDef("T", HidKeys.T), KeyDef("Y", HidKeys.Y), KeyDef("U", HidKeys.U), KeyDef("I", HidKeys.I),
+                KeyDef("O", HidKeys.O), KeyDef("P", HidKeys.P),
             ),
             listOf(
-                KeyDef("A", HidKeys.A),
-                KeyDef("S", HidKeys.S),
-                KeyDef("D", HidKeys.D),
-                KeyDef("F", HidKeys.F),
-                KeyDef("G", HidKeys.G),
-                KeyDef("H", HidKeys.H),
-                KeyDef("J", HidKeys.J),
-                KeyDef("K", HidKeys.K),
-                KeyDef("L", HidKeys.L),
-                KeyDef("⏎", HidKeys.ENTER, 1.4f),
+                KeyDef("A", HidKeys.A), KeyDef("S", HidKeys.S), KeyDef("D", HidKeys.D), KeyDef("F", HidKeys.F),
+                KeyDef("G", HidKeys.G), KeyDef("H", HidKeys.H), KeyDef("J", HidKeys.J), KeyDef("K", HidKeys.K),
+                KeyDef("L", HidKeys.L), KeyDef("⏎", HidKeys.ENTER, 1.4f),
             ),
             listOf(
                 KeyDef("⇧", HidKeys.NONE, 1.3f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_SHIFT),
-                KeyDef("Z", HidKeys.Z),
-                KeyDef("X", HidKeys.X),
-                KeyDef("C", HidKeys.C),
-                KeyDef("V", HidKeys.V),
-                KeyDef("B", HidKeys.B),
-                KeyDef("N", HidKeys.N),
-                KeyDef("M", HidKeys.M),
-                KeyDef(",", HidKeys.COMMA),
-                KeyDef(".", HidKeys.DOT),
-                KeyDef("?", HidKeys.SLASH),
+                KeyDef("Z", HidKeys.Z), KeyDef("X", HidKeys.X), KeyDef("C", HidKeys.C), KeyDef("V", HidKeys.V),
+                KeyDef("B", HidKeys.B), KeyDef("N", HidKeys.N), KeyDef("M", HidKeys.M),
+                KeyDef(",", HidKeys.COMMA), KeyDef(".", HidKeys.DOT), KeyDef("?", HidKeys.SLASH),
             ),
             listOf(
                 KeyDef("Ctrl", HidKeys.NONE, 1.2f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_CTRL),
                 KeyDef("Win", HidKeys.NONE, 1.1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_GUI),
                 KeyDef("Alt", HidKeys.NONE, 1.1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_ALT),
                 KeyDef("Space", HidKeys.SPACE, 3.2f),
-                KeyDef("←", HidKeys.LEFT),
-                KeyDef("↑", HidKeys.UP),
-                KeyDef("↓", HidKeys.DOWN),
-                KeyDef("→", HidKeys.RIGHT),
+                KeyDef("←", HidKeys.LEFT), KeyDef("↑", HidKeys.UP), KeyDef("↓", HidKeys.DOWN), KeyDef("→", HidKeys.RIGHT),
             ),
         )
 
@@ -138,21 +108,22 @@ fun KeyboardScreen(
             UiMod
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("KEYBOARD", fontWeight = FontWeight.Black, fontSize = 28.sp, color = SkitzInk)
+        Text("KEYS", fontWeight = FontWeight.Black, fontSize = 34.sp, color = SkitzInk, letterSpacing = (-1).sp)
         Text(
-            if (connected) "Typing to PC" else "Connect first",
+            if (connected) "LIVE ON PC" else "CONNECT FIRST",
             color = if (connected) SkitzGreen else SkitzMuted,
             fontFamily = FontFamily.Monospace,
             fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
         )
 
         rows.forEach { row ->
             Row(
                 modifier = UiMod.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 row.forEach { key ->
                     val active =
@@ -163,50 +134,63 @@ fun KeyboardScreen(
                             HidKeys.MOD_LEFT_GUI -> gui
                             else -> false
                         }
-                    Box(
-                        modifier =
-                            UiMod
-                                .weight(key.weight)
-                                .height(46.dp)
-                                .border(1.5.dp, SkitzInk, RectangleShape)
-                                .background(if (active) SkitzBlue else Color(0xFFFFFEF9))
-                                .pointerInput(connected, shift, ctrl, alt, gui) {
-                                    detectTapGestures(
-                                        onPress = {
-                                            if (!connected) return@detectTapGestures
-                                            if (key.isModifier) {
-                                                when (key.modifierBit) {
-                                                    HidKeys.MOD_LEFT_SHIFT -> shift = !shift
-                                                    HidKeys.MOD_LEFT_CTRL -> ctrl = !ctrl
-                                                    HidKeys.MOD_LEFT_ALT -> alt = !alt
-                                                    HidKeys.MOD_LEFT_GUI -> gui = !gui
-                                                }
-                                                syncMods()
-                                                tryAwaitRelease()
-                                                return@detectTapGestures
-                                            }
-                                            onKeyDown(key.usage)
-                                            val released = tryAwaitRelease()
-                                            onKeyUp(key.usage)
-                                            if (!released) {
-                                                // cancelled
-                                            }
-                                            // one-shot clear sticky shift after letter
-                                            if (shift && key.usage >= HidKeys.A && key.usage <= HidKeys.Z) {
-                                                shift = false
-                                                syncMods()
-                                            }
-                                        },
-                                    )
-                                },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            key.label,
-                            color = if (active) Color.White else SkitzInk,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = if (key.label.length > 3) 11.sp else 14.sp,
+                    val shadow =
+                        when {
+                            active -> SkitzBlue
+                            key.label == "⏎" -> SkitzGreen
+                            key.label == "⌫" -> SkitzRed
+                            key.isModifier -> SkitzYellow
+                            else -> Color(0xFFBDB5A6)
+                        }
+                    Box(modifier = UiMod.weight(key.weight)) {
+                        Box(
+                            modifier =
+                                UiMod
+                                    .matchParentSize()
+                                    .offset(x = 2.dp, y = 2.dp)
+                                    .background(shadow),
                         )
+                        Box(
+                            modifier =
+                                UiMod
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .border(2.5.dp, SkitzInk)
+                                    .background(if (active) SkitzBlue else Color(0xFFFFFEF9))
+                                    .pointerInput(connected, shift, ctrl, alt, gui) {
+                                        detectTapGestures(
+                                            onPress = {
+                                                if (!connected) return@detectTapGestures
+                                                if (key.isModifier) {
+                                                    when (key.modifierBit) {
+                                                        HidKeys.MOD_LEFT_SHIFT -> shift = !shift
+                                                        HidKeys.MOD_LEFT_CTRL -> ctrl = !ctrl
+                                                        HidKeys.MOD_LEFT_ALT -> alt = !alt
+                                                        HidKeys.MOD_LEFT_GUI -> gui = !gui
+                                                    }
+                                                    syncMods()
+                                                    tryAwaitRelease()
+                                                    return@detectTapGestures
+                                                }
+                                                onKeyDown(key.usage)
+                                                tryAwaitRelease()
+                                                onKeyUp(key.usage)
+                                                if (shift && key.usage >= HidKeys.A && key.usage <= HidKeys.Z) {
+                                                    shift = false
+                                                    syncMods()
+                                                }
+                                            },
+                                        )
+                                    },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                key.label,
+                                color = if (active) Color.White else SkitzInk,
+                                fontWeight = FontWeight.Black,
+                                fontSize = if (key.label.length > 3) 11.sp else 15.sp,
+                            )
+                        }
                     }
                 }
             }
@@ -220,4 +204,3 @@ fun KeyboardScreen(
         )
     }
 }
-

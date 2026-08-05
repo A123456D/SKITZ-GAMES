@@ -1,6 +1,7 @@
 package games.skitz.clickclack.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier as UiMod
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import games.skitz.clickclack.hid.HidService
 import games.skitz.clickclack.ui.theme.SkitzBlue
@@ -26,7 +28,6 @@ import games.skitz.clickclack.ui.theme.SkitzGreen
 import games.skitz.clickclack.ui.theme.SkitzInk
 import games.skitz.clickclack.ui.theme.SkitzPaper
 import games.skitz.clickclack.ui.theme.SkitzRed
-import games.skitz.clickclack.ui.theme.SkitzYellow
 
 @Composable
 fun ClickClackApp(
@@ -62,41 +63,52 @@ fun ClickClackApp(
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                NavigationBar(containerColor = Color(0xFFFFFEF9), contentColor = SkitzInk) {
+                NavigationBar(
+                    containerColor = Color(0xFFFFFEF9),
+                    contentColor = SkitzInk,
+                    tonalElevation = 0.dp,
+                    modifier = UiMod.border(width = 0.dp, color = Color.Transparent).padding(top = 2.dp),
+                ) {
                     NavigationBarItem(
                         selected = tab == 0,
                         onClick = { tab = 0 },
-                        icon = { Text("BT", fontWeight = FontWeight.Black, fontSize = 12.sp) },
-                        label = { Text("Connect", fontWeight = FontWeight.Bold) },
+                        icon = { Text("BT", fontWeight = FontWeight.Black, fontSize = 13.sp) },
+                        label = { Text("CONNECT", fontWeight = FontWeight.Black, fontSize = 11.sp) },
                         colors =
                             NavigationBarItemDefaults.colors(
                                 selectedIconColor = SkitzRed,
                                 selectedTextColor = SkitzRed,
-                                indicatorColor = Color(0xFFFFE8E6),
+                                indicatorColor = Color(0xFFFFD6D3),
+                                unselectedIconColor = SkitzInk,
+                                unselectedTextColor = SkitzInk,
                             ),
                     )
                     NavigationBarItem(
                         selected = tab == 1,
                         onClick = { tab = 1 },
-                        icon = { Text("PAD", fontWeight = FontWeight.Black, fontSize = 11.sp) },
-                        label = { Text("Pad", fontWeight = FontWeight.Bold) },
+                        icon = { Text("PAD", fontWeight = FontWeight.Black, fontSize = 12.sp) },
+                        label = { Text("PAD", fontWeight = FontWeight.Black, fontSize = 11.sp) },
                         colors =
                             NavigationBarItemDefaults.colors(
                                 selectedIconColor = SkitzBlue,
                                 selectedTextColor = SkitzBlue,
-                                indicatorColor = Color(0xFFE6EEFF),
+                                indicatorColor = Color(0xFFD6E4FF),
+                                unselectedIconColor = SkitzInk,
+                                unselectedTextColor = SkitzInk,
                             ),
                     )
                     NavigationBarItem(
                         selected = tab == 2,
                         onClick = { tab = 2 },
-                        icon = { Text("ABC", fontWeight = FontWeight.Black, fontSize = 11.sp) },
-                        label = { Text("Keys", fontWeight = FontWeight.Bold) },
+                        icon = { Text("ABC", fontWeight = FontWeight.Black, fontSize = 12.sp) },
+                        label = { Text("KEYS", fontWeight = FontWeight.Black, fontSize = 11.sp) },
                         colors =
                             NavigationBarItemDefaults.colors(
                                 selectedIconColor = SkitzGreen,
                                 selectedTextColor = SkitzGreen,
-                                indicatorColor = Color(0xFFE7F5E8),
+                                indicatorColor = Color(0xFFD9F0DB),
+                                unselectedIconColor = SkitzInk,
+                                unselectedTextColor = SkitzInk,
                             ),
                     )
                 }
@@ -134,4 +146,3 @@ fun ClickClackApp(
         }
     }
 }
-
