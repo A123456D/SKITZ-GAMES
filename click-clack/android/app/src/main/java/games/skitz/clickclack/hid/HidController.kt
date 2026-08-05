@@ -9,6 +9,8 @@ import android.bluetooth.BluetoothHidDeviceAppSdpSettings
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +42,8 @@ data class HidUiState(
 class HidController(private val context: Context) {
     private val tag = "ClickClackHid"
     private val executor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var profileTimeout: Runnable? = null
 
     private val bluetoothManager =
         context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -80,6 +84,8 @@ class HidController(private val context: Context) {
                 this@HidController.registered = registered
                 Log.i(tag, "onAppStatusChanged registered=$registered plugged=${pluggedDevice?.address}")
                 if (registered) {
+                    profileTimeout?.let { mainHandler.removeCallbacks(it) }
+                    profileTimeout = null
                     emit(HidConnectionState.WaitingForHost, message = "Ready — pair from your PC Bluetooth settings")
                     // Prefer already-bonded hosts when possible
                     pluggedDevice?.let { connectTo(it) }
@@ -121,6 +127,20 @@ class HidController(private val context: Context) {
             emit(HidConnectionState.BluetoothOff, message = "Turn on Bluetooth")
             return
         }
+        profileTimeout?.let { mainHandler.removeCallbacks(it) }
+        if (hidDevice != null) {
+            try {
+                if (registered) hidDevice?.unregisterApp()
+            } catch (_: Exception) {
+            }
+            try {
+                adapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDevice)
+            } catch (_: Exception) {
+            }
+            hidDevice = null
+            registered = false
+            hostDevice = null
+        }
         emit(HidConnectionState.Registering, message = "Starting Bluetooth HID…")
         val ok = adapter.getProfileProxy(context, profileListener, BluetoothProfile.HID_DEVICE)
         if (!ok) {
@@ -129,10 +149,25 @@ class HidController(private val context: Context) {
                 message = "This phone does not expose Bluetooth HID Device (OEM may have disabled it)",
                 profileAvailable = false,
             )
+            return
         }
+        val timeout =
+            Runnable {
+                if (hidDevice == null || !registered) {
+                    emit(
+                        HidConnectionState.Error,
+                        message = "Bluetooth HID timed out — tap Restart HID. Some phones disable this profile.",
+                        profileAvailable = hidDevice != null,
+                    )
+                }
+            }
+        profileTimeout = timeout
+        mainHandler.postDelayed(timeout, 8_000L)
     }
 
     fun stop() {
+        profileTimeout?.let { mainHandler.removeCallbacks(it) }
+        profileTimeout = null
         try {
             hostDevice?.let { hidDevice?.disconnect(it) }
             if (registered) hidDevice?.unregisterApp()

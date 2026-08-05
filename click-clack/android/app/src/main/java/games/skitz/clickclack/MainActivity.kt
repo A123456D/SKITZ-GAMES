@@ -23,8 +23,9 @@ import games.skitz.clickclack.ui.ClickClackApp
 import games.skitz.clickclack.ui.theme.ClickClackTheme
 
 class MainActivity : ComponentActivity() {
-    private var hidService: HidService? = null
+    private var hidService by mutableStateOf<HidService?>(null)
     private var bound by mutableStateOf(false)
+    private var bootMessage by mutableStateOf("Starting Bluetooth service…")
 
     private val connection =
         object : ServiceConnection {
@@ -32,18 +33,24 @@ class MainActivity : ComponentActivity() {
                 val binder = service as HidService.LocalBinder
                 hidService = binder.getService()
                 bound = true
+                bootMessage = ""
+                hidService?.controller?.start()
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
                 hidService = null
                 bound = false
+                bootMessage = "Bluetooth service disconnected — tap Restart HID"
             }
         }
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
             if (grants.values.all { it }) {
+                bootMessage = "Starting Bluetooth service…"
                 startHidService()
+            } else {
+                bootMessage = "Bluetooth permission required — tap Allow Bluetooth"
             }
         }
 
@@ -61,10 +68,17 @@ class MainActivity : ComponentActivity() {
         setContent {
             ClickClackTheme {
                 ClickClackApp(
-                    service = if (bound) hidService else null,
+                    service = hidService,
+                    bootMessage = bootMessage,
                     onRequestBluetooth = { requestEnableBluetooth() },
                     onRequestDiscoverable = { requestDiscoverable() },
                     onRequestPermissions = { ensurePermissionsAndStart() },
+                    onRestart = {
+                        bootMessage = "Restarting…"
+                        hidService?.controller?.stop()
+                        hidService?.controller?.start()
+                        if (hidService == null) startHidService()
+                    },
                 )
             }
         }
@@ -73,41 +87,49 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (hidService != null || hasBluetoothPermissions()) {
-            Intent(this, HidService::class.java).also { intent ->
-                bindService(intent, connection, Context.BIND_AUTO_CREATE)
-            }
+        if (hasBluetoothPermissions()) {
+            bindService(Intent(this, HidService::class.java), connection, Context.BIND_AUTO_CREATE)
         }
     }
 
-    override fun onStop() {
+    override fun onDestroy() {
         if (bound) {
-            unbindService(connection)
+            try {
+                unbindService(connection)
+            } catch (_: IllegalArgumentException) {
+            }
             bound = false
         }
-        super.onStop()
+        super.onDestroy()
     }
 
     private fun ensurePermissionsAndStart() {
-        val needed = requiredPermissions().filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
+        val needed =
+            requiredPermissions().filter {
+                ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+            }
         if (needed.isNotEmpty()) {
+            bootMessage = "Bluetooth permission required — tap Allow Bluetooth"
             permissionLauncher.launch(needed.toTypedArray())
             return
         }
+        bootMessage = "Starting Bluetooth service…"
         startHidService()
     }
 
     private fun startHidService() {
         val intent = Intent(this, HidService::class.java)
-        ContextCompat.startForegroundService(this, intent)
+        try {
+            ContextCompat.startForegroundService(this, intent)
+        } catch (e: Exception) {
+            bootMessage = "Could not start Bluetooth service: ${e.message}"
+            return
+        }
         bindService(intent, connection, Context.BIND_AUTO_CREATE)
     }
 
     private fun requestEnableBluetooth() {
-        val enable = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-        enableBtLauncher.launch(enable)
+        enableBtLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
     }
 
     private fun requestDiscoverable() {

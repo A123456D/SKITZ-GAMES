@@ -4,8 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -26,7 +28,7 @@ fun StickerPanel(
     shadow: Color,
     modifier: UiMod = UiMod,
     contentPadding: Dp = 14.dp,
-    content: @Composable BoxScope.() -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Box(modifier = modifier) {
         Box(
@@ -36,13 +38,14 @@ fun StickerPanel(
                     .offset(x = 5.dp, y = 5.dp)
                     .background(shadow),
         )
-        Box(
+        Column(
             modifier =
                 UiMod
                     .fillMaxWidth()
                     .border(3.dp, SkitzInk)
                     .background(Color(0xFFFFFEF9))
                     .padding(contentPadding),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
             content = content,
         )
     }

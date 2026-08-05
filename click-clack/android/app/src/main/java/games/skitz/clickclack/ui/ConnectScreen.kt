@@ -104,17 +104,24 @@ private fun StatusCard(state: HidUiState) {
             HidConnectionState.WaitingForHost, HidConnectionState.Registering -> SkitzBlue
             else -> SkitzYellow
         }
+    val title =
+        when (state.connection) {
+            HidConnectionState.Connected -> "CONNECTED"
+            HidConnectionState.WaitingForHost -> "WAITING FOR PC"
+            HidConnectionState.Registering -> "STARTING"
+            HidConnectionState.BluetoothOff -> "BLUETOOTH OFF"
+            HidConnectionState.Unsupported -> "NOT SUPPORTED"
+            HidConnectionState.Error -> "ERROR"
+            HidConnectionState.Idle -> "READY"
+        }
     StickerPanel(shadow = accent) {
-        Text(
-            state.connection.name.replace('_', ' ').uppercase(),
-            fontWeight = FontWeight.Black,
-            color = accent,
-            fontSize = 18.sp,
-        )
+        Text(title, fontWeight = FontWeight.Black, color = accent, fontSize = 18.sp)
         if (!state.hostName.isNullOrBlank()) {
             Text(state.hostName, color = SkitzInk, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
         }
-        Text(state.message, color = SkitzMuted, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+        if (state.message.isNotBlank()) {
+            Text(state.message, color = SkitzMuted, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+        }
     }
 }
 
