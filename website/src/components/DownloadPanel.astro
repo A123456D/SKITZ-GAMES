@@ -12,6 +12,7 @@ interface Props {
 	downloads: Downloads;
 	appStoreUrl?: string;
 	playStoreUrl?: string;
+	catalog?: 'games' | 'apps';
 	platforms: {
 		web: boolean;
 		windows: boolean;
@@ -22,7 +23,7 @@ interface Props {
 	};
 }
 
-const { slug, title, downloads, playStoreUrl, platforms } = Astro.props;
+const { slug, title, downloads, playStoreUrl, platforms, catalog = 'games' } = Astro.props;
 
 const desktop = [
 	{ key: 'windows', label: 'Windows', href: downloads.windows },
@@ -32,15 +33,17 @@ const desktop = [
 
 const androidHref = downloads.android;
 const showPlayStore = Boolean(playStoreUrl);
-const playHref = `/games/${slug}/play/`;
+const playHref = `/${catalog}/${slug}/play/`;
 const canInstallAndroid = platforms.web || platforms.android;
+const openLabel = catalog === 'apps' ? 'Open app to install' : 'Open game to install';
+const openVerb = catalog === 'apps' ? 'app' : 'game';
 ---
 
 <section class="downloads" aria-labelledby="downloads-heading">
 	<h2 id="downloads-heading" class="section-title">Download &amp; install</h2>
 	<p class="muted intro">
-		Play free in the browser. On Android, install {title} from Chrome — home-screen icon,
-		fullscreen, no store required.
+		{catalog === 'apps' ? 'Use free in the browser.' : 'Play free in the browser.'} On Android,
+		install {title} from Chrome — home-screen icon, fullscreen, no store required.
 	</p>
 
 	{
@@ -49,7 +52,7 @@ const canInstallAndroid = platforms.web || platforms.android;
 				<h3>Android — install</h3>
 				<div class="btn-row">
 					<a class="btn" href={playHref} id="install-open">
-						Open game to install
+						{openLabel}
 					</a>
 					{androidHref && (
 						<a class="btn btn-ghost" href={androidHref} download>
@@ -66,7 +69,7 @@ const canInstallAndroid = platforms.web || platforms.android;
 					<summary>How to install</summary>
 					<ol>
 						<li>
-							Tap <strong>Open game to install</strong> (Chrome on Android).
+							Tap <strong>{openLabel}</strong> (Chrome on Android).
 						</li>
 						<li>
 							Tap the menu (⋮) → <strong>Install app</strong> or <strong>Add to Home screen</strong>.
@@ -75,8 +78,8 @@ const canInstallAndroid = platforms.web || platforms.android;
 					</ol>
 					<p class="muted tip">
 						<strong>Icon not updating?</strong> Android keeps the first home-screen icon forever.
-						Long-press the old {title} icon → Remove / Uninstall, then open the game in Chrome and
-						Install again. The new logo only appears on a fresh install.
+						Long-press the old {title} icon → Remove / Uninstall, then open the {openVerb} in Chrome
+						and Install again. The new logo only appears on a fresh install.
 					</p>
 				</details>
 			</div>

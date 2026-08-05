@@ -6,9 +6,10 @@ interface Props {
 	cover: string;
 	preview?: string;
 	genre?: string;
+	cta?: string;
 }
 
-const { href, title, summary, cover, preview, genre } = Astro.props;
+const { href, title, summary, cover, preview, genre, cta = 'view game →' } = Astro.props;
 ---
 
 <a class="game-link" href={href}>
@@ -20,7 +21,7 @@ const { href, title, summary, cover, preview, genre } = Astro.props;
 					<img
 						class="game-item__preview"
 						src={preview}
-						alt={`${title} gameplay preview`}
+						alt={`${title} preview`}
 						width="480"
 						height="780"
 						loading="lazy"
@@ -32,7 +33,7 @@ const { href, title, summary, cover, preview, genre } = Astro.props;
 			{genre && <p class="eyebrow">{genre}</p>}
 			<h2>{title}</h2>
 			<p class="muted">{summary}</p>
-			<span class="cta">view game →</span>
+			<span class="cta">{cta}</span>
 		</div>
 	</article>
 </a>

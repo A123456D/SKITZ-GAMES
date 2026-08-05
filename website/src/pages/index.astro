@@ -3,11 +3,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import PeekSticker from '../components/PeekSticker.astro';
-import { getCollection } from 'astro:content';
-
-const games = (await getCollection('games'))
-	.filter((game) => game.data.released)
-	.sort((a, b) => a.data.title.localeCompare(b.data.title));
 ---
 
 <BaseLayout description="SKITZ — free games and apps. Play in the browser, install on Android.">
@@ -31,18 +26,12 @@ const games = (await getCollection('games'))
 				</p>
 				<div class="btn-row hero__cta">
 					<a class="btn" href="/games/">Browse games</a>
-					{
-						games[0] && (
-							<a class="btn btn-ghost" href={`/games/${games[0].id}/play/`}>
-								Play {games[0].data.title}
-							</a>
-						)
-					}
+					<a class="btn btn-ghost" href="/apps/">Browse apps</a>
 				</div>
 				<ul class="hero__chips" aria-label="What you get">
 					<li>Free games</li>
+					<li>Free apps</li>
 					<li>Browser play</li>
-					<li>Android apps</li>
 				</ul>
 			</div>
 		</section>

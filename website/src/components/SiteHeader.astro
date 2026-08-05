@@ -4,6 +4,7 @@ import PeekSticker from './PeekSticker.astro';
 const path = Astro.url.pathname;
 const links = [
 	{ href: '/games/', label: 'Games' },
+	{ href: '/apps/', label: 'Apps' },
 	{ href: '/about/', label: 'About' },
 ];
 ---
@@ -142,5 +143,10 @@ const links = [
 	.nav__link:nth-child(2):hover,
 	.nav__link:nth-child(2).is-active {
 		box-shadow: 3px 3px 0 var(--skitz-blue);
+	}
+
+	.nav__link:nth-child(3):hover,
+	.nav__link:nth-child(3).is-active {
+		box-shadow: 3px 3px 0 var(--skitz-green);
 	}
 </style>

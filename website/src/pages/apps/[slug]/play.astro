@@ -1,0 +1,17 @@
+---
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+	const apps = await getCollection('apps');
+	return apps
+		.filter((app) => app.data.platforms.web)
+		.map((app) => ({
+			params: { slug: app.id },
+			props: { app },
+		}));
+}
+
+const { app } = Astro.props;
+// Top-level navigation (not iframe) so Android Chrome can install the PWA.
+return Astro.redirect(`/apps/${app.id}/${app.data.webPlayPath}`);
+---

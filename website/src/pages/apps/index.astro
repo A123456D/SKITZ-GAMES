@@ -5,29 +5,30 @@ import SiteFooter from '../../components/SiteFooter.astro';
 import GameCard from '../../components/GameCard.astro';
 import { getCollection } from 'astro:content';
 
-const games = (await getCollection('games')).sort((a, b) => a.data.title.localeCompare(b.data.title));
+const apps = (await getCollection('apps')).sort((a, b) => a.data.title.localeCompare(b.data.title));
 ---
 
-<BaseLayout title="Games" description="Browse SKITZ games — play in the browser or download free.">
+<BaseLayout title="Apps" description="Browse SKITZ apps — free tools in the browser, install on Android.">
 	<SiteHeader />
 	<main class="site-main">
 		<section class="section">
 			<div class="wrap">
 				<p class="eyebrow">catalog</p>
-				<h1 class="section-title">Games</h1>
+				<h1 class="section-title">Apps</h1>
 				<p class="lead muted">
-					Free games — play in the browser, install on Android.
+					Free utilities and tools — open in the browser, install on Android.
 				</p>
 				<div class="list">
 					{
-						games.map((game) => (
+						apps.map((app) => (
 							<GameCard
-								href={`/games/${game.id}/`}
-								title={game.data.title}
-								summary={game.data.summary}
-								cover={game.data.cover}
-								preview={game.data.preview}
-								genre={game.data.genre}
+								href={`/apps/${app.id}/`}
+								title={app.data.title}
+								summary={app.data.summary}
+								cover={app.data.cover}
+								preview={app.data.preview}
+								genre={app.data.genre}
+								cta="view app →"
 							/>
 						))
 					}

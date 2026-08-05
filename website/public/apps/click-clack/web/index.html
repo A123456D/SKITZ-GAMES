@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="theme-color" content="#f3eee4" />
+		<meta
+			name="description"
+			content="Click Clack — test your mouse and keyboard in the browser. See key presses, clicks, scroll, and pointer trails."
+		/>
+		<link rel="manifest" href="./manifest.webmanifest" />
+		<link rel="icon" type="image/png" href="./icons/icon-192.png" />
+		<link rel="apple-touch-icon" href="./icons/icon-192.png" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;600&family=Special+Elite&display=swap"
+			rel="stylesheet"
+		/>
+		<link rel="stylesheet" href="./styles.css" />
+		<title>Click Clack · SKITZ</title>
+	</head>
+	<body>
+		<div class="app">
+			<header class="topbar">
+				<a class="brand" href="/apps/click-clack/" title="Click Clack on SKITZ">
+					<img class="brand__mark" src="./icons/icon-192.png" alt="" width="64" height="64" />
+					<span class="brand__text">
+						<span class="brand__title">Click Clack</span>
+						<span class="brand__sub">Mouse &amp; keyboard desk check</span>
+					</span>
+				</a>
+				<div class="topbar__actions">
+					<button class="btn btn--green" type="button" id="btn-copy">Copy last key</button>
+					<button class="btn" type="button" id="btn-lock">Lock pointer</button>
+					<button class="btn btn--red" type="button" id="btn-clear">Clear</button>
+					<a class="btn" href="/apps/">SKITZ apps</a>
+				</div>
+			</header>
+
+			<main class="main">
+				<section class="panel mouse-panel" aria-labelledby="mouse-title">
+					<div class="panel__head">
+						<h2 class="panel__title" id="mouse-title">Mouse pad</h2>
+						<p class="panel__hint">Move · click · scroll here</p>
+					</div>
+					<div
+						class="mouse-stage"
+						id="mouse-stage"
+						role="application"
+						aria-label="Mouse testing pad"
+						tabindex="0"
+					>
+						<div class="crosshair" id="crosshair" aria-hidden="true"></div>
+					</div>
+					<div class="mouse-device" aria-hidden="true">
+						<div class="mouse-btn mouse-btn--left" data-mouse="left">L</div>
+						<div class="mouse-btn mouse-btn--right" data-mouse="right">R</div>
+						<div class="mouse-btn mouse-btn--middle" data-mouse="middle">M</div>
+						<div class="mouse-btn mouse-btn--wheel" data-mouse="wheel">Wheel</div>
+					</div>
+				</section>
+
+				<section class="panel keyboard-panel" aria-labelledby="kb-title">
+					<div class="panel__head">
+						<h2 class="panel__title" id="kb-title">Keyboard</h2>
+						<p class="panel__hint">Type anywhere — keys light up</p>
+					</div>
+					<div class="keyboard" id="keyboard" aria-hidden="true"></div>
+					<div class="mods" aria-label="Modifier keys">
+						<span class="mod-chip" data-mod="ctrl">Ctrl</span>
+						<span class="mod-chip" data-mod="alt">Alt</span>
+						<span class="mod-chip" data-mod="shift">Shift</span>
+						<span class="mod-chip" data-mod="meta">Meta</span>
+					</div>
+				</section>
+
+				<section class="panel stats-panel" aria-labelledby="stats-title">
+					<div class="panel__head">
+						<h2 class="panel__title" id="stats-title">Live readouts</h2>
+						<p class="panel__hint">What your gear just did</p>
+					</div>
+					<div class="stats-grid">
+						<div class="stat">
+							<span class="stat__label">Last key</span>
+							<span class="stat__value" id="stat-last-key">—</span>
+						</div>
+						<div class="stat">
+							<span class="stat__label">Code</span>
+							<span class="stat__value" id="stat-code">—</span>
+						</div>
+						<div class="stat">
+							<span class="stat__label">Pointer</span>
+							<span class="stat__value" id="stat-coords">0, 0</span>
+						</div>
+						<div class="stat">
+							<span class="stat__label">Clicks / keys</span>
+							<span class="stat__value"
+								><span id="stat-clicks">0</span> · <span id="stat-keys">0</span></span
+							>
+						</div>
+						<div class="stat">
+							<span class="stat__label">Scroll total</span>
+							<span class="stat__value" id="stat-scroll">0</span>
+						</div>
+						<div class="stat">
+							<span class="stat__label">Click rate</span>
+							<span class="stat__value" id="stat-cps">0/s</span>
+						</div>
+					</div>
+					<div class="log-wrap">
+						<p class="panel__hint">Event log</p>
+						<div class="log" id="event-log" aria-live="polite"></div>
+					</div>
+				</section>
+			</main>
+
+			<footer class="footer">
+				<p>Free SKITZ utility — no install required.</p>
+				<p>
+					<a href="/apps/click-clack/">About</a>
+					·
+					<a href="/">skitz.games</a>
+				</p>
+			</footer>
+		</div>
+
+		<div class="toast" id="toast" role="status" aria-live="polite"></div>
+		<script src="./app.js" defer></script>
+	</body>
+</html>
