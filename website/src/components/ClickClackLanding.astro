@@ -1,0 +1,570 @@
+---
+interface Props {
+	apkHref: string;
+	cover: string;
+	heroArt: string;
+	phoneArt: string;
+}
+
+const { apkHref, cover, heroArt, phoneArt } = Astro.props;
+---
+
+<main class="site-main cc">
+	<section class="cc-hero" aria-labelledby="cc-title">
+		<div class="cc-hero__bg" aria-hidden="true"></div>
+		<div class="wrap cc-hero__grid">
+			<div class="cc-hero__copy">
+				<p class="cc-kicker">SKITZ · Android remote</p>
+				<h1 id="cc-title" class="cc-title">
+					<span class="cc-title__click">Click</span>
+					<span class="cc-title__clack">Clack</span>
+				</h1>
+				<p class="cc-line">Your phone is the mouse and keyboard.</p>
+				<p class="cc-sub">
+					Pair over Bluetooth. No PC install. Windows and Mac see a normal cursor and keys.
+				</p>
+				<div class="btn-row cc-cta">
+					<a class="btn cc-cta__primary" href={apkHref} download>Download APK</a>
+					<a class="btn btn-ghost" href="#install">How to pair</a>
+				</div>
+				<p class="cc-req">Android 9+ · Bluetooth HID · free sideload</p>
+			</div>
+
+			<div class="cc-stage" aria-hidden="true">
+				<img class="cc-stage__hero" src={heroArt} alt="" width="1200" height="900" />
+				<img class="cc-stage__phone" src={phoneArt} alt="" width="720" height="1280" />
+				<img class="cc-stage__mark" src={cover} alt="" width="320" height="320" />
+				<span class="cc-cursor"></span>
+				<span class="cc-key cc-key--a">A</span>
+				<span class="cc-key cc-key--w">W</span>
+				<span class="cc-key cc-key--enter">⏎</span>
+				<span class="cc-pulse"></span>
+			</div>
+		</div>
+	</section>
+
+	<section class="cc-moves" aria-label="What it does">
+		<div class="wrap cc-moves__row">
+			<div class="cc-move cc-move--red">
+				<span class="cc-move__n">01</span>
+				<strong>Touchpad</strong>
+				<em>Drag · tap · two-finger scroll</em>
+			</div>
+			<div class="cc-move cc-move--blue">
+				<span class="cc-move__n">02</span>
+				<strong>Keys</strong>
+				<em>Letters · mods · arrows</em>
+			</div>
+			<div class="cc-move cc-move--green">
+				<span class="cc-move__n">03</span>
+				<strong>Bluetooth</strong>
+				<em>Shows up as real HID</em>
+			</div>
+		</div>
+	</section>
+
+	<section class="section cc-pair" id="install">
+		<div class="wrap">
+			<p class="eyebrow">install</p>
+			<h2 class="section-title">Sideload. Pair. Click.</h2>
+			<p class="cc-pair__lead muted">
+				Four steps. No companion app on the PC — your phone becomes the input device.
+			</p>
+
+			<ol class="cc-steps">
+				<li>
+					<span class="cc-steps__n">1</span>
+					<div>
+						<strong>Download the APK</strong>
+						<p>Grab it on your Android phone from this page.</p>
+						<a class="btn" href={apkHref} download id="install-open">Download APK</a>
+					</div>
+				</li>
+				<li>
+					<span class="cc-steps__n">2</span>
+					<div>
+						<strong>Install Click Clack</strong>
+						<p>Allow installs from this browser if prompted, then open the app.</p>
+					</div>
+				</li>
+				<li>
+					<span class="cc-steps__n">3</span>
+					<div>
+						<strong>Make the phone discoverable</strong>
+						<p>Allow Bluetooth, tap Make phone discoverable.</p>
+					</div>
+				</li>
+				<li>
+					<span class="cc-steps__n">4</span>
+					<div>
+						<strong>Pair from the PC</strong>
+						<p>Bluetooth → Add device → select Click Clack → use Pad and Keys.</p>
+					</div>
+				</li>
+			</ol>
+
+			<p class="cc-warn muted">
+				Needs Android 9+ with Bluetooth HID Device support. Pixels are solid; some OEMs disable the
+				profile. iOS can’t do this.
+			</p>
+		</div>
+	</section>
+
+	<section class="section cc-free">
+		<div class="wrap">
+			<div class="sticker cc-free__card">
+				<p class="eyebrow">free</p>
+				<h2 class="section-title">Free APK. No PC install.</h2>
+				<p>
+					Sideload once, pair over Bluetooth, control the desk — no account, no store, no companion
+					software.
+				</p>
+			</div>
+		</div>
+	</section>
+</main>
+
+<style>
+	.cc-hero {
+		position: relative;
+		overflow: hidden;
+		padding: 1.25rem 0 2.5rem;
+		min-height: calc(100dvh - var(--header-h));
+		display: grid;
+		align-items: center;
+	}
+
+	.cc-hero__bg {
+		position: absolute;
+		inset: -10% -5% auto;
+		height: 85%;
+		background:
+			radial-gradient(ellipse 60% 55% at 78% 35%, rgba(30, 91, 184, 0.18), transparent 70%),
+			radial-gradient(ellipse 45% 50% at 18% 20%, rgba(224, 49, 46, 0.16), transparent 65%),
+			radial-gradient(ellipse 40% 40% at 55% 80%, rgba(232, 163, 23, 0.14), transparent 70%);
+		pointer-events: none;
+		z-index: 0;
+	}
+
+	.cc-hero__grid {
+		position: relative;
+		z-index: 1;
+		display: grid;
+		gap: 2rem;
+		align-items: center;
+	}
+
+	@media (min-width: 920px) {
+		.cc-hero__grid {
+			grid-template-columns: 1.05fr 0.95fr;
+			gap: 2.5rem;
+		}
+	}
+
+	.cc-kicker {
+		margin: 0 0 0.75rem;
+		font-family: var(--font-type);
+		font-size: 0.95rem;
+		color: var(--muted);
+		animation: slap-in 500ms var(--ease) both;
+	}
+
+	.cc-title {
+		display: grid;
+		gap: 0.15rem;
+		margin: 0 0 0.85rem;
+		font-size: clamp(3.6rem, 14vw, 7.2rem);
+		line-height: 0.82;
+		animation: slap-in 620ms var(--ease) both;
+	}
+
+	.cc-title__click {
+		color: var(--skitz-red);
+		transform: rotate(-1.5deg);
+		display: inline-block;
+	}
+
+	.cc-title__clack {
+		color: var(--skitz-blue);
+		transform: rotate(1.2deg);
+		display: inline-block;
+		margin-left: 0.08em;
+	}
+
+	.cc-line {
+		margin: 0 0 0.55rem;
+		font-family: var(--font-type);
+		font-size: clamp(1.15rem, 2.8vw, 1.55rem);
+		color: var(--mark);
+		animation: rise 700ms var(--ease) both;
+	}
+
+	.cc-sub {
+		margin: 0 0 1.35rem;
+		max-width: 28rem;
+		color: var(--muted);
+		font-size: 0.98rem;
+		animation: rise 780ms var(--ease) both;
+	}
+
+	.cc-cta {
+		animation: rise 860ms var(--ease) both;
+	}
+
+	.cc-cta__primary {
+		box-shadow: 5px 5px 0 var(--skitz-red) !important;
+		font-size: 1.05rem;
+		padding: 0.95rem 1.5rem;
+	}
+
+	.cc-req {
+		margin: 1rem 0 0;
+		font-family: var(--font-body);
+		font-size: 0.78rem;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+
+	.cc-stage {
+		position: relative;
+		min-height: min(58vw, 420px);
+		animation: slap-in 760ms var(--ease) both;
+	}
+
+	.cc-stage__hero {
+		width: 100%;
+		height: auto;
+		border: 3px solid var(--mark);
+		box-shadow: 10px 12px 0 var(--skitz-yellow);
+		transform: rotate(-1.4deg);
+		background: #fff;
+	}
+
+	.cc-stage__phone {
+		position: absolute;
+		right: 4%;
+		bottom: -8%;
+		width: min(38%, 170px);
+		border: 3px solid var(--mark);
+		box-shadow: 7px 8px 0 var(--skitz-blue);
+		transform: rotate(6deg);
+		background: #fffef9;
+		animation: phone-bob 4.2s ease-in-out infinite;
+	}
+
+	.cc-stage__mark {
+		position: absolute;
+		left: -2%;
+		bottom: -6%;
+		width: min(28%, 120px);
+		transform: rotate(-8deg);
+		filter: drop-shadow(5px 6px 0 rgba(22, 19, 16, 0.35));
+		animation: mark-wiggle 5s ease-in-out infinite;
+	}
+
+	.cc-cursor {
+		position: absolute;
+		width: 18px;
+		height: 18px;
+		border: 3px solid var(--mark);
+		border-radius: 0 80% 80% 80%;
+		background: var(--skitz-red);
+		box-shadow: 3px 3px 0 var(--mark);
+		top: 18%;
+		left: 58%;
+		transform: rotate(-18deg);
+		animation: cursor-skate 3.6s var(--ease) infinite;
+		z-index: 3;
+	}
+
+	.cc-key {
+		position: absolute;
+		z-index: 3;
+		display: grid;
+		place-items: center;
+		width: 2.1rem;
+		height: 2.1rem;
+		border: 2.5px solid var(--mark);
+		background: #fffef9;
+		font-family: var(--font-display);
+		font-size: 0.95rem;
+		box-shadow: 3px 3px 0 var(--skitz-green);
+		animation: key-slap 2.8s ease-in-out infinite;
+	}
+
+	.cc-key--a {
+		top: 8%;
+		right: 10%;
+		animation-delay: 0.2s;
+	}
+
+	.cc-key--w {
+		top: 22%;
+		right: -2%;
+		box-shadow: 3px 3px 0 var(--skitz-blue);
+		animation-delay: 0.9s;
+	}
+
+	.cc-key--enter {
+		bottom: 18%;
+		left: 8%;
+		width: 2.6rem;
+		box-shadow: 3px 3px 0 var(--skitz-red);
+		animation-delay: 1.4s;
+	}
+
+	.cc-pulse {
+		position: absolute;
+		left: 12%;
+		top: 12%;
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		background: var(--skitz-green);
+		border: 2px solid var(--mark);
+		box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.45);
+		animation: bt-pulse 2.2s ease-out infinite;
+		z-index: 3;
+	}
+
+	.cc-moves {
+		padding: 0.25rem 0 0.5rem;
+	}
+
+	.cc-moves__row {
+		display: grid;
+		gap: 0.85rem;
+	}
+
+	@media (min-width: 760px) {
+		.cc-moves__row {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 1rem;
+		}
+	}
+
+	.cc-move {
+		padding: 1.1rem 1rem 1rem;
+		border: 3px solid var(--mark);
+		background: rgba(255, 254, 249, 0.72);
+		transform: rotate(-0.6deg);
+		animation: rise 700ms var(--ease) both;
+	}
+
+	.cc-move:nth-child(2) {
+		transform: rotate(0.7deg);
+	}
+
+	.cc-move:nth-child(3) {
+		transform: rotate(-0.4deg);
+	}
+
+	.cc-move--red {
+		box-shadow: 6px 6px 0 var(--skitz-red);
+	}
+	.cc-move--blue {
+		box-shadow: 6px 6px 0 var(--skitz-blue);
+	}
+	.cc-move--green {
+		box-shadow: 6px 6px 0 var(--skitz-green);
+	}
+
+	.cc-move__n {
+		display: block;
+		font-family: var(--font-body);
+		font-size: 0.75rem;
+		letter-spacing: 0.08em;
+		color: var(--muted);
+		margin-bottom: 0.35rem;
+	}
+
+	.cc-move strong {
+		display: block;
+		font-family: var(--font-display);
+		font-size: 1.55rem;
+		text-transform: uppercase;
+		letter-spacing: -0.02em;
+		margin-bottom: 0.25rem;
+	}
+
+	.cc-move em {
+		font-family: var(--font-type);
+		font-style: normal;
+		color: var(--muted);
+		font-size: 0.95rem;
+	}
+
+	.cc-pair__lead {
+		max-width: 34rem;
+		margin-bottom: 1.75rem;
+		font-family: var(--font-type);
+	}
+
+	.cc-steps {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 1rem;
+	}
+
+	.cc-steps li {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 1rem;
+		align-items: start;
+		padding: 1.1rem 1.1rem 1.15rem;
+		border: 3px solid var(--mark);
+		background: rgba(255, 254, 249, 0.65);
+		box-shadow: 5px 5px 0 var(--skitz-yellow);
+	}
+
+	.cc-steps li:nth-child(2) {
+		box-shadow: 5px 5px 0 var(--skitz-red);
+	}
+	.cc-steps li:nth-child(3) {
+		box-shadow: 5px 5px 0 var(--skitz-blue);
+	}
+	.cc-steps li:nth-child(4) {
+		box-shadow: 5px 5px 0 var(--skitz-green);
+	}
+
+	.cc-steps__n {
+		display: grid;
+		place-items: center;
+		width: 2.4rem;
+		height: 2.4rem;
+		border: 2.5px solid var(--mark);
+		background: var(--mark);
+		color: var(--paper);
+		font-family: var(--font-display);
+		font-size: 1.15rem;
+	}
+
+	.cc-steps strong {
+		display: block;
+		font-family: var(--font-display);
+		font-size: 1.25rem;
+		text-transform: uppercase;
+		margin-bottom: 0.25rem;
+	}
+
+	.cc-steps p {
+		margin: 0 0 0.85rem;
+		color: var(--muted);
+		font-family: var(--font-type);
+		font-size: 0.98rem;
+	}
+
+	.cc-warn {
+		margin-top: 1.5rem;
+		max-width: 40rem;
+		font-size: 0.9rem;
+		font-family: var(--font-body);
+	}
+
+	.cc-free__card {
+		padding: 1.5rem 1.35rem 1.35rem;
+		max-width: 38rem;
+		transform: rotate(-0.8deg);
+	}
+
+	.cc-free__card p:last-child {
+		margin: 0;
+		font-family: var(--font-type);
+		font-size: 1.05rem;
+		color: var(--mark);
+	}
+
+	@keyframes cursor-skate {
+		0%,
+		100% {
+			transform: translate(0, 0) rotate(-18deg);
+		}
+		35% {
+			transform: translate(42px, 28px) rotate(-8deg);
+		}
+		65% {
+			transform: translate(-18px, 54px) rotate(-24deg);
+		}
+	}
+
+	@keyframes key-slap {
+		0%,
+		70%,
+		100% {
+			transform: translateY(0) rotate(-2deg);
+		}
+		78% {
+			transform: translateY(3px) rotate(2deg) scale(0.94);
+		}
+		86% {
+			transform: translateY(-4px) rotate(-3deg);
+		}
+	}
+
+	@keyframes phone-bob {
+		0%,
+		100% {
+			transform: rotate(6deg) translateY(0);
+		}
+		50% {
+			transform: rotate(4.5deg) translateY(-8px);
+		}
+	}
+
+	@keyframes mark-wiggle {
+		0%,
+		100% {
+			transform: rotate(-8deg);
+		}
+		50% {
+			transform: rotate(-4deg) translateY(-4px);
+		}
+	}
+
+	@keyframes bt-pulse {
+		0% {
+			box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.5);
+		}
+		70% {
+			box-shadow: 0 0 0 16px rgba(46, 125, 50, 0);
+		}
+		100% {
+			box-shadow: 0 0 0 0 rgba(46, 125, 50, 0);
+		}
+	}
+
+	@media (max-width: 719px) {
+		.cc-stage {
+			min-height: 280px;
+			margin-top: 0.5rem;
+		}
+
+		.cc-stage__phone {
+			width: 120px;
+			bottom: -4%;
+		}
+
+		.cc-stage__mark {
+			width: 88px;
+		}
+
+		.cc-key--w {
+			right: 2%;
+		}
+	}
+</style>
+
+<script>
+	function focusInstall() {
+		const hash = window.location.hash;
+		if (hash !== '#install' && hash !== '#downloads') return;
+		const block = document.getElementById('install');
+		if (!block) return;
+		block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
+	focusInstall();
+	window.addEventListener('hashchange', focusInstall);
+</script>

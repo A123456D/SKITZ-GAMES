@@ -3,6 +3,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 import SiteHeader from '../../../components/SiteHeader.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
 import DownloadPanel from '../../../components/DownloadPanel.astro';
+import ClickClackLanding from '../../../components/ClickClackLanding.astro';
 import { getCollection, render } from 'astro:content';
 
 export async function getStaticPaths() {
@@ -27,203 +28,217 @@ const {
 	playStoreUrl,
 	genre,
 } = app.data;
+
+const isClickClack = app.id === 'click-clack';
+const apkHref = downloads.android ?? '/apps/click-clack/downloads/click-clack.apk';
 ---
 
 <BaseLayout title={title} description={summary}>
 	<SiteHeader />
-	<main class="site-main">
-		<section class="detail-hero">
-			<div class="wrap detail-hero__grid">
-				<div class="detail-hero__copy">
-					{genre && <p class="eyebrow">{genre}</p>}
-					<h1>{title}</h1>
-					{tagline && <p class="tagline">{tagline}</p>}
-					<p class="muted">{summary}</p>
-					<div class="btn-row">
-						{
-							downloads.android && !platforms.web ? (
-								<a class="btn" href={downloads.android} download>
-									Download APK
+	{
+		isClickClack ? (
+			<ClickClackLanding
+				apkHref={apkHref}
+				cover={cover}
+				heroArt="/images/click-clack-hero.png"
+				phoneArt="/images/click-clack-phone.png"
+			/>
+		) : (
+			<main class="site-main">
+				<section class="detail-hero">
+					<div class="wrap detail-hero__grid">
+						<div class="detail-hero__copy">
+							{genre && <p class="eyebrow">{genre}</p>}
+							<h1>{title}</h1>
+							{tagline && <p class="tagline">{tagline}</p>}
+							<p class="muted">{summary}</p>
+							<div class="btn-row">
+								{downloads.android && !platforms.web ? (
+									<a class="btn" href={downloads.android} download>
+										Download APK
+									</a>
+								) : platforms.web ? (
+									<a class="btn" href={`/apps/${app.id}/play/`}>
+										Open app
+									</a>
+								) : null}
+								<a class="btn btn-ghost" href="#install">
+									{downloads.android && !platforms.web ? 'How to install' : 'Download'}
 								</a>
-							) : platforms.web ? (
-								<a class="btn" href={`/apps/${app.id}/play/`}>
-									Open app
-								</a>
-							) : null
-						}
-						<a class="btn btn-ghost" href="#install">
-							{downloads.android && !platforms.web ? 'How to install' : 'Download'}
-						</a>
+							</div>
+						</div>
+						<div class={`detail-hero__art${preview ? ' detail-hero__art--pair' : ''}`}>
+							<img src={cover} alt={`${title} cover art`} width="640" height="640" />
+							{preview && (
+								<img
+									class="detail-hero__preview"
+									src={preview}
+									alt={`${title} preview`}
+									width="480"
+									height="780"
+								/>
+							)}
+						</div>
 					</div>
-				</div>
-				<div class={`detail-hero__art${preview ? ' detail-hero__art--pair' : ''}`}>
-					<img src={cover} alt={`${title} cover art`} width="640" height="640" />
-					{
-						preview && (
-							<img
-								class="detail-hero__preview"
-								src={preview}
-								alt={`${title} preview`}
-								width="480"
-								height="780"
-							/>
-						)
-					}
-				</div>
-			</div>
-		</section>
+				</section>
 
-		<section class="section">
-			<div class="wrap prose">
-				<h2 class="section-title">About</h2>
-				<Content />
-			</div>
-		</section>
+				<section class="section">
+					<div class="wrap prose">
+						<h2 class="section-title">About</h2>
+						<Content />
+					</div>
+				</section>
 
-		<section class="section" id="downloads">
-			<div class="wrap">
-				<DownloadPanel
-					slug={app.id}
-					title={title}
-					downloads={downloads}
-					appStoreUrl={appStoreUrl}
-					playStoreUrl={playStoreUrl}
-					platforms={platforms}
-					catalog="apps"
-				/>
-			</div>
-		</section>
+				<section class="section" id="downloads">
+					<div class="wrap">
+						<DownloadPanel
+							slug={app.id}
+							title={title}
+							downloads={downloads}
+							appStoreUrl={appStoreUrl}
+							playStoreUrl={playStoreUrl}
+							platforms={platforms}
+							catalog="apps"
+						/>
+					</div>
+				</section>
 
-		<section class="section free-note">
-			<div class="wrap">
-				<p class="eyebrow">free</p>
-				<h2 class="section-title">
-					{downloads.android && !platforms.web ? 'Free APK. No PC install.' : 'Use free. Install free.'}
-				</h2>
-				<div class="sticker free-card">
-					<p>
-						{
-							downloads.android && !platforms.web
-								? 'Sideload the Android APK, pair over Bluetooth, and control your PC — no account, no companion app on the computer.'
-								: 'Full web use and Android install from Chrome — no account wall, no paywall on the desk.'
-						}
-					</p>
-				</div>
-			</div>
-		</section>
-	</main>
+				<section class="section free-note">
+					<div class="wrap">
+						<p class="eyebrow">free</p>
+						<h2 class="section-title">
+							{downloads.android && !platforms.web
+								? 'Free APK. No PC install.'
+								: 'Use free. Install free.'}
+						</h2>
+						<div class="sticker free-card">
+							<p>
+								{downloads.android && !platforms.web
+									? 'Sideload the Android APK, pair over Bluetooth, and control your PC — no account, no companion app on the computer.'
+									: 'Full web use and Android install from Chrome — no account wall, no paywall on the desk.'}
+							</p>
+						</div>
+					</div>
+				</section>
+			</main>
+		)
+	}
 	<SiteFooter />
 </BaseLayout>
 
-<style>
-	.detail-hero {
-		padding: 2.5rem 0 1rem;
-		animation: rise 550ms var(--ease);
-	}
+{
+	!isClickClack && (
+		<style>
+			.detail-hero {
+				padding: 2.5rem 0 1rem;
+				animation: rise 550ms var(--ease);
+			}
 
-	.detail-hero__grid {
-		display: grid;
-		gap: 2rem;
-		align-items: center;
-	}
+			.detail-hero__grid {
+				display: grid;
+				gap: 2rem;
+				align-items: center;
+			}
 
-	@media (min-width: 860px) {
-		.detail-hero__grid {
-			grid-template-columns: 1.1fr 0.9fr;
-			gap: 2.5rem;
-		}
-	}
+			@media (min-width: 860px) {
+				.detail-hero__grid {
+					grid-template-columns: 1.1fr 0.9fr;
+					gap: 2.5rem;
+				}
+			}
 
-	.detail-hero h1 {
-		font-size: clamp(2.8rem, 8vw, 5rem);
-		margin-bottom: 0.35rem;
-	}
+			.detail-hero h1 {
+				font-size: clamp(2.8rem, 8vw, 5rem);
+				margin-bottom: 0.35rem;
+			}
 
-	.tagline {
-		font-family: var(--font-type);
-		font-size: 1.2rem;
-		margin-bottom: 0.75rem;
-		color: var(--paper);
-	}
+			.tagline {
+				font-family: var(--font-type);
+				font-size: 1.2rem;
+				margin-bottom: 0.75rem;
+				color: var(--mark);
+			}
 
-	.detail-hero__art {
-		max-width: 340px;
-		margin-inline: auto;
-		background: #fff;
-		padding: 0.65rem;
-		box-shadow: 8px 9px 0 var(--skitz-blue);
-		clip-path: polygon(
-			1.5% 2%,
-			8% 0%,
-			18% 2.5%,
-			32% 0.5%,
-			48% 2%,
-			62% 0%,
-			78% 2.2%,
-			92% 0.8%,
-			100% 3%,
-			98.5% 18%,
-			100% 34%,
-			98% 52%,
-			100% 68%,
-			98.5% 84%,
-			100% 97%,
-			86% 100%,
-			70% 98%,
-			52% 100%,
-			34% 98.5%,
-			18% 100%,
-			4% 97.5%,
-			0% 84%,
-			1.5% 68%,
-			0% 50%,
-			2% 32%,
-			0% 14%
-		);
-		transform: rotate(1.4deg);
-	}
+			.detail-hero__art {
+				max-width: 340px;
+				margin-inline: auto;
+				background: #fff;
+				padding: 0.65rem;
+				box-shadow: 8px 9px 0 var(--skitz-blue);
+				clip-path: polygon(
+					1.5% 2%,
+					8% 0%,
+					18% 2.5%,
+					32% 0.5%,
+					48% 2%,
+					62% 0%,
+					78% 2.2%,
+					92% 0.8%,
+					100% 3%,
+					98.5% 18%,
+					100% 34%,
+					98% 52%,
+					100% 68%,
+					98.5% 84%,
+					100% 97%,
+					86% 100%,
+					70% 98%,
+					52% 100%,
+					34% 98.5%,
+					18% 100%,
+					4% 97.5%,
+					0% 84%,
+					1.5% 68%,
+					0% 50%,
+					2% 32%,
+					0% 14%
+				);
+				transform: rotate(1.4deg);
+			}
 
-	.detail-hero__art--pair {
-		max-width: 520px;
-		display: grid;
-		grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.05fr);
-		gap: 0.55rem;
-		align-items: center;
-		clip-path: none;
-		border-radius: 0.25rem;
-		transform: rotate(0.6deg);
-	}
+			.detail-hero__art--pair {
+				max-width: 520px;
+				display: grid;
+				grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.05fr);
+				gap: 0.55rem;
+				align-items: center;
+				clip-path: none;
+				border-radius: 0.25rem;
+				transform: rotate(0.6deg);
+			}
 
-	.detail-hero__art img {
-		width: 100%;
-		height: auto;
-		display: block;
-	}
+			.detail-hero__art img {
+				width: 100%;
+				height: auto;
+				display: block;
+			}
 
-	.detail-hero__preview {
-		aspect-ratio: 9 / 16;
-		object-fit: cover;
-		object-position: top center;
-		background: #111;
-	}
+			.detail-hero__preview {
+				aspect-ratio: 9 / 16;
+				object-fit: cover;
+				object-position: top center;
+				background: #111;
+			}
 
-	.prose :global(p) {
-		max-width: 40rem;
-		color: var(--muted);
-		font-family: var(--font-type);
-	}
+			.prose :global(p) {
+				max-width: 40rem;
+				color: var(--muted);
+				font-family: var(--font-type);
+			}
 
-	.free-card {
-		padding: 1.35rem 1.25rem 1.2rem;
-		max-width: 36rem;
-		transform: rotate(-0.8deg);
-		margin-top: 0.5rem;
-	}
+			.free-card {
+				padding: 1.35rem 1.25rem 1.2rem;
+				max-width: 36rem;
+				transform: rotate(-0.8deg);
+				margin-top: 0.5rem;
+			}
 
-	.free-card p {
-		margin: 0;
-		font-family: var(--font-type);
-		color: var(--mark);
-		font-size: 1.05rem;
-	}
-</style>
+			.free-card p {
+				margin: 0;
+				font-family: var(--font-type);
+				color: var(--mark);
+				font-size: 1.05rem;
+			}
+		</style>
+	)
+}

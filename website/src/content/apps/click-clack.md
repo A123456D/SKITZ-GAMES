@@ -3,6 +3,7 @@ title: Click Clack
 tagline: Your phone is the mouse and keyboard.
 summary: A free Android app that pairs over Bluetooth and shows up on your PC as a normal mouse + keyboard. No PC install — just the APK.
 cover: /images/click-clack-logo.png
+preview: /images/click-clack-phone.png
 screenshots: []
 featured: true
 released: true
