@@ -34,7 +34,8 @@ const desktop = [
 const androidHref = downloads.android;
 const showPlayStore = Boolean(playStoreUrl);
 const playHref = `/${catalog}/${slug}/play/`;
-const canInstallAndroid = platforms.web || platforms.android;
+const apkFirst = Boolean(androidHref) && !platforms.web;
+const canInstallPwa = !apkFirst && (platforms.web || platforms.android);
 const openLabel = catalog === 'apps' ? 'Open app to install' : 'Open game to install';
 const openVerb = catalog === 'apps' ? 'app' : 'game';
 ---
@@ -42,12 +43,63 @@ const openVerb = catalog === 'apps' ? 'app' : 'game';
 <section class="downloads" aria-labelledby="downloads-heading">
 	<h2 id="downloads-heading" class="section-title">Download &amp; install</h2>
 	<p class="muted intro">
-		{catalog === 'apps' ? 'Use free in the browser.' : 'Play free in the browser.'} On Android,
-		install {title} from Chrome — home-screen icon, fullscreen, no store required.
+		{
+			apkFirst ? (
+				<>
+					Download the free Android APK, install it on your phone, then pair over Bluetooth. No PC
+					software required.
+				</>
+			) : (
+				<>
+					{catalog === 'apps' ? 'Use free in the browser.' : 'Play free in the browser.'} On Android,
+					install {title} from Chrome — home-screen icon, fullscreen, no store required.
+				</>
+			)
+		}
 	</p>
 
 	{
-		canInstallAndroid && (
+		apkFirst && androidHref && (
+			<div class="block install-block" id="install">
+				<h3>Android — APK</h3>
+				<div class="btn-row">
+					<a class="btn" href={androidHref} download id="install-open">
+						Download APK
+					</a>
+					{showPlayStore && (
+						<a class="btn btn-ghost" href={playStoreUrl} rel="noopener noreferrer" target="_blank">
+							Google Play
+						</a>
+					)}
+				</div>
+				<details class="help" id="install-help" open>
+					<summary>How to sideload &amp; pair</summary>
+					<ol>
+						<li>
+							On your Android phone, tap <strong>Download APK</strong> and open the file.
+						</li>
+						<li>
+							If prompted, allow installs from this browser, then install <strong>{title}</strong>.
+						</li>
+						<li>
+							Open the app → <strong>Allow Bluetooth</strong> → <strong>Make phone discoverable</strong>.
+						</li>
+						<li>
+							On the PC: Bluetooth settings → Add device → select <strong>Click Clack</strong> and pair.
+						</li>
+						<li>When the app says Connected, use the Pad and Keys tabs.</li>
+					</ol>
+					<p class="muted tip">
+						<strong>Needs Android 9+</strong> with Bluetooth HID Device support. Some OEM phones disable
+						this profile — Pixels are a solid bet. iOS cannot host HID remotes like this.
+					</p>
+				</details>
+			</div>
+		)
+	}
+
+	{
+		canInstallPwa && (
 			<div class="block install-block" id="install">
 				<h3>Android — install</h3>
 				<div class="btn-row">
@@ -102,7 +154,7 @@ const openVerb = catalog === 'apps' ? 'app' : 'game';
 	}
 
 	{
-		desktop.length === 0 && !canInstallAndroid && !androidHref && !showPlayStore && (
+		desktop.length === 0 && !apkFirst && !canInstallPwa && !androidHref && !showPlayStore && (
 			<p class="muted">Downloads are not published yet.</p>
 		)
 	}

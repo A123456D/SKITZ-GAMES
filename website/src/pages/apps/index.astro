@@ -8,7 +8,7 @@ import { getCollection } from 'astro:content';
 const apps = (await getCollection('apps')).sort((a, b) => a.data.title.localeCompare(b.data.title));
 ---
 
-<BaseLayout title="Apps" description="Browse SKITZ apps — free tools in the browser, install on Android.">
+<BaseLayout title="Apps" description="Browse SKITZ apps — free tools and Android downloads.">
 	<SiteHeader />
 	<main class="site-main">
 		<section class="section">
@@ -16,7 +16,7 @@ const apps = (await getCollection('apps')).sort((a, b) => a.data.title.localeCom
 				<p class="eyebrow">catalog</p>
 				<h1 class="section-title">Apps</h1>
 				<p class="lead muted">
-					Free utilities and tools — open in the browser, install on Android.
+					Free utilities and tools — some in the browser, some as Android downloads.
 				</p>
 				<div class="list">
 					{

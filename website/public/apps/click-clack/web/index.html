@@ -2,150 +2,83 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-		<meta name="theme-color" content="#f3eee4" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Click Clack — get the Android app</title>
 		<meta
 			name="description"
-			content="Click Clack — test your mouse and keyboard in the browser. See key presses, clicks, scroll, and pointer trails."
+			content="Click Clack is an Android Bluetooth mouse & keyboard remote. Download the free APK from SKITZ."
 		/>
-		<link rel="manifest" href="./manifest.webmanifest" />
-		<link rel="icon" type="image/png" href="./icons/icon-192.png" />
-		<link rel="apple-touch-icon" href="./icons/icon-192.png" />
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-		<link
-			href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;600&family=Special+Elite&display=swap"
-			rel="stylesheet"
-		/>
-		<link rel="stylesheet" href="./styles.css?v=2" />
-		<title>Click Clack · SKITZ</title>
+		<meta http-equiv="refresh" content="0;url=/apps/click-clack/#install" />
+		<link rel="canonical" href="/apps/click-clack/" />
+		<style>
+			:root {
+				color-scheme: dark;
+				--ink: #1a1714;
+				--paper: #f4efe6;
+				--red: #e23d28;
+				--blue: #2f6fed;
+				--yellow: #e8a317;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				min-height: 100vh;
+				display: grid;
+				place-items: center;
+				padding: 1.5rem;
+				font-family: 'IBM Plex Mono', ui-monospace, monospace;
+				background:
+					radial-gradient(circle at 12% 18%, rgba(226, 61, 40, 0.18), transparent 42%),
+					radial-gradient(circle at 88% 12%, rgba(47, 111, 237, 0.16), transparent 40%),
+					linear-gradient(160deg, #14110f, #221c18 55%, #1a1714);
+				color: var(--paper);
+			}
+			.card {
+				max-width: 28rem;
+				padding: 1.5rem 1.35rem;
+				border: 3px solid var(--paper);
+				background: rgba(255, 254, 249, 0.06);
+				box-shadow: 8px 8px 0 var(--yellow);
+			}
+			h1 {
+				margin: 0 0 0.5rem;
+				font-family: 'Archivo Black', Impact, sans-serif;
+				font-size: clamp(2rem, 8vw, 2.8rem);
+				letter-spacing: -0.03em;
+			}
+			p {
+				margin: 0 0 1rem;
+				line-height: 1.45;
+				color: rgba(244, 239, 230, 0.78);
+			}
+			a {
+				display: inline-block;
+				padding: 0.7rem 1rem;
+				border: 2px solid var(--paper);
+				background: var(--paper);
+				color: var(--ink);
+				text-decoration: none;
+				font-weight: 700;
+			}
+			a:hover {
+				background: var(--red);
+				border-color: var(--red);
+				color: #fff;
+			}
+		</style>
 	</head>
 	<body>
-		<div class="app">
-			<header class="topbar">
-				<a class="brand" href="/apps/click-clack/" title="Click Clack on SKITZ">
-					<img class="brand__mark" src="./icons/icon-192.png" alt="" width="64" height="64" />
-					<span class="brand__text">
-						<span class="brand__title">Click Clack</span>
-						<span class="brand__sub">Mouse &amp; keyboard desk check</span>
-					</span>
-				</a>
-				<div class="topbar__actions">
-					<button class="btn btn--green" type="button" id="btn-copy">Copy last key</button>
-					<button class="btn btn--desk-only" type="button" id="btn-lock">Lock pointer</button>
-					<button class="btn btn--red" type="button" id="btn-clear">Clear</button>
-					<a class="btn" href="/apps/">SKITZ apps</a>
-				</div>
-			</header>
-
-			<main class="main">
-				<section class="panel mouse-panel" aria-labelledby="mouse-title">
-					<div class="panel__head">
-						<h2 class="panel__title" id="mouse-title">Touch pad</h2>
-						<p class="panel__hint">Drag · tap · scroll</p>
-					</div>
-					<div
-						class="mouse-stage"
-						id="mouse-stage"
-						role="application"
-						aria-label="Pointer testing pad"
-						tabindex="0"
-					>
-						<div class="crosshair" id="crosshair" aria-hidden="true"></div>
-					</div>
-					<div class="mouse-device" aria-label="Mouse buttons">
-						<button class="mouse-btn mouse-btn--left" type="button" data-mouse="left">L</button>
-						<button class="mouse-btn mouse-btn--right" type="button" data-mouse="right">R</button>
-						<button class="mouse-btn mouse-btn--middle" type="button" data-mouse="middle">M</button>
-						<div class="mouse-btn mouse-btn--wheel" data-mouse="wheel">
-							<button class="wheel-hit" type="button" data-wheel="up">Wheel ↑</button>
-							<button class="wheel-hit wheel-hit--down" type="button" data-wheel="down">
-								Wheel ↓
-							</button>
-						</div>
-					</div>
-				</section>
-
-				<section class="panel keyboard-panel" aria-labelledby="kb-title">
-					<div class="panel__head">
-						<h2 class="panel__title" id="kb-title">Keyboard</h2>
-						<p class="panel__hint">Tap keys or type below</p>
-					</div>
-					<div class="type-catcher">
-						<label class="sr-only" for="type-catcher-input">Type here to open the soft keyboard</label>
-						<input
-							id="type-catcher-input"
-							class="type-catcher__input"
-							type="text"
-							autocomplete="off"
-							autocapitalize="off"
-							autocorrect="off"
-							spellcheck="false"
-							enterkeyhint="done"
-							placeholder="Tap here to type with your phone keyboard"
-						/>
-						<p class="type-catcher__hint">Opens your soft keyboard — keys light up as you type.</p>
-					</div>
-					<div class="keyboard" id="keyboard"></div>
-					<div class="mods" aria-label="modifier keys">
-						<span class="mod-chip" data-mod="ctrl">Ctrl</span>
-						<span class="mod-chip" data-mod="alt">Alt</span>
-						<span class="mod-chip" data-mod="shift">Shift</span>
-						<span class="mod-chip" data-mod="meta">Meta</span>
-					</div>
-				</section>
-
-				<section class="panel stats-panel" aria-labelledby="stats-title">
-					<div class="panel__head">
-						<h2 class="panel__title" id="stats-title">Live readouts</h2>
-						<p class="panel__hint">What your gear just did</p>
-					</div>
-					<div class="stats-grid">
-						<div class="stat">
-							<span class="stat__label">Last key</span>
-							<span class="stat__value" id="stat-last-key">—</span>
-						</div>
-						<div class="stat">
-							<span class="stat__label">Code</span>
-							<span class="stat__value" id="stat-code">—</span>
-						</div>
-						<div class="stat">
-							<span class="stat__label">Pointer</span>
-							<span class="stat__value" id="stat-coords">0, 0</span>
-						</div>
-						<div class="stat">
-							<span class="stat__label">Clicks / keys</span>
-							<span class="stat__value"
-								><span id="stat-clicks">0</span> · <span id="stat-keys">0</span></span
-							>
-						</div>
-						<div class="stat">
-							<span class="stat__label">Scroll total</span>
-							<span class="stat__value" id="stat-scroll">0</span>
-						</div>
-						<div class="stat">
-							<span class="stat__label">Click rate</span>
-							<span class="stat__value" id="stat-cps">0/s</span>
-						</div>
-					</div>
-					<div class="log-wrap">
-						<p class="panel__hint">Event log</p>
-						<div class="log" id="event-log" aria-live="polite"></div>
-					</div>
-				</section>
-			</main>
-
-			<footer class="footer">
-				<p>Free SKITZ utility — no install required.</p>
-				<p>
-					<a href="/apps/click-clack/">About</a>
-					·
-					<a href="/">skitz.games</a>
-				</p>
-			</footer>
-		</div>
-
-		<div class="toast" id="toast" role="status" aria-live="polite"></div>
-		<script src="./app.js?v=2" defer></script>
+		<main class="card">
+			<h1>CLICK CLACK</h1>
+			<p>
+				The browser tester is gone. Click Clack is an Android Bluetooth remote — your phone becomes a
+				mouse and keyboard for the PC.
+			</p>
+			<p>
+				<a href="/apps/click-clack/#install">Get the Android APK</a>
+			</p>
+		</main>
 	</body>
 </html>

@@ -1,5 +1,7 @@
-# Click Clack (web)
+# Click Clack
 
-Mouse & keyboard desk check — live key highlights, pointer trails, click/scroll readouts.
+Android Bluetooth HID remote (mouse + keyboard). The product is the APK under
+`downloads/click-clack.apk`, built from `click-clack/android/`.
 
-App path: `/apps/click-clack/play/`
+This `web/` folder is only a short landing page that points people at the Apps
+catalog download — not a browser controller.

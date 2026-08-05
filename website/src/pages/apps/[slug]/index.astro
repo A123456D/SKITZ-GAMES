@@ -41,13 +41,19 @@ const {
 					<p class="muted">{summary}</p>
 					<div class="btn-row">
 						{
-							platforms.web && (
+							downloads.android && !platforms.web ? (
+								<a class="btn" href={downloads.android} download>
+									Download APK
+								</a>
+							) : platforms.web ? (
 								<a class="btn" href={`/apps/${app.id}/play/`}>
 									Open app
 								</a>
-							)
+							) : null
 						}
-						<a class="btn btn-ghost" href="#install">Download</a>
+						<a class="btn btn-ghost" href="#install">
+							{downloads.android && !platforms.web ? 'How to install' : 'Download'}
+						</a>
 					</div>
 				</div>
 				<div class={`detail-hero__art${preview ? ' detail-hero__art--pair' : ''}`}>
@@ -91,10 +97,16 @@ const {
 		<section class="section free-note">
 			<div class="wrap">
 				<p class="eyebrow">free</p>
-				<h2 class="section-title">Use free. Install free.</h2>
+				<h2 class="section-title">
+					{downloads.android && !platforms.web ? 'Free APK. No PC install.' : 'Use free. Install free.'}
+				</h2>
 				<div class="sticker free-card">
 					<p>
-						Full web use and Android install from Chrome — no account wall, no paywall on the desk.
+						{
+							downloads.android && !platforms.web
+								? 'Sideload the Android APK, pair over Bluetooth, and control your PC — no account, no companion app on the computer.'
+								: 'Full web use and Android install from Chrome — no account wall, no paywall on the desk.'
+						}
 					</p>
 				</div>
 			</div>

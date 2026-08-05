@@ -1,0 +1,2 @@
+﻿-keep class games.skitz.clickclack.** { *; }
+-dontwarn androidx.compose.**

@@ -1,29 +1,31 @@
 ---
 title: Click Clack
-tagline: Mash keys. Trace the mouse. Trust your gear.
-summary: A free browser desk check for mouse and keyboard — live key highlights, pointer trails, click rate, and scroll readouts. No install required.
+tagline: Your phone is the mouse and keyboard.
+summary: A free Android app that pairs over Bluetooth and shows up on your PC as a normal mouse + keyboard. No PC install — just the APK.
 cover: /images/click-clack-logo.png
 screenshots: []
 featured: true
 released: true
 genre: Utility
 platforms:
-  web: true
+  web: false
   windows: false
   android: true
   macos: false
   linux: false
-  ios: true
+  ios: false
 webPlayPath: web/index.html
-downloads: {}
+downloads:
+  android: /apps/click-clack/downloads/click-clack.apk
 ---
 
-**Click Clack** is a SKITZ utility for checking your input gear in the browser.
+**Click Clack** turns your Android phone into a Bluetooth HID remote for your PC.
 
-- Type anywhere — the keyboard lights up with the real key codes
-- Move and click on the mouse pad for trails, button states, and click rate
-- Scroll the wheel, lock the pointer, copy the last key, clear the counters
+- Pair over Bluetooth — Windows and macOS see a normal mouse + keyboard
+- Touchpad: drag to move, tap to click, two-finger scroll and right-click
+- On-screen keyboard for letters, numbers, modifiers, and arrows
+- No PC companion app and no internet required after download
 
-Handy for new mice, sticky keys, or just watching the desk light up.
+**Needs Android 9+** with Bluetooth HID Device support. Many Pixels work well; some OEM phones disable the profile.
 
-**Free to use** online. Open **Open app** to jump straight into the desk.
+**Free to sideload.** Download the APK below, allow installs from this browser, then pair from your PC’s Bluetooth settings.
