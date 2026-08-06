@@ -127,6 +127,8 @@ class MainActivity : ComponentActivity() {
         val controller = hidService?.controller ?: return
         bootMessage = ""
         controller.start()
+        // Re-check HID profile — phone BT "Connected" can exist without a working mouse link.
+        controller.refreshHostLink()
         hidService?.updateNotification("Ready to pair")
     }
 

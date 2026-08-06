@@ -181,20 +181,9 @@ class HidController(private val context: Context) {
             emit(HidConnectionState.BluetoothOff, message = "Turn on Bluetooth")
             return
         }
-        // Already good — don't tear down a live registration (Samsung races hard on restart).
+        // Already registered — verify the real HID link (Bluetooth paired ≠ mouse working).
         if (registered && hidDevice != null) {
-            if (hostDevice != null && isConnectedTo(hostDevice)) {
-                emit(
-                    HidConnectionState.Connected,
-                    hostName = safeName(hostDevice),
-                    message = "Connected — use Pad and Keys",
-                )
-            } else if (_state.value.connection != HidConnectionState.Connected) {
-                emit(
-                    HidConnectionState.WaitingForHost,
-                    message = "Ready — make phone discoverable, then pair from the PC",
-                )
-            }
+            refreshHostLink()
             return
         }
         if (starting) {
@@ -281,6 +270,59 @@ class HidController(private val context: Context) {
 
     fun makeDiscoverable(): Boolean = adapter != null
 
+    /**
+     * Re-check HID profile connection against the Bluetooth stack.
+     * Phone Bluetooth can show the laptop as "Connected" while HID mouse/keyboard is dead.
+     */
+    @SuppressLint("MissingPermission")
+    fun refreshHostLink() {
+        val hid = hidDevice
+        if (!registered || hid == null) {
+            if (wantRunning && !starting && !intentionalStop) {
+                // Fall through to normal start path when called from UI.
+            }
+            return
+        }
+        try {
+            // Prefer an already-known host if the profile says connected.
+            val current = hostDevice
+            if (current != null && hid.getConnectionState(current) == BluetoothProfile.STATE_CONNECTED) {
+                emit(
+                    HidConnectionState.Connected,
+                    hostName = safeName(current),
+                    message = "Connected — use Pad and Keys",
+                )
+                return
+            }
+            // Scan bonded PCs for a live HID host session.
+            for (device in bondedDevices()) {
+                if (hid.getConnectionState(device) == BluetoothProfile.STATE_CONNECTED) {
+                    hostDevice = device
+                    emit(
+                        HidConnectionState.Connected,
+                        hostName = safeName(device),
+                        message = "Connected — use Pad and Keys",
+                    )
+                    return
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "refreshHostLink", e)
+        }
+        hostDevice = null
+        val tip =
+            if (bondedDevices().isEmpty()) {
+                "Ready — make phone discoverable, then pair from the PC"
+            } else {
+                "Paired in Bluetooth ≠ HID. Tap Connect HID under Known devices (keep app open)"
+            }
+        emit(
+            HidConnectionState.WaitingForHost,
+            hostName = null,
+            message = tip,
+        )
+    }
+
     @SuppressLint("MissingPermission")
     fun connectTo(device: BluetoothDevice, fromAuto: Boolean = false) {
         val hid = hidDevice ?: return
@@ -288,19 +330,9 @@ class HidController(private val context: Context) {
             emit(HidConnectionState.Error, message = "HID not registered yet — tap Restart HID")
             return
         }
-        // Already linked to this host — skip. Re-calling connect() makes Android toast
-        // "Can't connect to …" even though the HID session is fine.
-        if (isConnectedTo(device) || hostDevice?.address == device.address) {
-            hostDevice = device
-            emit(
-                HidConnectionState.Connected,
-                hostName = safeName(device),
-                message = "Connected — use Pad and Keys",
-            )
-            return
-        }
         try {
             val state = hid.getConnectionState(device)
+            // Only treat as linked when the HID profile says so — not merely bonded / remembered.
             if (state == BluetoothProfile.STATE_CONNECTED) {
                 hostDevice = device
                 emit(
@@ -318,19 +350,34 @@ class HidController(private val context: Context) {
                 )
                 return
             }
+            // Drop stale host so we don't falsely claim Connected.
+            if (hostDevice?.address == device.address) hostDevice = null
             emit(
                 HidConnectionState.WaitingForHost,
                 hostName = safeName(device),
-                message = "Connecting to ${safeName(device)}…",
+                message = "Connecting HID to ${safeName(device)}…",
             )
             val ok = hid.connect(device)
             if (!ok) {
                 Log.w(tag, "connect() returned false for ${device.address} auto=$fromAuto")
-                // Stay waiting — system toast already fires; don't flip to Error/CONNECTED mismatch.
                 emit(
                     HidConnectionState.WaitingForHost,
                     hostName = safeName(device),
-                    message = "PC refused the link — wait a second, then tap Connect again",
+                    message = "HID connect failed — on PC: forget ClickClack, then pair again with this screen open",
+                )
+            } else {
+                // connect() is async; verify shortly in case STATE_CONNECTED never arrives.
+                mainHandler.postDelayed(
+                    {
+                        if (!isConnectedTo(device) && wantRunning && registered) {
+                            emit(
+                                HidConnectionState.WaitingForHost,
+                                hostName = safeName(device),
+                                message = "Still no HID link — forget device on PC & phone, pair again with app open",
+                            )
+                        }
+                    },
+                    4_000L,
                 )
             }
         } catch (e: SecurityException) {
@@ -352,9 +399,16 @@ class HidController(private val context: Context) {
     }
 
     fun sendMouse(dx: Int, dy: Int, buttons: Int = 0, wheel: Int = 0): Boolean {
-        val host = hostDevice ?: return false
-        val hid = hidDevice ?: return false
-        if (!registered) return false
+        val host = hostDevice
+        val hid = hidDevice
+        if (host == null || hid == null || !registered) {
+            onReportFailed("No HID host — go to Connect and tap Connect under Known devices")
+            return false
+        }
+        if (!isConnectedTo(host)) {
+            onReportFailed("HID link dropped — tap Connect under Known devices")
+            return false
+        }
         val report =
             byteArrayOf(
                 buttons.toByte(),
@@ -363,9 +417,12 @@ class HidController(private val context: Context) {
                 clampByte(wheel),
             )
         return try {
-            hid.sendReport(host, HidDescriptors.MOUSE_REPORT_ID, report)
+            val ok = hid.sendReport(host, HidDescriptors.MOUSE_REPORT_ID, report)
+            if (!ok) onReportFailed("Mouse report blocked — reopen app and tap Connect")
+            ok
         } catch (e: SecurityException) {
             Log.w(tag, "mouse report", e)
+            onReportFailed("Bluetooth permission denied")
             false
         }
     }
@@ -399,17 +456,37 @@ class HidController(private val context: Context) {
     }
 
     private fun flushKeyboard(): Boolean {
-        val host = hostDevice ?: return false
-        val hid = hidDevice ?: return false
-        if (!registered) return false
+        val host = hostDevice
+        val hid = hidDevice
+        if (host == null || hid == null || !registered) {
+            onReportFailed("No HID host — go to Connect and tap Connect under Known devices")
+            return false
+        }
+        if (!isConnectedTo(host)) {
+            onReportFailed("HID link dropped — tap Connect under Known devices")
+            return false
+        }
         val keys = ByteArray(6)
         pressedKeys.take(6).forEachIndexed { i, b -> keys[i] = b }
         val report = byteArrayOf(modifierByte, 0) + keys
         return try {
-            hid.sendReport(host, HidDescriptors.KEYBOARD_REPORT_ID, report)
+            val ok = hid.sendReport(host, HidDescriptors.KEYBOARD_REPORT_ID, report)
+            if (!ok) onReportFailed("Key report blocked — reopen app and tap Connect")
+            ok
         } catch (e: SecurityException) {
             Log.w(tag, "keyboard report", e)
+            onReportFailed("Bluetooth permission denied")
             false
+        }
+    }
+
+    private fun onReportFailed(message: String) {
+        hostDevice = null
+        if (!wantRunning || !registered) return
+        if (_state.value.connection == HidConnectionState.Connected ||
+            _state.value.connection == HidConnectionState.WaitingForHost
+        ) {
+            emit(HidConnectionState.WaitingForHost, hostName = null, message = message)
         }
     }
 
@@ -420,18 +497,7 @@ class HidController(private val context: Context) {
         if (registered) {
             starting = false
             clearTimeout()
-            if (hostDevice != null && isConnectedTo(hostDevice)) {
-                emit(
-                    HidConnectionState.Connected,
-                    hostName = safeName(hostDevice),
-                    message = "Connected — use Pad and Keys",
-                )
-            } else {
-                emit(
-                    HidConnectionState.WaitingForHost,
-                    message = "Ready — make phone discoverable, then pair from the PC",
-                )
-            }
+            refreshHostLink()
             return
         }
         emit(HidConnectionState.Registering, message = "Registering as Click Clack…")

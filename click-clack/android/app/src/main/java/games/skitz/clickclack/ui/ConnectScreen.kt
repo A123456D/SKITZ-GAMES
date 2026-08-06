@@ -107,14 +107,22 @@ fun ConnectScreen(
 
         SectionLabel("PAIR ON YOUR PC")
         StickerPanel(shadow = SkitzWashYellow, contentPadding = 14.dp) {
-            StepRow("1", "PC → Bluetooth → Add device")
-            StepRow("2", "Phone → Make discoverable")
-            StepRow("3", "Select ClickClack and pair")
-            StepRow("4", "Status becomes Connected")
+            StepRow("1", "Open Click Clack · Allow Bluetooth")
+            StepRow("2", "Make phone discoverable (keep this screen open)")
+            StepRow("3", "PC → Bluetooth → Add → ClickClack")
+            StepRow("4", "Back here → tap Connect under Known devices")
+            StepRow("5", "App status must say CONNECTED (not only phone Settings)")
         }
 
         if (bonded.isNotEmpty()) {
             SectionLabel("KNOWN DEVICES")
+            Text(
+                "Phone Settings can say Connected while mouse still fails — tap Connect here.",
+                color = SkitzMuted,
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 16.sp,
+            )
             bonded.forEach { device ->
                 val label =
                     try {
@@ -122,20 +130,30 @@ fun ConnectScreen(
                     } catch (_: SecurityException) {
                         device.address
                     }
-                val already =
+                val live =
                     state.connection == HidConnectionState.Connected &&
                         !state.hostName.isNullOrBlank() &&
                         (state.hostName == label || state.hostName.equals(device.address, ignoreCase = true))
-                if (already) {
-                    StickerAction("Connected · $label", SkitzGreen, { }, subtitle = "Already linked")
+                if (live) {
+                    StickerAction(
+                        "HID linked · $label",
+                        SkitzGreen,
+                        { onConnectBonded(device) },
+                        subtitle = "Tap again if Pad/Keys stop working",
+                    )
                 } else {
-                    StickerAction("Connect · $label", SkitzBlue, { onConnectBonded(device) })
+                    StickerAction(
+                        "Connect HID · $label",
+                        SkitzBlue,
+                        { onConnectBonded(device) },
+                        subtitle = "Required after pairing",
+                    )
                 }
             }
         }
 
         Text(
-            "Android 9+ · keep Click Clack open while pairing · close other BT remote apps first",
+            "If stuck: forget ClickClack on PC + phone, reopen this app, pair again, then Connect HID",
             color = SkitzMuted,
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
