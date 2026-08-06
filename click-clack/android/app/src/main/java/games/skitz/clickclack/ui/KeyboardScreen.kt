@@ -24,14 +24,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier as UiMod
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import games.skitz.clickclack.hid.HidKeys
 import games.skitz.clickclack.ui.theme.SkitzBlue
 import games.skitz.clickclack.ui.theme.SkitzGreen
 import games.skitz.clickclack.ui.theme.SkitzInk
+import games.skitz.clickclack.ui.theme.SkitzMono
 import games.skitz.clickclack.ui.theme.SkitzMuted
 import games.skitz.clickclack.ui.theme.SkitzRed
 import games.skitz.clickclack.ui.theme.SkitzYellow
@@ -43,7 +42,7 @@ private data class KeyDef(
     val isModifier: Boolean = false,
     val modifierBit: Byte = 0,
     val accent: Color? = null,
-    val fontSp: Float = 16f,
+    val fontSp: Float = 15f,
 )
 
 @Composable
@@ -79,7 +78,7 @@ fun KeyboardScreen(
             KeyDef("4", HidKeys.NUM_4), KeyDef("5", HidKeys.NUM_5), KeyDef("6", HidKeys.NUM_6),
             KeyDef("7", HidKeys.NUM_7), KeyDef("8", HidKeys.NUM_8), KeyDef("9", HidKeys.NUM_9),
             KeyDef("0", HidKeys.NUM_0),
-            KeyDef("⌫", HidKeys.BACKSPACE, 1.55f, accent = SkitzRed, fontSp = 18f),
+            KeyDef("⌫", HidKeys.BACKSPACE, 1.6f, accent = SkitzRed, fontSp = 17f),
         )
     val topLetter =
         listOf(
@@ -92,36 +91,36 @@ fun KeyboardScreen(
             KeyDef("A", HidKeys.A), KeyDef("S", HidKeys.S), KeyDef("D", HidKeys.D), KeyDef("F", HidKeys.F),
             KeyDef("G", HidKeys.G), KeyDef("H", HidKeys.H), KeyDef("J", HidKeys.J), KeyDef("K", HidKeys.K),
             KeyDef("L", HidKeys.L),
-            KeyDef("⏎", HidKeys.ENTER, 1.55f, accent = SkitzGreen, fontSp = 18f),
+            KeyDef("⏎", HidKeys.ENTER, 1.6f, accent = SkitzGreen, fontSp = 17f),
         )
     val bottomLetter =
         listOf(
-            KeyDef("⇧", HidKeys.NONE, 1.45f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_SHIFT, accent = SkitzYellow, fontSp = 18f),
+            KeyDef("⇧", HidKeys.NONE, 1.5f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_SHIFT, accent = SkitzYellow, fontSp = 17f),
             KeyDef("Z", HidKeys.Z), KeyDef("X", HidKeys.X), KeyDef("C", HidKeys.C), KeyDef("V", HidKeys.V),
             KeyDef("B", HidKeys.B), KeyDef("N", HidKeys.N), KeyDef("M", HidKeys.M),
             KeyDef(",", HidKeys.COMMA), KeyDef(".", HidKeys.DOT),
         )
     val mods =
         listOf(
-            KeyDef("Ctrl", HidKeys.NONE, 1.15f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_CTRL, accent = SkitzRed, fontSp = 13f),
-            KeyDef("Win", HidKeys.NONE, 1.05f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_GUI, accent = SkitzBlue, fontSp = 13f),
-            KeyDef("Alt", HidKeys.NONE, 1.05f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_ALT, accent = SkitzYellow, fontSp = 13f),
-            KeyDef("Space", HidKeys.SPACE, 3.6f, accent = SkitzBlue, fontSp = 14f),
+            KeyDef("Ctrl", HidKeys.NONE, 1.15f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_CTRL, accent = SkitzRed, fontSp = 12f),
+            KeyDef("Win", HidKeys.NONE, 1.05f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_GUI, accent = SkitzBlue, fontSp = 12f),
+            KeyDef("Alt", HidKeys.NONE, 1.05f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_ALT, accent = SkitzYellow, fontSp = 12f),
+            KeyDef("Space", HidKeys.SPACE, 3.6f, accent = SkitzBlue, fontSp = 13f),
             KeyDef("?", HidKeys.SLASH, 1.1f),
         )
     val arrows =
         listOf(
-            KeyDef("←", HidKeys.LEFT, accent = SkitzInk, fontSp = 20f),
-            KeyDef("↑", HidKeys.UP, accent = SkitzInk, fontSp = 20f),
-            KeyDef("↓", HidKeys.DOWN, accent = SkitzInk, fontSp = 20f),
-            KeyDef("→", HidKeys.RIGHT, accent = SkitzInk, fontSp = 20f),
+            KeyDef("←", HidKeys.LEFT, accent = SkitzInk, fontSp = 18f),
+            KeyDef("↑", HidKeys.UP, accent = SkitzInk, fontSp = 18f),
+            KeyDef("↓", HidKeys.DOWN, accent = SkitzInk, fontSp = 18f),
+            KeyDef("→", HidKeys.RIGHT, accent = SkitzInk, fontSp = 18f),
         )
 
     @Composable
     fun KeyRow(keys: List<KeyDef>, tall: Boolean = false) {
         Row(
             modifier = UiMod.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
             keys.forEach { key ->
                 val latched =
@@ -132,19 +131,14 @@ fun KeyboardScreen(
                         HidKeys.MOD_LEFT_GUI -> gui
                         else -> false
                     }
-                val accent =
-                    key.accent
-                        ?: when {
-                            latched -> SkitzBlue
-                            else -> Color(0xFFB7AE9E)
-                        }
+                val accent = key.accent ?: Color(0xFFB7AE9E)
                 Keycap(
                     label = key.label,
                     accent = accent,
                     enabled = connected,
                     latched = latched,
                     fontSize = key.fontSp.sp,
-                    modifier = UiMod.weight(key.weight).height(if (tall) 58.dp else 54.dp),
+                    modifier = UiMod.weight(key.weight).height(if (tall) 56.dp else 52.dp),
                     onTap =
                         if (key.isModifier) {
                             {
@@ -183,32 +177,25 @@ fun KeyboardScreen(
             UiMod
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        Row(
-            modifier = UiMod.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text("KEYS", fontWeight = FontWeight.Black, fontSize = 36.sp, color = SkitzInk, letterSpacing = (-1.5).sp)
-                AnimatedContent(
-                    targetState = lastHit,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = "last-hit",
-                ) { hit ->
-                    Text(
-                        "▸ $hit",
-                        color = SkitzBlue,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                    )
+        PanelHead(
+            title = "Keyboard",
+            hint = "",
+            trailing = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AnimatedContent(
+                        targetState = lastHit,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "last-hit",
+                    ) { hit ->
+                        Text("▸ $hit", color = SkitzBlue, fontFamily = SkitzMono, fontSize = 12.sp)
+                    }
+                    LivePill(connected)
                 }
-            }
-            LivePill(connected)
-        }
+            },
+        )
 
         KeyRow(numberRow)
         KeyRow(topLetter)
@@ -216,18 +203,15 @@ fun KeyboardScreen(
         KeyRow(bottomLetter)
         KeyRow(mods, tall = true)
 
-        Row(
-            modifier = UiMod.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(modifier = UiMod.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 arrows.forEach { key ->
                     Keycap(
                         label = key.label,
                         accent = key.accent ?: SkitzInk,
                         enabled = connected,
                         fontSize = key.fontSp.sp,
-                        modifier = UiMod.width(64.dp).height(56.dp),
+                        modifier = UiMod.width(62.dp).height(54.dp),
                         onPress = {
                             onKeyDown(key.usage)
                             lastHit = key.label
@@ -239,10 +223,10 @@ fun KeyboardScreen(
         }
 
         Text(
-            "Keys flash + buzz on press · modifiers stay lit until tapped off",
+            "Keys flash + vibrate · modifiers stay lit until tapped off",
             color = SkitzMuted,
             fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = SkitzMono,
         )
         Spacer(modifier = UiMod.height(4.dp))
     }

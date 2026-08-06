@@ -39,6 +39,7 @@ import games.skitz.clickclack.hid.HidConnectionState
 import games.skitz.clickclack.hid.HidService
 import games.skitz.clickclack.hid.HidUiState
 import games.skitz.clickclack.ui.theme.SkitzBlue
+import games.skitz.clickclack.ui.theme.SkitzDisplay
 import games.skitz.clickclack.ui.theme.SkitzCream
 import games.skitz.clickclack.ui.theme.SkitzGreen
 import games.skitz.clickclack.ui.theme.SkitzInk

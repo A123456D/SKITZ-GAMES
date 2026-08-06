@@ -25,13 +25,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import games.skitz.clickclack.ui.theme.SkitzCream
+import games.skitz.clickclack.ui.theme.SkitzDisplay
 import games.skitz.clickclack.ui.theme.SkitzInk
+import games.skitz.clickclack.ui.theme.SkitzMono
 import games.skitz.clickclack.ui.theme.SkitzMuted
 
 @Composable
@@ -94,9 +95,9 @@ fun StickerAction(
             contentAlignment = Alignment.CenterStart,
         ) {
             Column {
-                Text(label, fontWeight = FontWeight.Black, fontSize = 15.sp, color = SkitzInk)
+                Text(label, fontWeight = FontWeight.Black, fontSize = 15.sp, color = SkitzInk, fontFamily = SkitzDisplay)
                 if (subtitle != null) {
-                    Text(subtitle, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = SkitzMuted)
+                    Text(subtitle, fontFamily = SkitzMono, fontSize = 11.sp, color = SkitzMuted)
                 }
             }
         }
@@ -132,7 +133,7 @@ fun MiniKey(label: String, shadow: Color, rotation: Float = 0f) {
                     .background(SkitzCream),
             contentAlignment = Alignment.Center,
         ) {
-            Text(label, fontWeight = FontWeight.Black, fontSize = 14.sp, color = SkitzInk)
+            Text(label, fontWeight = FontWeight.Black, fontSize = 14.sp, color = SkitzInk, fontFamily = SkitzDisplay)
         }
     }
 }
@@ -145,6 +146,6 @@ fun SectionLabel(text: String) {
         fontSize = 13.sp,
         color = SkitzMuted,
         letterSpacing = 1.sp,
-        fontFamily = FontFamily.Monospace,
+        fontFamily = SkitzMono,
     )
 }

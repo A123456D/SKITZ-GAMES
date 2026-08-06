@@ -20,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier as UiMod
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,8 +27,10 @@ import games.skitz.clickclack.hid.HidConnectionState
 import games.skitz.clickclack.hid.HidUiState
 import games.skitz.clickclack.ui.theme.SkitzBlue
 import games.skitz.clickclack.ui.theme.SkitzCream
+import games.skitz.clickclack.ui.theme.SkitzDisplay
 import games.skitz.clickclack.ui.theme.SkitzGreen
 import games.skitz.clickclack.ui.theme.SkitzInk
+import games.skitz.clickclack.ui.theme.SkitzMono
 import games.skitz.clickclack.ui.theme.SkitzMuted
 import games.skitz.clickclack.ui.theme.SkitzRed
 import games.skitz.clickclack.ui.theme.SkitzWashYellow
@@ -61,27 +62,27 @@ fun ConnectScreen(
             Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 Text(
                     "CLICK",
-                    fontSize = 46.sp,
-                    fontWeight = FontWeight.Black,
+                    fontSize = 48.sp,
+                    fontFamily = SkitzDisplay,
                     color = SkitzRed,
                     letterSpacing = (-2).sp,
-                    lineHeight = 44.sp,
+                    lineHeight = 46.sp,
                 )
                 Text(
                     "CLACK",
-                    fontSize = 46.sp,
-                    fontWeight = FontWeight.Black,
+                    fontSize = 48.sp,
+                    fontFamily = SkitzDisplay,
                     color = SkitzBlue,
                     letterSpacing = (-2).sp,
-                    lineHeight = 44.sp,
+                    lineHeight = 46.sp,
                 )
                 Spacer(modifier = UiMod.height(8.dp))
                 Text(
                     "Your phone is the mouse\nand keyboard.",
                     color = SkitzInk,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
+                    fontFamily = SkitzMono,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
                 )
             }
             Column(
@@ -121,7 +122,7 @@ fun ConnectScreen(
                 "Phone Settings can say Connected while mouse still fails — tap Connect here.",
                 color = SkitzMuted,
                 fontSize = 12.sp,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = SkitzMono,
                 lineHeight = 16.sp,
             )
             bonded.forEach { device ->
@@ -157,7 +158,7 @@ fun ConnectScreen(
             "IMPORTANT: pair only while this screen is open. Opening phone Bluetooth settings drops HID and breaks the link. After any update: forget ClickClack on PC + phone, then re-pair.",
             color = SkitzMuted,
             fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = SkitzMono,
             lineHeight = 16.sp,
         )
         Spacer(modifier = UiMod.height(8.dp))
@@ -189,16 +190,16 @@ private fun StatusCard(state: HidUiState) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StatusDot(accent)
-            Text(title, fontWeight = FontWeight.Black, color = accent, fontSize = 18.sp, letterSpacing = 0.5.sp)
+            Text(title, fontFamily = SkitzDisplay, color = accent, fontSize = 20.sp, letterSpacing = 0.5.sp)
         }
         if (!state.hostName.isNullOrBlank()) {
-            Text(state.hostName, color = SkitzInk, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+            Text(state.hostName, color = SkitzInk, fontFamily = SkitzMono, fontSize = 13.sp)
         }
         if (state.message.isNotBlank()) {
-            Text(state.message, color = SkitzMuted, fontSize = 13.sp, fontFamily = FontFamily.Monospace, lineHeight = 18.sp)
+            Text(state.message, color = SkitzMuted, fontSize = 13.sp, fontFamily = SkitzMono, lineHeight = 18.sp)
         }
         if (state.detail.isNotBlank()) {
-            Text(state.detail, color = SkitzMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, lineHeight = 15.sp)
+            Text(state.detail, color = SkitzMuted, fontSize = 11.sp, fontFamily = SkitzMono, lineHeight = 15.sp)
         }
     }
 }
@@ -221,6 +222,6 @@ private fun StepRow(n: String, text: String) {
         ) {
             Text(n, fontWeight = FontWeight.Black, color = SkitzRed, fontSize = 13.sp)
         }
-        Text(text, color = SkitzInk, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+        Text(text, color = SkitzInk, fontFamily = SkitzMono, fontSize = 13.sp)
     }
 }
