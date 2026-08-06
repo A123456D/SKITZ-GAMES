@@ -12,8 +12,8 @@ android {
         applicationId = "games.skitz.clickclack"
         minSdk = 28
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.2.2"
+        versionCode = 8
+        versionName = "1.3.0"
         ndk {
             // Phone sideload only — drop desktop emulator ABIs to keep the APK small.
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")

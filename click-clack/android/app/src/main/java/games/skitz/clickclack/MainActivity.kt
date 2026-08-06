@@ -75,7 +75,10 @@ class MainActivity : ComponentActivity() {
                     service = hidService,
                     bootMessage = bootMessage,
                     onRequestBluetooth = { requestEnableBluetooth() },
-                    onRequestDiscoverable = { requestDiscoverable() },
+                    onRequestDiscoverable = {
+                        val ok = hidService?.controller?.makeDiscoverableInApp() == true
+                        if (!ok) requestDiscoverable()
+                    },
                     onRequestPermissions = { ensurePermissionsAndStart() },
                     onRestart = {
                         bootMessage = "Restarting…"

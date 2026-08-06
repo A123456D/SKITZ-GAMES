@@ -107,11 +107,12 @@ fun ConnectScreen(
 
         SectionLabel("PAIR ON YOUR PC")
         StickerPanel(shadow = SkitzWashYellow, contentPadding = 14.dp) {
-            StepRow("1", "Open Click Clack · Allow Bluetooth")
-            StepRow("2", "Make phone discoverable (keep this screen open)")
+            StepRow("1", "Stay inside Click Clack (leaving kills HID)")
+            StepRow("2", "Tap Make phone discoverable")
             StepRow("3", "PC → Bluetooth → Add → ClickClack")
-            StepRow("4", "Back here → tap Connect under Known devices")
-            StepRow("5", "App status must say CONNECTED (not only phone Settings)")
+            StepRow("4", "Accept pair on the phone popup")
+            StepRow("5", "Tap Connect HID under Known devices")
+            StepRow("6", "Forget old ClickClack first if you paired before")
         }
 
         if (bonded.isNotEmpty()) {
@@ -153,7 +154,7 @@ fun ConnectScreen(
         }
 
         Text(
-            "If stuck: forget ClickClack on PC + phone, reopen this app, pair again, then Connect HID",
+            "IMPORTANT: pair only while this screen is open. Opening phone Bluetooth settings drops HID and breaks the link. After any update: forget ClickClack on PC + phone, then re-pair.",
             color = SkitzMuted,
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
@@ -195,6 +196,9 @@ private fun StatusCard(state: HidUiState) {
         }
         if (state.message.isNotBlank()) {
             Text(state.message, color = SkitzMuted, fontSize = 13.sp, fontFamily = FontFamily.Monospace, lineHeight = 18.sp)
+        }
+        if (state.detail.isNotBlank()) {
+            Text(state.detail, color = SkitzMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, lineHeight = 15.sp)
         }
     }
 }
