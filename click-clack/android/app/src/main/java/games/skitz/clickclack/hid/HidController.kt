@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothHidDevice
-import android.bluetooth.BluetoothHidDeviceAppQosSettings
 import android.bluetooth.BluetoothHidDeviceAppSdpSettings
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
@@ -38,6 +37,9 @@ data class HidUiState(
 
 /**
  * Wraps [BluetoothHidDevice] as a combo mouse + keyboard peripheral.
+ *
+ * Samsung note: register only while the Activity is in the foreground — the system
+ * auto-unregisters background apps. Also avoid restarting mid-registration.
  */
 class HidController(private val context: Context) {
     private val tag = "ClickClackHid"
@@ -52,8 +54,10 @@ class HidController(private val context: Context) {
     private var hidDevice: BluetoothHidDevice? = null
     private var hostDevice: BluetoothDevice? = null
     private var registered = false
+    private var starting = false
+    private var wantRunning = false
 
-    private val _state = MutableStateFlow(HidUiState())
+    private val _state = MutableStateFlow(HidUiState(message = "Tap Allow Bluetooth to begin"))
     val state: StateFlow<HidUiState> = _state.asStateFlow()
 
     private var modifierByte: Byte = 0
@@ -65,7 +69,9 @@ class HidController(private val context: Context) {
                 if (profile != BluetoothProfile.HID_DEVICE || proxy !is BluetoothHidDevice) return
                 hidDevice = proxy
                 Log.i(tag, "HID_DEVICE proxy connected")
-                registerApp()
+                if (wantRunning) {
+                    registerApp()
+                }
             }
 
             override fun onServiceDisconnected(profile: Int) {
@@ -74,7 +80,10 @@ class HidController(private val context: Context) {
                 hidDevice = null
                 registered = false
                 hostDevice = null
-                emit(HidConnectionState.Error, message = "Bluetooth HID service lost")
+                starting = false
+                if (wantRunning) {
+                    emit(HidConnectionState.Error, message = "Bluetooth HID service lost — tap Restart HID")
+                }
             }
         }
 
@@ -82,15 +91,22 @@ class HidController(private val context: Context) {
         object : BluetoothHidDevice.Callback() {
             override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
                 this@HidController.registered = registered
+                starting = false
                 Log.i(tag, "onAppStatusChanged registered=$registered plugged=${pluggedDevice?.address}")
+                clearTimeout()
                 if (registered) {
-                    profileTimeout?.let { mainHandler.removeCallbacks(it) }
-                    profileTimeout = null
-                    emit(HidConnectionState.WaitingForHost, message = "Ready — pair from your PC Bluetooth settings")
-                    // Prefer already-bonded hosts when possible
+                    emit(
+                        HidConnectionState.WaitingForHost,
+                        message = "Ready — make phone discoverable, then pair from the PC",
+                    )
                     pluggedDevice?.let { connectTo(it) }
+                } else if (wantRunning) {
+                    emit(
+                        HidConnectionState.Error,
+                        message = "HID unregistered (app must stay open in foreground). Tap Restart HID.",
+                    )
                 } else {
-                    emit(HidConnectionState.Idle, message = "HID app unregistered")
+                    emit(HidConnectionState.Idle, message = "Stopped")
                 }
             }
 
@@ -101,8 +117,8 @@ class HidController(private val context: Context) {
                         hostDevice = device
                         emit(
                             HidConnectionState.Connected,
-                            hostName = device?.name ?: device?.address,
-                            message = "Connected — use the touchpad and keyboard",
+                            hostName = safeName(device),
+                            message = "Connected — use Pad and Keys",
                         )
                     }
                     BluetoothProfile.STATE_DISCONNECTED -> {
@@ -112,13 +128,14 @@ class HidController(private val context: Context) {
                         }
                     }
                     BluetoothProfile.STATE_CONNECTING -> {
-                        emit(HidConnectionState.WaitingForHost, message = "Connecting…")
+                        emit(HidConnectionState.WaitingForHost, message = "Connecting to PC…")
                     }
                 }
             }
         }
 
     fun start() {
+        wantRunning = true
         if (adapter == null) {
             emit(HidConnectionState.Unsupported, message = "No Bluetooth adapter", profileAvailable = false)
             return
@@ -127,58 +144,64 @@ class HidController(private val context: Context) {
             emit(HidConnectionState.BluetoothOff, message = "Turn on Bluetooth")
             return
         }
-        profileTimeout?.let { mainHandler.removeCallbacks(it) }
-        if (hidDevice != null) {
-            try {
-                if (registered) hidDevice?.unregisterApp()
-            } catch (_: Exception) {
-            }
-            try {
-                adapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDevice)
-            } catch (_: Exception) {
-            }
-            hidDevice = null
-            registered = false
-            hostDevice = null
+        // Already good — don't tear down a live registration (Samsung races hard on restart).
+        if (registered && hidDevice != null) {
+            emit(
+                HidConnectionState.WaitingForHost,
+                message = "Ready — make phone discoverable, then pair from the PC",
+            )
+            return
         }
+        if (starting) {
+            emit(HidConnectionState.Registering, message = "Still starting Bluetooth HID…")
+            return
+        }
+        starting = true
         emit(HidConnectionState.Registering, message = "Starting Bluetooth HID…")
+
+        if (hidDevice != null) {
+            registerApp()
+            return
+        }
+
         val ok = adapter.getProfileProxy(context, profileListener, BluetoothProfile.HID_DEVICE)
         if (!ok) {
+            starting = false
             emit(
                 HidConnectionState.Unsupported,
-                message = "This phone does not expose Bluetooth HID Device (OEM may have disabled it)",
+                message = "Bluetooth HID Device profile missing on this phone",
                 profileAvailable = false,
             )
             return
         }
-        val timeout =
-            Runnable {
-                if (hidDevice == null || !registered) {
-                    emit(
-                        HidConnectionState.Error,
-                        message = "Bluetooth HID timed out — tap Restart HID. Some phones disable this profile.",
-                        profileAvailable = hidDevice != null,
-                    )
-                }
-            }
-        profileTimeout = timeout
-        mainHandler.postDelayed(timeout, 8_000L)
+        armTimeout("Bluetooth HID timed out — keep the app open, then tap Restart HID")
     }
 
     fun stop() {
-        profileTimeout?.let { mainHandler.removeCallbacks(it) }
-        profileTimeout = null
+        wantRunning = false
+        starting = false
+        clearTimeout()
         try {
             hostDevice?.let { hidDevice?.disconnect(it) }
             if (registered) hidDevice?.unregisterApp()
         } catch (e: SecurityException) {
             Log.w(tag, "stop security", e)
+        } catch (e: Exception) {
+            Log.w(tag, "stop", e)
         }
-        adapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDevice)
-        hidDevice = null
-        hostDevice = null
         registered = false
+        hostDevice = null
+        // Keep profile proxy for faster resume; only close on release()
         emit(HidConnectionState.Idle, message = "Stopped")
+    }
+
+    fun release() {
+        stop()
+        try {
+            adapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDevice)
+        } catch (_: Exception) {
+        }
+        hidDevice = null
     }
 
     fun makeDiscoverable(): Boolean = adapter != null
@@ -186,11 +209,19 @@ class HidController(private val context: Context) {
     @SuppressLint("MissingPermission")
     fun connectTo(device: BluetoothDevice) {
         val hid = hidDevice ?: return
+        if (!registered) {
+            emit(HidConnectionState.Error, message = "HID not registered yet — tap Restart HID")
+            return
+        }
         try {
+            emit(HidConnectionState.WaitingForHost, message = "Connecting to ${safeName(device)}…")
             hid.connect(device)
         } catch (e: SecurityException) {
             Log.w(tag, "connect failed", e)
             emit(HidConnectionState.Error, message = "Bluetooth permission denied")
+        } catch (e: Exception) {
+            Log.w(tag, "connect failed", e)
+            emit(HidConnectionState.Error, message = "Connect failed: ${e.message}")
         }
     }
 
@@ -206,12 +237,14 @@ class HidController(private val context: Context) {
     fun sendMouse(dx: Int, dy: Int, buttons: Int = 0, wheel: Int = 0): Boolean {
         val host = hostDevice ?: return false
         val hid = hidDevice ?: return false
-        val report = byteArrayOf(
-            buttons.toByte(),
-            clampByte(dx),
-            clampByte(dy),
-            clampByte(wheel),
-        )
+        if (!registered) return false
+        val report =
+            byteArrayOf(
+                buttons.toByte(),
+                clampByte(dx),
+                clampByte(dy),
+                clampByte(wheel),
+            )
         return try {
             hid.sendReport(host, HidDescriptors.MOUSE_REPORT_ID, report)
         } catch (e: SecurityException) {
@@ -251,6 +284,7 @@ class HidController(private val context: Context) {
     private fun flushKeyboard(): Boolean {
         val host = hostDevice ?: return false
         val hid = hidDevice ?: return false
+        if (!registered) return false
         val keys = ByteArray(6)
         pressedKeys.take(6).forEachIndexed { i, b -> keys[i] = b }
         val report = byteArrayOf(modifierByte, 0) + keys
@@ -265,37 +299,79 @@ class HidController(private val context: Context) {
     @SuppressLint("MissingPermission")
     private fun registerApp() {
         val hid = hidDevice ?: return
+        if (!wantRunning) return
+        if (registered) {
+            starting = false
+            clearTimeout()
+            emit(
+                HidConnectionState.WaitingForHost,
+                message = "Ready — make phone discoverable, then pair from the PC",
+            )
+            return
+        }
         emit(HidConnectionState.Registering, message = "Registering as Click Clack…")
+        // Keep SDP strings short/ASCII — some OEMs reject long names.
         val sdp =
             BluetoothHidDeviceAppSdpSettings(
-                "Click Clack",
-                "SKITZ Bluetooth mouse & keyboard",
+                "ClickClack",
+                "Mouse and Keyboard",
                 "SKITZ",
                 BluetoothHidDevice.SUBCLASS1_COMBO,
                 HidDescriptors.COMBO,
             )
-        val qos =
-            BluetoothHidDeviceAppQosSettings(
-                BluetoothHidDeviceAppQosSettings.SERVICE_BEST_EFFORT,
-                800,
-                9,
-                0,
-                11250,
-                BluetoothHidDeviceAppQosSettings.MAX,
-            )
+        // null QoS = system defaults. Custom QoS fails registerApp on some Samsungs.
         val ok =
             try {
-                hid.registerApp(sdp, null, qos, executor, callback)
+                hid.registerApp(sdp, null, null, executor, callback)
             } catch (e: SecurityException) {
+                Log.e(tag, "registerApp security", e)
+                false
+            } catch (e: Exception) {
                 Log.e(tag, "registerApp", e)
                 false
             }
         if (!ok) {
+            starting = false
+            clearTimeout()
             emit(
-                HidConnectionState.Unsupported,
-                message = "Could not register HID app — this phone may not support Bluetooth HID Device",
-                profileAvailable = false,
+                HidConnectionState.Error,
+                message = "Could not register HID — close other BT remote apps, keep Click Clack open, tap Restart HID",
+                profileAvailable = true,
             )
+            return
+        }
+        armTimeout("Registration timed out — keep Click Clack open in the foreground, then Restart HID")
+    }
+
+    private fun armTimeout(message: String) {
+        clearTimeout()
+        val timeout =
+            Runnable {
+                if (wantRunning && !registered) {
+                    starting = false
+                    emit(
+                        HidConnectionState.Error,
+                        message = message,
+                        profileAvailable = hidDevice != null,
+                    )
+                }
+            }
+        profileTimeout = timeout
+        mainHandler.postDelayed(timeout, 12_000L)
+    }
+
+    private fun clearTimeout() {
+        profileTimeout?.let { mainHandler.removeCallbacks(it) }
+        profileTimeout = null
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun safeName(device: BluetoothDevice?): String {
+        if (device == null) return "PC"
+        return try {
+            device.name?.takeIf { it.isNotBlank() } ?: device.address
+        } catch (_: SecurityException) {
+            device.address
         }
     }
 

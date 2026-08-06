@@ -26,8 +26,9 @@ class HidService : Service() {
         super.onCreate()
         controller = HidController(applicationContext)
         createChannel()
-        startForeground(NOTIFY_ID, buildNotification("Starting…"))
-        controller.start()
+        startForeground(NOTIFY_ID, buildNotification("Open Click Clack to connect"))
+        // Do NOT call controller.start() here — Samsung (and Android docs) require the
+        // registering app to be in the foreground. MainActivity starts HID onResume.
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -41,7 +42,9 @@ class HidService : Service() {
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
-        controller.stop()
+        if (::controller.isInitialized) {
+            controller.release()
+        }
         super.onDestroy()
     }
 
