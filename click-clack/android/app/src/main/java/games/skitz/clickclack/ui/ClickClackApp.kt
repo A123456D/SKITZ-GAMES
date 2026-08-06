@@ -1,12 +1,22 @@
 package games.skitz.clickclack.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier as UiMod
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -27,10 +38,15 @@ import games.skitz.clickclack.hid.HidConnectionState
 import games.skitz.clickclack.hid.HidService
 import games.skitz.clickclack.hid.HidUiState
 import games.skitz.clickclack.ui.theme.SkitzBlue
+import games.skitz.clickclack.ui.theme.SkitzCream
 import games.skitz.clickclack.ui.theme.SkitzGreen
 import games.skitz.clickclack.ui.theme.SkitzInk
 import games.skitz.clickclack.ui.theme.SkitzPaper
+import games.skitz.clickclack.ui.theme.SkitzPaperDeep
 import games.skitz.clickclack.ui.theme.SkitzRed
+import games.skitz.clickclack.ui.theme.SkitzWashBlue
+import games.skitz.clickclack.ui.theme.SkitzWashGreen
+import games.skitz.clickclack.ui.theme.SkitzWashRed
 import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
@@ -62,7 +78,6 @@ fun ClickClackApp(
         }
     }
     val state by (controller?.state ?: fallback).collectAsState()
-
     var tab by rememberSaveable { mutableIntStateOf(0) }
 
     Box(
@@ -70,66 +85,45 @@ fun ClickClackApp(
             UiMod
                 .fillMaxSize()
                 .background(
-                    Brush.linearGradient(
+                    Brush.verticalGradient(
                         listOf(
-                            Color(0xFFF7F2E8),
+                            Color(0xFFFFFBF3),
                             SkitzPaper,
-                            Color(0xFFE8E0D2),
+                            SkitzPaperDeep,
                         ),
                     ),
                 ),
     ) {
+        // soft brand washes
+        Box(
+            modifier =
+                UiMod
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(Color(0x33E0312E), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(80f, 120f),
+                            radius = 520f,
+                        ),
+                    ),
+        )
+        Box(
+            modifier =
+                UiMod
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(Color(0x291E5BB8), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(900f, 200f),
+                            radius = 480f,
+                        ),
+                    ),
+        )
+
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                NavigationBar(
-                    containerColor = Color(0xFFFFFEF9),
-                    contentColor = SkitzInk,
-                    tonalElevation = 0.dp,
-                ) {
-                    NavigationBarItem(
-                        selected = tab == 0,
-                        onClick = { tab = 0 },
-                        icon = { Text("BT", fontWeight = FontWeight.Black, fontSize = 13.sp) },
-                        label = { Text("CONNECT", fontWeight = FontWeight.Black, fontSize = 11.sp) },
-                        colors =
-                            NavigationBarItemDefaults.colors(
-                                selectedIconColor = SkitzRed,
-                                selectedTextColor = SkitzRed,
-                                indicatorColor = Color(0xFFFFD6D3),
-                                unselectedIconColor = SkitzInk,
-                                unselectedTextColor = SkitzInk,
-                            ),
-                    )
-                    NavigationBarItem(
-                        selected = tab == 1,
-                        onClick = { tab = 1 },
-                        icon = { Text("PAD", fontWeight = FontWeight.Black, fontSize = 12.sp) },
-                        label = { Text("TOUCH", fontWeight = FontWeight.Black, fontSize = 11.sp) },
-                        colors =
-                            NavigationBarItemDefaults.colors(
-                                selectedIconColor = SkitzBlue,
-                                selectedTextColor = SkitzBlue,
-                                indicatorColor = Color(0xFFD6E4FF),
-                                unselectedIconColor = SkitzInk,
-                                unselectedTextColor = SkitzInk,
-                            ),
-                    )
-                    NavigationBarItem(
-                        selected = tab == 2,
-                        onClick = { tab = 2 },
-                        icon = { Text("ABC", fontWeight = FontWeight.Black, fontSize = 12.sp) },
-                        label = { Text("KEYS", fontWeight = FontWeight.Black, fontSize = 11.sp) },
-                        colors =
-                            NavigationBarItemDefaults.colors(
-                                selectedIconColor = SkitzGreen,
-                                selectedTextColor = SkitzGreen,
-                                indicatorColor = Color(0xFFD9F0DB),
-                                unselectedIconColor = SkitzInk,
-                                unselectedTextColor = SkitzInk,
-                            ),
-                    )
-                }
+                PremiumNavBar(selected = tab, onSelect = { tab = it })
             },
         ) { padding ->
             Box(modifier = UiMod.padding(padding).fillMaxSize()) {
@@ -159,6 +153,72 @@ fun ClickClackApp(
                             onModifiers = { controller?.setModifiers(it) },
                             onTap = { usage, mods -> controller?.tapKey(usage, mods) },
                         )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PremiumNavBar(selected: Int, onSelect: (Int) -> Unit) {
+    val items =
+        listOf(
+            Triple("CONNECT", SkitzRed, SkitzWashRed),
+            Triple("PAD", SkitzBlue, SkitzWashBlue),
+            Triple("KEYS", SkitzGreen, SkitzWashGreen),
+        )
+    Column(
+        modifier =
+            UiMod
+                .fillMaxWidth()
+                .background(SkitzCream)
+                .border(width = 3.dp, color = SkitzInk)
+                .navigationBarsPadding()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Row(
+            modifier = UiMod.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items.forEachIndexed { index, (label, accent, wash) ->
+                val on = selected == index
+                val interaction = remember { MutableInteractionSource() }
+                Box(modifier = UiMod.weight(1f).height(54.dp)) {
+                    if (on) {
+                        Box(
+                            modifier =
+                                UiMod
+                                    .matchParentSize()
+                                    .offset(x = 3.dp, y = 3.dp)
+                                    .background(accent),
+                        )
+                    }
+                    Box(
+                        modifier =
+                            UiMod
+                                .fillMaxSize()
+                                .border(if (on) 3.dp else 2.dp, if (on) SkitzInk else SkitzInk.copy(alpha = 0.35f))
+                                .background(if (on) wash else SkitzCream)
+                                .clickable(interactionSource = interaction, indication = null) { onSelect(index) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                modifier =
+                                    UiMod
+                                        .size(8.dp)
+                                        .background(if (on) accent else Color.Transparent, CircleShape),
+                            )
+                            Spacer(modifier = UiMod.height(4.dp))
+                            Text(
+                                label,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 13.sp,
+                                color = if (on) accent else SkitzInk,
+                                letterSpacing = 0.5.sp,
+                            )
+                        }
+                    }
                 }
             }
         }

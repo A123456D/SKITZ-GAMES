@@ -1,5 +1,6 @@
 package games.skitz.clickclack.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier as UiMod
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.text.font.FontFamily
@@ -33,9 +36,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import games.skitz.clickclack.ui.theme.SkitzBlue
+import games.skitz.clickclack.ui.theme.SkitzCream
 import games.skitz.clickclack.ui.theme.SkitzInk
 import games.skitz.clickclack.ui.theme.SkitzMuted
 import games.skitz.clickclack.ui.theme.SkitzRed
+import games.skitz.clickclack.ui.theme.SkitzWashBlue
 import games.skitz.clickclack.ui.theme.SkitzYellow
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -51,24 +56,30 @@ fun TouchpadScreen(
         modifier =
             UiMod
                 .fillMaxSize()
-                .padding(18.dp),
+                .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("PAD", fontWeight = FontWeight.Black, fontSize = 34.sp, color = SkitzInk, letterSpacing = (-1).sp)
-        Text(
-            if (connected) "LIVE ON PC" else "CONNECT FIRST",
-            color = if (connected) SkitzBlue else SkitzMuted,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-        )
+        Row(
+            modifier = UiMod.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Text("PAD", fontWeight = FontWeight.Black, fontSize = 40.sp, color = SkitzInk, letterSpacing = (-1.5).sp)
+            Text(
+                if (connected) "LIVE ON PC" else "CONNECT FIRST",
+                color = if (connected) SkitzBlue else SkitzMuted,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
 
         Box(modifier = UiMod.fillMaxWidth().weight(1f)) {
             Box(
                 modifier =
                     UiMod
                         .matchParentSize()
-                        .offset(x = 6.dp, y = 6.dp)
+                        .offset(x = 7.dp, y = 7.dp)
                         .background(SkitzBlue),
             )
             Box(
@@ -76,11 +87,11 @@ fun TouchpadScreen(
                     UiMod
                         .fillMaxSize()
                         .border(3.dp, SkitzInk)
-                        .background(Color(0xFFFFFEF9))
+                        .background(SkitzCream)
                         .pointerInput(connected) {
                             if (!connected) return@pointerInput
                             awaitEachGesture {
-                                val first = awaitFirstDown(requireUnconsumed = false)
+                                awaitFirstDown(requireUnconsumed = false)
                                 var totalMove = 0f
                                 var lastScrollY = 0f
                                 var multi = false
@@ -119,9 +130,21 @@ fun TouchpadScreen(
                                 }
                             }
                         },
-                contentAlignment = Alignment.Center,
             ) {
-                Text(hint, color = SkitzMuted, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Canvas(modifier = UiMod.fillMaxSize().padding(18.dp)) {
+                    val effect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f), 0f)
+                    drawLine(
+                        color = SkitzWashBlue,
+                        start = Offset(size.width * 0.15f, size.height * 0.35f),
+                        end = Offset(size.width * 0.78f, size.height * 0.55f),
+                        strokeWidth = 6f,
+                        cap = StrokeCap.Round,
+                        pathEffect = effect,
+                    )
+                }
+                Box(modifier = UiMod.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(hint, color = SkitzMuted, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
             }
         }
 
@@ -129,7 +152,7 @@ fun TouchpadScreen(
             PadBtn("L", SkitzRed, UiMod.weight(1f), connected) {
                 onMouse(0, 0, 0x01, 0); onMouse(0, 0, 0, 0)
             }
-            PadBtn("M", SkitzYellow, UiMod.weight(0.75f), connected) {
+            PadBtn("M", SkitzYellow, UiMod.weight(0.72f), connected) {
                 onMouse(0, 0, 0x04, 0); onMouse(0, 0, 0, 0)
             }
             PadBtn("R", SkitzBlue, UiMod.weight(1f), connected) {
@@ -139,10 +162,10 @@ fun TouchpadScreen(
         Text(
             "Two-finger drag scrolls · two-finger tap right-clicks",
             color = SkitzMuted,
-            fontSize = 12.sp,
+            fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
         )
-        Spacer(modifier = UiMod.height(4.dp))
+        Spacer(modifier = UiMod.height(2.dp))
     }
 }
 
@@ -156,24 +179,18 @@ private fun PadBtn(
 ) {
     val interaction = remember { MutableInteractionSource() }
     Box(modifier = modifier) {
-        Box(
-            modifier =
-                UiMod
-                    .matchParentSize()
-                    .offset(x = 4.dp, y = 4.dp)
-                    .background(shadow),
-        )
+        Box(modifier = UiMod.matchParentSize().offset(x = 4.dp, y = 4.dp).background(shadow))
         Box(
             modifier =
                 UiMod
                     .fillMaxWidth()
-                    .height(56.dp)
+                    .height(58.dp)
                     .border(3.dp, SkitzInk)
-                    .background(if (enabled) Color(0xFFFFFEF9) else Color(0xFFEDE7DB))
+                    .background(if (enabled) SkitzCream else Color(0xFFEDE7DB))
                     .clickable(enabled = enabled, interactionSource = interaction, indication = null, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Text(label, fontWeight = FontWeight.Black, fontSize = 20.sp, color = SkitzInk)
+            Text(label, fontWeight = FontWeight.Black, fontSize = 22.sp, color = SkitzInk)
         }
     }
 }

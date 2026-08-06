@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import games.skitz.clickclack.hid.HidKeys
 import games.skitz.clickclack.ui.theme.SkitzBlue
+import games.skitz.clickclack.ui.theme.SkitzCream
 import games.skitz.clickclack.ui.theme.SkitzGreen
 import games.skitz.clickclack.ui.theme.SkitzInk
 import games.skitz.clickclack.ui.theme.SkitzMuted
@@ -108,22 +109,34 @@ fun KeyboardScreen(
             UiMod
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(14.dp),
+                .padding(horizontal = 14.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("KEYS", fontWeight = FontWeight.Black, fontSize = 34.sp, color = SkitzInk, letterSpacing = (-1).sp)
-        Text(
-            if (connected) "LIVE ON PC" else "CONNECT FIRST",
-            color = if (connected) SkitzGreen else SkitzMuted,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-        )
+        Row(
+            modifier = UiMod.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Text(
+                "KEYS",
+                fontWeight = FontWeight.Black,
+                fontSize = 40.sp,
+                color = SkitzInk,
+                letterSpacing = (-1.5).sp,
+            )
+            Text(
+                if (connected) "LIVE ON PC" else "CONNECT FIRST",
+                color = if (connected) SkitzBlue else SkitzMuted,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
 
         rows.forEach { row ->
             Row(
                 modifier = UiMod.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 row.forEach { key ->
                     val active =
@@ -139,24 +152,30 @@ fun KeyboardScreen(
                             active -> SkitzBlue
                             key.label == "⏎" -> SkitzGreen
                             key.label == "⌫" -> SkitzRed
+                            key.label == "Space" -> SkitzYellow
                             key.isModifier -> SkitzYellow
                             else -> Color(0xFFBDB5A6)
                         }
-                    Box(modifier = UiMod.weight(key.weight)) {
+                    Box(modifier = UiMod.weight(key.weight).height(50.dp)) {
                         Box(
                             modifier =
                                 UiMod
                                     .matchParentSize()
-                                    .offset(x = 2.dp, y = 2.dp)
+                                    .offset(x = 3.dp, y = 3.dp)
                                     .background(shadow),
                         )
                         Box(
                             modifier =
                                 UiMod
-                                    .fillMaxWidth()
-                                    .height(48.dp)
+                                    .fillMaxSize()
                                     .border(2.5.dp, SkitzInk)
-                                    .background(if (active) SkitzBlue else Color(0xFFFFFEF9))
+                                    .background(
+                                        when {
+                                            active -> SkitzBlue
+                                            !connected -> Color(0xFFEDE7DB)
+                                            else -> SkitzCream
+                                        },
+                                    )
                                     .pointerInput(connected, shift, ctrl, alt, gui) {
                                         detectTapGestures(
                                             onPress = {
@@ -189,6 +208,7 @@ fun KeyboardScreen(
                                 color = if (active) Color.White else SkitzInk,
                                 fontWeight = FontWeight.Black,
                                 fontSize = if (key.label.length > 3) 11.sp else 15.sp,
+                                fontFamily = FontFamily.Monospace,
                             )
                         }
                     }
@@ -197,7 +217,7 @@ fun KeyboardScreen(
         }
 
         Text(
-            "Hold keys for repeat · ⇧ Ctrl Alt Win stick until tapped again",
+            "Hold keys for repeat · modifiers stick until tapped again",
             color = SkitzMuted,
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
