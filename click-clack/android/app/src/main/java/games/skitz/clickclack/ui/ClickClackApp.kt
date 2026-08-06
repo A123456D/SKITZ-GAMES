@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -190,15 +191,19 @@ private fun PremiumNavBar(selected: Int, onSelect: (Int) -> Unit) {
                                 UiMod
                                     .matchParentSize()
                                     .offset(x = 3.dp, y = 3.dp)
-                                    .background(accent),
+                                    .background(accent, RoundedCornerShape(12.dp)),
                         )
                     }
                     Box(
                         modifier =
                             UiMod
                                 .fillMaxSize()
-                                .border(if (on) 3.dp else 2.dp, if (on) SkitzInk else SkitzInk.copy(alpha = 0.35f))
-                                .background(if (on) wash else SkitzCream)
+                                .border(
+                                    if (on) 3.dp else 2.dp,
+                                    if (on) SkitzInk else SkitzInk.copy(alpha = 0.35f),
+                                    RoundedCornerShape(12.dp),
+                                )
+                                .background(if (on) wash else SkitzCream, RoundedCornerShape(12.dp))
                                 .clickable(interactionSource = interaction, indication = null) { onSelect(index) },
                         contentAlignment = Alignment.Center,
                     ) {
