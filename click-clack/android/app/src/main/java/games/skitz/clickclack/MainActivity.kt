@@ -79,9 +79,11 @@ class MainActivity : ComponentActivity() {
                     onRequestPermissions = { ensurePermissionsAndStart() },
                     onRestart = {
                         bootMessage = "Restarting…"
-                        hidService?.controller?.stop()
-                        maybeStartHid()
-                        if (hidService == null) startHidService()
+                        if (hidService == null) {
+                            startHidService()
+                        } else {
+                            hidService?.controller?.restart()
+                        }
                     },
                 )
             }

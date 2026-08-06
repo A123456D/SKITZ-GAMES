@@ -122,7 +122,15 @@ fun ConnectScreen(
                     } catch (_: SecurityException) {
                         device.address
                     }
-                StickerAction("Connect · ", SkitzBlue, { onConnectBonded(device) })
+                val already =
+                    state.connection == HidConnectionState.Connected &&
+                        !state.hostName.isNullOrBlank() &&
+                        (state.hostName == label || state.hostName.equals(device.address, ignoreCase = true))
+                if (already) {
+                    StickerAction("Connected · $label", SkitzGreen, { }, subtitle = "Already linked")
+                } else {
+                    StickerAction("Connect · $label", SkitzBlue, { onConnectBonded(device) })
+                }
             }
         }
 
