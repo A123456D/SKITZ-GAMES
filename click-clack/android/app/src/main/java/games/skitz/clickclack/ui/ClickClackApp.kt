@@ -1,6 +1,10 @@
 package games.skitz.clickclack.ui
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -27,7 +31,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,6 +46,7 @@ import games.skitz.clickclack.hid.HidService
 import games.skitz.clickclack.hid.HidUiState
 import games.skitz.clickclack.ui.theme.TechAccent
 import games.skitz.clickclack.ui.theme.TechBg
+import games.skitz.clickclack.ui.theme.TechHairline
 import games.skitz.clickclack.ui.theme.TechInk
 import games.skitz.clickclack.ui.theme.TechMuted
 import games.skitz.clickclack.ui.theme.TechSans
@@ -81,7 +92,7 @@ fun SkitzControllerApp(
                 ),
             )
         }
-    LaunchedEffect(bootMessage, controller == null) {
+    androidx.compose.runtime.LaunchedEffect(bootMessage, controller == null) {
         if (controller == null) {
             fallback.value =
                 HidUiState(
@@ -92,6 +103,19 @@ fun SkitzControllerApp(
     }
     val state by (controller?.state ?: fallback).collectAsState()
     var tab by rememberSaveable { mutableIntStateOf(0) }
+
+    // Keys tab is landscape-only (matches approved design).
+    val activity = LocalContext.current as? Activity
+    DisposableEffect(tab) {
+        if (tab == 2) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
 
     Scaffold(
         containerColor = TechBg,
@@ -130,6 +154,7 @@ fun SkitzControllerApp(
                 else ->
                     KeyboardScreen(
                         connected = state.connection == HidConnectionState.Connected,
+                        forceLandscape = true,
                         onKeyDown = { controller?.keyDown(it) },
                         onKeyUp = { controller?.keyUp(it) },
                         onModifiers = { controller?.setModifiers(it) },
@@ -154,18 +179,19 @@ private fun PremiumNavBar(selected: Int, onSelect: (Int) -> Unit) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(TechSurface)
+                .background(TechSurface.copy(alpha = 0.92f))
                 .navigationBarsPadding()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().height(58.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items.forEachIndexed { index, item ->
                 val on = selected == index
                 val interaction = remember { MutableInteractionSource() }
-                val tint = if (on) TechInk else TechMuted
+                val tint = if (on) TechAccent else TechMuted
+                val labelTint = if (on) TechInk else TechMuted
                 Column(
                     modifier =
                         Modifier
@@ -174,6 +200,13 @@ private fun PremiumNavBar(selected: Int, onSelect: (Int) -> Unit) {
                             .background(
                                 if (on) TechSurfaceRaised else Color.Transparent,
                                 RoundedCornerShape(14.dp),
+                            )
+                            .then(
+                                if (on) {
+                                    Modifier.border(1.dp, TechHairline, RoundedCornerShape(14.dp))
+                                } else {
+                                    Modifier
+                                },
                             )
                             .clickable(interactionSource = interaction, indication = null) {
                                 if (selected != index) {
@@ -187,28 +220,79 @@ private fun PremiumNavBar(selected: Int, onSelect: (Int) -> Unit) {
                     item.icon(tint)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        item.label,
+                        item.label.uppercase(),
                         fontFamily = TechSans,
-                        fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium,
-                        fontSize = 11.sp,
-                        color = tint,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.6.sp,
+                        color = labelTint,
                     )
                 }
             }
         }
     }
 }
+
 @Composable
 private fun LinkIcon(color: Color) {
-    Text("<>", color = color, fontSize = 13.sp, fontFamily = TechSans, fontWeight = FontWeight.Bold)
+    Canvas(modifier = Modifier.size(20.dp)) {
+        val stroke = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
+        drawCircle(color, radius = size.minDimension * 0.18f, center = Offset(size.width * 0.33f, size.height * 0.5f), style = stroke)
+        drawCircle(color, radius = size.minDimension * 0.18f, center = Offset(size.width * 0.67f, size.height * 0.5f), style = stroke)
+        drawLine(
+            color,
+            start = Offset(size.width * 0.42f, size.height * 0.5f),
+            end = Offset(size.width * 0.58f, size.height * 0.5f),
+            strokeWidth = 1.8.dp.toPx(),
+            cap = StrokeCap.Round,
+        )
+    }
 }
 
 @Composable
 private fun PadIcon(color: Color) {
-    Text(":::", color = color, fontSize = 12.sp, fontFamily = TechSans, fontWeight = FontWeight.Bold)
+    Canvas(modifier = Modifier.size(20.dp)) {
+        val gap = size.width * 0.08f
+        val cell = (size.width - gap * 2) / 3f
+        val r = CornerRadius(cell * 0.22f, cell * 0.22f)
+        for (row in 0 until 3) {
+            for (col in 0 until 3) {
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(col * (cell + gap), row * (cell + gap)),
+                    size = Size(cell, cell),
+                    cornerRadius = r,
+                    style = Stroke(width = 1.6.dp.toPx()),
+                )
+            }
+        }
+    }
 }
 
 @Composable
 private fun KeysIcon(color: Color) {
-    Text("ABC", color = color, fontSize = 10.sp, fontFamily = TechSans, fontWeight = FontWeight.Bold)
+    Canvas(modifier = Modifier.size(20.dp)) {
+        val stroke = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(size.width * 0.12f, size.height * 0.22f),
+            size = Size(size.width * 0.76f, size.height * 0.48f),
+            cornerRadius = CornerRadius(size.width * 0.18f, size.width * 0.18f),
+            style = stroke,
+        )
+        drawLine(
+            color,
+            start = Offset(size.width * 0.28f, size.height * 0.46f),
+            end = Offset(size.width * 0.72f, size.height * 0.46f),
+            strokeWidth = 1.8.dp.toPx(),
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color,
+            start = Offset(size.width * 0.36f, size.height * 0.62f),
+            end = Offset(size.width * 0.64f, size.height * 0.62f),
+            strokeWidth = 1.8.dp.toPx(),
+            cap = StrokeCap.Round,
+        )
+    }
 }
