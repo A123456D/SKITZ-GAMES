@@ -313,19 +313,22 @@ fun KeyboardScreen(
                 .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
         if (landscape) {
+            // During Keys orientation lock, first frame can still be portrait-sized.
+            // Never use coerceIn(min, max) when max can be < min — that crashes the app.
             val gap = 5.dp
             val sideWidth = min(88.dp, maxWidth * 0.12f)
-            val mainWidth = maxWidth - sideWidth - 10.dp
+            val mainWidth = (maxWidth - sideWidth - 10.dp).coerceAtLeast(1.dp)
             val letterRows = 4
             val letterBudget = maxHeight * 0.62f
             val letterSize =
                 min(
                     (letterBudget - gap * (letterRows - 1)) / letterRows,
                     (mainWidth - gap * 9) / 10,
-                )
-            val fH = (maxHeight * 0.09f).coerceIn(26.dp, letterSize * 0.58f)
-            val auxH = (maxHeight * 0.095f).coerceIn(28.dp, letterSize * 0.72f)
-            val modH = (maxHeight * 0.11f).coerceIn(32.dp, letterSize * 0.82f)
+                ).coerceAtLeast(20.dp)
+            val fH = min(maxHeight * 0.09f, letterSize * 0.58f).coerceAtLeast(18.dp)
+            val auxH = min(maxHeight * 0.095f, letterSize * 0.72f).coerceAtLeast(20.dp)
+            val modH = min(maxHeight * 0.11f, letterSize * 0.82f).coerceAtLeast(22.dp)
+            val delH = min(36.dp, maxHeight * 0.12f).coerceAtLeast(24.dp)
 
             Row(
                 modifier = Modifier.fillMaxSize(),
@@ -349,7 +352,7 @@ fun KeyboardScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    RenderKey(delKey, Modifier.fillMaxWidth().height(36.dp))
+                    RenderKey(delKey, Modifier.fillMaxWidth().height(delH))
                     RenderKey(arrows[1], Modifier.fillMaxWidth().weight(1.2f))
                     Row(
                         modifier = Modifier.fillMaxWidth().weight(1f),

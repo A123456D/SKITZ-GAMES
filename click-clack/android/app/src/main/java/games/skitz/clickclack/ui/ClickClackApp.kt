@@ -1,6 +1,8 @@
 package games.skitz.clickclack.ui
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -105,15 +107,18 @@ fun SkitzControllerApp(
     var tab by rememberSaveable { mutableIntStateOf(0) }
 
     // Keys tab is landscape-only (matches approved design).
-    val activity = LocalContext.current as? Activity
-    DisposableEffect(tab) {
+    val activity = LocalContext.current.findActivity()
+    DisposableEffect(tab, activity) {
         if (tab == 2) {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         } else {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
         onDispose {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            // Only reset when leaving Keys — avoid fighting the next effect on tab change.
+            if (tab == 2) {
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
         }
     }
 
@@ -295,4 +300,13 @@ private fun KeysIcon(color: Color) {
             cap = StrokeCap.Round,
         )
     }
+}
+
+private fun Context.findActivity(): Activity? {
+    var ctx: Context? = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return ctx as? Activity
 }
