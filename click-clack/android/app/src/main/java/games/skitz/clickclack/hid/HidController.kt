@@ -338,7 +338,7 @@ class HidController(private val context: Context) {
             if (ok) {
                 emit(
                     _state.value.connection,
-                    message = "Discoverable 5 min — on PC: Add device → ClickClack (stay in this app)",
+                    message = "Discoverable 5 min — on PC: Add device → Skitz Controller (stay in this app)",
                     detail = diagLine(),
                 )
             }
@@ -437,7 +437,7 @@ class HidController(private val context: Context) {
                 emit(
                     HidConnectionState.WaitingForHost,
                     hostName = safeName(device),
-                    message = "HID connect refused — forget ClickClack on PC + phone, pair again WHILE this app is open",
+                    message = "HID connect refused — forget Skitz Controller on PC + phone, pair again WHILE this app is open",
                     detail = diagLine(),
                 )
             } else {
@@ -573,10 +573,10 @@ class HidController(private val context: Context) {
             refreshHostLink()
             return
         }
-        emit(HidConnectionState.Registering, message = "Registering as Click Clack…")
+        emit(HidConnectionState.Registering, message = "Registering as Skitz Controller…")
         val sdp =
             BluetoothHidDeviceAppSdpSettings(
-                "ClickClack",
+                "Skitz Controller",
                 "Mouse and Keyboard",
                 "SKITZ",
                 BluetoothHidDevice.SUBCLASS1_COMBO,
@@ -594,11 +594,11 @@ class HidController(private val context: Context) {
             clearTimeout()
             emit(
                 HidConnectionState.Error,
-                message = "Could not register HID — force-stop other BT remotes, keep Click Clack open, Restart HID",
+                message = "Could not register HID — force-stop other BT remotes, keep Skitz Controller open, Restart HID",
             )
             return
         }
-        armTimeout("Registration timed out — keep Click Clack open in front, then Restart HID")
+        armTimeout("Registration timed out — keep Skitz Controller open in front, then Restart HID")
     }
 
     @SuppressLint("MissingPermission")
@@ -664,7 +664,7 @@ class HidController(private val context: Context) {
             emit(
                 HidConnectionState.Error,
                 hostName = null,
-                message = "HID dropped — keep Click Clack open in front, then tap Restart HID",
+                message = "HID dropped — keep Skitz Controller open in front, then tap Restart HID",
             )
             return
         }

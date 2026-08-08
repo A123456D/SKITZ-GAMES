@@ -1,10 +1,7 @@
 package games.skitz.clickclack.ui
 
 import android.bluetooth.BluetoothDevice
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,29 +9,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier as UiMod
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import games.skitz.clickclack.hid.HidConnectionState
 import games.skitz.clickclack.hid.HidUiState
-import games.skitz.clickclack.ui.theme.SkitzBlue
-import games.skitz.clickclack.ui.theme.SkitzCream
-import games.skitz.clickclack.ui.theme.SkitzDisplay
-import games.skitz.clickclack.ui.theme.SkitzGreen
-import games.skitz.clickclack.ui.theme.SkitzInk
-import games.skitz.clickclack.ui.theme.SkitzMono
-import games.skitz.clickclack.ui.theme.SkitzMuted
-import games.skitz.clickclack.ui.theme.SkitzRed
-import games.skitz.clickclack.ui.theme.SkitzWashYellow
-import games.skitz.clickclack.ui.theme.SkitzYellow
+import games.skitz.clickclack.ui.theme.TechAccent
+import games.skitz.clickclack.ui.theme.TechConnected
+import games.skitz.clickclack.ui.theme.TechError
+import games.skitz.clickclack.ui.theme.TechInk
+import games.skitz.clickclack.ui.theme.TechMono
+import games.skitz.clickclack.ui.theme.TechMuted
+import games.skitz.clickclack.ui.theme.TechSans
 
 @Composable
 fun ConnectScreen(
@@ -48,83 +40,60 @@ fun ConnectScreen(
 ) {
     Column(
         modifier =
-            UiMod
+            Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(
-            modifier = UiMod.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                Text(
-                    "CLICK",
-                    fontSize = 48.sp,
-                    fontFamily = SkitzDisplay,
-                    color = SkitzRed,
-                    letterSpacing = (-2).sp,
-                    lineHeight = 46.sp,
-                )
-                Text(
-                    "CLACK",
-                    fontSize = 48.sp,
-                    fontFamily = SkitzDisplay,
-                    color = SkitzBlue,
-                    letterSpacing = (-2).sp,
-                    lineHeight = 46.sp,
-                )
-                Spacer(modifier = UiMod.height(8.dp))
-                Text(
-                    "Your phone is the mouse\nand keyboard.",
-                    color = SkitzInk,
-                    fontFamily = SkitzMono,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                )
-            }
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = UiMod.padding(top = 6.dp),
-            ) {
-                MiniKey("A", SkitzGreen, -8f)
-                MiniKey("W", SkitzBlue, 6f)
-                MiniKey("⏎", SkitzRed, -3f)
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                "Skitz Controller",
+                fontFamily = TechSans,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 28.sp,
+                color = TechInk,
+                letterSpacing = (-0.4).sp,
+            )
+            Text(
+                "Phone as mouse and keyboard.",
+                fontFamily = TechSans,
+                fontWeight = FontWeight.Normal,
+                fontSize = 14.sp,
+                color = TechMuted,
+            )
         }
 
         StatusCard(state)
 
-        SectionLabel("SETUP")
-        StickerAction("Allow Bluetooth", SkitzRed, onRequestPermissions, subtitle = "Required before pairing")
+        SectionLabel("Setup")
+        ActionRow(
+            label = "Allow Bluetooth",
+            onClick = onRequestPermissions,
+            emphasized = true,
+            subtitle = "Required before pairing",
+        )
         if (state.connection == HidConnectionState.BluetoothOff) {
-            StickerAction("Turn on Bluetooth", SkitzBlue, onRequestBluetooth)
+            ActionRow(label = "Turn on Bluetooth", onClick = onRequestBluetooth)
         }
-        StickerAction("Make phone discoverable", SkitzYellow, onRequestDiscoverable, subtitle = "Keep this screen open")
-        StickerAction("Restart HID", Color(0xFFBDB5A6), onRestart)
+        ActionRow(
+            label = "Make phone discoverable",
+            onClick = onRequestDiscoverable,
+            subtitle = "Keep this screen open",
+        )
+        ActionRow(label = "Restart HID", onClick = onRestart)
 
-        SectionLabel("PAIR ON YOUR PC")
-        StickerPanel(shadow = SkitzWashYellow, contentPadding = 14.dp) {
-            StepRow("1", "Stay inside Click Clack (leaving kills HID)")
+        SectionLabel("Pair on PC")
+        Panel(contentPadding = 14.dp) {
+            StepRow("1", "Stay in Skitz Controller")
             StepRow("2", "Tap Make phone discoverable")
-            StepRow("3", "PC → Bluetooth → Add → ClickClack")
-            StepRow("4", "Accept pair on the phone popup")
-            StepRow("5", "Tap Connect HID under Known devices")
-            StepRow("6", "Forget old ClickClack first if you paired before")
+            StepRow("3", "PC → Bluetooth → Add → Skitz Controller")
+            StepRow("4", "Accept the pair prompt on the phone")
+            StepRow("5", "Tap Connect under Known devices")
         }
 
         if (bonded.isNotEmpty()) {
-            SectionLabel("KNOWN DEVICES")
-            Text(
-                "Phone Settings can say Connected while mouse still fails — tap Connect here.",
-                color = SkitzMuted,
-                fontSize = 12.sp,
-                fontFamily = SkitzMono,
-                lineHeight = 16.sp,
-            )
+            SectionLabel("Known devices")
             bonded.forEach { device ->
                 val label =
                     try {
@@ -136,32 +105,23 @@ fun ConnectScreen(
                     state.connection == HidConnectionState.Connected &&
                         !state.hostName.isNullOrBlank() &&
                         (state.hostName == label || state.hostName.equals(device.address, ignoreCase = true))
-                if (live) {
-                    StickerAction(
-                        "HID linked · $label",
-                        SkitzGreen,
-                        { onConnectBonded(device) },
-                        subtitle = "Tap again if Pad/Keys stop working",
-                    )
-                } else {
-                    StickerAction(
-                        "Connect HID · $label",
-                        SkitzBlue,
-                        { onConnectBonded(device) },
-                        subtitle = "Required after pairing",
-                    )
-                }
+                ActionRow(
+                    label = if (live) "Linked · $label" else "Connect · $label",
+                    onClick = { onConnectBonded(device) },
+                    emphasized = !live,
+                    subtitle = if (live) "HID active" else "Required after pairing",
+                )
             }
         }
 
         Text(
-            "IMPORTANT: pair only while this screen is open. Opening phone Bluetooth settings drops HID and breaks the link. After any update: forget ClickClack on PC + phone, then re-pair.",
-            color = SkitzMuted,
-            fontSize = 11.sp,
-            fontFamily = SkitzMono,
-            lineHeight = 16.sp,
+            "Pair only while this screen is open. After updates, forget Skitz Controller on PC and phone, then re-pair.",
+            color = TechMuted,
+            fontSize = 12.sp,
+            fontFamily = TechSans,
+            lineHeight = 17.sp,
         )
-        Spacer(modifier = UiMod.height(8.dp))
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
@@ -169,37 +129,43 @@ fun ConnectScreen(
 private fun StatusCard(state: HidUiState) {
     val accent =
         when (state.connection) {
-            HidConnectionState.Connected -> SkitzGreen
-            HidConnectionState.Unsupported, HidConnectionState.Error -> SkitzRed
-            HidConnectionState.WaitingForHost, HidConnectionState.Registering -> SkitzBlue
-            else -> SkitzYellow
+            HidConnectionState.Connected -> TechConnected
+            HidConnectionState.Unsupported, HidConnectionState.Error -> TechError
+            HidConnectionState.WaitingForHost, HidConnectionState.Registering -> TechAccent
+            else -> TechMuted
         }
     val title =
         when (state.connection) {
-            HidConnectionState.Connected -> "CONNECTED"
-            HidConnectionState.WaitingForHost -> "WAITING FOR PC"
-            HidConnectionState.Registering -> "STARTING"
-            HidConnectionState.BluetoothOff -> "BLUETOOTH OFF"
-            HidConnectionState.Unsupported -> "NOT SUPPORTED"
-            HidConnectionState.Error -> "ERROR"
-            HidConnectionState.Idle -> "READY"
+            HidConnectionState.Connected -> "Connected"
+            HidConnectionState.WaitingForHost -> "Waiting for PC"
+            HidConnectionState.Registering -> "Starting"
+            HidConnectionState.BluetoothOff -> "Bluetooth off"
+            HidConnectionState.Unsupported -> "Not supported"
+            HidConnectionState.Error -> "Error"
+            HidConnectionState.Idle -> "Ready"
         }
-    StickerPanel(shadow = accent) {
+    Panel(contentPadding = 14.dp) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StatusDot(accent)
-            Text(title, fontFamily = SkitzDisplay, color = accent, fontSize = 20.sp, letterSpacing = 0.5.sp)
+            Text(
+                title,
+                fontFamily = TechSans,
+                fontWeight = FontWeight.SemiBold,
+                color = accent,
+                fontSize = 16.sp,
+            )
         }
         if (!state.hostName.isNullOrBlank()) {
-            Text(state.hostName, color = SkitzInk, fontFamily = SkitzMono, fontSize = 13.sp)
+            Text(state.hostName, color = TechInk, fontFamily = TechMono, fontSize = 13.sp)
         }
         if (state.message.isNotBlank()) {
-            Text(state.message, color = SkitzMuted, fontSize = 13.sp, fontFamily = SkitzMono, lineHeight = 18.sp)
+            Text(state.message, color = TechMuted, fontSize = 13.sp, fontFamily = TechSans, lineHeight = 18.sp)
         }
         if (state.detail.isNotBlank()) {
-            Text(state.detail, color = SkitzMuted, fontSize = 11.sp, fontFamily = SkitzMono, lineHeight = 15.sp)
+            Text(state.detail, color = TechMuted, fontSize = 12.sp, fontFamily = TechSans, lineHeight = 16.sp)
         }
     }
 }
@@ -208,20 +174,17 @@ private fun StatusCard(state: HidUiState) {
 private fun StepRow(n: String, text: String) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = UiMod.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Box(
-            modifier =
-                UiMod
-                    .width(26.dp)
-                    .height(26.dp)
-                    .border(2.dp, SkitzInk)
-                    .background(SkitzCream),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(n, fontWeight = FontWeight.Black, color = SkitzRed, fontSize = 13.sp)
-        }
-        Text(text, color = SkitzInk, fontFamily = SkitzMono, fontSize = 13.sp)
+        Text(
+            n,
+            fontFamily = TechSans,
+            fontWeight = FontWeight.SemiBold,
+            color = TechMuted,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 1.dp),
+        )
+        Text(text, color = TechInk, fontFamily = TechSans, fontSize = 13.sp, lineHeight = 18.sp)
     }
 }

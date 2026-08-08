@@ -20,20 +20,41 @@ class Buzz(private val context: Context) {
             context.getSystemService(Vibrator::class.java)
         }
 
-    fun click() = pulse(28, 180)
+    private var moveAccum = 0f
 
-    fun tick() = pulse(18, 120)
+    fun click() = pulse(28, 180, heavy = false)
 
-    fun thump() = pulse(42, 255)
+    fun tick() = pulse(14, 90, heavy = false, preferTick = true)
 
-    private fun pulse(ms: Long, amplitude: Int) {
+    fun thump() = pulse(42, 255, heavy = true)
+
+    /** Soft textured ticks while the finger travels on the pad. */
+    fun moveTick(distancePx: Float, thresholdPx: Float = 28f) {
+        moveAccum += distancePx
+        while (moveAccum >= thresholdPx) {
+            moveAccum -= thresholdPx
+            tick()
+        }
+    }
+
+    fun resetMove() {
+        moveAccum = 0f
+    }
+
+    private fun pulse(
+        ms: Long,
+        amplitude: Int,
+        heavy: Boolean,
+        preferTick: Boolean = false,
+    ) {
         val v = vibrator ?: return
         if (!v.hasVibrator()) return
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val effect =
                     when {
-                        ms >= 40 -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK)
+                        preferTick -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
+                        heavy -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK)
                         ms >= 25 -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
                         else -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
                     }

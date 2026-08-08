@@ -1,4 +1,4 @@
-# Click Clack — Android
+# Skitz Controller — Android
 
 Bluetooth HID mouse + keyboard remote (`games.skitz.clickclack`).
 
@@ -23,3 +23,4 @@ Copy to the site:
 
 - minSdk 28 (BluetoothHidDevice)
 - Some OEMs disable the HID Device profile; check in-app status
+- Bluetooth name: **Skitz Controller**

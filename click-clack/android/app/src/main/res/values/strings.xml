@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Click Clack</string>
+    <string name="app_name">Skitz Controller</string>
     <string name="notification_channel">Bluetooth remote</string>
 </resources>
