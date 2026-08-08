@@ -5,11 +5,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import games.skitz.clickclack.hid.HidKeys
 import games.skitz.clickclack.ui.theme.TechAccent
@@ -31,9 +34,10 @@ private data class KeyDef(
     val weight: Float = 1f,
     val isModifier: Boolean = false,
     val modifierBit: Byte = 0,
-    /** When set, key uses tapKey(usage, tapMods) instead of press/release. */
     val tapMods: Byte? = null,
     val round: Boolean = true,
+    /** Letter-style keys stay circular via aspectRatio. */
+    val square: Boolean = true,
     val fontSp: Float = 15f,
 )
 
@@ -64,36 +68,6 @@ fun KeyboardScreen(
         onModifiers(currentMods())
     }
 
-    val fRow =
-        listOf(
-            KeyDef("Esc", HidKeys.ESCAPE, fontSp = 11f),
-            KeyDef("F1", HidKeys.F1, fontSp = 12f),
-            KeyDef("F2", HidKeys.F2, fontSp = 12f),
-            KeyDef("F3", HidKeys.F3, fontSp = 12f),
-            KeyDef("F4", HidKeys.F4, fontSp = 12f),
-            KeyDef("F5", HidKeys.F5, fontSp = 12f),
-            KeyDef("F6", HidKeys.F6, fontSp = 12f),
-            KeyDef("F7", HidKeys.F7, fontSp = 12f),
-            KeyDef("F8", HidKeys.F8, fontSp = 12f),
-            KeyDef("F9", HidKeys.F9, fontSp = 12f),
-            KeyDef("F10", HidKeys.F10, fontSp = 11f),
-            KeyDef("F11", HidKeys.F11, fontSp = 11f),
-            KeyDef("F12", HidKeys.F12, fontSp = 11f),
-        )
-    val symbolRow =
-        listOf(
-            KeyDef("`", HidKeys.GRAVE),
-            KeyDef("-", HidKeys.MINUS),
-            KeyDef("=", HidKeys.EQUAL),
-            KeyDef("[", HidKeys.LEFT_BRACKET),
-            KeyDef("]", HidKeys.RIGHT_BRACKET),
-            KeyDef("\\", HidKeys.BACKSLASH),
-            KeyDef(";", HidKeys.SEMICOLON),
-            KeyDef("'", HidKeys.APOSTROPHE),
-            KeyDef("/", HidKeys.SLASH),
-            KeyDef("?", HidKeys.SLASH, tapMods = HidKeys.MOD_LEFT_SHIFT),
-            KeyDef("Del", HidKeys.DELETE, 1.2f, fontSp = 12f),
-        )
     val numberRow =
         listOf(
             KeyDef("1", HidKeys.NUM_1),
@@ -106,7 +80,6 @@ fun KeyboardScreen(
             KeyDef("8", HidKeys.NUM_8),
             KeyDef("9", HidKeys.NUM_9),
             KeyDef("0", HidKeys.NUM_0),
-            KeyDef("⌫", HidKeys.BACKSPACE, 1.5f, fontSp = 17f),
         )
     val topLetter =
         listOf(
@@ -132,11 +105,9 @@ fun KeyboardScreen(
             KeyDef("J", HidKeys.J),
             KeyDef("K", HidKeys.K),
             KeyDef("L", HidKeys.L),
-            KeyDef("⏎", HidKeys.ENTER, 1.5f, fontSp = 17f),
         )
     val bottomLetter =
         listOf(
-            KeyDef("⇧", HidKeys.NONE, 1.4f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_SHIFT, fontSp = 17f),
             KeyDef("Z", HidKeys.Z),
             KeyDef("X", HidKeys.X),
             KeyDef("C", HidKeys.C),
@@ -144,34 +115,51 @@ fun KeyboardScreen(
             KeyDef("B", HidKeys.B),
             KeyDef("N", HidKeys.N),
             KeyDef("M", HidKeys.M),
+        )
+    val utilRow =
+        listOf(
+            KeyDef("Shift", HidKeys.NONE, 1.15f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_SHIFT, square = false, fontSp = 11f),
             KeyDef(",", HidKeys.COMMA),
             KeyDef(".", HidKeys.DOT),
+            KeyDef("/", HidKeys.SLASH),
+            KeyDef("?", HidKeys.SLASH, tapMods = HidKeys.MOD_LEFT_SHIFT),
+            KeyDef("Bksp", HidKeys.BACKSPACE, 1.25f, square = false, fontSp = 11f),
         )
     val mods =
         listOf(
-            KeyDef("Ctrl", HidKeys.NONE, 1.1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_CTRL, round = false, fontSp = 12f),
-            KeyDef("Win", HidKeys.NONE, 1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_GUI, round = false, fontSp = 12f),
-            KeyDef("Alt", HidKeys.NONE, 1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_ALT, round = false, fontSp = 12f),
-            KeyDef("Space", HidKeys.SPACE, 3.4f, round = false, fontSp = 13f),
-            KeyDef("/", HidKeys.SLASH, 1f),
-            KeyDef("?", HidKeys.SLASH, 1f, tapMods = HidKeys.MOD_LEFT_SHIFT),
+            KeyDef("Ctrl", HidKeys.NONE, 1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_CTRL, round = false, square = false, fontSp = 11f),
+            KeyDef("Win", HidKeys.NONE, 1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_GUI, round = false, square = false, fontSp = 11f),
+            KeyDef("Alt", HidKeys.NONE, 1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_ALT, round = false, square = false, fontSp = 11f),
+            KeyDef("Space", HidKeys.SPACE, 3.2f, round = false, square = false, fontSp = 12f),
+            KeyDef("Enter", HidKeys.ENTER, 1.2f, square = false, fontSp = 11f),
         )
+    val fRow =
+        listOf(
+            KeyDef("Esc", HidKeys.ESCAPE, square = false, fontSp = 10f),
+            KeyDef("F1", HidKeys.F1, square = false, fontSp = 10f),
+            KeyDef("F2", HidKeys.F2, square = false, fontSp = 10f),
+            KeyDef("F3", HidKeys.F3, square = false, fontSp = 10f),
+            KeyDef("F4", HidKeys.F4, square = false, fontSp = 10f),
+            KeyDef("F5", HidKeys.F5, square = false, fontSp = 10f),
+            KeyDef("F6", HidKeys.F6, square = false, fontSp = 10f),
+            KeyDef("F7", HidKeys.F7, square = false, fontSp = 10f),
+            KeyDef("F8", HidKeys.F8, square = false, fontSp = 10f),
+            KeyDef("F9", HidKeys.F9, square = false, fontSp = 10f),
+            KeyDef("F10", HidKeys.F10, square = false, fontSp = 9f),
+            KeyDef("F11", HidKeys.F11, square = false, fontSp = 9f),
+            KeyDef("F12", HidKeys.F12, square = false, fontSp = 9f),
+        )
+    // Unicode escapes avoid encoding corruption on Windows tooling.
     val arrows =
         listOf(
-            KeyDef("←", HidKeys.LEFT, fontSp = 18f),
-            KeyDef("↑", HidKeys.UP, fontSp = 18f),
-            KeyDef("↓", HidKeys.DOWN, fontSp = 18f),
-            KeyDef("→", HidKeys.RIGHT, fontSp = 18f),
-        )
-    val extras =
-        listOf(
-            KeyDef("Tab", HidKeys.TAB, round = false, fontSp = 12f),
-            KeyDef("Esc", HidKeys.ESCAPE, round = false, fontSp = 12f),
-            KeyDef("Del", HidKeys.DELETE, round = false, fontSp = 12f),
+            KeyDef("\u2190", HidKeys.LEFT, fontSp = 13f),
+            KeyDef("\u2191", HidKeys.UP, fontSp = 13f),
+            KeyDef("\u2193", HidKeys.DOWN, fontSp = 13f),
+            KeyDef("\u2192", HidKeys.RIGHT, fontSp = 13f),
         )
 
     @Composable
-    fun RenderKey(key: KeyDef, modifier: Modifier) {
+    fun RenderKey(key: KeyDef, keyModifier: Modifier) {
         val latched =
             when (key.modifierBit) {
                 HidKeys.MOD_LEFT_SHIFT -> shift
@@ -186,8 +174,9 @@ fun KeyboardScreen(
             enabled = connected,
             latched = latched,
             round = key.round,
+            aspectSquare = key.square,
             fontSize = key.fontSp.sp,
-            modifier = modifier,
+            modifier = keyModifier,
             onTap =
                 when {
                     key.isModifier -> {
@@ -221,15 +210,56 @@ fun KeyboardScreen(
         )
     }
 
+    /** Letter rows: equal circular keys sized from available width (never squished). */
     @Composable
-    fun KeyRow(keys: List<KeyDef>, rowHeight: Dp, gap: Dp) {
+    fun LetterRow(keys: List<KeyDef>, keySize: Dp, gap: Dp) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(rowHeight),
-            horizontalArrangement = Arrangement.spacedBy(gap),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             keys.forEach { key ->
-                RenderKey(key, modifier = Modifier.weight(key.weight).fillMaxHeight())
+                RenderKey(key, Modifier.size(keySize))
+            }
+        }
+    }
+
+    @Composable
+    fun WeightedRow(keys: List<KeyDef>, rowHeight: Dp, gap: Dp) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(rowHeight),
+            horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            keys.forEach { key ->
+                // Round keys keep a fixed circle; only stadium keys stretch with weight.
+                val keyModifier =
+                    if (key.square) {
+                        Modifier.size(rowHeight)
+                    } else {
+                        Modifier.weight(key.weight).fillMaxHeight()
+                    }
+                RenderKey(key, keyModifier)
+            }
+        }
+    }
+
+    /** Compact inverted-T cluster — much smaller footprint than a full-width arrow row. */
+    @Composable
+    fun CompactArrows(arrowKeySize: Dp, gap: Dp) {
+        val left = arrows[0]
+        val up = arrows[1]
+        val down = arrows[2]
+        val right = arrows[3]
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(gap),
+        ) {
+            RenderKey(up, Modifier.size(arrowKeySize))
+            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                RenderKey(left, Modifier.size(arrowKeySize))
+                RenderKey(down, Modifier.size(arrowKeySize))
+                RenderKey(right, Modifier.size(arrowKeySize))
             }
         }
     }
@@ -238,80 +268,62 @@ fun KeyboardScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
-        val gap = if (landscape) 8.dp else 10.dp
-        val availableWidth = maxWidth
-        val availableHeight = maxHeight
+        val gap = if (landscape) 5.dp else 7.dp
         if (landscape) {
-            val rows = 7
-            val rowH = (availableHeight - gap * (rows - 1)) / rows
-            val sideWidth = availableWidth * 0.22f
+            // Letters claim most of the width; arrows sit in a narrow rail.
+            val letterSize = min(maxWidth * 0.062f, maxHeight * 0.15f)
+            val arrowSize = letterSize * 0.52f
             Row(
                 modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Column(
                     modifier = Modifier.weight(1f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(gap),
-                ) {
-                    KeyRow(fRow, rowH, gap)
-                    KeyRow(symbolRow, rowH, gap)
-                    KeyRow(numberRow, rowH, gap)
-                    KeyRow(topLetter, rowH, gap)
-                    KeyRow(midLetter, rowH, gap)
-                    KeyRow(bottomLetter, rowH, gap)
-                    KeyRow(mods, rowH, gap)
-                }
-                Column(
-                    modifier =
-                        Modifier
-                            .width(sideWidth)
-                            .fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(gap),
+                    verticalArrangement = Arrangement.SpaceEvenly,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    extras.forEach { key ->
-                        RenderKey(key, modifier = Modifier.fillMaxWidth().weight(1f))
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().weight(1.2f),
-                        horizontalArrangement = Arrangement.spacedBy(gap),
-                    ) {
-                        arrows.forEach { key ->
-                            RenderKey(key, modifier = Modifier.weight(1f).fillMaxHeight())
-                        }
-                    }
+                    WeightedRow(fRow, letterSize * 0.62f, gap)
+                    LetterRow(numberRow, letterSize, gap)
+                    LetterRow(topLetter, letterSize, gap)
+                    LetterRow(midLetter, letterSize, gap)
+                    LetterRow(bottomLetter, letterSize, gap)
+                    WeightedRow(utilRow, letterSize, gap)
+                    WeightedRow(mods, letterSize * 0.82f, gap)
+                }
+                Column(
+                    modifier = Modifier.width(arrowSize * 3.4f).fillMaxHeight(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CompactArrows(arrowSize, gap * 0.75f)
                 }
             }
         } else {
-            val rows = 6
-            val rowH = (availableHeight - gap * (rows - 1)) / rows
+            // Portrait: letters dominate; tiny inverted-T arrows in the footer.
+            val letterCount = 10
+            val letterSize = (maxWidth - gap * (letterCount - 1)) / letterCount
+            val arrowSize = letterSize * 0.55f
             Column(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(gap),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                KeyRow(numberRow, rowH, gap)
-                KeyRow(topLetter, rowH, gap)
-                KeyRow(midLetter, rowH, gap)
-                KeyRow(bottomLetter, rowH, gap)
-                KeyRow(mods, rowH, gap)
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(rowH),
-                    horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically,
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.SpaceEvenly,
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    arrows.forEach { key ->
-                        RenderKey(
-                            key,
-                            modifier =
-                                Modifier
-                                    .weight(1f, fill = false)
-                                    .fillMaxHeight()
-                                    .width(rowH),
-                        )
-                    }
+                    LetterRow(numberRow, letterSize, gap)
+                    LetterRow(topLetter, letterSize, gap)
+                    LetterRow(midLetter, letterSize, gap)
+                    LetterRow(bottomLetter, letterSize, gap)
+                    WeightedRow(utilRow, letterSize, gap)
+                    WeightedRow(mods, letterSize * 0.88f, gap)
                 }
+                Spacer(Modifier.height(4.dp))
+                CompactArrows(arrowSize, gap * 0.75f)
             }
         }
     }

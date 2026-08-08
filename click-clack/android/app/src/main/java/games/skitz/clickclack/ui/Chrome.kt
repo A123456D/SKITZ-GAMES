@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -19,19 +22,48 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import games.skitz.clickclack.ui.theme.TechBg
 import games.skitz.clickclack.ui.theme.TechHairline
 import games.skitz.clickclack.ui.theme.TechInk
 import games.skitz.clickclack.ui.theme.TechMono
 import games.skitz.clickclack.ui.theme.TechMuted
 import games.skitz.clickclack.ui.theme.TechSans
 import games.skitz.clickclack.ui.theme.TechSurface
+import games.skitz.clickclack.ui.theme.TechSurfaceRaised
 
-private val PanelShape = RoundedCornerShape(16.dp)
+private val PanelShape = RoundedCornerShape(18.dp)
+
+@Composable
+fun AppHeader() {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(TechBg)
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        // Decorative balance — keeps title centered like the mockup
+        Spacer(modifier = Modifier.size(28.dp))
+        Text(
+            "Skitz Controller",
+            fontFamily = TechSans,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 17.sp,
+            color = TechInk,
+            letterSpacing = (-0.2).sp,
+        )
+        Spacer(modifier = Modifier.size(28.dp))
+    }
+}
 
 @Composable
 fun Panel(
@@ -43,8 +75,9 @@ fun Panel(
         modifier =
             modifier
                 .fillMaxWidth()
-                .border(1.dp, TechHairline, PanelShape)
+                .shadow(8.dp, PanelShape, clip = false, ambientColor = Color.Black.copy(alpha = 0.5f))
                 .background(TechSurface, PanelShape)
+                .border(1.dp, TechHairline, PanelShape)
                 .padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         content = content,
@@ -61,14 +94,14 @@ fun ActionRow(
 ) {
     val buzz = rememberBuzz()
     val interaction = remember { MutableInteractionSource() }
-    val bg = if (emphasized) TechInk else TechSurface
-    val fg = if (emphasized) TechSurface else TechInk
+    val bg = if (emphasized) TechSurfaceRaised else TechSurface
     Box(
         modifier =
             modifier
                 .fillMaxWidth()
-                .border(1.dp, if (emphasized) TechInk else TechHairline, RoundedCornerShape(14.dp))
-                .background(bg, RoundedCornerShape(14.dp))
+                .shadow(6.dp, RoundedCornerShape(16.dp), clip = false, ambientColor = Color.Black.copy(alpha = 0.45f))
+                .background(bg, RoundedCornerShape(16.dp))
+                .border(1.dp, TechHairline, RoundedCornerShape(16.dp))
                 .clickable(interactionSource = interaction, indication = null) {
                     buzz.click()
                     onClick()
@@ -82,7 +115,7 @@ fun ActionRow(
                 fontFamily = TechSans,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp,
-                color = fg,
+                color = TechInk,
             )
             if (subtitle != null) {
                 Text(
@@ -90,7 +123,7 @@ fun ActionRow(
                     fontFamily = TechSans,
                     fontWeight = FontWeight.Normal,
                     fontSize = 12.sp,
-                    color = if (emphasized) TechSurface.copy(alpha = 0.72f) else TechMuted,
+                    color = TechMuted,
                 )
             }
         }
@@ -99,12 +132,7 @@ fun ActionRow(
 
 @Composable
 fun StatusDot(color: Color) {
-    Box(
-        modifier =
-            Modifier
-                .size(8.dp)
-                .background(color, CircleShape),
-    )
+    Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
 }
 
 @Composable
@@ -121,7 +149,7 @@ fun SectionLabel(text: String) {
 
 @Composable
 fun LivePill(live: Boolean, modifier: Modifier = Modifier) {
-    val fg = if (live) Color(0xFF0F9F6E) else TechMuted
+    val fg = if (live) games.skitz.clickclack.ui.theme.TechConnected else TechMuted
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
@@ -138,7 +166,6 @@ fun LivePill(live: Boolean, modifier: Modifier = Modifier) {
     }
 }
 
-// Compatibility wrappers for any leftover call sites
 @Composable
 fun StickerPanel(
     shadow: Color,
@@ -162,5 +189,4 @@ fun StickerAction(
 
 @Composable
 fun MiniKey(label: String, shadow: Color, rotation: Float = 0f) {
-    // Decorative keys removed from Connect; no-op placeholder.
 }

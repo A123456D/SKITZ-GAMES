@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.sp
 import games.skitz.clickclack.ui.theme.TechAccent
 import games.skitz.clickclack.ui.theme.TechHairline
 import games.skitz.clickclack.ui.theme.TechPadField
-import games.skitz.clickclack.ui.theme.TechSurface
+import games.skitz.clickclack.ui.theme.TechSurfaceRaised
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -57,7 +57,7 @@ fun TouchpadScreen(
     val scope = rememberCoroutineScope()
     val buzz = rememberBuzz()
     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val wellShape = RoundedCornerShape(20.dp)
+    val wellShape = RoundedCornerShape(24.dp)
 
     fun clickLeft() {
         onMouse(0, 0, 0x01, 0)
@@ -76,8 +76,9 @@ fun TouchpadScreen(
         Box(
             modifier =
                 modifier
+                    .shadow(12.dp, wellShape, clip = false, ambientColor = Color.Black.copy(alpha = 0.55f))
                     .border(1.dp, TechHairline, wellShape)
-                    .background(if (connected) TechPadField else TechPadField.copy(alpha = 0.55f), wellShape)
+                    .background(if (connected) TechPadField else TechPadField.copy(alpha = 0.7f), wellShape)
                     .pointerInput(connected, heldButtons) {
                         if (!connected) return@pointerInput
                         awaitEachGesture {
@@ -88,8 +89,7 @@ fun TouchpadScreen(
                             var totalMove = 0f
                             var lastScrollY = 0f
                             var multi = false
-                            val isDoubleHold =
-                                awaitSecondTap && (downTime - lastTapUp) < 450L
+                            val isDoubleHold = awaitSecondTap && (downTime - lastTapUp) < 450L
                             if (isDoubleHold) {
                                 awaitSecondTap = false
                                 singleClickJob?.cancel()
@@ -139,11 +139,7 @@ fun TouchpadScreen(
                                     }
                                 }
 
-                                val buttons =
-                                    when {
-                                        dragging -> heldButtons or 0x01
-                                        else -> heldButtons
-                                    }
+                                val buttons = if (dragging) heldButtons or 0x01 else heldButtons
                                 if (dx != 0 || dy != 0) {
                                     onMouse(dx, dy, buttons, 0)
                                     buzz.moveTick(travel)
@@ -155,18 +151,15 @@ fun TouchpadScreen(
                                 onMouse(0, 0, heldButtons, 0)
                                 return@awaitEachGesture
                             }
-
                             if (multi && totalMove < 28f && abs(lastScrollY) < 20f) {
                                 clickRight()
                                 return@awaitEachGesture
                             }
-
                             if (isDoubleHold && totalMove < 18f) {
                                 clickLeft()
                                 clickLeft()
                                 return@awaitEachGesture
                             }
-
                             if (!multi && totalMove < 18f) {
                                 awaitSecondTap = true
                                 lastTapUp = System.currentTimeMillis()
@@ -185,8 +178,8 @@ fun TouchpadScreen(
         ) {
             finger?.let { pos ->
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawCircle(TechAccent.copy(alpha = 0.16f), 48f, pos)
-                    drawCircle(TechAccent.copy(alpha = 0.55f), 14f, pos)
+                    drawCircle(TechAccent.copy(alpha = 0.18f), 48f, pos)
+                    drawCircle(TechAccent.copy(alpha = 0.7f), 14f, pos)
                     drawCircle(Color.White, 5f, pos)
                 }
             }
@@ -199,8 +192,9 @@ fun TouchpadScreen(
         Box(
             modifier =
                 modifier
-                    .border(1.dp, TechHairline, RoundedCornerShape(16.dp))
-                    .background(TechSurface, RoundedCornerShape(16.dp))
+                    .shadow(8.dp, RoundedCornerShape(18.dp), clip = false, ambientColor = Color.Black.copy(alpha = 0.5f))
+                    .border(1.dp, TechHairline, RoundedCornerShape(18.dp))
+                    .background(TechSurfaceRaised, RoundedCornerShape(18.dp))
                     .pointerInput(connected) {
                         if (!connected) return@pointerInput
                         awaitEachGesture {
@@ -223,7 +217,6 @@ fun TouchpadScreen(
                         }
                     },
         ) {
-            // quiet visual cue — thin center grip
             Box(
                 modifier =
                     Modifier
@@ -238,134 +231,78 @@ fun TouchpadScreen(
     @Composable
     fun MouseButtons(modifier: Modifier = Modifier) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
+            modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp),
         ) {
-            Keycap(
-                label = "L",
-                enabled = connected,
-                latched = heldButtons and 0x01 != 0,
-                round = true,
-                fontSize = 18.sp,
-                modifier = Modifier.weight(1.2f).height(64.dp),
-                onPress = {
-                    heldButtons = heldButtons or 0x01
-                    onMouse(0, 0, heldButtons, 0)
-                },
-                onRelease = {
-                    heldButtons = heldButtons and 0x01.inv()
-                    onMouse(0, 0, heldButtons, 0)
-                },
-            )
-            Keycap(
-                label = "M",
-                enabled = connected,
-                latched = heldButtons and 0x04 != 0,
-                round = true,
-                fontSize = 16.sp,
-                modifier = Modifier.weight(0.8f).height(64.dp),
-                onPress = {
-                    heldButtons = heldButtons or 0x04
-                    onMouse(0, 0, heldButtons, 0)
-                },
-                onRelease = {
-                    heldButtons = heldButtons and 0x04.inv()
-                    onMouse(0, 0, heldButtons, 0)
-                },
-            )
-            Keycap(
-                label = "R",
-                enabled = connected,
-                latched = heldButtons and 0x02 != 0,
-                round = true,
-                fontSize = 18.sp,
-                modifier = Modifier.weight(1.2f).height(64.dp),
-                onPress = {
-                    heldButtons = heldButtons or 0x02
-                    onMouse(0, 0, heldButtons, 0)
-                },
-                onRelease = {
-                    heldButtons = heldButtons and 0x02.inv()
-                    onMouse(0, 0, heldButtons, 0)
-                },
-            )
+            listOf(
+                Triple("L", 0x01, 1.2f),
+                Triple("M", 0x04, 1f),
+                Triple("R", 0x02, 1.2f),
+            ).forEach { (label, bit, w) ->
+                Keycap(
+                    label = label,
+                    enabled = connected,
+                    latched = heldButtons and bit != 0,
+                    round = true,
+                    aspectSquare = true,
+                    fontSize = 18.sp,
+                    modifier = Modifier.weight(w),
+                    onPress = {
+                        heldButtons = heldButtons or bit
+                        onMouse(0, 0, heldButtons, 0)
+                    },
+                    onRelease = {
+                        heldButtons = heldButtons and bit.inv()
+                        onMouse(0, 0, heldButtons, 0)
+                    },
+                )
+            }
         }
     }
 
     if (landscape) {
         Row(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxSize().padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             PadWell(modifier = Modifier.weight(1f).fillMaxHeight())
             Column(
-                modifier = Modifier.width(88.dp).fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.width(92.dp).fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 ScrollRail(modifier = Modifier.weight(1f).fillMaxWidth())
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Keycap(
-                        label = "L",
-                        enabled = connected,
-                        latched = heldButtons and 0x01 != 0,
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        onPress = {
-                            heldButtons = heldButtons or 0x01
-                            onMouse(0, 0, heldButtons, 0)
-                        },
-                        onRelease = {
-                            heldButtons = heldButtons and 0x01.inv()
-                            onMouse(0, 0, heldButtons, 0)
-                        },
-                    )
-                    Keycap(
-                        label = "M",
-                        enabled = connected,
-                        latched = heldButtons and 0x04 != 0,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        onPress = {
-                            heldButtons = heldButtons or 0x04
-                            onMouse(0, 0, heldButtons, 0)
-                        },
-                        onRelease = {
-                            heldButtons = heldButtons and 0x04.inv()
-                            onMouse(0, 0, heldButtons, 0)
-                        },
-                    )
-                    Keycap(
-                        label = "R",
-                        enabled = connected,
-                        latched = heldButtons and 0x02 != 0,
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        onPress = {
-                            heldButtons = heldButtons or 0x02
-                            onMouse(0, 0, heldButtons, 0)
-                        },
-                        onRelease = {
-                            heldButtons = heldButtons and 0x02.inv()
-                            onMouse(0, 0, heldButtons, 0)
-                        },
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    listOf("L" to 0x01, "M" to 0x04, "R" to 0x02).forEach { (label, bit) ->
+                        Keycap(
+                            label = label,
+                            enabled = connected,
+                            latched = heldButtons and bit != 0,
+                            aspectSquare = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            onPress = {
+                                heldButtons = heldButtons or bit
+                                onMouse(0, 0, heldButtons, 0)
+                            },
+                            onRelease = {
+                                heldButtons = heldButtons and bit.inv()
+                                onMouse(0, 0, heldButtons, 0)
+                            },
+                        )
+                    }
                 }
             }
         }
     } else {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxSize().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 PadWell(modifier = Modifier.weight(1f).fillMaxHeight())
-                ScrollRail(modifier = Modifier.width(44.dp).fillMaxHeight())
+                ScrollRail(modifier = Modifier.width(46.dp).fillMaxHeight())
             }
             MouseButtons()
         }
