@@ -236,7 +236,7 @@ fun KeyboardScreen(
         }
     }
 
-    /** Mixed circle + pill row (e.g. TAB + letters + ENTER). */
+    /** Mixed circle + pill row. Pills stay compact — never steal width from letters. */
     @Composable
     fun MixedRow(
         leading: KeyDef?,
@@ -244,7 +244,7 @@ fun KeyboardScreen(
         trailing: KeyDef?,
         keySize: Dp,
         gap: Dp,
-        pillWeight: Float = 1.15f,
+        pillWidth: Dp = keySize * 1.35f,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().height(keySize),
@@ -252,13 +252,13 @@ fun KeyboardScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (leading != null) {
-                RenderKey(leading, Modifier.weight(pillWeight).fillMaxHeight())
+                RenderKey(leading, Modifier.width(pillWidth).fillMaxHeight())
             }
             circles.forEach { key ->
                 RenderKey(key, Modifier.size(keySize))
             }
             if (trailing != null) {
-                RenderKey(trailing, Modifier.weight(pillWeight).fillMaxHeight())
+                RenderKey(trailing, Modifier.width(pillWidth).fillMaxHeight())
             }
         }
     }
@@ -313,66 +313,63 @@ fun KeyboardScreen(
                 .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
         if (landscape) {
-            // Restored 1.5 landscape: letters fill height; compact side rail for nav/arrows.
-            val gap = 6.dp
-            val rows = 7
-            val rowH = (maxHeight - gap * (rows - 1)) / rows
-            val sideWidth = maxWidth * 0.20f
-            val mainWidth = maxWidth - sideWidth - 10.dp
-            val letterSize = min(rowH, (mainWidth - gap * 9) / 10)
+            // Letters own the screen. Aux rows stay thin; side rail is arrows-only.
+            val gap = 5.dp
+            val sideWidth = maxWidth * 0.13f
+            val mainWidth = maxWidth - sideWidth - 8.dp
+            val letterRows = 4 // numbers + QWERTY + ASDF + ZXCV
+            val letterBudget = maxHeight * 0.74f
+            val letterSize =
+                min(
+                    (letterBudget - gap * (letterRows - 1)) / letterRows,
+                    (mainWidth - gap * 9) / 10,
+                )
+            val auxH = ((maxHeight - letterBudget - gap * 3) / 2).coerceAtLeast(letterSize * 0.55f)
+            val fKeySize = min(auxH * 0.9f, letterSize * 0.72f)
 
             Row(
                 modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Column(
                     modifier = Modifier.weight(1f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(gap),
+                    verticalArrangement = Arrangement.SpaceBetween,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    // F-row: circles + a few pills for F10-12
                     Row(
-                        modifier = Modifier.fillMaxWidth().height(rowH),
+                        modifier = Modifier.fillMaxWidth().height(auxH),
                         horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         fRow.forEach { key ->
                             if (key.circle) {
-                                RenderKey(key, Modifier.size(min(rowH * 0.92f, letterSize * 0.85f)))
+                                RenderKey(key, Modifier.size(fKeySize))
                             } else {
-                                RenderKey(key, Modifier.weight(1f).fillMaxHeight())
+                                RenderKey(key, Modifier.width(fKeySize * 1.4f).height(fKeySize))
                             }
                         }
                     }
                     CircleRow(numberRow, letterSize, gap)
                     CircleRow(topLetter, letterSize, gap)
-                    MixedRow(tabKey, midLetter, enterKey, letterSize, gap)
-                    MixedRow(shiftKey, bottomLetter, bkspKey, letterSize, gap)
-                    PillRow(punct, rowH * 0.9f, gap)
-                    PillRow(mods, rowH * 0.9f, gap)
+                    MixedRow(tabKey, midLetter, enterKey, letterSize, gap, pillWidth = letterSize * 1.25f)
+                    MixedRow(shiftKey, bottomLetter, bkspKey, letterSize, gap, pillWidth = letterSize * 1.25f)
+                    PillRow(mods, auxH, gap)
                 }
                 Column(
                     modifier = Modifier.width(sideWidth).fillMaxHeight(),
                     verticalArrangement = Arrangement.spacedBy(gap),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    sideExtras.forEach { key ->
-                        RenderKey(key, Modifier.fillMaxWidth().weight(1f))
-                    }
-                    Spacer(Modifier.height(2.dp))
-                    Column(
-                        modifier = Modifier.weight(2.2f).fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(gap),
+                    RenderKey(sideExtras[2], Modifier.fillMaxWidth().weight(0.7f)) // DEL
+                    Spacer(Modifier.weight(0.15f))
+                    RenderKey(arrows[1], Modifier.fillMaxWidth().weight(1f))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(gap),
                     ) {
-                        RenderKey(arrows[1], Modifier.fillMaxWidth().weight(1f))
-                        Row(
-                            modifier = Modifier.fillMaxWidth().weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(gap),
-                        ) {
-                            RenderKey(arrows[0], Modifier.weight(1f).fillMaxHeight())
-                            RenderKey(arrows[2], Modifier.weight(1f).fillMaxHeight())
-                            RenderKey(arrows[3], Modifier.weight(1f).fillMaxHeight())
-                        }
+                        RenderKey(arrows[0], Modifier.weight(1f).fillMaxHeight())
+                        RenderKey(arrows[2], Modifier.weight(1f).fillMaxHeight())
+                        RenderKey(arrows[3], Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }
@@ -396,13 +393,13 @@ fun KeyboardScreen(
                 ) {
                     CircleRow(numberRow, letterSize, gap)
                     CircleRow(topLetter, letterSize, gap)
-                    MixedRow(tabKey, midLetter, null, letterSize, gap, pillWeight = 1.1f)
-                    MixedRow(shiftKey, bottomLetter, bkspKey, letterSize, gap)
+                    MixedRow(tabKey, midLetter, null, letterSize, gap, pillWidth = letterSize * 1.2f)
+                    MixedRow(shiftKey, bottomLetter, bkspKey, letterSize, gap, pillWidth = letterSize * 1.2f)
                     PillRow(punct, pillH, gap)
                     PillRow(mods, pillH, gap)
                 }
                 Spacer(Modifier.height(4.dp))
-                ArrowCluster(arrowH, gap * 0.7f)
+                ArrowCluster(arrowH, gap * 0.75f)
                 Spacer(Modifier.height(4.dp))
                 PillRow(nav, arrowH, gap)
             }
