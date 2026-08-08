@@ -1,4 +1,4 @@
-﻿package games.skitz.clickclack.ui
+package games.skitz.clickclack.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -77,7 +77,7 @@ fun SkitzControllerApp(
             MutableStateFlow(
                 HidUiState(
                     connection = HidConnectionState.Registering,
-                    message = "Starting Bluetoothâ€¦",
+                    message = "Starting Bluetooth…",
                 ),
             )
         }
@@ -86,7 +86,7 @@ fun SkitzControllerApp(
             fallback.value =
                 HidUiState(
                     connection = HidConnectionState.Registering,
-                    message = bootMessage.ifBlank { "Starting Bluetoothâ€¦" },
+                    message = bootMessage.ifBlank { "Starting Bluetooth…" },
                 )
         }
     }
@@ -117,11 +117,15 @@ fun SkitzControllerApp(
                         onRestart = onRestart,
                     )
                 1 ->
-                    TouchpadScreen(
+                    PadWorkspace(
                         connected = state.connection == HidConnectionState.Connected,
                         onMouse = { dx, dy, buttons, wheel ->
                             controller?.sendMouse(dx, dy, buttons, wheel)
                         },
+                        onKeyDown = { controller?.keyDown(it) },
+                        onKeyUp = { controller?.keyUp(it) },
+                        onModifiers = { controller?.setModifiers(it) },
+                        onTap = { usage, mods -> controller?.tapKey(usage, mods) },
                     )
                 else ->
                     KeyboardScreen(

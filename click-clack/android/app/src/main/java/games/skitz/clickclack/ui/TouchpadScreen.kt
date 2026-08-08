@@ -52,6 +52,7 @@ import kotlin.math.roundToInt
 fun TouchpadScreen(
     connected: Boolean,
     onMouse: (dx: Int, dy: Int, buttons: Int, wheel: Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var finger by remember { mutableStateOf<Offset?>(null) }
     var heldButtons by remember { mutableIntStateOf(0) }
@@ -290,7 +291,7 @@ fun TouchpadScreen(
 
     if (landscape) {
         Row(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
+            modifier = modifier.fillMaxSize().padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             PadWell(modifier = Modifier.weight(1f).fillMaxHeight())
@@ -331,7 +332,7 @@ fun TouchpadScreen(
         }
     } else {
         Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
+            modifier = modifier.fillMaxSize().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(
