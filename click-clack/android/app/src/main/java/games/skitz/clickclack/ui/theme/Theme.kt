@@ -6,17 +6,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 /** Dark tech premium palette — modern hardware companion. */
-val TechBg = Color(0xFF0E1116)
-val TechSurface = Color(0xFF1A1F27)
-val TechSurfaceRaised = Color(0xFF222833)
-val TechHairline = Color(0xFF2E3644)
+val TechBg = Color(0xFF050608)
+val TechSurface = Color(0xFF12161C)
+val TechSurfaceRaised = Color(0xFF1C222C)
+val TechHairline = Color(0xFF2A3340)
 val TechInk = Color(0xFFF2F4F7)
 val TechMuted = Color(0xFF8B93A7)
 val TechSelected = Color(0xFF3B82F6)
 val TechAccent = Color(0xFF3B82F6)
 val TechConnected = Color(0xFF22C55E)
 val TechError = Color(0xFFF43F5E)
-val TechPadField = Color(0xFF151A22)
+val TechPadField = Color(0xFF0F1A2E)
 val TechDisabled = Color(0xFF2A303C)
 val TechShadow = Color(0x99000000)
 

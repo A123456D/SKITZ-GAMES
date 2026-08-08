@@ -35,10 +35,9 @@ private data class KeyDef(
     val isModifier: Boolean = false,
     val modifierBit: Byte = 0,
     val tapMods: Byte? = null,
-    val round: Boolean = true,
-    /** Letter-style keys stay circular via aspectRatio. */
-    val square: Boolean = true,
-    val fontSp: Float = 15f,
+    /** Circle for letters/numbers; false = stadium pill. */
+    val circle: Boolean = true,
+    val fontSp: Float = 14f,
 )
 
 @Composable
@@ -68,6 +67,22 @@ fun KeyboardScreen(
         onModifiers(currentMods())
     }
 
+    val fRow =
+        listOf(
+            KeyDef("ESC", HidKeys.ESCAPE, fontSp = 9f),
+            KeyDef("F1", HidKeys.F1, fontSp = 10f),
+            KeyDef("F2", HidKeys.F2, fontSp = 10f),
+            KeyDef("F3", HidKeys.F3, fontSp = 10f),
+            KeyDef("F4", HidKeys.F4, fontSp = 10f),
+            KeyDef("F5", HidKeys.F5, fontSp = 10f),
+            KeyDef("F6", HidKeys.F6, fontSp = 10f),
+            KeyDef("F7", HidKeys.F7, fontSp = 10f),
+            KeyDef("F8", HidKeys.F8, fontSp = 10f),
+            KeyDef("F9", HidKeys.F9, fontSp = 10f),
+            KeyDef("F10", HidKeys.F10, circle = false, fontSp = 9f),
+            KeyDef("F11", HidKeys.F11, circle = false, fontSp = 9f),
+            KeyDef("F12", HidKeys.F12, circle = false, fontSp = 9f),
+        )
     val numberRow =
         listOf(
             KeyDef("1", HidKeys.NUM_1),
@@ -116,46 +131,43 @@ fun KeyboardScreen(
             KeyDef("N", HidKeys.N),
             KeyDef("M", HidKeys.M),
         )
-    val utilRow =
+    val punct =
         listOf(
-            KeyDef("Shift", HidKeys.NONE, 1.15f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_SHIFT, square = false, fontSp = 11f),
-            KeyDef(",", HidKeys.COMMA),
-            KeyDef(".", HidKeys.DOT),
-            KeyDef("/", HidKeys.SLASH),
-            KeyDef("?", HidKeys.SLASH, tapMods = HidKeys.MOD_LEFT_SHIFT),
-            KeyDef("Bksp", HidKeys.BACKSPACE, 1.25f, square = false, fontSp = 11f),
+            KeyDef(",", HidKeys.COMMA, circle = false, fontSp = 12f),
+            KeyDef(".", HidKeys.DOT, circle = false, fontSp = 12f),
+            KeyDef("/", HidKeys.SLASH, circle = false, fontSp = 12f),
+            KeyDef("?", HidKeys.SLASH, circle = false, tapMods = HidKeys.MOD_LEFT_SHIFT, fontSp = 12f),
+            KeyDef("-", HidKeys.MINUS, circle = false, fontSp = 12f),
+            KeyDef("=", HidKeys.EQUAL, circle = false, fontSp = 12f),
         )
     val mods =
         listOf(
-            KeyDef("Ctrl", HidKeys.NONE, 1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_CTRL, round = false, square = false, fontSp = 11f),
-            KeyDef("Win", HidKeys.NONE, 1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_GUI, round = false, square = false, fontSp = 11f),
-            KeyDef("Alt", HidKeys.NONE, 1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_ALT, round = false, square = false, fontSp = 11f),
-            KeyDef("Space", HidKeys.SPACE, 3.2f, round = false, square = false, fontSp = 12f),
-            KeyDef("Enter", HidKeys.ENTER, 1.2f, square = false, fontSp = 11f),
+            KeyDef("CTRL", HidKeys.NONE, 1.1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_CTRL, circle = false, fontSp = 11f),
+            KeyDef("WIN", HidKeys.NONE, 1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_GUI, circle = false, fontSp = 11f),
+            KeyDef("ALT", HidKeys.NONE, 1f, isModifier = true, modifierBit = HidKeys.MOD_LEFT_ALT, circle = false, fontSp = 11f),
+            KeyDef("SPACE", HidKeys.SPACE, 3.4f, circle = false, fontSp = 11f),
+            KeyDef("ENTER", HidKeys.ENTER, 1.3f, circle = false, fontSp = 11f),
         )
-    val fRow =
+    val nav =
         listOf(
-            KeyDef("Esc", HidKeys.ESCAPE, square = false, fontSp = 10f),
-            KeyDef("F1", HidKeys.F1, square = false, fontSp = 10f),
-            KeyDef("F2", HidKeys.F2, square = false, fontSp = 10f),
-            KeyDef("F3", HidKeys.F3, square = false, fontSp = 10f),
-            KeyDef("F4", HidKeys.F4, square = false, fontSp = 10f),
-            KeyDef("F5", HidKeys.F5, square = false, fontSp = 10f),
-            KeyDef("F6", HidKeys.F6, square = false, fontSp = 10f),
-            KeyDef("F7", HidKeys.F7, square = false, fontSp = 10f),
-            KeyDef("F8", HidKeys.F8, square = false, fontSp = 10f),
-            KeyDef("F9", HidKeys.F9, square = false, fontSp = 10f),
-            KeyDef("F10", HidKeys.F10, square = false, fontSp = 9f),
-            KeyDef("F11", HidKeys.F11, square = false, fontSp = 9f),
-            KeyDef("F12", HidKeys.F12, square = false, fontSp = 9f),
+            KeyDef("HOME", HidKeys.HOME, circle = false, fontSp = 10f),
+            KeyDef("END", HidKeys.END, circle = false, fontSp = 10f),
+            KeyDef("PG UP", HidKeys.PAGE_UP, circle = false, fontSp = 10f),
+            KeyDef("PG DN", HidKeys.PAGE_DOWN, circle = false, fontSp = 10f),
         )
-    // Unicode escapes avoid encoding corruption on Windows tooling.
     val arrows =
         listOf(
-            KeyDef("\u2190", HidKeys.LEFT, fontSp = 13f),
-            KeyDef("\u2191", HidKeys.UP, fontSp = 13f),
-            KeyDef("\u2193", HidKeys.DOWN, fontSp = 13f),
-            KeyDef("\u2192", HidKeys.RIGHT, fontSp = 13f),
+            KeyDef("\u2190", HidKeys.LEFT, circle = false, fontSp = 14f),
+            KeyDef("\u2191", HidKeys.UP, circle = false, fontSp = 14f),
+            KeyDef("\u2193", HidKeys.DOWN, circle = false, fontSp = 14f),
+            KeyDef("\u2192", HidKeys.RIGHT, circle = false, fontSp = 14f),
+        )
+    val sideExtras =
+        listOf(
+            KeyDef("TAB", HidKeys.TAB, circle = false, fontSp = 11f),
+            KeyDef("ESC", HidKeys.ESCAPE, circle = false, fontSp = 11f),
+            KeyDef("DEL", HidKeys.DELETE, circle = false, fontSp = 11f),
+            KeyDef("BKSP", HidKeys.BACKSPACE, circle = false, fontSp = 11f),
         )
 
     @Composable
@@ -173,8 +185,8 @@ fun KeyboardScreen(
             accent = TechAccent,
             enabled = connected,
             latched = latched,
-            round = key.round,
-            aspectSquare = key.square,
+            round = key.circle,
+            aspectSquare = key.circle,
             fontSize = key.fontSp.sp,
             modifier = keyModifier,
             onTap =
@@ -210,11 +222,11 @@ fun KeyboardScreen(
         )
     }
 
-    /** Letter rows: equal circular keys sized from available width (never squished). */
+    /** Equal circular keys — never squished. */
     @Composable
-    fun LetterRow(keys: List<KeyDef>, keySize: Dp, gap: Dp) {
+    fun CircleRow(keys: List<KeyDef>, keySize: Dp, gap: Dp) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(keySize),
             horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -224,87 +236,154 @@ fun KeyboardScreen(
         }
     }
 
+    /** Mixed circle + pill row (e.g. TAB + letters + ENTER). */
     @Composable
-    fun WeightedRow(keys: List<KeyDef>, rowHeight: Dp, gap: Dp) {
+    fun MixedRow(
+        leading: KeyDef?,
+        circles: List<KeyDef>,
+        trailing: KeyDef?,
+        keySize: Dp,
+        gap: Dp,
+        pillWeight: Float = 1.15f,
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(rowHeight),
+            modifier = Modifier.fillMaxWidth().height(keySize),
             horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            keys.forEach { key ->
-                // Round keys keep a fixed circle; only stadium keys stretch with weight.
-                val keyModifier =
-                    if (key.square) {
-                        Modifier.size(rowHeight)
-                    } else {
-                        Modifier.weight(key.weight).fillMaxHeight()
-                    }
-                RenderKey(key, keyModifier)
+            if (leading != null) {
+                RenderKey(leading, Modifier.weight(pillWeight).fillMaxHeight())
+            }
+            circles.forEach { key ->
+                RenderKey(key, Modifier.size(keySize))
+            }
+            if (trailing != null) {
+                RenderKey(trailing, Modifier.weight(pillWeight).fillMaxHeight())
             }
         }
     }
 
-    /** Compact inverted-T cluster — much smaller footprint than a full-width arrow row. */
     @Composable
-    fun CompactArrows(arrowKeySize: Dp, gap: Dp) {
+    fun PillRow(keys: List<KeyDef>, rowHeight: Dp, gap: Dp) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(rowHeight),
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            keys.forEach { key ->
+                RenderKey(key, Modifier.weight(key.weight).fillMaxHeight())
+            }
+        }
+    }
+
+    /** Compact inverted-T of wide pills — small footprint. */
+    @Composable
+    fun ArrowCluster(rowHeight: Dp, gap: Dp) {
         val left = arrows[0]
         val up = arrows[1]
         val down = arrows[2]
         val right = arrows[3]
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(gap),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            RenderKey(up, Modifier.size(arrowKeySize))
-            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                RenderKey(left, Modifier.size(arrowKeySize))
-                RenderKey(down, Modifier.size(arrowKeySize))
-                RenderKey(right, Modifier.size(arrowKeySize))
+            RenderKey(up, Modifier.fillMaxWidth(0.48f).height(rowHeight))
+            Row(
+                modifier = Modifier.fillMaxWidth().height(rowHeight),
+                horizontalArrangement = Arrangement.spacedBy(gap),
+            ) {
+                RenderKey(left, Modifier.weight(1f).fillMaxHeight())
+                RenderKey(down, Modifier.weight(1f).fillMaxHeight())
+                RenderKey(right, Modifier.weight(1f).fillMaxHeight())
             }
         }
     }
+
+    val shiftKey =
+        KeyDef("SHIFT", HidKeys.NONE, isModifier = true, modifierBit = HidKeys.MOD_LEFT_SHIFT, circle = false, fontSp = 11f)
+    val tabKey = KeyDef("TAB", HidKeys.TAB, circle = false, fontSp = 11f)
+    val bkspKey = KeyDef("BKSP", HidKeys.BACKSPACE, circle = false, fontSp = 11f)
+    val enterKey = KeyDef("ENTER", HidKeys.ENTER, circle = false, fontSp = 11f)
 
     BoxWithConstraints(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
-        val gap = if (landscape) 5.dp else 7.dp
         if (landscape) {
-            // Letters claim most of the width; arrows sit in a narrow rail.
-            val letterSize = min(maxWidth * 0.062f, maxHeight * 0.15f)
-            val arrowSize = letterSize * 0.52f
+            // Restored 1.5 landscape: letters fill height; compact side rail for nav/arrows.
+            val gap = 6.dp
+            val rows = 7
+            val rowH = (maxHeight - gap * (rows - 1)) / rows
+            val sideWidth = maxWidth * 0.20f
+            val mainWidth = maxWidth - sideWidth - 10.dp
+            val letterSize = min(rowH, (mainWidth - gap * 9) / 10)
+
             Row(
                 modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Column(
                     modifier = Modifier.weight(1f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.SpaceEvenly,
+                    verticalArrangement = Arrangement.spacedBy(gap),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    WeightedRow(fRow, letterSize * 0.62f, gap)
-                    LetterRow(numberRow, letterSize, gap)
-                    LetterRow(topLetter, letterSize, gap)
-                    LetterRow(midLetter, letterSize, gap)
-                    LetterRow(bottomLetter, letterSize, gap)
-                    WeightedRow(utilRow, letterSize, gap)
-                    WeightedRow(mods, letterSize * 0.82f, gap)
+                    // F-row: circles + a few pills for F10-12
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(rowH),
+                        horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        fRow.forEach { key ->
+                            if (key.circle) {
+                                RenderKey(key, Modifier.size(min(rowH * 0.92f, letterSize * 0.85f)))
+                            } else {
+                                RenderKey(key, Modifier.weight(1f).fillMaxHeight())
+                            }
+                        }
+                    }
+                    CircleRow(numberRow, letterSize, gap)
+                    CircleRow(topLetter, letterSize, gap)
+                    MixedRow(tabKey, midLetter, enterKey, letterSize, gap)
+                    MixedRow(shiftKey, bottomLetter, bkspKey, letterSize, gap)
+                    PillRow(punct, rowH * 0.9f, gap)
+                    PillRow(mods, rowH * 0.9f, gap)
                 }
                 Column(
-                    modifier = Modifier.width(arrowSize * 3.4f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.width(sideWidth).fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(gap),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    CompactArrows(arrowSize, gap * 0.75f)
+                    sideExtras.forEach { key ->
+                        RenderKey(key, Modifier.fillMaxWidth().weight(1f))
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Column(
+                        modifier = Modifier.weight(2.2f).fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(gap),
+                    ) {
+                        RenderKey(arrows[1], Modifier.fillMaxWidth().weight(1f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(gap),
+                        ) {
+                            RenderKey(arrows[0], Modifier.weight(1f).fillMaxHeight())
+                            RenderKey(arrows[2], Modifier.weight(1f).fillMaxHeight())
+                            RenderKey(arrows[3], Modifier.weight(1f).fillMaxHeight())
+                        }
+                    }
                 }
             }
         } else {
-            // Portrait: letters dominate; tiny inverted-T arrows in the footer.
+            // Portrait: letters dominate; small pill arrow cluster + nav at bottom.
+            val gap = 7.dp
             val letterCount = 10
-            val letterSize = (maxWidth - gap * (letterCount - 1)) / letterCount
-            val arrowSize = letterSize * 0.55f
+            val letterSize = min((maxWidth - gap * (letterCount - 1)) / letterCount, maxHeight * 0.105f)
+            val pillH = letterSize * 0.78f
+            val arrowH = letterSize * 0.62f
+
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween,
@@ -315,15 +394,17 @@ fun KeyboardScreen(
                     verticalArrangement = Arrangement.SpaceEvenly,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    LetterRow(numberRow, letterSize, gap)
-                    LetterRow(topLetter, letterSize, gap)
-                    LetterRow(midLetter, letterSize, gap)
-                    LetterRow(bottomLetter, letterSize, gap)
-                    WeightedRow(utilRow, letterSize, gap)
-                    WeightedRow(mods, letterSize * 0.88f, gap)
+                    CircleRow(numberRow, letterSize, gap)
+                    CircleRow(topLetter, letterSize, gap)
+                    MixedRow(tabKey, midLetter, null, letterSize, gap, pillWeight = 1.1f)
+                    MixedRow(shiftKey, bottomLetter, bkspKey, letterSize, gap)
+                    PillRow(punct, pillH, gap)
+                    PillRow(mods, pillH, gap)
                 }
                 Spacer(Modifier.height(4.dp))
-                CompactArrows(arrowSize, gap * 0.75f)
+                ArrowCluster(arrowH, gap * 0.7f)
+                Spacer(Modifier.height(4.dp))
+                PillRow(nav, arrowH, gap)
             }
         }
     }

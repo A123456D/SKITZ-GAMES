@@ -3,6 +3,7 @@ package games.skitz.clickclack.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
@@ -16,22 +17,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import games.skitz.clickclack.ui.theme.TechAccent
-import games.skitz.clickclack.ui.theme.TechDisabled
 import games.skitz.clickclack.ui.theme.TechInk
+import games.skitz.clickclack.ui.theme.TechMuted
 import games.skitz.clickclack.ui.theme.TechSans
 import games.skitz.clickclack.ui.theme.TechSurfaceRaised
 
 /**
- * Premium round / stadium keycap for dark tech UI.
- * Letter keys should use [aspectSquare]=true so they stay circular, not squished.
+ * Outlined circle / capsule keycap — thin ring, blue when active.
+ * Set [filled]=true for solid mouse buttons.
  */
 @Composable
 fun Keycap(
@@ -40,8 +41,11 @@ fun Keycap(
     accent: Color = TechAccent,
     enabled: Boolean = true,
     latched: Boolean = false,
+    /** true = circle, false = stadium/pill */
     round: Boolean = true,
     aspectSquare: Boolean = false,
+    filled: Boolean = false,
+    corner: Dp = 14.dp,
     fontSize: TextUnit = 15.sp,
     onPress: () -> Unit = {},
     onRelease: () -> Unit = {},
@@ -49,36 +53,53 @@ fun Keycap(
 ) {
     var pressed by remember { mutableStateOf(false) }
     val buzz = rememberBuzz()
-    val shape = if (round) CircleShape else RoundedCornerShape(percent = 50)
-    val active = pressed || latched
+    val shape =
+        when {
+            round -> CircleShape
+            filled -> RoundedCornerShape(corner)
+            else -> RoundedCornerShape(percent = 50)
+        }
+    val active = enabled && (pressed || latched)
+
+    val ring by animateColorAsState(
+        targetValue =
+            when {
+                !enabled -> TechMuted.copy(alpha = 0.25f)
+                active -> accent
+                filled -> TechMuted.copy(alpha = 0.35f)
+                else -> TechMuted.copy(alpha = 0.55f)
+            },
+        animationSpec = tween(80),
+        label = "key-ring",
+    )
     val face by animateColorAsState(
         targetValue =
             when {
-                !enabled -> TechDisabled
-                latched -> accent
-                pressed -> accent.copy(alpha = 0.85f)
-                else -> TechSurfaceRaised
+                !enabled && filled -> TechSurfaceRaised.copy(alpha = 0.45f)
+                active && filled -> accent.copy(alpha = 0.35f)
+                filled -> TechSurfaceRaised
+                active -> accent.copy(alpha = 0.12f)
+                else -> Color.Transparent
             },
-        animationSpec = tween(70),
+        animationSpec = tween(80),
         label = "key-face",
     )
-    val labelColor =
-        when {
-            !enabled -> TechInk.copy(alpha = 0.35f)
-            else -> TechInk
-        }
+    val labelColor by animateColorAsState(
+        targetValue =
+            when {
+                !enabled -> TechInk.copy(alpha = 0.28f)
+                active -> if (filled) TechInk else accent
+                else -> TechInk
+            },
+        animationSpec = tween(80),
+        label = "key-label",
+    )
 
     Box(
         modifier =
             modifier
-                .then(if (aspectSquare) Modifier.aspectRatio(1f) else Modifier)
-                .shadow(
-                    elevation = if (active) 1.dp else 6.dp,
-                    shape = shape,
-                    clip = false,
-                    ambientColor = Color.Black.copy(alpha = 0.55f),
-                    spotColor = Color.Black.copy(alpha = 0.65f),
-                )
+                .then(if (aspectSquare || (round && !filled)) Modifier.aspectRatio(1f) else Modifier)
+                .border(if (filled) 1.dp else 1.5.dp, ring, shape)
                 .background(face, shape)
                 .pointerInput(enabled, latched) {
                     detectTapGestures(
@@ -105,7 +126,7 @@ fun Keycap(
         Text(
             label,
             color = labelColor,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Medium,
             fontSize = fontSize,
             fontFamily = TechSans,
             maxLines = 1,

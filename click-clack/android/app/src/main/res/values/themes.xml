@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.ClickClack" parent="android:Theme.Material.NoActionBar">
-        <item name="android:statusBarColor">#0E1116</item>
-        <item name="android:navigationBarColor">#1A1F27</item>
-        <item name="android:windowBackground">#0E1116</item>
+        <item name="android:statusBarColor">#050608</item>
+        <item name="android:navigationBarColor">#12161C</item>
+        <item name="android:windowBackground">#050608</item>
         <item name="android:colorPrimary">#3B82F6</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>

@@ -68,11 +68,15 @@ object HidKeys {
     const val F10: Byte = 0x43
     const val F11: Byte = 0x44
     const val F12: Byte = 0x45
+    const val HOME: Byte = 0x4A
+    const val PAGE_UP: Byte = 0x4B
+    const val DELETE: Byte = 0x4C
+    const val END: Byte = 0x4D
+    const val PAGE_DOWN: Byte = 0x4E
     const val RIGHT: Byte = 0x4F
     const val LEFT: Byte = 0x50
     const val DOWN: Byte = 0x51
     const val UP: Byte = 0x52
-    const val DELETE: Byte = 0x4C
 
     const val MOD_LEFT_CTRL: Byte = 0x01
     const val MOD_LEFT_SHIFT: Byte = 0x02

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,8 +28,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalConfiguration
@@ -176,6 +180,28 @@ fun TouchpadScreen(
                         }
                     },
         ) {
+            // Subtle mouse glyph when idle — like the reference remotes.
+            if (finger == null) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cx = size.width * 0.5f
+                    val cy = size.height * 0.48f
+                    val w = size.minDimension * 0.12f
+                    val h = w * 1.55f
+                    drawRoundRect(
+                        color = TechAccent.copy(alpha = 0.22f),
+                        topLeft = Offset(cx - w / 2f, cy - h / 2f),
+                        size = Size(w, h),
+                        cornerRadius = CornerRadius(w * 0.45f, w * 0.45f),
+                        style = Stroke(width = 2.5f),
+                    )
+                    drawLine(
+                        color = TechAccent.copy(alpha = 0.22f),
+                        start = Offset(cx, cy - h / 2f + 4f),
+                        end = Offset(cx, cy - h * 0.08f),
+                        strokeWidth = 2.5f,
+                    )
+                }
+            }
             finger?.let { pos ->
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     drawCircle(TechAccent.copy(alpha = 0.18f), 48f, pos)
@@ -231,22 +257,24 @@ fun TouchpadScreen(
     @Composable
     fun MouseButtons(modifier: Modifier = Modifier) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
-            modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            modifier = modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
         ) {
+            // Wide L / narrow M / wide R — matches remote-app pad chrome.
             listOf(
-                Triple("L", 0x01, 1.2f),
-                Triple("M", 0x04, 1f),
-                Triple("R", 0x02, 1.2f),
+                Triple("L", 0x01, 1.35f),
+                Triple("M", 0x04, 0.55f),
+                Triple("R", 0x02, 1.35f),
             ).forEach { (label, bit, w) ->
                 Keycap(
                     label = label,
                     enabled = connected,
                     latched = heldButtons and bit != 0,
-                    round = true,
-                    aspectSquare = true,
-                    fontSize = 18.sp,
-                    modifier = Modifier.weight(w),
+                    round = false,
+                    filled = true,
+                    corner = 12.dp,
+                    fontSize = 16.sp,
+                    modifier = Modifier.weight(w).fillMaxHeight(),
                     onPress = {
                         heldButtons = heldButtons or bit
                         onMouse(0, 0, heldButtons, 0)
@@ -271,14 +299,23 @@ fun TouchpadScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 ScrollRail(modifier = Modifier.weight(1f).fillMaxWidth())
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    listOf("L" to 0x01, "M" to 0x04, "R" to 0x02).forEach { (label, bit) ->
+                Column(
+                    modifier = Modifier.weight(1.15f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    listOf(
+                        Triple("L", 0x01, 1.2f),
+                        Triple("M", 0x04, 0.7f),
+                        Triple("R", 0x02, 1.2f),
+                    ).forEach { (label, bit, h) ->
                         Keycap(
                             label = label,
                             enabled = connected,
                             latched = heldButtons and bit != 0,
-                            aspectSquare = true,
-                            modifier = Modifier.fillMaxWidth(),
+                            round = false,
+                            filled = true,
+                            corner = 12.dp,
+                            modifier = Modifier.fillMaxWidth().weight(h),
                             onPress = {
                                 heldButtons = heldButtons or bit
                                 onMouse(0, 0, heldButtons, 0)
