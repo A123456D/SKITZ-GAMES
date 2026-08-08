@@ -14,10 +14,7 @@ const { apkHref, phoneArt } = Astro.props;
 		<div class="wrap cc-hero__grid">
 			<div class="cc-hero__copy">
 				<p class="cc-kicker">SKITZ · Android remote</p>
-				<h1 id="cc-title" class="cc-title">
-					<span class="cc-title__click">Skitz</span>
-					<span class="cc-title__clack">Controller</span>
-				</h1>
+				<h1 id="cc-title" class="cc-title">Skitz Controller</h1>
 				<p class="cc-line">Your phone is the mouse and keyboard.</p>
 				<p class="cc-sub">
 					Pair over Bluetooth. No PC install. Windows and Mac see a normal cursor and keys.
@@ -154,23 +151,14 @@ const { apkHref, phoneArt } = Astro.props;
 	}
 
 	.cc-title {
-		display: grid;
-		gap: 0.1rem;
+		display: block;
 		margin: 0 0 0.85rem;
-		font-size: clamp(3.2rem, 12vw, 6.4rem);
-		line-height: 0.84;
-	}
-
-	.cc-title__click {
-		color: var(--skitz-red);
-		display: inline-block;
-		transform: rotate(-1.2deg);
-	}
-
-	.cc-title__clack {
-		color: var(--skitz-blue);
-		display: inline-block;
-		transform: rotate(0.9deg);
+		font-family: var(--font-display);
+		font-weight: 700;
+		letter-spacing: -0.04em;
+		font-size: clamp(2.6rem, 9vw, 4.8rem);
+		line-height: 0.95;
+		color: #0b1220;
 	}
 
 	.cc-line {
