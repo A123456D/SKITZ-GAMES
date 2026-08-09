@@ -86,4 +86,4 @@ self.addEventListener("fetch", (e) => {
 `,
 );
 
-Copied ${dist} → ${dest} (${SW_CACHE})`);
+console.log(`Copied ${dist} → ${dest} (${SW_CACHE})`);
