@@ -3,7 +3,7 @@
   <head>
     <script>
 (function () {
-  var KEY = "oculum-bust-v11";
+  var KEY = "oculum-bust-v13";
   try {
     if (sessionStorage.getItem(KEY) === "1") return;
     sessionStorage.setItem(KEY, "1");
@@ -11,8 +11,8 @@
   var done = function () {
     try {
       var u = new URL(location.href);
-      if (u.searchParams.get("v") !== "11") {
-        u.searchParams.set("v", "11");
+      if (u.searchParams.get("v") !== "13") {
+        u.searchParams.set("v", "13");
         location.replace(u.toString());
       }
     } catch (e2) {}
@@ -57,8 +57,8 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-J1UkoZuc.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BYaHDXBR.css">
+    <script type="module" crossorigin src="./assets/index-BICCjWgE.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-N6PMbXrS.css">
   </head>
   <body class="on-menu">
     <div id="app">
@@ -150,6 +150,10 @@
             </div>
             <span class="will-label">FOE</span>
           </button>
+        </div>
+
+        <div id="meter-tip" hidden role="status" aria-live="polite">
+          <p id="meter-tip-text"></p>
         </div>
 
         <div id="toast" hidden>
@@ -409,7 +413,7 @@
               <img class="menu-seal" src="./assets/ui/seal-eye.png" alt="" draggable="false" />
               <h1 class="menu-wordmark">OCULUM <span class="wordmark-beta">beta</span></h1>
               <p class="menu-tag">VEIL · WITNESS · ASCEND</p>
-              <p class="menu-build" id="menu-build">build 11</p>
+              <p class="menu-build" id="menu-build">build 13</p>
               <p class="menu-blurb">Things only fully exist when seen.</p>
             </header>
             <nav class="menu-actions" aria-label="Main">
@@ -693,7 +697,10 @@
           <div id="fx-dim" aria-hidden="true"></div>
           <p id="fx-caption" hidden></p>
           <div id="fx-ghost">
-            <img id="fx-card" alt="" draggable="false" />
+            <div id="fx-card-spin">
+              <img id="fx-card" class="fx-face fx-face-front" alt="" draggable="false" />
+              <img id="fx-card-back" class="fx-face fx-face-back" alt="" draggable="false" />
+            </div>
           </div>
           <div id="fx-motes" aria-hidden="true"></div>
         </div>

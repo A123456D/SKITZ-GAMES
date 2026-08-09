@@ -93,6 +93,8 @@ const tutorialListEl = document.getElementById("tutorial-list")!;
 const unsupported = document.getElementById("unsupported")!;
 const toastEl = document.getElementById("toast")!;
 const toastText = document.getElementById("toast-text")!;
+const meterTipEl = document.getElementById("meter-tip")!;
+const meterTipText = document.getElementById("meter-tip-text")!;
 const eventLogPanel = document.getElementById("event-log-panel")!;
 const eventLogEl = document.getElementById("event-log")!;
 const btnHudLog = document.getElementById("btn-hud-log") as HTMLButtonElement;
@@ -123,7 +125,9 @@ const fxLayer = document.getElementById("fx-layer")!;
 const fxDim = document.getElementById("fx-dim")!;
 const fxCaption = document.getElementById("fx-caption")!;
 const fxGhost = document.getElementById("fx-ghost")!;
+const fxCardSpin = document.getElementById("fx-card-spin")!;
 const fxCardImg = document.getElementById("fx-card") as HTMLImageElement;
+const fxCardBackImg = document.getElementById("fx-card-back") as HTMLImageElement;
 const fxMotes = document.getElementById("fx-motes")!;
 const combatFxSvg = document.getElementById("combat-fx-svg")!;
 const combatArrowPath = document.getElementById("combat-arrow-path") as unknown as SVGPathElement;
@@ -314,6 +318,7 @@ function setMenuMode(on: boolean): void {
   stage.setMenuBackground(on);
   if (on) {
     hidePhaseBanner();
+    hideMeterTip();
     clearTutorGuide();
   }
 }
@@ -675,12 +680,26 @@ const METER_HELP: Record<string, { kind: string; text: string }> = {
   },
 };
 
+let meterTipTimer = 0;
+
+function hideMeterTip(): void {
+  meterTipEl.hidden = true;
+  meterTipText.textContent = "";
+  meterTipTimer = 0;
+}
+
+function showMeterTip(msg: string, ms = 5200): void {
+  meterTipText.textContent = msg;
+  meterTipEl.hidden = false;
+  meterTipTimer = ms;
+}
+
 function explainMeterHelp(key: string): void {
   const help = METER_HELP[key];
   if (!help) return;
   playSfx("ui-tap");
-  clearToastQueue();
-  flashToast(help.text, paceMs(5200), help.kind);
+  // Help belongs under the meters — never dump glossary text into the bottom toast over the hand.
+  showMeterTip(help.text, paceMs(5200));
 }
 
 function whoLabel(side: Side): string {
@@ -1161,16 +1180,12 @@ function buildHeresyList(): void {
   }
 }
 
-function queueHandDeal(count: number): void {
-  if (!state || count <= 0) return;
-  const start = Math.max(0, state.hand.length - count);
-  for (let i = start; i < state.hand.length; i++) dealingSlots.add(i);
+function queueHandDeal(_count: number): void {
+  /* Draws appear in hand with no fly-in. */
 }
 
 function queueOpeningDeal(): void {
   dealingSlots.clear();
-  if (!state) return;
-  for (let i = 0; i < state.hand.length; i++) dealingSlots.add(i);
 }
 
 function syncMulliganChrome(): void {
@@ -2514,6 +2529,8 @@ function flyCardFace(spec: FlySpec): Promise<void> {
     const my = Math.min(spec.fromY, spec.toY) - arcLift;
 
     fxCardImg.src = spec.src;
+    fxCardBackImg.src = cardBackSrc();
+    fxCardSpin.style.transform = "rotateX(0deg) rotateY(0deg)";
     fxLayer.hidden = false;
     fxGhost.classList.add("is-flying");
     fxGhost.classList.toggle("is-casting", exit === "cast");
@@ -2683,6 +2700,34 @@ function resetFxGhost(): void {
   fxGhost.style.opacity = "";
   fxGhost.style.left = "";
   fxGhost.style.top = "";
+  fxGhost.style.width = "";
+  fxGhost.style.height = "";
+  fxCardSpin.style.transition = "";
+  fxCardSpin.style.transform = "";
+  fxCardSpin.style.animation = "";
+}
+
+/** Layout size for summon FX — modest hero so we scale down, never up. */
+function fxHeroBox(): { w: number; h: number } {
+  const wide = window.innerWidth >= 900 && window.innerHeight >= 680;
+  const xl = window.innerWidth >= 1200 && window.innerHeight >= 800;
+  const max = xl ? 220 : wide ? 200 : 168;
+  const min = xl ? 176 : wide ? 156 : 132;
+  const ratio = wide ? 0.22 : 0.24;
+  const w = Math.round(Math.min(max, Math.max(min, window.innerHeight * ratio)));
+  return { w, h: Math.round(w * 1.5) };
+}
+
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function easeOutQuint(t: number): number {
+  return 1 - Math.pow(1 - t, 5);
 }
 
 function animateFxGhost(
@@ -2695,10 +2740,9 @@ function animateFxGhost(
     const start = performance.now();
     const mx = (from.x + to.x) / 2;
     const my = Math.min(from.y, to.y) - arcLift;
-    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
     const tick = (now: number): void => {
       const t = Math.min(1, (now - start) / durationMs);
-      const e = ease(t);
+      const e = easeOutCubic(t);
       const x = (1 - e) * (1 - e) * from.x + 2 * (1 - e) * e * mx + e * e * to.x;
       const y = (1 - e) * (1 - e) * from.y + 2 * (1 - e) * e * my + e * e * to.y;
       const scale = from.scale + (to.scale - from.scale) * e;
@@ -2717,7 +2761,102 @@ function animateFxGhost(
 }
 
 /**
- * High-level CCG reveal: lift from origin → big center hover (readable) → fall to board.
+ * Premium summon: dual-face 3D card rises while spinning sideways (back visible mid-flip),
+ * holds large and readable, then flips/settles onto the board.
+ */
+function animateSummonFlip3d(spec: {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  fromScale: number;
+  peakScale: number;
+  landScale: number;
+  riseMs: number;
+  holdMs: number;
+  fallMs: number;
+  spins?: number;
+}): Promise<void> {
+  return new Promise((resolve) => {
+    const spins = spec.spins ?? 1;
+    const totalY = 360 * spins;
+    const start = performance.now();
+    const riseEnd = spec.riseMs;
+    const holdEnd = riseEnd + spec.holdMs;
+    const fallEnd = holdEnd + spec.fallMs;
+    const mxRise = (spec.fromX + window.innerWidth * 0.5) / 2;
+    const myRise = Math.min(spec.fromY, window.innerHeight * 0.4) - 48;
+    const cx = window.innerWidth * 0.5;
+    const cy = window.innerHeight * 0.4;
+    const mxFall = (cx + spec.toX) / 2 + (spec.toX - cx) * 0.05;
+    const myFall = Math.min(cy, spec.toY) - 56;
+
+    fxCardSpin.style.transition = "none";
+    fxCardSpin.style.animation = "none";
+
+    const tick = (now: number): void => {
+      const elapsed = now - start;
+
+      if (elapsed < riseEnd) {
+        const u = elapsed / riseEnd;
+        const e = easeOutQuint(u);
+        const flipE = easeInOutCubic(u);
+        const x = (1 - e) * (1 - e) * spec.fromX + 2 * (1 - e) * e * mxRise + e * e * cx;
+        const y = (1 - e) * (1 - e) * spec.fromY + 2 * (1 - e) * e * myRise + e * e * cy;
+        const scale = spec.fromScale + (spec.peakScale - spec.fromScale) * e;
+        // Slight Z tilt while rising for depth; full sideways Y spin
+        const rotZ = -10 * (1 - e);
+        const rotY = totalY * flipE;
+        const rotX = 8 * Math.sin(Math.PI * u);
+        fxGhost.style.left = `${x}px`;
+        fxGhost.style.top = `${y}px`;
+        fxGhost.style.transform = `translate(-50%, -50%) rotate(${rotZ}deg) scale(${scale})`;
+        fxCardSpin.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+        window.requestAnimationFrame(tick);
+        return;
+      }
+
+      if (elapsed < holdEnd) {
+        const holdU = (elapsed - riseEnd) / Math.max(1, spec.holdMs);
+        const bob = Math.sin(holdU * Math.PI * 2) * 6;
+        fxGhost.style.left = `${cx}px`;
+        fxGhost.style.top = `${cy + bob}px`;
+        fxGhost.style.transform = `translate(-50%, -50%) rotate(0deg) scale(${spec.peakScale})`;
+        fxCardSpin.style.transform = `rotateX(0deg) rotateY(${totalY}deg)`;
+        window.requestAnimationFrame(tick);
+        return;
+      }
+
+      if (elapsed < fallEnd) {
+        const u = (elapsed - holdEnd) / spec.fallMs;
+        const e = easeInOutCubic(u);
+        const x = (1 - e) * (1 - e) * cx + 2 * (1 - e) * e * mxFall + e * e * spec.toX;
+        const y = (1 - e) * (1 - e) * cy + 2 * (1 - e) * e * myFall + e * e * spec.toY;
+        const scale = spec.peakScale + (spec.landScale - spec.peakScale) * e;
+        // Another full sideways flip while landing — ends face-forward
+        const rotY = totalY + 360 * e;
+        const rotZ = 8 * Math.sin(Math.PI * e);
+        const rotX = -8 * Math.sin(Math.PI * e);
+        fxGhost.style.left = `${x}px`;
+        fxGhost.style.top = `${y}px`;
+        fxGhost.style.transform = `translate(-50%, -50%) rotate(${rotZ}deg) scale(${scale})`;
+        fxCardSpin.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+        window.requestAnimationFrame(tick);
+        return;
+      }
+
+      fxGhost.style.left = `${spec.toX}px`;
+      fxGhost.style.top = `${spec.toY}px`;
+      fxGhost.style.transform = `translate(-50%, -50%) rotate(0deg) scale(${spec.landScale})`;
+      fxCardSpin.style.transform = `rotateX(0deg) rotateY(${totalY + 360}deg)`;
+      resolve();
+    };
+    window.requestAnimationFrame(tick);
+  });
+}
+
+/**
+ * High-level CCG reveal: 3D flip rise → big center hover → flip settle to board.
  */
 function revealCardCeremony(spec: RevealSpec): Promise<void> {
   return new Promise((resolve) => {
@@ -2726,17 +2865,30 @@ function revealCardCeremony(spec: RevealSpec): Promise<void> {
         resolve();
         return;
       }
-      const cx = window.innerWidth * 0.5;
-      const cy = window.innerHeight * 0.4;
-      const fromScale = spec.fromScale ?? 0.85;
-      const peakScale = spec.peakScale ?? Math.min(2.85, Math.max(2.15, (window.innerHeight * 0.52) / 162));
-      const landScale = spec.landScale ?? (spec.kind === "rite" ? 0.55 : spec.kind === "relic" ? 0.42 : 0.48);
-      const holdMs = spec.holdMs ?? paceMs(spec.kind === "witness" || spec.kind === "gaze" || spec.kind === "expose" ? 1700 : 1300);
-      const riseMs = paceMs(520);
-      const fallMs = paceMs(spec.kind === "rite" ? 420 : 500);
+      const hero = fxHeroBox();
+      fxGhost.style.width = `${hero.w}px`;
+      fxGhost.style.height = `${hero.h}px`;
+      // Peak ≈ 1 = native hero pixels (never upscale a tiny card).
+      const fromScale = spec.fromScale ?? Math.min(0.42, 112 / hero.w);
+      const peakScale = spec.peakScale ?? 0.88;
+      const landScale =
+        spec.landScale ??
+        (spec.kind === "rite" ? 0.22 : spec.kind === "relic" ? 0.16 : spec.kind === "site" ? 0.24 : 0.2);
+      const holdMs = spec.holdMs ?? paceMs(spec.kind === "witness" || spec.kind === "gaze" || spec.kind === "expose" ? 1500 : 1100);
+      const riseMs = paceMs(720);
+      const fallMs = paceMs(spec.kind === "rite" ? 520 : 580);
       const caption = spec.caption ?? revealCaption(spec.kind);
 
       fxCardImg.src = spec.src ?? handCardSrc(spec.cardId);
+      fxCardBackImg.src = cardBackSrc();
+      try {
+        await Promise.all([
+          fxCardImg.decode?.() ?? Promise.resolve(),
+          fxCardBackImg.decode?.() ?? Promise.resolve(),
+        ]);
+      } catch {
+        /* decode optional */
+      }
       fxLayer.hidden = false;
       fxLayer.classList.add("is-revealing");
       fxGhost.className = `is-flying is-revealing is-reveal-${spec.kind}`;
@@ -2744,54 +2896,57 @@ function revealCardCeremony(spec: RevealSpec): Promise<void> {
       fxGhost.style.opacity = "1";
       fxGhost.style.left = `${spec.fromX}px`;
       fxGhost.style.top = `${spec.fromY}px`;
-      fxGhost.style.transform = `translate(-50%, -50%) rotate(-7deg) scale(${fromScale})`;
+      fxGhost.style.transform = `translate(-50%, -50%) rotate(-8deg) scale(${fromScale})`;
+      fxCardSpin.style.transform = "rotateX(0deg) rotateY(0deg)";
       fxCaption.textContent = caption;
       fxCaption.hidden = false;
-      // Dim + caption after a frame so transitions fire
+      if (spec.kind === "figure" || spec.kind === "vessel") playSfx("summon");
+      else if (spec.kind === "site") playSfx("site");
+      else if (spec.kind === "relic") playSfx("graft");
+      else if (spec.kind === "rite") playSfx("rite");
+      else if (spec.kind === "witness" || spec.kind === "expose") playSfx("witness");
+      else if (spec.kind === "gaze") playSfx("gaze");
       window.requestAnimationFrame(() => {
         fxDim.classList.add("is-on");
         fxCaption.classList.add("is-on");
       });
-      spawnFlightMotes(spec.fromX, spec.fromY, cx, cy, spec.kind === "rite" ? "cast" : "summon");
+      spawnFlightMotes(spec.fromX, spec.fromY, window.innerWidth * 0.5, window.innerHeight * 0.4, spec.kind === "rite" ? "cast" : "summon");
 
-      await animateFxGhost(
-        { x: spec.fromX, y: spec.fromY, scale: fromScale, rot: -7 },
-        { x: cx, y: cy, scale: peakScale, rot: 0 },
+      await animateSummonFlip3d({
+        fromX: spec.fromX,
+        fromY: spec.fromY,
+        toX: spec.toX,
+        toY: spec.kind === "rite" ? spec.toY - 24 : spec.toY,
+        fromScale,
+        peakScale,
+        landScale: spec.kind === "rite" ? landScale * 1.08 : landScale,
         riseMs,
-        36,
-      );
+        holdMs,
+        fallMs,
+        spins: 1,
+      });
 
-      fxGhost.classList.add("is-hovering");
-      await waitMs(holdMs);
-      fxGhost.classList.remove("is-hovering");
       fxCaption.classList.remove("is-on");
       fxDim.classList.remove("is-on");
-
-      spawnFlightMotes(cx, cy, spec.toX, spec.toY, spec.kind === "relic" ? "graft" : "summon");
+      spawnFlightMotes(
+        window.innerWidth * 0.5,
+        window.innerHeight * 0.4,
+        spec.toX,
+        spec.toY,
+        spec.kind === "relic" ? "graft" : "summon",
+      );
 
       if (spec.kind === "rite") {
-        await animateFxGhost(
-          { x: cx, y: cy, scale: peakScale, rot: 0 },
-          { x: spec.toX, y: spec.toY - 24, scale: landScale * 1.15, rot: 0 },
-          fallMs,
-          20,
-        );
-        fxGhost.style.transition = `opacity ${paceMs(380)}ms ease, transform ${paceMs(380)}ms ease, filter ${paceMs(380)}ms ease`;
+        fxGhost.style.transition = `opacity ${paceMs(360)}ms ease, transform ${paceMs(360)}ms ease, filter ${paceMs(360)}ms ease`;
         fxGhost.style.filter = "drop-shadow(0 0 40px rgba(160, 200, 255, 0.98)) brightness(1.7)";
-        fxGhost.style.transform = `translate(-50%, -50%) scale(${landScale * 1.28})`;
+        fxGhost.style.transform = `translate(-50%, -50%) scale(${landScale * 1.15})`;
         fxGhost.style.opacity = "0";
-        await waitMs(paceMs(380));
+        await waitMs(paceMs(360));
       } else {
-        await animateFxGhost(
-          { x: cx, y: cy, scale: peakScale, rot: 0 },
-          { x: spec.toX, y: spec.toY, scale: landScale, rot: 0 },
-          fallMs,
-          48,
-        );
-        fxGhost.style.transition = `opacity 160ms ease, transform 160ms ease`;
+        fxGhost.style.transition = "opacity 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1)";
         fxGhost.style.opacity = "0";
         fxGhost.style.transform = `translate(-50%, -50%) scale(${landScale * 0.92})`;
-        await waitMs(160);
+        await waitMs(180);
       }
 
       resetFxGhost();
@@ -3178,8 +3333,9 @@ function queueCardMoments(events: OculusEvent[]): void {
           toX: land.x,
           toY: land.y,
           kind,
-          fromScale: 0.72,
-          landScale: 0.5,
+          fromScale: 0.28,
+          peakScale: 0.88,
+          landScale: 0.2,
           holdMs: paceMs(kind === "gaze" ? 1600 : 1800),
         }),
       );
@@ -3193,8 +3349,9 @@ function queueCardMoments(events: OculusEvent[]): void {
           toX: land.x,
           toY: land.y,
           kind: "expose",
-          fromScale: 0.72,
-          landScale: 0.5,
+          fromScale: 0.28,
+          peakScale: 0.88,
+          landScale: 0.2,
           holdMs: paceMs(1700),
         }),
       );
@@ -3320,54 +3477,19 @@ async function flyDrawToHand(
   });
 }
 
-async function animateHandDeals(cardIds: string[]): Promise<void> {
-  if (!cardIds.length || !state) return;
-  if (reduceMotionOn()) {
-    for (const btn of handEl.querySelectorAll(".hand-card.dealing")) {
-      btn.classList.remove("dealing");
-      btn.classList.add("dealt");
-    }
-    dealingSlots.clear();
-    syncDeckPiles();
-    return;
-  }
-  const startSlot = Math.max(0, state.hand.length - cardIds.length);
-  for (let i = 0; i < cardIds.length; i++) {
-    const slot = startSlot + i;
-    const btn = handEl.querySelector(`.hand-card[data-slot="${slot}"]`) as HTMLElement | null;
-    let toX = deckOrigin("player").x - 24;
-    let toY = deckOrigin("player").y - 56;
-    if (btn) {
-      const r = btn.getBoundingClientRect();
-      toX = r.left + r.width / 2;
-      toY = r.top + r.height / 2;
-    }
-    playSfx("draw");
-    await flyDrawToHand(cardIds[i], toX, toY, "player");
-    dealingSlots.delete(slot);
-    if (btn) {
-      btn.classList.remove("dealing");
-      btn.classList.add("dealt");
-    }
-    await waitMs(paceMs(70));
+/**
+ * Hand draws: no fly-in — cards appear in the fan immediately.
+ */
+async function animateHandDeals(_cardIds: string[]): Promise<void> {
+  dealingSlots.clear();
+  for (const btn of handEl.querySelectorAll(".hand-card.dealing")) {
+    btn.classList.remove("dealing");
   }
   syncDeckPiles();
 }
 
-/** Foe draws into hidden hand — back flies from their library toward top rail. */
-async function animateEnemyDraws(count: number): Promise<void> {
-  if (!count || !state || reduceMotionOn()) {
-    syncDeckPiles();
-    return;
-  }
-  const origin = deckOrigin("enemy");
-  for (let i = 0; i < count; i++) {
-    playSfx("draw");
-    const toX = origin.x - 28 - i * 6;
-    const toY = origin.y - 36;
-    await flyDrawToHand(null, toX, toY, "enemy");
-    await waitMs(paceMs(50));
-  }
+/** Foe draws: update pile only — no library fly-in. */
+async function animateEnemyDraws(_count: number): Promise<void> {
   syncDeckPiles();
 }
 
@@ -3557,7 +3679,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         "rite",
       );
     } else if (ev.type === "toll") {
-      playSfx("rite");
+      playSfx("toll");
       punchAltitude(ev.altitude, "rite");
       floatLaneCue(ev.altitude, "Toll placed", "toll");
       flashPhase("Toll", {
@@ -3572,7 +3694,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         "rite",
       );
     } else if (ev.type === "toll_pay") {
-      playSfx("law");
+      playSfx("toll");
       punchAltitude(ev.altitude, "rite");
       floatLaneCue(ev.altitude, ev.paid ? "Toll tax paid" : "Toll — no Sight", "toll");
       explain(
@@ -3601,7 +3723,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         "rite",
       );
     } else if (ev.type === "peal") {
-      playSfx("law");
+      playSfx("peal");
       punchAltitude(ev.altitude, "rite");
       floatLaneCue(ev.altitude, "Peal armed", "peal");
       flashPhase("Peal", {
@@ -3616,7 +3738,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         "rite",
       );
     } else if (ev.type === "peal_pay") {
-      playSfx("eclipse");
+      playSfx("peal");
       punchAltitude(ev.altitude, "eclipse");
       floatLaneCue(ev.altitude, "Peal pays", "peal");
       explain(
@@ -3644,7 +3766,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         "stance",
       );
     } else if (ev.type === "wager") {
-      playSfx("select");
+      playSfx("wager");
       punchAltitude(ev.altitude, "stance");
       floatLaneCue(ev.altitude, "Wager", "wager");
       flashPhase("Wager", {
@@ -3662,7 +3784,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         "stance",
       );
     } else if (ev.type === "cash") {
-      playSfx("eclipse");
+      playSfx("cash");
       punchAltitude(ev.altitude, "resolve");
       floatLaneCue(ev.altitude, "Cash!", "wager");
       playWagerFlip(ev.altitude, "cash");
@@ -3672,7 +3794,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         "eclipse",
       );
     } else if (ev.type === "bust") {
-      playSfx("strain");
+      playSfx("bust");
       punchAltitude(ev.altitude, "strain");
       floatLaneCue(ev.altitude, "Bust", "strain");
       playWagerFlip(ev.altitude, "bust");
@@ -3699,7 +3821,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         "strain",
       );
     } else if (ev.type === "press") {
-      playSfx("strain");
+      playSfx("press");
       punchAltitude(ev.altitude, "stain");
       floatLaneCue(ev.altitude, "Pressed", "press");
       flashPhase("Press", {
@@ -3718,7 +3840,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         "stain",
       );
     } else if (ev.type === "press_backlash") {
-      playSfx("blind");
+      playSfx("bust");
       punchAltitude(ev.altitude, "strain");
       floatLaneCue(ev.altitude, "Press backlash", "strain");
       explain(
@@ -4230,8 +4352,9 @@ async function flySpectateIntent(intent: Intent, side: Side): Promise<void> {
         toX: land.x,
         toY: land.y,
         kind,
-        fromScale: side === "player" ? 0.92 : 0.82,
-        landScale: kind === "rite" ? 0.52 : kind === "site" ? 0.58 : kind === "relic" ? 0.42 : 0.48,
+        fromScale: side === "player" ? 0.4 : 0.36,
+        peakScale: 0.88,
+        landScale: kind === "rite" ? 0.22 : kind === "site" ? 0.24 : kind === "relic" ? 0.16 : 0.2,
         holdMs: paceMs(kind === "rite" || kind === "site" ? 1450 : 1200),
       });
     });
@@ -4333,8 +4456,9 @@ async function flyEnemyIntent(intent: Intent): Promise<void> {
         toX: land.x,
         toY: land.y,
         kind,
-        fromScale: 0.92,
-        landScale: kind === "site" ? 0.58 : kind === "relic" ? 0.42 : 0.5,
+        fromScale: 0.38,
+        peakScale: 0.88,
+        landScale: kind === "site" ? 0.24 : kind === "relic" ? 0.16 : 0.2,
         holdMs: paceMs(kind === "site" ? 1400 : 1150),
       });
       punchAltitude(intent.altitude, isSite ? "summon" : "play");
@@ -4352,7 +4476,9 @@ async function flyEnemyIntent(intent: Intent): Promise<void> {
         toX: land.x,
         toY: land.y,
         kind: "rite",
-        fromScale: 0.88,
+        fromScale: 0.36,
+        peakScale: 0.88,
+        landScale: 0.22,
         holdMs: paceMs(1400),
       }),
     );
@@ -4594,9 +4720,9 @@ async function commitPlayerIntent(intent: Intent, alt: Altitude): Promise<void> 
     if (isBoardVerb) {
       if (intent.kind === "stance") playSfx("stance");
       else if (intent.kind === "reveil") playSfx("witness");
-      else if (intent.kind === "press") playSfx("strain");
-      else if (intent.kind === "peal") playSfx("law");
-      else if (intent.kind === "wager") playSfx("select");
+      else if (intent.kind === "press") playSfx("press");
+      else if (intent.kind === "peal") playSfx("peal");
+      else if (intent.kind === "wager") playSfx("wager");
       else if (intent.kind === "witness") playSfx(intent.enemy ? "gaze" : "witness");
       const events = applyIntent(state, intent);
       try {
@@ -4630,6 +4756,7 @@ async function commitPlayerIntent(intent: Intent, alt: Altitude): Promise<void> 
               );
             }
             const kind = revealKindForPlay(cardId, intent.kind);
+            const hero = fxHeroBox();
             await revealCardCeremony({
               cardId,
               fromX: r.left + r.width / 2,
@@ -4637,9 +4764,10 @@ async function commitPlayerIntent(intent: Intent, alt: Altitude): Promise<void> 
               toX: land.x,
               toY: land.y,
               kind,
-              fromScale: 1.02,
-              landScale: kind === "rite" ? 0.52 : kind === "site" ? 0.58 : kind === "relic" ? 0.42 : 0.48,
-              holdMs: paceMs(kind === "rite" || kind === "site" ? 1500 : 1200),
+              fromScale: Math.min(0.45, Math.max(0.32, r.width / hero.w)),
+              peakScale: 0.88,
+              landScale: kind === "rite" ? 0.22 : kind === "site" ? 0.24 : kind === "relic" ? 0.16 : 0.2,
+              holdMs: paceMs(kind === "rite" || kind === "site" ? 1300 : 1050),
             });
             punchAltitude(alt, isRite ? "rite" : isSite ? "summon" : isGraft ? "play" : "summon");
           });
@@ -5386,6 +5514,10 @@ function frame(now: number): void {
         if (state?.phase === "play") showToast(hint(state));
       }
     }
+  }
+  if (meterTipTimer > 0) {
+    meterTipTimer -= dt * 1000;
+    if (meterTipTimer <= 0) hideMeterTip();
   }
   if (phaseTimer > 0) {
     phaseTimer -= dt * 1000;

@@ -61,6 +61,11 @@
   --font-display: Cinzel, "Times New Roman", serif;
   --font-ui: "Barlow Condensed", "Arial Narrow", sans-serif;
   --pad: 8px;
+  --hand-card-w: 108px;
+  --hand-card-h: 162px;
+  --hand-row-h: 178px;
+  --deck-w: clamp(52px, 12vw, 72px);
+  --deck-foe-w: clamp(40px, 9vw, 56px);
   font-family: var(--font-ui);
   color: var(--bone);
   background: #0e0a12;
@@ -130,7 +135,7 @@ body:not(.on-menu) #stage {
     auto
     auto
     minmax(0, 1.1fr)
-    178px
+    var(--hand-row-h)
     minmax(52px, auto);
   grid-template-areas:
     "top"
@@ -591,6 +596,41 @@ body.paused #altitudes {
   width: 100%;
   min-width: 0;
   pointer-events: auto;
+}
+
+/* Glossary tip for ESS / SIGHT / FAV / Will / Eclipse — sits under the meters, not over the hand */
+#meter-tip {
+  grid-area: board;
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  transform: translateX(-50%);
+  z-index: 35;
+  width: min(calc(100% - 12px), 420px);
+  max-width: 100%;
+  pointer-events: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(10, 8, 14, 0.92);
+  box-shadow:
+    inset 0 0 0 1px rgba(212, 175, 55, 0.4),
+    0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+#meter-tip[hidden] {
+  display: none !important;
+}
+
+#meter-tip-text {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  text-align: center;
+  color: rgba(245, 236, 220, 0.96);
+  text-shadow: 0 1px 3px #000;
 }
 
 .will-side {
@@ -2921,8 +2961,8 @@ body.dragging-card .alt-hit.legal {
   position: fixed;
   left: 0;
   top: 0;
-  width: 108px;
-  height: 162px;
+  width: var(--hand-card-w);
+  height: var(--hand-card-h);
   transform: translate(-50%, -58%) rotate(-3deg) scale(1.04);
   transform-origin: 50% 100%;
   will-change: left, top, transform;
@@ -3006,14 +3046,51 @@ body.reduce-motion #drag-ghost {
   position: fixed;
   left: 0;
   top: 0;
-  width: 108px;
-  height: 162px;
+  /* Modest hero — never upscale past ~1; from/land use scale < 1 for sharpness */
+  width: min(168px, 26vmin);
+  height: min(252px, 39vmin);
   transform: translate(-50%, -50%) scale(1);
   transform-origin: 50% 50%;
   will-change: left, top, transform, filter, opacity;
   filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.6));
   z-index: 1;
   opacity: 1;
+  perspective: 1600px;
+  perspective-origin: 50% 45%;
+}
+
+#fx-card-spin {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+#fx-ghost .fx-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  pointer-events: none;
+  /* Keep GPU samples crisp while spinning */
+  transform: translateZ(0);
+  image-rendering: auto;
+  box-shadow:
+    0 0 0 1px rgba(237, 228, 212, 0.22),
+    0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+#fx-ghost .fx-face-front {
+  transform: rotateY(0deg) translateZ(1.5px);
+}
+
+#fx-ghost .fx-face-back {
+  transform: rotateY(180deg) translateZ(1.5px);
 }
 
 #fx-ghost.is-flying {
@@ -3022,12 +3099,10 @@ body.reduce-motion #drag-ghost {
 
 #fx-ghost.is-revealing {
   border-radius: 8px;
-  box-shadow:
-    0 0 0 1px rgba(237, 228, 212, 0.28),
-    0 28px 48px rgba(0, 0, 0, 0.72);
+  filter: drop-shadow(0 28px 48px rgba(0, 0, 0, 0.72));
 }
 
-#fx-ghost.is-hovering {
+#fx-ghost.is-hovering #fx-card-spin {
   animation: fx-reveal-bob 2.4s ease-in-out infinite;
 }
 
@@ -3051,16 +3126,16 @@ body.reduce-motion #drag-ghost {
 
 #fx-ghost.is-reveal-figure,
 #fx-ghost.is-reveal-vessel {
-  filter: drop-shadow(0 22px 36px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 22px rgba(237, 200, 140, 0.4));
+  filter: drop-shadow(0 22px 36px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 22px rgba(237, 200, 140, 0.45));
 }
 
 @keyframes fx-reveal-bob {
   0%,
   100% {
-    translate: 0 0;
+    transform: translateY(0) rotateY(0deg);
   }
   50% {
-    translate: 0 -10px;
+    transform: translateY(-10px) rotateY(0deg);
   }
 }
 
@@ -3079,7 +3154,7 @@ body.reduce-motion #drag-ghost {
   filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.45));
 }
 
-body.reduce-motion #fx-ghost.is-hovering {
+body.reduce-motion #fx-ghost.is-hovering #fx-card-spin {
   animation: none;
 }
 
@@ -3236,11 +3311,12 @@ body.reduce-motion .alt-hit.fx-gaze {
   animation: none !important;
 }
 
-#fx-card {
+#fx-card,
+#fx-card-back {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  border-radius: 5px;
+  object-fit: contain;
+  border-radius: 8px;
   display: block;
 }
 
@@ -3413,7 +3489,7 @@ body.enemy-turn #toast-text {
   font: inherit;
   padding: 0;
   position: relative;
-  width: clamp(52px, 12vw, 72px);
+  width: var(--deck-w);
   aspect-ratio: 2 / 3;
   flex: 0 0 auto;
   pointer-events: auto;
@@ -3446,7 +3522,7 @@ body.enemy-turn #toast-text {
   top: calc(env(safe-area-inset-top, 0px) + 6px + 42px + 34px);
   right: max(6px, var(--pad));
   z-index: 5;
-  width: clamp(40px, 9vw, 56px);
+  width: var(--deck-foe-w);
   pointer-events: auto;
 }
 
@@ -3577,7 +3653,7 @@ body.enemy-turn #toast-text {
   width: auto;
   flex: 1 1 auto;
   min-width: 0;
-  max-width: min(920px, 100%);
+  max-width: min(var(--hand-fan-max, 920px), 100%);
   height: 100%;
   margin: 0;
   overflow: visible;
@@ -3593,8 +3669,8 @@ body.enemy-turn #toast-text {
   left: var(--slot-x);
   /* Sit on the hand-row floor; arc only lifts upward (negative Y) */
   bottom: 0;
-  width: 108px;
-  height: 162px;
+  width: var(--hand-card-w);
+  height: var(--hand-card-h);
   margin: 0;
   appearance: none;
   border: none;
@@ -5186,6 +5262,126 @@ button.menu-link:active {
   }
 }
 
+/* Desktop / large landscape — scale hand + HUD so cards aren't tiny */
+@media (min-width: 900px) and (min-height: 680px) {
+  :root {
+    --pad: 12px;
+    --hand-card-w: 136px;
+    --hand-card-h: 204px;
+    --hand-row-h: 228px;
+    --hand-fan-max: 1080px;
+    --deck-w: clamp(68px, 7vw, 92px);
+    --deck-foe-w: clamp(52px, 5vw, 72px);
+  }
+
+  #hud {
+    gap: 8px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) var(--pad)
+      calc(12px + env(safe-area-inset-bottom, 0px));
+    grid-template-rows:
+      auto
+      auto
+      minmax(0, 1.15fr)
+      var(--hand-row-h)
+      minmax(56px, auto);
+  }
+
+  #altitudes {
+    gap: 14px;
+    max-width: 1180px;
+    margin-inline: auto;
+  }
+
+  .meter {
+    min-width: 56px;
+    height: 44px;
+    padding: 3px 11px 4px;
+  }
+
+  .meter-label {
+    font-size: 0.62rem;
+  }
+
+  .meter-val {
+    font-size: 1.05rem;
+  }
+
+  .ecl-pip {
+    min-width: 76px;
+  }
+
+  #actions {
+    max-width: 920px;
+    margin-inline: auto;
+    gap: 8px;
+    max-height: 128px;
+  }
+
+  #actions button {
+    min-height: 52px;
+    font-size: 1rem;
+  }
+
+  .hand-card {
+    border-radius: 8px;
+  }
+
+  .hand-card img.face {
+    border-radius: 7px;
+  }
+
+  #fx-ghost {
+    width: min(200px, 22vmin);
+    height: min(300px, 33vmin);
+  }
+
+  .foil-card--inspect {
+    width: min(360px, 42vw);
+  }
+
+  .card-inspect.has-companions .foil-card--inspect {
+    width: min(300px, 34vw);
+  }
+}
+
+@media (min-width: 1200px) and (min-height: 800px) {
+  :root {
+    --hand-card-w: 156px;
+    --hand-card-h: 234px;
+    --hand-row-h: 262px;
+    --hand-fan-max: 1240px;
+    --deck-w: clamp(76px, 6.5vw, 104px);
+    --deck-foe-w: clamp(58px, 4.5vw, 80px);
+  }
+
+  #hud {
+    grid-template-rows:
+      auto
+      auto
+      minmax(0, 1.2fr)
+      var(--hand-row-h)
+      minmax(60px, auto);
+  }
+
+  #altitudes {
+    max-width: 1320px;
+  }
+
+  #fx-ghost {
+    width: min(220px, 20vmin);
+    height: min(330px, 30vmin);
+  }
+}
+
+@media (min-width: 1500px) and (min-height: 900px) {
+  :root {
+    --hand-card-w: 168px;
+    --hand-card-h: 252px;
+    --hand-row-h: 280px;
+    --hand-fan-max: 1360px;
+  }
+}
+
 body.on-menu {
   /* Allow vertical pan on the title sheet despite global touch-action: none */
   touch-action: manipulation;
@@ -5813,6 +6009,7 @@ body.on-menu #actions,
 body.on-menu #hand-area,
 body.on-menu #enemy-deck,
 body.on-menu #willrow,
+body.on-menu #meter-tip,
 body.on-menu #meters,
 body.on-menu #altitudes {
   visibility: hidden;
@@ -5872,10 +6069,10 @@ body.on-menu #stage {
   #hud {
     grid-template-rows: auto auto minmax(0, 1fr) 160px minmax(48px, auto);
   }
-  .hand-card,
-  .hand-card img.face {
-    width: 88px;
-    height: 132px;
+  :root {
+    --hand-card-w: 88px;
+    --hand-card-h: 132px;
+    --hand-row-h: 160px;
   }
   #hand,
   .hand-fan {

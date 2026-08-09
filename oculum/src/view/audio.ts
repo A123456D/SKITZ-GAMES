@@ -4,11 +4,18 @@ export type SfxId =
   | "ui-tap"
   | "select"
   | "play"
+  | "summon"
   | "site"
   | "witness"
   | "gaze"
   | "graft"
   | "stance"
+  | "wager"
+  | "cash"
+  | "bust"
+  | "press"
+  | "toll"
+  | "peal"
   | "rite"
   | "pass"
   | "resolve"
@@ -29,11 +36,18 @@ const SFX_FILES: Record<SfxId, string> = {
   "ui-tap": "ui-tap.mp3",
   select: "select.mp3",
   play: "play.mp3",
+  summon: "summon.mp3",
   site: "site.mp3",
   witness: "witness.mp3",
   gaze: "gaze.mp3",
   graft: "graft.mp3",
   stance: "stance.mp3",
+  wager: "wager.mp3",
+  cash: "cash.mp3",
+  bust: "bust.mp3",
+  press: "press.mp3",
+  toll: "toll.mp3",
+  peal: "peal.mp3",
   rite: "rite.mp3",
   pass: "pass.mp3",
   resolve: "resolve.mp3",
@@ -58,28 +72,38 @@ const MUSIC_FILES: Record<MusicBed, string> = {
 
 const MUTE_KEY = "oculum.muted";
 const MUSIC_MUTE_KEY = "oculum.musicMuted";
-const SFX_VERSION = 9;
+const SFX_VERSION = 11;
 const MUSIC_VOLUME = 0.32;
 const END_MUSIC_VOLUME = 0.4;
 
 /** Keep UI dry; only a few combat stingers get light pitch vary. */
 const PITCH_VARY: Partial<Record<SfxId, boolean>> = {
   play: true,
+  summon: true,
   resolve: true,
   fall: true,
   stain: true,
   strain: true,
+  cash: true,
+  bust: true,
 };
 
 const DEFAULT_VOL: Partial<Record<SfxId, number>> = {
   "ui-tap": 0.28,
   select: 0.32,
   play: 0.42,
+  summon: 0.52,
   site: 0.48,
   witness: 0.28,
   gaze: 0.5,
   graft: 0.4,
   stance: 0.38,
+  wager: 0.42,
+  cash: 0.5,
+  bust: 0.46,
+  press: 0.48,
+  toll: 0.5,
+  peal: 0.5,
   rite: 0.5,
   pass: 0.3,
   resolve: 0.55,
