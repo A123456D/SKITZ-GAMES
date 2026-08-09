@@ -10,7 +10,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "smoke:assets": "node scripts/smoke-assets.mjs"
   },
   "dependencies": {
     "astro": "^7.1.3"

@@ -1,0 +1,12 @@
+---
+description: Skitz Pages deploy — never break cross-game art; run smoke:assets
+alwaysApply: true
+---
+
+# Skitz website deploys (from OCULUM / monorepo work)
+
+When changing `website/` Cloudflare Pages config, Functions, `_headers`, `_routes.json`, or anything that can affect `/images` or `/games/*/`:
+
+1. **Never** add a catch-all Pages Function that 404s asset paths by regex alone (this blanked every Skitz game on 2026-08-09).
+2. After push, run `npm run smoke:assets` in `website/` and confirm exit 0 before telling the user it is fixed.
+3. Full rule: `website/.cursor/rules/pages-asset-safety.mdc`

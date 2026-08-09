@@ -1,0 +1,42 @@
+---
+description: Never break Skitz Pages art with catch-all Functions or SPA HTML poison
+alwaysApply: true
+---
+
+# SKITZ site — asset safety (hard rule)
+
+## Incident (2026-08-09)
+
+A Cloudflare Pages `functions/[[path]].js` returned **404 text/plain for every** `/images/*`, `/assets/*`, card JPG, etc. HTML shells still loaded → blank/white games with no art.
+
+## Never do this
+
+- Do **not** add `website/functions/**` catch-all routes that 404 by path pattern alone.
+- Do **not** assume “Function only runs when static file is missing” — on this project it **did** intercept real assets.
+- Do **not** ship `_routes.json` with `"include": ["/*"]` unless you have verified assets still 200 after deploy.
+
+## Allowed 404 / SPA fixes
+
+- Prefer **root** `website/public/404.html` so Pages is not in silent SPA mode (missing files → real 404 page, not `index.html` 200).
+- Game `sw.js` may refuse to **cache** `text/html` as image/audio (client poison guard).
+- If you ever need a Function for missing assets, you **must** try the asset binding first and only 404 when that miss is confirmed:
+
+```js
+// ONLY safe pattern — still verify with smoke:assets after deploy
+export async function onRequest(context) {
+  const asset = await context.env.ASSETS.fetch(context.request);
+  if (asset.status !== 404) return asset;
+  // …then optional custom 404 for asset-like URLs
+  return asset;
+}
+```
+
+## Before calling a site “fixed”
+
+From `website/`:
+
+```bash
+npm run smoke:assets
+```
+
+Must exit 0. If it fails, **revert the deploy change** — do not tell the user phones need a clear until smoke passes.
