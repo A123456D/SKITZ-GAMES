@@ -1575,7 +1575,11 @@ function syncHud(): void {
   btnReveil.disabled = spectatorMode || state.active !== "player" || !canReveil;
   btnStance.disabled = spectatorMode || state.active !== "player" || !canStance;
   btnWager.disabled = spectatorMode || state.active !== "player" || !canWager;
-  btnPress.disabled = spectatorMode || state.active !== "player" || !canPress;
+  btnPress.disabled =
+    spectatorMode ||
+    state.active !== "player" ||
+    state.pressUsed.player ||
+    (!canPress && !sidePlaysHeresy(state, "player", "ink"));
   btnPeal.disabled = spectatorMode || state.active !== "player" || !canPeal;
   btnPass.disabled = spectatorMode || state.active !== "player" || !canPass;
   if (spectatorMode) {
@@ -2195,6 +2199,10 @@ function summarizeRiteOutcome(events: OculusEvent[], side: Side): string[] {
       lines.push(`${who} ${getCard(ev.cardId).name} Fell`);
     } else if (ev.type === "overwrite") {
       lines.push(`${getCard(ev.bouncedId).name} bounced to hand`);
+    } else if (ev.type === "tuck") {
+      lines.push(
+        `Tucked ${getCard(ev.inhabitantId).name} into ${getCard(ev.vesselId).name}`,
+      );
     } else if (ev.type === "scrutiny") {
       lines.push(
         ev.stacks >= 2
@@ -2535,6 +2543,13 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         holdMs,
         "play",
       );
+    } else if (ev.type === "tuck") {
+      punchAltitude(ev.altitude, "play");
+      explain(
+        `Tuck: ${getCard(ev.inhabitantId).name} enters ${getCard(ev.vesselId).name} as Inhabitant on ${ALT_NAMES[ev.altitude]} (INH badge).`,
+        holdMs,
+        "play",
+      );
     } else if (ev.type === "graft") {
       const def = getCard(ev.relicId);
       punchAltitude(ev.altitude, "play");
@@ -2659,8 +2674,12 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "press") {
       playSfx("stain");
       punchAltitude(ev.altitude, "stain");
+      const dahaka =
+        ev.bonusWill && ev.bonusWill > 0
+          ? ` Dahaka Witnessed: foe −${ev.bonusWill} Will.`
+          : "";
       explain(
-        `Press — ${whoVerb(ev.side, "mark", "marks")} ${getCard(ev.cardId).name}. Win that lane to pierce Stance B / Erase; fail = backlash. (Free into Motley Stance B; Stain not required there.)`,
+        `Press — ${whoVerb(ev.side, "mark", "marks")} ${getCard(ev.cardId).name}. Win that lane to pierce Stance B / Erase; fail = backlash. (Free into Motley Stance B; Stain not required there.)${dahaka}`,
         holdMs + 400,
         "stain",
       );
@@ -3739,9 +3758,17 @@ btnWager.addEventListener("click", () => {
 });
 
 btnPress.addEventListener("click", () => {
-  if (uiPaused) return;
-  mode = mode === "press" ? "play" : "press";
+  if (uiPaused || !state) return;
+  if (state.active !== "player" || state.pressUsed.player) return;
   selectedHand = null;
+  const can = legalIntents(state).some((i) => i.kind === "press");
+  if (!can) {
+    mode = "press";
+    showToast("Press needs a Veiled enemy with Stain (1 Sight) — or Motley Stance B (free).");
+    syncHud();
+    return;
+  }
+  mode = mode === "press" ? "play" : "press";
   syncHud();
 });
 

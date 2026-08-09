@@ -222,15 +222,17 @@ function tryPress(
   foe.pressed = true;
   foe.pressedBy = side;
   state.pressUsed[side] = true;
-  push(state, { type: "press", side, altitude, cardId: foe.cardId });
+  let bonusWill = 0;
   // Dahaka: Press while Witnessed → 1 Will
   for (let a = 0; a < ALTITUDE_COUNT; a++) {
     const u = unitOf(state.altitudes[a as Altitude], side);
     if (u && !u.veiled && u.cardId === "dahaka") {
       dealWillToOpponent(state, side, 1);
+      bonusWill = 1;
       break;
     }
   }
+  push(state, { type: "press", side, altitude, cardId: foe.cardId, bonusWill });
   return true;
 }
 
@@ -1192,7 +1194,8 @@ function countOtherFriendlyVeiledInk(
 }
 
 /**
- * Blot Herald (Veiled): enemy Figure in another altitude becomes Witnessed → Stain it.
+ * Blot Herald (Veiled): enemy Figure in another altitude becomes Witnessed →
+ * Stain that Figure (Witnessed Erase path), then Stain a different Veiled enemy if able (Press path).
  */
 function onEnemyFigureBecameWitnessed(
   state: MatchState,
@@ -1207,6 +1210,8 @@ function onEnemyFigureBecameWitnessed(
     const herald = unitOf(state.altitudes[a as Altitude], heraldSide);
     if (herald?.veiled && herald.cardId === "blot_herald") {
       stainUnit(state, u);
+      // Press needs Veiled + Stained — also Mark a still-Veiled foe if able
+      stainOtherEnemyVeiled(state, heraldSide, altitude);
       return;
     }
   }
@@ -4546,8 +4551,18 @@ export function legalIntents(state: MatchState): Intent[] {
       // Overwrite: bounce own figure/vessel if hand has room after play
       const t = getCard(occ.cardId).type;
       if (t === "figure" || t === "vessel") {
-        const after = hand.length - 1 + bounceCardsReturning(occ);
-        if (after <= HAND_MAX) {
+        // Vessel onto your Figure tucks that Figure (does not bounce it back)
+        let returning = bounceCardsReturning(occ);
+        let handLeft = hand.length - 1;
+        if (def.type === "vessel" && t === "figure") {
+          returning = occ.grafts.length + (occ.inhabitant ? 1 : 0);
+        } else if (def.type === "vessel") {
+          // Hand tuck frees a slot when another Figure is available
+          if (hand.some((id, i) => i !== hi && getCard(id).type === "figure")) {
+            handLeft -= 1;
+          }
+        }
+        if (handLeft + returning <= HAND_MAX) {
           out.push({ kind: "play", handIndex: hi, altitude: a as Altitude });
         }
       }
@@ -5115,8 +5130,22 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
       }
     }
 
-    if (unitOf(slot, side)) {
-      bounceOwnToHand(state, side, intent.altitude);
+    const occ = unitOf(slot, side);
+    if (occ) {
+      // Play Vessel onto your own Figure → tuck that Figure if Urn still empty
+      if (
+        def.type === "vessel" &&
+        !inhabitant &&
+        getCard(occ.cardId).type === "figure"
+      ) {
+        inhabitant = occ.cardId;
+        for (const g of occ.grafts) hand.push(g.cardId);
+        if (occ.inhabitant) hand.push(occ.inhabitant);
+        setUnit(slot, side, null);
+        noteTuck(state, side);
+      } else {
+        bounceOwnToHand(state, side, intent.altitude);
+      }
     }
 
     const u = mint(state, cardId, true);
@@ -5126,6 +5155,15 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
     // Enemy Stainwell on this lane stains a newly played Veiled figure
     applyStainwell(state, other(side), intent.altitude);
     push(state, { type: "play", side, altitude: intent.altitude, cardId, veiled: true });
+    if (inhabitant) {
+      push(state, {
+        type: "tuck",
+        side,
+        altitude: intent.altitude,
+        vesselId: cardId,
+        inhabitantId: inhabitant,
+      });
+    }
     return done();
   }
 

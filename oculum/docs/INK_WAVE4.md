@@ -15,6 +15,7 @@ Five cards. Completes the craft with **Dahaka** (Sovereign) and the remaining ki
 - **Veiled:** Whenever an enemy Figure becomes Forced Exposed, gain 1 Sight.
 - **Revelation:** Stain each enemy Figure. If you Stained 2 or more, draw 1 and Blind Mid this turn.
 - **While Witnessed:** Whenever you Forced Expose an enemy Figure, Blind that altitude this turn.
+- **Press:** When you Press, if this is Witnessed, deal 1 Will.
 - **Fall:** Draw 1.
 
 ## Echo Blot — Mill-Stain

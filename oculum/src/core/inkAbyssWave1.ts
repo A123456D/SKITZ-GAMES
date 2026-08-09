@@ -18,9 +18,9 @@ export const INK_ABYSS_WAVE1: CardDef[] = [
     artSubject:
       "same Ink Abyss set style as Mire Duelist — ink-abyss creature pale courier blot-seal staff ink-maw void face, unique cream processional arch inner frame, high-contrast cream-black ink-wash",
     veiledAbility:
-      "Whenever an enemy Figure in another altitude becomes Witnessed, Stain that Figure.",
+      "Whenever an enemy Figure in another altitude becomes Witnessed, Stain that Figure. Then Stain a different Veiled enemy Figure if able.",
     revelation: "Stain the enemy Figure here if able. Gain 1 Sight.",
-    text: "Veiled: Whenever an enemy Figure in another altitude becomes Witnessed, Stain that Figure. Revelation: Stain the enemy Figure here if able. Gain 1 Sight. Press: shared (1 Sight → Press Stained Veiled enemy; win Resolve to Erase through Stance B; fail → lose 1 Sight).",
+    text: "Veiled: Whenever an enemy Figure in another altitude becomes Witnessed, Stain that Figure. Then Stain a different Veiled enemy Figure if able. Revelation: Stain the enemy Figure here if able. Gain 1 Sight. Press: shared (1 Sight → Press Stained Veiled enemy; win Resolve to Erase through Stance B; fail → lose 1 Sight).",
   },
   {
     id: "smother_bride",

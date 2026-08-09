@@ -127,7 +127,7 @@ export type OculusEvent =
   | { type: "bust"; side: Side; altitude: Altitude; cardId: string }
   | { type: "fold"; side: Side; altitude: Altitude; cardId: string }
   | { type: "favor"; side: Side; amount: number }
-  | { type: "press"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "press"; side: Side; altitude: Altitude; cardId: string; bonusWill?: number }
   | { type: "press_backlash"; side: Side; altitude: Altitude; cardId: string }
   | { type: "peal"; side: Side; altitude: Altitude }
   | { type: "peal_pay"; side: Side; altitude: Altitude }
@@ -140,6 +140,7 @@ export type OculusEvent =
   | { type: "blind"; altitude: Altitude }
   | { type: "scrutiny"; side: Side; altitude: Altitude; cardId: string; stacks: number }
   | { type: "overwrite"; side: Side; altitude: Altitude; bouncedId: string }
+  | { type: "tuck"; side: Side; altitude: Altitude; vesselId: string; inhabitantId: string }
   | { type: "draw"; side: Side; cardId: string; to: "hand" | "law" }
   | { type: "law"; side: Side; cardId: string; eclipseGain: number }
   | { type: "eclipse"; side: Side; amount: number; reason?: string }

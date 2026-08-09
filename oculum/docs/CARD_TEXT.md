@@ -5,7 +5,7 @@
 Five dual-mode Figures. Motley / Dusk / Bonewick shelved until Ink�s 20 are done. **Sovereign** = craft legend rarity (not �premium�).
 
 ### Blot Herald � 2E / 1W � V2 / W3 � Police
-**Veiled:** Whenever an enemy Figure in another altitude becomes Witnessed, Stain that Figure.  
+**Veiled:** Whenever an enemy Figure in another altitude becomes Witnessed, Stain that Figure. Then Stain a different Veiled enemy Figure if able.  
 **Revelation:** Stain the enemy Figure here if able. Gain 1 Sight.
 
 ### Smother Bride � 3E / 2W � V2 / W4 � Tax / Fog
@@ -38,7 +38,7 @@ Erase kit tools. See also [INK_WAVE2.md](./INK_WAVE2.md).
 When an enemy Figure here becomes Forced Exposed, gain 1 Sight. When you Stain an enemy Figure here, gain 1 Sight.
 
 ### Gulf Urn � 3E / 2W � V1 / W3 � Vessel � Break spreader
-**Vessel.** On play, tuck a Figure from hand as Inhabitant if able.  
+**Vessel.** On play, tuck a Figure from hand as Inhabitant if able — or tuck your Figure on this lane when you play the Urn over them.  
 **Revelation:** Stain the enemy Figure here if able.  
 When this Falls or is Forced Exposed: Stain an enemy Veiled Figure if able, then Blind that Figure�s altitude this turn.
 
@@ -80,6 +80,7 @@ See also [INK_WAVE4.md](./INK_WAVE4.md).
 **Veiled:** Whenever an enemy Figure becomes Forced Exposed, gain 1 Sight.  
 **Revelation:** Stain each enemy Figure. If you Stained 2 or more, draw 1 and Blind Mid this turn.  
 **While Witnessed:** Whenever you Forced Expose an enemy Figure, Blind that altitude this turn.  
+**Press:** When you Press, if this is Witnessed, deal 1 Will.  
 **Fall:** Draw 1.
 
 ### Echo Blot � 1E � Rite � Mill-Stain
@@ -92,7 +93,7 @@ Stain an enemy Figure in the chosen altitude if able. If Mid, draw 1. If it was 
 As you play this, Stain the enemy Veiled Figure here if able. Your Figures here have +1 power against Stained enemies. When a Stained enemy Figure here becomes Forced Exposed, gain 1 Sight.
 
 ### Abyss Urn � 3E / 2W � V1 / W3 � Vessel � Continuity
-On play, tuck a Figure from hand as Inhabitant if able.  
+On play, tuck a Figure from hand as Inhabitant if able — or tuck your Figure on this lane when you play the Urn over them.  
 **Revelation:** Release Inhabitant here if the lane is empty, otherwise to hand. Stain the enemy Figure here if able.  
 **Fall:** release Inhabitant here Veiled if able.
 
@@ -1945,7 +1946,7 @@ Graft: +1 power while host Witnessed. When you Blind an altitude while host is W
 ### Carnival Urn
 **Craft:** Motley Masquerade · **Type:** Vessel · **Essence:** 3 · **Witness:** 2
 **Veiled 1 · Witnessed 3**
-Vessel. On play, tuck a Figure from hand as Inhabitant if able. Revelation: Switch Stance. Free Wager another friendly Veiled Figure if able. Fall: Free Wager another friendly Veiled Figure if able; if you have Favor, gain 1 Sight.
+Vessel. On play, tuck a Figure from hand as Inhabitant if able — or tuck your Figure on this lane when you play the Urn over them. Revelation: Switch Stance. Free Wager another friendly Veiled Figure if able. Fall: Free Wager another friendly Veiled Figure if able; if you have Favor, gain 1 Sight.
 
 ### Antewell
 **Craft:** Motley Masquerade · **Type:** Site · **Essence:** 2
@@ -2035,7 +2036,7 @@ Open / Breach support. See `docs/BREACH_WAVE2.md`. Placeholders first.
 ### Iron Urn
 **Craft:** Scar Breach · **Type:** Vessel · **Essence:** 3 · **Witness:** 2
 **Veiled 1 · Witnessed 3**
-**Vessel.** On play, tuck a Figure from hand as Inhabitant if able.
+**Vessel.** On play, tuck a Figure from hand as Inhabitant if able — or tuck your Figure on this lane when you play the Urn over them.
 **Revelation:** Gain 2 Sight.
 **Fall:** Witness a friendly Veiled Figure for free if able; otherwise gain 1 Sight.
 

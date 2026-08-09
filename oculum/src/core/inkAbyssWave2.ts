@@ -50,7 +50,7 @@ export const INK_ABYSS_WAVE2: CardDef[] = [
     artSubject:
       "same Ink Abyss set style as Mire Duelist — ink gulf urn vessel cream stone black drip seals swamp inhabitant chamber, unique cream urn-lip circle inner frame, high-contrast cream-black ink-wash",
     revelation: "Stain the enemy Figure here if able.",
-    text: "Vessel. On play, tuck a Figure from hand as Inhabitant if able. Revelation: Stain the enemy Figure here if able. When this Falls or is Forced Exposed: Stain an enemy Veiled Figure if able, then Blind that Figure's altitude this turn.",
+    text: "Vessel. On play, tuck a Figure from hand as Inhabitant if able — or tuck your Figure on this lane when you play the Urn over them. Revelation: Stain the enemy Figure here if able. When this Falls or is Forced Exposed: Stain an enemy Veiled Figure if able, then Blind that Figure's altitude this turn.",
   },
   {
     id: "smother_cord",

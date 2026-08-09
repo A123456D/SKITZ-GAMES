@@ -62,18 +62,33 @@ describe("Ink Abyss Wave 1 identity", () => {
 
   it("Blot Herald stains when enemy Figure elsewhere becomes Witnessed", () => {
     const s = createMatch({ deck: teachDeck(), enemyDeck: teachDeck(), seed: 1 });
-    s.altitudes[0].player = fig("blot_herald", { veiled: true });
-    s.altitudes[1].enemy = fig("pale_ledger", { veiled: true });
-    s.sight = 5;
-    // Gaze requires Gaze control — Witness own mid instead after swapping sides via enemy Witness:
-    // Put Herald on enemy side elsewhere, Witness our figure → Herald stains us.
     s.altitudes[0].player = null;
     s.altitudes[0].enemy = fig("blot_herald", { veiled: true });
     s.altitudes[1].player = fig("pale_ledger", { veiled: true });
     s.altitudes[1].enemy = null;
+    s.sight = 5;
     applyIntent(s, { kind: "witness", altitude: 1 });
     expect(s.altitudes[1].player?.veiled).toBe(false);
     expect(s.altitudes[1].player?.stained).toBe(true);
+  });
+
+  it("Blot Herald also Stains a different Veiled foe for Press", () => {
+    const s = createMatch({ deck: teachDeck(), enemyDeck: teachDeck(), seed: 11 });
+    s.altitudes[0].player = fig("blot_herald", { veiled: true });
+    s.altitudes[1].enemy = fig("pale_ledger", { veiled: true });
+    s.altitudes[2].enemy = fig("well_cantor", { veiled: true });
+    s.sight = 5;
+    // Enemy Witnesses Mid via swapping: put Herald on enemy High, Witness our Mid
+    s.altitudes[0].player = null;
+    s.altitudes[0].enemy = fig("blot_herald", { veiled: true });
+    s.altitudes[1].player = fig("pale_ledger", { veiled: true });
+    s.altitudes[1].enemy = null;
+    s.altitudes[2].player = fig("well_cantor", { veiled: true });
+    s.altitudes[2].enemy = null;
+    applyIntent(s, { kind: "witness", altitude: 1 });
+    expect(s.altitudes[1].player?.stained).toBe(true);
+    expect(s.altitudes[2].player?.stained).toBe(true);
+    expect(s.altitudes[2].player?.veiled).toBe(true);
   });
 
   it("Blot Herald Revelation stains here and gains Sight", () => {
@@ -517,6 +532,54 @@ describe("Ink Abyss Wave 4 closing pack", () => {
     expect(s.altitudes[1].player?.inhabitant).toBeNull();
     expect(s.hand).toContain("blot_herald");
     expect(s.altitudes[1].enemy?.stained).toBe(true);
+  });
+
+  it("Dahaka Witnessed: Press deals 1 Will", () => {
+    const s = createMatch({ deck: teachDeck(), enemyDeck: teachDeck(), seed: 49 });
+    s.altitudes[0].player = fig("dahaka", { veiled: false, revelationFired: true });
+    s.altitudes[1].enemy = fig("pale_ledger", { veiled: true, stained: true });
+    s.hand = ["blot_herald"];
+    s.sight = 2;
+    const before = s.enemyWill;
+    const ev = applyIntent(s, { kind: "press", altitude: 1 });
+    expect(s.altitudes[1].enemy?.pressed).toBe(true);
+    expect(s.enemyWill).toBe(before - 1);
+    expect(ev.some((e) => e.type === "press" && e.bonusWill === 1)).toBe(true);
+  });
+
+  it("Dahaka Veiled: Press does not deal Will", () => {
+    const s = createMatch({ deck: teachDeck(), enemyDeck: teachDeck(), seed: 50 });
+    s.altitudes[0].player = fig("dahaka", { veiled: true });
+    s.altitudes[1].enemy = fig("pale_ledger", { veiled: true, stained: true });
+    s.hand = ["blot_herald"];
+    s.sight = 2;
+    const before = s.enemyWill;
+    applyIntent(s, { kind: "press", altitude: 1 });
+    expect(s.enemyWill).toBe(before);
+  });
+
+  it("playing Gulf Urn tucks a Figure from hand", () => {
+    const s = createMatch({ deck: teachDeck(), enemyDeck: teachDeck(), seed: 47 });
+    s.hand = ["gulf_urn", "blot_herald", "pale_ledger"];
+    s.essence = 5;
+    const ev = applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
+    expect(s.altitudes[1].player?.cardId).toBe("gulf_urn");
+    expect(s.altitudes[1].player?.inhabitant).toBe("blot_herald");
+    expect(s.hand).not.toContain("gulf_urn");
+    expect(s.hand).not.toContain("blot_herald");
+    expect(s.hand).toContain("pale_ledger");
+    expect(ev.some((e) => e.type === "tuck" && e.inhabitantId === "blot_herald")).toBe(true);
+  });
+
+  it("playing Urn over your own Figure tucks that Figure", () => {
+    const s = createMatch({ deck: teachDeck(), enemyDeck: teachDeck(), seed: 48 });
+    s.altitudes[1].player = fig("blot_herald", { veiled: true });
+    s.hand = ["gulf_urn"];
+    s.essence = 5;
+    applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
+    expect(s.altitudes[1].player?.cardId).toBe("gulf_urn");
+    expect(s.altitudes[1].player?.inhabitant).toBe("blot_herald");
+    expect(s.hand).not.toContain("blot_herald");
   });
 
   it("Press into Motley Stance B is free (still once per window)", () => {

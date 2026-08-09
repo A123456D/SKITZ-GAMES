@@ -80,7 +80,7 @@ export const INK_ABYSS_WAVE4: CardDef[] = [
       "same Ink Abyss set style as Mire Duelist — abyss urn vessel cream stone black drip deep seals swamp inhabitant chamber, unique cream abyss-urn lip inner frame, high-contrast cream-black ink-wash",
     revelation:
       "Release Inhabitant here if the lane is empty, otherwise to hand. Stain the enemy Figure here if able.",
-    text: "Vessel. On play, tuck a Figure from hand as Inhabitant if able. Revelation: Release Inhabitant here if the lane is empty, otherwise to hand. Stain the enemy Figure here if able. Fall: release Inhabitant here Veiled if able.",
+    text: "Vessel. On play, tuck a Figure from hand as Inhabitant if able — or tuck your Figure on this lane when you play the Urn over them. Revelation: Release Inhabitant here if the lane is empty, otherwise to hand. Stain the enemy Figure here if able. Fall: release Inhabitant here Veiled if able.",
   },
 ];
 
