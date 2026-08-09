@@ -36,6 +36,7 @@ import {
   type Side,
 } from "./core/types";
 import {
+  bakeCardFace,
   clearCardFaceCache,
   cardBackSrc,
   handCardSrc,
@@ -2239,6 +2240,10 @@ function syncHud(): void {
     img.width = 108;
     img.height = 162;
     img.src = handCardSrc(id);
+    img.onerror = () => {
+      img.onerror = null;
+      img.src = bakeCardFace(id, false).toDataURL("image/jpeg", 0.92);
+    };
     btn.appendChild(img);
     // Hand stays flat + opaque (foil tilt reserved for inspect / codex)
     btn.title = mulliganActive

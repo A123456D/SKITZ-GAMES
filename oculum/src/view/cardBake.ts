@@ -57,8 +57,8 @@ export function preloadCardChrome(): Promise<void> {
       await Promise.all(
         FULL_CARD_IDS.map(async (id) => {
           const img =
-            (await tryLoad(`./assets/cards/${id}.jpg?v=masque`)) ??
-            (await tryLoad(`./assets/cards/${id}.png?v=masque`));
+            (await tryLoad(`./assets/cards/${id}.jpg?v=14`)) ??
+            (await tryLoad(`./assets/cards/${id}.png?v=14`));
           if (img) fullCardImgs.set(id, img);
         }),
       );
@@ -76,14 +76,11 @@ export function cardBackSrc(): string {
   return `./assets/cards/card-back.jpg?v=1`;
 }
 
-/** URL for DOM hand display — full art when available (never veiled in hand). */
+/** URL for DOM hand display — always prefer shipped JPG (preload fills GPU map). */
 export function handCardSrc(cardId: string): string {
-  if (fullCardImgs.has(cardId)) {
-    // Prefer jpg (shipped), fall back to png path for freshly generated faces
-    // Cache-bust when faces are regenerated in-place (same filename).
-    return `./assets/cards/${cardId}.jpg?v=masque`;
-  }
-  return bakeCardFace(cardId, false).toDataURL("image/jpeg", 0.92);
+  // Stable filenames need a bust when faces regenerate or a bad HTML 200 was
+  // cached under /assets/* immutable headers (SPA fallback on missing files).
+  return `./assets/cards/${cardId}.jpg?v=14`;
 }
 
 function hashStr(s: string): number {
