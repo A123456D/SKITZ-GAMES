@@ -49,6 +49,44 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
   return a;
 }
 
+/**
+ * Opening mulligan — put selected hand cards back into the library, shuffle, draw that many.
+ * Returns the newly drawn hand card ids (for deal FX). Prophecies that surface go to Law and
+ * do not count toward the redraw quota (keeps drawing until the hand is filled or the deck is empty).
+ */
+export function applyMulligan(state: MatchState, handIndices: number[]): string[] {
+  const hand = state.hand;
+  const uniq = [...new Set(handIndices)]
+    .filter((i) => Number.isInteger(i) && i >= 0 && i < hand.length)
+    .sort((a, b) => b - a);
+  if (!uniq.length) return [];
+
+  const returned: string[] = [];
+  for (const i of uniq) {
+    returned.push(hand.splice(i, 1)[0]!);
+  }
+
+  let seed = (state.nextId * 1103515245 + returned.length * 9973 + state.turn * 13) >>> 0;
+  const rng = (): number => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  state.deck = shuffle([...state.deck, ...returned], rng);
+
+  const drawn: string[] = [];
+  let need = returned.length;
+  let guard = 24;
+  while (need > 0 && state.deck.length > 0 && guard-- > 0) {
+    const before = hand.length;
+    drawOne(state, "player");
+    if (hand.length > before) {
+      drawn.push(hand[hand.length - 1]!);
+      need -= 1;
+    }
+  }
+  return drawn;
+}
+
 function emptyBoard(): [AltitudeSlot, AltitudeSlot, AltitudeSlot] {
   return [
     { player: null, enemy: null, playerSite: null, enemySite: null, blinded: false },
@@ -4385,6 +4423,8 @@ function doWitness(
 export function createMatch(opts?: {
   seed?: number;
   tutorial?: boolean;
+  /** Curriculum when tutorial — defaults to First Gaze. */
+  tutorialId?: import("./tutorial/types").TutorialId;
   /** Constructed 20 — validated. Omit for Teach deck. */
   deck?: string[];
   enemyDeck?: string[];
@@ -4485,11 +4525,12 @@ export function createMatch(opts?: {
     events: [],
     nextId: 1,
     tutorial: !!opts?.tutorial,
+    tutorialId: opts?.tutorial ? (opts.tutorialId ?? "first_gaze") : null,
     tutorialStep: opts?.tutorial ? "intro" : "done",
     aiDifficulty: opts?.aiDifficulty ?? "normal",
   };
   beginTurn(state, "player", true);
-  if (opts?.tutorial) setupTutorial(state);
+  if (opts?.tutorial) setupTutorial(state, opts.tutorialId ?? "first_gaze");
   return state;
 }
 

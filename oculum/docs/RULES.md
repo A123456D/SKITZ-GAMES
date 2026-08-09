@@ -8,7 +8,7 @@
 |----------|-----|
 | **Essence** | Play cards from hand. Gain `turn` Essence at the start of your turn (capped at 8). Unspent Essence does not carry. |
 | **Sight** | Witness cards, steal enemy Revelations (via Gaze), play some Rites. Gain **1 base + board Sight** at turn start. Cap carried Sight at 6. |
-| **Will** | Starting **40**. Will ≤ 0 → Break loss. |
+| **Will** | Starting **30**. Will ≤ 0 → Break loss. |
 | **Eclipse** | Reach **10** to win without Breaking Will. |
 
 ## Board

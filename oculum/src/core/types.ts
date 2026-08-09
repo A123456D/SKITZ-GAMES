@@ -1,7 +1,7 @@
 export const ALTITUDE_COUNT = 3;
 export const MAX_TURNS = 10;
 export const HAND_MAX = 5;
-export const START_WILL = 40;
+export const START_WILL = 30;
 export const SIGHT_CARRY_CAP = 6;
 export const ESSENCE_CAP = 8;
 export const ECLIPSE_WIN = 10;
@@ -154,18 +154,14 @@ export type OculusEvent =
 export type MatchPhase = "menu" | "play" | "end";
 
 /**
- * First Gaze — real guided match (not isolated lesson scenes).
- * Soft CTA only on intro; later beats are legal match actions with real Pass/Resolve.
- * Extra hud/card anatomy steps reserved for upcoming tutorial work.
+ * Tutorial lesson id.
+ * First Gaze uses the named steps below; craft curricula use prefixed ids (ink_*, motley_*, …).
  */
-export type TutorialStep =
+export type TutorialStep = string;
+
+/** Named First Gaze steps (also valid TutorialStep values). */
+export type FirstGazeStep =
   | "intro"
-  | "play"
-  | "site"
-  | "pass1"
-  | "witness"
-  | "graft"
-  | "pass2"
   | "card_essence"
   | "card_sight"
   | "card_power"
@@ -173,7 +169,30 @@ export type TutorialStep =
   | "hud_sight"
   | "hud_eclipse"
   | "hud_lanes"
-  | "done";
+  | "types_figure"
+  | "types_site"
+  | "types_relic"
+  | "types_rite"
+  | "types_vessel"
+  | "loop_veil"
+  | "loop_resolve"
+  | "demo_ink"
+  | "demo_motley"
+  | "demo_toll"
+  | "demo_breach"
+  | "counter_erase_trick"
+  | "outro"
+  | "done"
+  /** legacy interactive steps (no longer used; kept for save compat) */
+  | "play"
+  | "site"
+  | "pass1"
+  | "witness"
+  | "graft"
+  | "pass2";
+
+/** @deprecated Prefer TutorialStep; kept as alias of FirstGazeStep for older imports. */
+export type LegacyTutorialStep = FirstGazeStep;
 
 export type AiDifficulty = "easy" | "normal" | "hard";
 
@@ -269,6 +288,8 @@ export type MatchState = {
   events: OculusEvent[];
   nextId: number;
   tutorial: boolean;
+  /** Active curriculum — first_gaze or a craft Teach (ink/motley/toll/breach). */
+  tutorialId: import("./tutorial/types").TutorialId | null;
   tutorialStep: TutorialStep;
   aiDifficulty: AiDifficulty;
 };

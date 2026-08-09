@@ -207,6 +207,13 @@ export function initDeckBuilder(opts: {
   };
 
   filterEl.addEventListener("change", () => renderPoolCounts());
+  previewMeta.addEventListener("click", (ev) => {
+    const btn = (ev.target as HTMLElement | null)?.closest?.("[data-kw]") as HTMLElement | null;
+    if (!btn) return;
+    const id = btn.getAttribute("data-kw");
+    if (!id) return;
+    window.dispatchEvent(new CustomEvent("oculum-keyword", { detail: { id } }));
+  });
   btnAdd.addEventListener("click", () => addSelected());
   btnRemove.addEventListener("click", () => removeSelected());
   btnSave.addEventListener("click", () => {

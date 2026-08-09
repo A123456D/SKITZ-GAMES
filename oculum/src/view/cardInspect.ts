@@ -138,6 +138,19 @@ export function initCardInspect(root: HTMLElement): CardInspectApi {
   meta.addEventListener("click", onOpenCard);
   companions?.addEventListener("click", onOpenCard);
 
+  const onKeyword = (ev: Event): void => {
+    const t = ev.target as HTMLElement | null;
+    const btn = t?.closest?.("[data-kw]") as HTMLElement | null;
+    if (!btn) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const id = btn.getAttribute("data-kw");
+    if (!id) return;
+    window.dispatchEvent(new CustomEvent("oculum-keyword", { detail: { id } }));
+  };
+  meta.addEventListener("click", onKeyword);
+  companions?.addEventListener("click", onKeyword);
+
   closeBtn?.addEventListener("click", (ev) => {
     ev.stopPropagation();
     close();
@@ -166,6 +179,10 @@ export type LiftInspectOpts = {
   onInspectOpen?: () => void;
   /** Custom open (board sites / live status). Default: inspect.open(id). */
   openCard?: (id: string) => void;
+  /** When true, hold does not open inspect (Press / Witness / play targeting). */
+  suppressHoldInspect?: () => boolean;
+  /** Override hold duration (ms). */
+  longMs?: number;
 };
 
 export function bindLiftInspect(
@@ -229,10 +246,12 @@ export function bindLiftInspect(
       /* ignore */
     }
     clearTimer();
+    if (opts?.suppressHoldInspect?.()) return;
+    const holdFor = opts?.longMs ?? LONG_MS;
     timer = window.setTimeout(() => {
       longFired = true;
       openInspect();
-    }, LONG_MS);
+    }, holdFor);
   };
 
   const onPointerMove = (ev: PointerEvent): void => {

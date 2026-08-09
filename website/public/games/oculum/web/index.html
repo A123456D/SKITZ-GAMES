@@ -25,8 +25,8 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-BLkdF_jA.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BS6AEN4W.css">
+    <script type="module" crossorigin src="./assets/index-Dqv_-Q0d.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-4vDoOSEV.css">
   </head>
   <body class="on-menu">
     <div id="app">
@@ -42,34 +42,34 @@
             </div>
           </div>
           <div id="meters" hidden>
-            <div class="meter essence" title="Essence — you · foe">
+            <button type="button" class="meter essence" data-meter-help="essence" aria-label="Essence — tap for explanation">
               <span class="meter-label">ESS</span>
               <span class="meter-pair">
                 <span id="m-essence" class="meter-val">0</span>
                 <span class="meter-sep">·</span>
                 <span id="m-essence-foe" class="meter-val foe">0</span>
               </span>
-            </div>
-            <div class="meter sight" title="Sight — you · foe">
+            </button>
+            <button type="button" class="meter sight" data-meter-help="sight" aria-label="Sight — tap for explanation">
               <span class="meter-label">SIGHT</span>
               <span class="meter-pair">
                 <span id="m-sight" class="meter-val">0</span>
                 <span class="meter-sep">·</span>
                 <span id="m-sight-foe" class="meter-val foe">0</span>
               </span>
-            </div>
-            <div class="meter favor" title="Favor — you · foe (Motley ante, max 3)">
+            </button>
+            <button type="button" class="meter favor" data-meter-help="favor" aria-label="Favor — tap for explanation">
               <span class="meter-label">FAV</span>
               <span class="meter-pair">
                 <span id="m-favor" class="meter-val">0</span>
                 <span class="meter-sep">·</span>
                 <span id="m-favor-foe" class="meter-val foe">0</span>
               </span>
-            </div>
-            <div class="meter turn" title="Turn">
+            </button>
+            <button type="button" class="meter turn" data-meter-help="turn" aria-label="Round — tap for explanation">
               <span class="meter-label">T</span>
               <span id="m-turn" class="meter-val">1</span>
-            </div>
+            </button>
             <button
               type="button"
               id="btn-hud-log"
@@ -88,7 +88,7 @@
         </header>
 
         <div id="willrow" hidden>
-          <div class="will-side you">
+          <button type="button" class="will-side you" data-meter-help="will" aria-label="Your Will — tap for explanation">
             <span class="will-label">YOU</span>
             <div class="will-track">
               <div class="will-fill-wrap">
@@ -96,20 +96,20 @@
               </div>
             </div>
             <span id="will-you-n" class="will-n">15</span>
-          </div>
+          </button>
           <div class="center-pips">
-            <div class="ecl-pip" title="Eclipse — you · foe (10 to win)">
+            <button type="button" class="ecl-pip" data-meter-help="eclipse" aria-label="Eclipse — tap for explanation">
               <span class="ecl-label">ECL</span>
               <span id="ecl-you">0</span>
               <span class="ecl-sep">·</span>
               <span id="ecl-foe">0</span>
-            </div>
-            <div id="law-chip" hidden title="Unblinking Law — Witness 3 heresies, then Pass">
+            </button>
+            <button type="button" id="law-chip" data-meter-help="law" hidden aria-label="Law — tap for explanation">
               <span class="law-label">LAW</span>
               <span id="law-progress">0/3</span>
-            </div>
+            </button>
           </div>
-          <div class="will-side foe">
+          <button type="button" class="will-side foe" data-meter-help="will" aria-label="Foe Will — tap for explanation">
             <span id="will-foe-n" class="will-n">15</span>
             <div class="will-track">
               <div class="will-fill-wrap foe">
@@ -117,16 +117,20 @@
               </div>
             </div>
             <span class="will-label">FOE</span>
-          </div>
+          </button>
         </div>
 
         <div id="toast" hidden>
           <span id="toast-text"></span>
         </div>
         <div id="event-log-panel" hidden>
-          <div class="event-log-sheet" role="dialog" aria-label="Event log">
+          <button type="button" id="event-log-backdrop" class="event-log-backdrop" aria-label="Close chronicle"></button>
+          <div class="event-log-sheet" role="dialog" aria-labelledby="event-log-title" aria-modal="true">
             <header class="event-log-head">
-              <p class="event-log-title">Chronicle</p>
+              <div class="event-log-head-copy">
+                <p class="event-log-kicker">Match log</p>
+                <p id="event-log-title" class="event-log-title">Chronicle</p>
+              </div>
               <button type="button" id="event-log-close" class="ghost mini">
                 <span class="btn-label">Close</span>
               </button>
@@ -153,10 +157,26 @@
           <button type="button" id="coach-cta" hidden>Got it</button>
         </div>
 
+        <div id="mulligan" hidden role="dialog" aria-labelledby="mulligan-title" aria-modal="true">
+          <p id="mulligan-title" class="mulligan-title">Opening hand</p>
+          <p class="mulligan-body">Tap cards to put back into your library. Hold a card to read it. Draw replacements once — then Round 1 begins.</p>
+          <p id="mulligan-hint" class="mulligan-hint">None selected — keep as dealt, or tap to redraw.</p>
+          <div class="mulligan-actions">
+            <button type="button" id="btn-mulligan-keep" class="cta">
+              <span class="btn-label"><span class="btn-kicker">Stay</span>Keep hand</span>
+            </button>
+            <button type="button" id="btn-mulligan-redraw" class="ghost" disabled>
+              <span class="btn-label"><span class="btn-kicker">Once</span>Redraw selected</span>
+            </button>
+          </div>
+        </div>
+
         <div id="tutor-guide" hidden aria-hidden="true">
           <div id="tutor-dim"></div>
           <div id="tutor-card-stage" hidden>
+            <p id="tutor-card-kicker" class="tutor-card-kicker"></p>
             <img id="tutor-card-face" alt="" draggable="false" />
+            <p id="tutor-card-rules" class="tutor-card-rules"></p>
           </div>
           <div id="tutor-ring" hidden></div>
           <svg id="tutor-arrow-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -182,14 +202,16 @@
             <span class="alt-tag">HIGH</span>
             <span class="alt-rule">Gaze −1</span>
             <span class="alt-badge alt-badge--blind" data-blind hidden>BLIND</span>
-            <span class="alt-badge alt-badge--toll" data-toll hidden>TOLL</span>
-            <span class="alt-badge alt-badge--peal" data-peal hidden>PEAL</span>
+            <button type="button" class="alt-badge alt-badge--toll" data-toll hidden title="What is Toll?" aria-label="Toll">TOLL</button>
+            <button type="button" class="alt-badge alt-badge--peal" data-peal hidden title="What is Peal?" aria-label="Peal">PEAL</button>
+            <span class="alt-stain" data-stain data-side="enemy" hidden title="Stained"></span>
+            <span class="alt-stain" data-stain data-side="player" hidden title="Stained"></span>
             <div class="alt-status foe" data-side="enemy" aria-hidden="true">
               <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
               <span class="alt-badge alt-badge--wager" data-wager hidden>WAGER</span>
               <span class="alt-badge alt-badge--strain" data-strain hidden>STR</span>
-              <span class="alt-badge alt-badge--stain" data-stain hidden>STAIN</span>
+              <span class="alt-badge alt-badge--press" data-press hidden>PRESS</span>
               <span class="alt-badge alt-badge--scrutiny" data-scrutiny hidden>SCR</span>
               <button type="button" class="alt-badge alt-badge--inh" data-inh hidden title="Inspect Inhabitant">INH</button>
               <button type="button" class="alt-badge alt-badge--graft" data-graft hidden title="Inspect charms">×0</button>
@@ -206,7 +228,7 @@
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
               <span class="alt-badge alt-badge--wager" data-wager hidden>WAGER</span>
               <span class="alt-badge alt-badge--strain" data-strain hidden>STR</span>
-              <span class="alt-badge alt-badge--stain" data-stain hidden>STAIN</span>
+              <span class="alt-badge alt-badge--press" data-press hidden>PRESS</span>
               <span class="alt-badge alt-badge--scrutiny" data-scrutiny hidden>SCR</span>
               <button type="button" class="alt-badge alt-badge--inh" data-inh hidden title="Inspect Inhabitant">INH</button>
               <button type="button" class="alt-badge alt-badge--graft" data-graft hidden title="Inspect charms">×0</button>
@@ -217,14 +239,16 @@
             <span class="alt-tag">MID</span>
             <span class="alt-rule">Witness draw</span>
             <span class="alt-badge alt-badge--blind" data-blind hidden>BLIND</span>
-            <span class="alt-badge alt-badge--toll" data-toll hidden>TOLL</span>
-            <span class="alt-badge alt-badge--peal" data-peal hidden>PEAL</span>
+            <button type="button" class="alt-badge alt-badge--toll" data-toll hidden title="What is Toll?" aria-label="Toll">TOLL</button>
+            <button type="button" class="alt-badge alt-badge--peal" data-peal hidden title="What is Peal?" aria-label="Peal">PEAL</button>
+            <span class="alt-stain" data-stain data-side="enemy" hidden title="Stained"></span>
+            <span class="alt-stain" data-stain data-side="player" hidden title="Stained"></span>
             <div class="alt-status foe" data-side="enemy" aria-hidden="true">
               <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
               <span class="alt-badge alt-badge--wager" data-wager hidden>WAGER</span>
               <span class="alt-badge alt-badge--strain" data-strain hidden>STR</span>
-              <span class="alt-badge alt-badge--stain" data-stain hidden>STAIN</span>
+              <span class="alt-badge alt-badge--press" data-press hidden>PRESS</span>
               <span class="alt-badge alt-badge--scrutiny" data-scrutiny hidden>SCR</span>
               <button type="button" class="alt-badge alt-badge--inh" data-inh hidden title="Inspect Inhabitant">INH</button>
               <button type="button" class="alt-badge alt-badge--graft" data-graft hidden title="Inspect charms">×0</button>
@@ -241,7 +265,7 @@
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
               <span class="alt-badge alt-badge--wager" data-wager hidden>WAGER</span>
               <span class="alt-badge alt-badge--strain" data-strain hidden>STR</span>
-              <span class="alt-badge alt-badge--stain" data-stain hidden>STAIN</span>
+              <span class="alt-badge alt-badge--press" data-press hidden>PRESS</span>
               <span class="alt-badge alt-badge--scrutiny" data-scrutiny hidden>SCR</span>
               <button type="button" class="alt-badge alt-badge--inh" data-inh hidden title="Inspect Inhabitant">INH</button>
               <button type="button" class="alt-badge alt-badge--graft" data-graft hidden title="Inspect charms">×0</button>
@@ -252,14 +276,16 @@
             <span class="alt-tag">LOW</span>
             <span class="alt-rule">Veil +1 Sight</span>
             <span class="alt-badge alt-badge--blind" data-blind hidden>BLIND</span>
-            <span class="alt-badge alt-badge--toll" data-toll hidden>TOLL</span>
-            <span class="alt-badge alt-badge--peal" data-peal hidden>PEAL</span>
+            <button type="button" class="alt-badge alt-badge--toll" data-toll hidden title="What is Toll?" aria-label="Toll">TOLL</button>
+            <button type="button" class="alt-badge alt-badge--peal" data-peal hidden title="What is Peal?" aria-label="Peal">PEAL</button>
+            <span class="alt-stain" data-stain data-side="enemy" hidden title="Stained"></span>
+            <span class="alt-stain" data-stain data-side="player" hidden title="Stained"></span>
             <div class="alt-status foe" data-side="enemy" aria-hidden="true">
               <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
               <span class="alt-badge alt-badge--wager" data-wager hidden>WAGER</span>
               <span class="alt-badge alt-badge--strain" data-strain hidden>STR</span>
-              <span class="alt-badge alt-badge--stain" data-stain hidden>STAIN</span>
+              <span class="alt-badge alt-badge--press" data-press hidden>PRESS</span>
               <span class="alt-badge alt-badge--scrutiny" data-scrutiny hidden>SCR</span>
               <button type="button" class="alt-badge alt-badge--inh" data-inh hidden title="Inspect Inhabitant">INH</button>
               <button type="button" class="alt-badge alt-badge--graft" data-graft hidden title="Inspect charms">×0</button>
@@ -276,7 +302,7 @@
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
               <span class="alt-badge alt-badge--wager" data-wager hidden>WAGER</span>
               <span class="alt-badge alt-badge--strain" data-strain hidden>STR</span>
-              <span class="alt-badge alt-badge--stain" data-stain hidden>STAIN</span>
+              <span class="alt-badge alt-badge--press" data-press hidden>PRESS</span>
               <span class="alt-badge alt-badge--scrutiny" data-scrutiny hidden>SCR</span>
               <button type="button" class="alt-badge alt-badge--inh" data-inh hidden title="Inspect Inhabitant">INH</button>
               <button type="button" class="alt-badge alt-badge--graft" data-graft hidden title="Inspect charms">×0</button>
@@ -286,9 +312,39 @@
         </div>
 
         <div id="hand-area" hidden>
+          <button
+            type="button"
+            id="player-deck"
+            class="match-deck match-deck--you"
+            aria-label="Your library"
+            title="Your library — cards left to draw"
+          >
+            <span class="match-deck-stack" aria-hidden="true">
+              <img class="match-deck-back match-deck-back--3" src="./assets/cards/card-back.jpg?v=1" alt="" draggable="false" />
+              <img class="match-deck-back match-deck-back--2" src="./assets/cards/card-back.jpg?v=1" alt="" draggable="false" />
+              <img class="match-deck-back match-deck-back--1" src="./assets/cards/card-back.jpg?v=1" alt="" draggable="false" />
+            </span>
+            <span class="match-deck-count" id="player-deck-n">0</span>
+          </button>
           <div id="deck-anchor" aria-hidden="true"></div>
           <div id="hand" class="hand-fan" data-n="0"></div>
         </div>
+
+        <button
+          type="button"
+          id="enemy-deck"
+          class="match-deck match-deck--foe"
+          hidden
+          aria-label="Foe library"
+          title="Foe library — cards left to draw"
+        >
+          <span class="match-deck-stack" aria-hidden="true">
+            <img class="match-deck-back match-deck-back--3" src="./assets/cards/card-back.jpg?v=1" alt="" draggable="false" />
+            <img class="match-deck-back match-deck-back--2" src="./assets/cards/card-back.jpg?v=1" alt="" draggable="false" />
+            <img class="match-deck-back match-deck-back--1" src="./assets/cards/card-back.jpg?v=1" alt="" draggable="false" />
+          </span>
+          <span class="match-deck-count" id="enemy-deck-n">0</span>
+        </button>
 
         <div id="actions" hidden>
           <button type="button" id="btn-witness" class="ghost" disabled>
@@ -324,11 +380,14 @@
               <p class="menu-blurb">Things only fully exist when seen.</p>
             </header>
             <nav class="menu-actions" aria-label="Main">
+              <button type="button" id="btn-continue" class="cta menu-cta" hidden>
+                <span class="btn-label"><span class="btn-kicker">Resume</span>Continue Match</span>
+              </button>
               <button type="button" id="btn-play" class="cta menu-cta">
                 <span class="btn-label"><span class="btn-kicker">Play</span>Enter the Gaze</span>
               </button>
               <button type="button" id="btn-tutorial" class="ghost menu-secondary-cta">
-                <span class="btn-label">First Gaze · Tutorial</span>
+                <span class="btn-label">Tutorials · Learn</span>
               </button>
               <button type="button" id="btn-spectate" class="ghost menu-secondary-cta">
                 <span class="btn-label">Watch · Bot Sim</span>
@@ -386,6 +445,19 @@
           </div>
         </div>
 
+        <div id="tutorial-pick" class="panel sheet" hidden>
+          <div class="sheet-content heresy-pick-content">
+            <button type="button" id="tutorial-back" class="ghost mini panel-back">
+              <span class="btn-label">Back</span>
+            </button>
+            <p class="tag">LEARN THE GAZE</p>
+            <p class="heresy-pick-blurb">
+              First Gaze covers shared law. Each heresy Teach is a full curriculum — fundamentals plus that craft’s kit, combos, and counters. No shortcuts.
+            </p>
+            <div id="tutorial-list" class="tutorial-list" role="list"></div>
+          </div>
+        </div>
+
         <div id="heresy-pick" class="panel sheet" hidden>
           <div class="sheet-content heresy-pick-content">
             <button type="button" id="heresy-back" class="ghost mini panel-back">
@@ -431,7 +503,7 @@
                 <h3>Resources</h3>
                 <p><strong>Essence</strong> — pay to play cards from hand.</p>
                 <p><strong>Sight</strong> — pay to Witness (yours or, with Gaze, an enemy's).</p>
-                <p><strong>Will</strong> — your life (start at 40). Hit 0 and you lose by Break.</p>
+                <p><strong>Will</strong> — your life (start at 30). Hit 0 and you lose by Break.</p>
               </section>
               <section class="howto-block">
                 <h3>Three lanes</h3>
@@ -585,10 +657,35 @@
         </div>
 
         <div id="fx-layer" hidden>
+          <div id="fx-dim" aria-hidden="true"></div>
+          <p id="fx-caption" hidden></p>
           <div id="fx-ghost">
             <img id="fx-card" alt="" draggable="false" />
           </div>
+          <div id="fx-motes" aria-hidden="true"></div>
         </div>
+
+        <svg id="combat-fx-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" hidden>
+          <defs>
+            <marker id="combat-arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L9,3 z" fill="currentColor" />
+            </marker>
+            <linearGradient id="combat-beam-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="rgba(255, 236, 180, 0.15)" />
+              <stop offset="50%" stop-color="rgba(255, 220, 120, 0.95)" />
+              <stop offset="100%" stop-color="rgba(255, 250, 230, 0.9)" />
+            </linearGradient>
+          </defs>
+          <path
+            id="combat-arrow-path"
+            class="combat-arrow-path"
+            fill="none"
+            stroke="url(#combat-beam-grad)"
+            stroke-width="3.5"
+            stroke-linecap="round"
+            marker-end="url(#combat-arrowhead)"
+          />
+        </svg>
 
         <div id="rite-reveal" class="rite-reveal" hidden>
           <div class="rite-reveal-backdrop" aria-hidden="true"></div>

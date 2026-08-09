@@ -600,6 +600,16 @@ export class OculusStage {
       } else if (ev.type === "blind") {
         this.bump(ev.altitude, "player", 0.7 * soft, [0.2, 0.22, 0.35], 0);
         this.bump(ev.altitude, "enemy", 0.7 * soft, [0.2, 0.22, 0.35], 0);
+      } else if (ev.type === "press") {
+        this.bump(ev.altitude, ev.side === "player" ? "enemy" : "player", 1.2 * soft, [0.85, 0.25, 0.35], 0.14 * soft);
+      } else if (ev.type === "toll") {
+        this.bump(ev.altitude, "player", 0.85 * soft, [0.55, 0.42, 0.18], 0.08 * soft);
+        this.bump(ev.altitude, "enemy", 0.85 * soft, [0.55, 0.42, 0.18], 0.08 * soft);
+      } else if (ev.type === "peal" || ev.type === "peal_pay") {
+        this.bump(ev.altitude, "player", 0.95 * soft, [0.75, 0.6, 0.25], 0.1 * soft);
+        this.bump(ev.altitude, "enemy", 0.95 * soft, [0.75, 0.6, 0.25], 0.1 * soft);
+      } else if (ev.type === "wager" || ev.type === "cash") {
+        this.bump(ev.altitude, ev.side, 0.9 * soft, [0.65, 0.5, 0.85], 0.1 * soft);
       } else if (ev.type === "eclipse") {
         this.resolveFlash = Math.max(this.resolveFlash, 0.55 * soft);
       } else if (ev.type === "law") {
@@ -763,7 +773,7 @@ export class OculusStage {
         }
       }
 
-      // Live Resolve power seal — sits in the mid-lane gutter, facing the rival
+      // Live Resolve power — cover the printed top-left power / cost seal (gold pip)
       if (!u.hybridSite && getCard(u.cardId).type !== "site") {
         const live = unitPower(state, alt, side);
         const printed = printedFacePower(u);
@@ -773,13 +783,10 @@ export class OculusStage {
           this.powerPulse[alt][side] = Math.max(this.powerPulse[alt][side], this.reduceMotion ? 0.45 : 0.85);
         }
         this.lastPower[alt][side] = live;
-        const chip = Math.min(cardW * 0.4, lane.w * 0.34, 52);
-        // Slightly left of center so Motley graft seals on the right stay clear
-        const px = cx + cardW * 0.08;
-        const gutterMid = lane.y + lane.h * 0.5;
-        const py = top
-          ? Math.min(cy + cardH - chip * 0.18, gutterMid - chip * 0.62)
-          : Math.max(cy - chip * 0.82, gutterMid - chip * 0.38);
+        const chip = Math.min(cardW * 0.26, lane.w * 0.22, 36);
+        // Center on printed top-left gold seal (bake: ~36,36 on 300×450 → 0.12, 0.08)
+        const px = cx + cardW * 0.12 - chip * 0.5;
+        const py = cy + cardH * 0.08 - chip * 0.5;
         const moodFx: [number, number, number] =
           mood === "up"
             ? [0.85, 0.55, 0.2]
@@ -795,29 +802,34 @@ export class OculusStage {
           fxColor: moodFx,
         });
 
-        // Live Witness / Gaze Sight cost — top-right of Veiled figures (matches printed teal pip)
-        if (u.veiled) {
-          const def = getCard(u.cardId);
-          if (def.type === "figure" || def.type === "vessel") {
-            // Player POV: your unit = own Witness; foe unit = Gaze cost (High −1)
-            const liveWit = witnessCostAt(alt, def.witnessCost, side === "enemy");
-            const witMood = this.witnessMood(liveWit, def.witnessCost);
-            const ws = Math.min(cardW * 0.3, lane.w * 0.26, 38);
-            const wx = cx + cardW - ws * 0.95;
-            const wy = cy + ws * 0.06;
-            const witFx: [number, number, number] =
-              witMood === "cheap"
-                ? [0.4, 0.85, 0.78]
-                : witMood === "taxed"
-                  ? [0.35, 0.5, 0.48]
+        // Live Witness / Gaze Sight cost — stays on the teal pip until Fall / Unmake
+        // (Witnessed → show 0; free Witness while Veiled also shows 0)
+        const def = getCard(u.cardId);
+        if (def.type === "figure" || def.type === "vessel") {
+          const liveWit = u.veiled
+            ? witnessCostAt(alt, def.witnessCost, side === "enemy")
+            : 0;
+          const witMood: WitnessChipMood = u.veiled
+            ? this.witnessMood(liveWit, def.witnessCost)
+            : "spent";
+          const ws = Math.min(cardW * 0.26, lane.w * 0.22, 34);
+          // Center on printed top-right teal Witness / Sight pip (bake: w-36, 36)
+          const wx = cx + cardW * 0.88 - ws * 0.5;
+          const wy = cy + cardH * 0.08 - ws * 0.5;
+          const witFx: [number, number, number] =
+            witMood === "cheap"
+              ? [0.4, 0.85, 0.78]
+              : witMood === "taxed"
+                ? [0.35, 0.5, 0.48]
+                : witMood === "spent"
+                  ? [0.22, 0.38, 0.36]
                   : [0.25, 0.7, 0.65];
-            this.drawWitnessChip(liveWit, witMood, wx, wy, ws, {
-              pulse: pulse * 0.35,
-              alpha: 1,
-              z: top ? 0.05 : 0.02,
-              fxColor: witFx,
-            });
-          }
+          this.drawWitnessChip(liveWit, witMood, wx, wy, ws, {
+            pulse: pulse * 0.35,
+            alpha: 1,
+            z: top ? 0.05 : 0.02,
+            fxColor: witFx,
+          });
         }
       }
     } else {

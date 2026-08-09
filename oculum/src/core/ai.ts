@@ -487,6 +487,19 @@ function scorePlay(
     if (def.heresy === "toll" && altitudeIsTolled(state, i.altitude) && def.type === "figure") {
       s += 8;
     }
+    // Bellward Will race — plant bodies where Witnessed (+Toll) would win the lane
+    if (def.heresy === "toll" && (def.type === "figure" || def.type === "vessel")) {
+      const tollBonus = altitudeIsTolled(state, i.altitude) && state.tollOwner[i.altitude] === side ? 1 : 0;
+      const post = def.witnessedPower + tollBonus;
+      const foe = foeUnit(state, side, i.altitude);
+      const theirPow = foe ? unitPower(state, i.altitude, other(side)) : 0;
+      if (!foe && i.altitude === 0) s += 14; // claim High for free chip
+      if (!foe && i.altitude === 1) s += 8;
+      if (foe && post > theirPow) s += 18;
+      else if (foe && post === theirPow) s += 8;
+      else if (foe && post + 1 > theirPow) s += 10; // Sound/Revelation Toll can swing it
+      if (foe?.veiled && getCard(foe.cardId).heresy === "motley") s += 8;
+    }
     if (
       def.heresy === "toll" &&
       (mySite(state, side, i.altitude) === "cloth_bellspire" ||
@@ -723,7 +736,41 @@ function scoreWitnessOwn(
 
   if (u.veiled && theirs > 0) {
     if (effectiveWit > theirs && mine <= theirs) s += 18;
-    if (effectiveWit <= theirs) s -= 24;
+    if (effectiveWit <= theirs) {
+      // Toll Revelations (Lure / place Toll) are still worth Opening even if the lane stays contested
+      const tollSetupOpen =
+        def.heresy === "toll" &&
+        (def.id === "bell_siren" ||
+          def.id === "path_bellman" ||
+          def.id === "clapper_cantor" ||
+          def.id === "veil_ringer" ||
+          def.id === "carillon" ||
+          def.id === "peal_urn" ||
+          def.id === "toll_urn");
+      s -= tollSetupOpen ? 6 : 24;
+    }
+  }
+
+  // Bellward — Open into Will chips; Lure / Toll Revelations beat Motley Hold walls
+  if (def.heresy === "toll") {
+    s += 6;
+    if (effectiveWit > theirs) s += 24; // Resolve chip this window
+    else if (effectiveWit === theirs && alt === 0) s += 8; // High still pressured after Gaze/Toll
+    if (state.tollOwner[alt] === side) s += 10; // +1 from Toll already live
+    if (def.id === "bell_siren" && countEnemyVeiledFigures(state, side) > 0) s += 22;
+    if (
+      (def.id === "path_bellman" || def.id === "clapper_cantor" || def.id === "veil_ringer") &&
+      !anyAltitudeTolled(state)
+    ) {
+      s += 20; // Revelation plants the trap line
+    }
+    if (def.id === "carillon") s += 12;
+    // Don't sit Veiled under a Motley Stance B wall — Open or get Gazed
+    const foe = foeUnit(state, side, alt);
+    if (foe?.veiled && foe.stanceB && getCard(foe.cardId).heresy === "motley") {
+      if (effectiveWit > theirs) s += 16;
+      else s += 4;
+    }
   }
 
   // Motley Trick: don't Witness into the weak Stance B face when Veiled B already wins
@@ -971,13 +1018,15 @@ function scoreRite(
       const foe = foeUnit(state, side, i.altitude);
       const motleyLane = scoreContestMotleyLane(state, side, i.altitude, "blind");
       if (!tolled) {
-        s += 28; // place sticky Toll — real setup
+        s += 34; // place sticky Toll — real setup + figure +1
+        if (!anyAltitudeTolled(state)) s += 12; // first Toll of the match
         if (id === "ring_out") s += 4;
+        if (myUnit(state, side, i.altitude)) s += 10; // buff our body now
         if (motleyLane > 0) s += Math.floor(motleyLane * 0.6);
       } else if (tolled && id === "ring_out") {
         s += 22; // Resonance + Sight, keep trap
       } else if (foe?.veiled && getCard(foe.cardId).type === "figure") {
-        s += 18 + motleyLane; // Sound can Lure
+        s += 22 + motleyLane; // Sound can Lure — strip Motley Hold
       } else if (tolled && id === "sound_the_toll") {
         s += 16;
         if (motleyLane > 0) s += Math.floor(motleyLane * 0.4);
@@ -1054,6 +1103,22 @@ export function chooseAiMove(state: MatchState): Intent {
           if (u?.veiled && getCard(u.cardId).heresy === "breach") return -18;
         }
       }
+      // Toll: don't Pass while Veiled Bellward can still Open (Toll / Lure payoffs)
+      if (sidePlaysHeresy(state, side, "toll") && sightOf(state, side) >= 1) {
+        for (let a = 0; a < 3; a++) {
+          const u = myUnit(state, side, a as Altitude);
+          if (u?.veiled && getCard(u.cardId).heresy === "toll") return -20;
+        }
+        // Banked Sight + no Tolls down — keep looking for Sound / Revelation setups
+        if (!anyAltitudeTolled(state) && handOf(state, side).some((id) => id === "sound_the_toll")) {
+          return -14;
+        }
+      }
+      // Don't Pass while any foe Veiled figure is Gaze-able and we have Sight
+      if (sightOf(state, side) >= 1 && countEnemyVeiledFigures(state, side) > 0) {
+        const canGaze = legalIntents(state).some((x) => x.kind === "witness" && x.enemy);
+        if (canGaze) return -10 - Math.min(3, countEnemyVeiledFigures(state, side)) * 4;
+      }
       // Ink: don't Pass while a Press is live
       if (sidePlaysHeresy(state, side, "ink") && !state.pressUsed[side]) {
         for (let a = 0; a < 3; a++) {
@@ -1096,8 +1161,17 @@ export function chooseAiMove(state: MatchState): Intent {
       const mine = unitPower(state, i.altitude, side);
       const theirs = unitPower(state, i.altitude, other(side));
       if (foe && mine > theirs) s += 10;
+      // Strip Motley Hold walls that are winning / tying the lane
+      if (foe?.veiled && theirs >= mine) s += 14;
+      if (foe?.veiled && foe.stanceB && getCard(foe.cardId).heresy === "motley") s += 18;
+      if (foe?.veiled && foe.wagered && getCard(foe.cardId).heresy === "motley") s += 12;
       // Interrupt Motley Eclipse — Gaze Wager / Masque / Stance-B Veiled
       s += scoreContestMotleyLane(state, side, i.altitude, "gaze");
+      // Bellward: Gaze contested lanes (tax on our Toll, or swing a lost race)
+      if (sidePlaysHeresy(state, side, "toll") && foe?.veiled) {
+        if (state.tollOwner[i.altitude] === side) s += 8;
+        if (mine > 0 && theirs >= mine) s += 12;
+      }
       // Scar Breach: Gaze to Open foes so Breach Will can fire
       if (sidePlaysBreach(state, side) && foe?.veiled) {
         const mineU = myUnit(state, side, i.altitude);

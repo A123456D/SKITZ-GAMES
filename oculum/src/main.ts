@@ -4,17 +4,25 @@ import { fullCraftDeck } from "./core/decks";
 import { catalogOrder } from "./core/catalog";
 import { collectiblePool } from "./core/construct";
 import { HERESY_IDS, heresyName, heresyPickFace, heresyPitch, heresyShort, heresyVerb } from "./core/heresies";
-import { applyIntent, createMatch, lawHeresyProgress, legalIntents, printedFacePower, sidePlaysHeresy, takeEvents, unitPower, witnessCostAt } from "./core/match";
+import { applyIntent, applyMulligan, createMatch, lawHeresyProgress, legalIntents, printedFacePower, sidePlaysHeresy, takeEvents, unitPower, witnessCostAt } from "./core/match";
 import {
   CARD_ANCHORS,
+  TUTORIAL_HUB,
+  setupTutorial,
+  isKnownTutorialStep,
   tutorialCoach,
+  tutorialDemoBeats,
+  tutorialDemoCrafts,
   tutorialHint,
   tutorialSelectHandIndex,
   tutorialShowsCard,
   tutorialTarget,
   tutorialTeachCard,
+  tutorialCardCaption,
   tutorialUiMode,
+  isTutorialDemoStep,
   isTutorialSoftPass,
+  type TutorialId,
 } from "./core/tutorial";
 import {
   ECLIPSE_WIN,
@@ -29,6 +37,7 @@ import {
 } from "./core/types";
 import {
   clearCardFaceCache,
+  cardBackSrc,
   handCardSrc,
   preloadCardChrome,
 } from "./view/cardBake";
@@ -48,12 +57,22 @@ import { bindFoilStage } from "./view/foilCard";
 import { CARD_SKINS_ENABLED } from "./view/skins";
 import { hasArtLayers, setStackArtLayers } from "./view/cardLayers";
 import { cardMetaHtml } from "./view/cardMeta";
+import { explainKeyword } from "./view/keywords";
 import { bindLiftInspect, initCardInspect } from "./view/cardInspect";
 import { initDeckBuilder } from "./view/deckBuilder";
+import {
+  canContinue,
+  clearMatchProgress,
+  loadProgress,
+  markTutorialCompleted,
+  saveLastConstructedDeck,
+  saveMatchProgress,
+} from "./view/progress";
 
 const CODEX_ALL = catalogOrder(collectiblePool());
 const canvas = document.getElementById("stage") as HTMLCanvasElement;
 const menu = document.getElementById("menu")!;
+const btnContinue = document.getElementById("btn-continue") as HTMLButtonElement;
 const endPanel = document.getElementById("end")!;
 const codexPanel = document.getElementById("codex")!;
 const builderPanel = document.getElementById("deck-builder")!;
@@ -69,6 +88,8 @@ const settingsPanel = document.getElementById("settings")!;
 const howtoPanel = document.getElementById("howto")!;
 const heresyPickPanel = document.getElementById("heresy-pick")!;
 const heresyListEl = document.getElementById("heresy-list")!;
+const tutorialPickPanel = document.getElementById("tutorial-pick")!;
+const tutorialListEl = document.getElementById("tutorial-list")!;
 const unsupported = document.getElementById("unsupported")!;
 const toastEl = document.getElementById("toast")!;
 const toastText = document.getElementById("toast-text")!;
@@ -90,6 +111,8 @@ const coachCta = document.getElementById("coach-cta") as HTMLButtonElement;
 const tutorGuide = document.getElementById("tutor-guide")!;
 const tutorCardStage = document.getElementById("tutor-card-stage")!;
 const tutorCardFace = document.getElementById("tutor-card-face") as HTMLImageElement;
+const tutorCardKicker = document.getElementById("tutor-card-kicker")!;
+const tutorCardRules = document.getElementById("tutor-card-rules")!;
 const tutorRing = document.getElementById("tutor-ring")!;
 const tutorArrowPath = document.getElementById("tutor-arrow-path")!;
 const tutorPin = document.getElementById("tutor-pin")!;
@@ -97,12 +120,25 @@ const dragLayer = document.getElementById("drag-layer")!;
 const dragGhost = document.getElementById("drag-ghost")!;
 const dragCardImg = document.getElementById("drag-card") as HTMLImageElement;
 const fxLayer = document.getElementById("fx-layer")!;
+const fxDim = document.getElementById("fx-dim")!;
+const fxCaption = document.getElementById("fx-caption")!;
 const fxGhost = document.getElementById("fx-ghost")!;
 const fxCardImg = document.getElementById("fx-card") as HTMLImageElement;
+const fxMotes = document.getElementById("fx-motes")!;
+const combatFxSvg = document.getElementById("combat-fx-svg")!;
+const combatArrowPath = document.getElementById("combat-arrow-path") as unknown as SVGPathElement;
 const deckAnchor = document.getElementById("deck-anchor")!;
+const playerDeckEl = document.getElementById("player-deck") as HTMLButtonElement;
+const enemyDeckEl = document.getElementById("enemy-deck") as HTMLButtonElement;
+const playerDeckN = document.getElementById("player-deck-n")!;
+const enemyDeckN = document.getElementById("enemy-deck-n")!;
 const handEl = document.getElementById("hand")!;
 const handArea = document.getElementById("hand-area")!;
 const actionsEl = document.getElementById("actions")!;
+const mulliganPanel = document.getElementById("mulligan")!;
+const mulliganHint = document.getElementById("mulligan-hint")!;
+const btnMulliganKeep = document.getElementById("btn-mulligan-keep") as HTMLButtonElement;
+const btnMulliganRedraw = document.getElementById("btn-mulligan-redraw") as HTMLButtonElement;
 const metersEl = document.getElementById("meters")!;
 const willrowEl = document.getElementById("willrow")!;
 const btnHudMenu = document.getElementById("btn-hud-menu") as HTMLButtonElement;
@@ -198,8 +234,13 @@ type DragState = {
 };
 let drag: DragState | null = null;
 const DRAG_THRESHOLD = 28;
-/** Hand slots to hide until draw flight lands (consumed by syncHud). */
-let handDealCount = 0;
+/**
+ * Hand slots still flying in. Must survive syncHud rebuilds (toasts/meters) so cards
+ * stay invisible under the deal FX instead of flashing in early.
+ */
+let dealingSlots = new Set<number>();
+let mulliganActive = false;
+let mulliganSelected = new Set<number>();
 /** Drag-drop already flew the card — skip tap summon flight. */
 let skipNextSummonFly = false;
 let fxChain: Promise<void> = Promise.resolve();
@@ -208,13 +249,17 @@ let intentBusy = false;
 let last = performance.now();
 const fps = new FpsSampler();
 let flashTimer = 0;
+type ToastQueued = { msg: string; ms: number; kind: string | null };
+const toastQueue: ToastQueued[] = [];
+let toastBusy = false;
+const TOAST_QUEUE_MAX = 8;
 let phaseTimer = 0;
 let codexIndex = 0;
 let codexBuilt = false;
 let codexFilter: Heresy | "all" = "all";
 let codexIds = CODEX_ALL;
 /** Last constructed deck used for rematch (Teach / tutorial leave this null). */
-let lastConstructedDeck: string[] | null = null;
+let lastConstructedDeck: string[] | null = loadProgress().lastConstructedDeck;
 /** DPR hysteresis ? avoid buffer thrash flash when FPS oscillates. */
 let dprLowFrames = 0;
 let dprHighFrames = 0;
@@ -224,6 +269,8 @@ let uiPaused = false;
 let spectatorMode = false;
 let spectateGen = 0;
 let spectateBusy = false;
+/** First Gaze heresy demos — coach CTA runs tableaux before advancing. */
+let tutorialDemoBusy = false;
 type SettingsReturn = "menu" | "pause" | "play";
 let settingsReturn: SettingsReturn = "menu";
 let howtoReturn: SettingsReturn = "menu";
@@ -284,15 +331,50 @@ function hideAllSheets(): void {
   settingsPanel.hidden = true;
   howtoPanel.hidden = true;
   heresyPickPanel.hidden = true;
+  tutorialPickPanel.hidden = true;
   const spectatePick = document.getElementById("spectate-pick");
   if (spectatePick) spectatePick.hidden = true;
+  mulliganPanel.hidden = true;
+  mulliganActive = false;
+  mulliganSelected.clear();
+  document.body.classList.remove("mulligan-open");
   hideRiteReveal();
   hideVictoryReveal();
   closeEventLog();
   cardInspect.close();
 }
 
+function persistProgress(): void {
+  if (!state || spectatorMode) return;
+  if (state.phase !== "play" || state.winner != null) return;
+  saveMatchProgress(state, { mode, selectedHand });
+}
+
+function syncContinueButton(): void {
+  const show = canContinue();
+  btnContinue.hidden = !show;
+  if (show) {
+    const p = loadProgress();
+    const tid = p.match?.tutorialId;
+    const resumeName =
+      tid === "ink"
+        ? "Ink Teach"
+        : tid === "motley"
+          ? "Motley Teach"
+          : tid === "toll"
+            ? "Bellward Teach"
+            : tid === "breach"
+              ? "Scar Teach"
+              : "First Gaze";
+    const label = p.match?.tutorial
+      ? `<span class="btn-label"><span class="btn-kicker">Resume</span>Continue ${resumeName}</span>`
+      : '<span class="btn-label"><span class="btn-kicker">Resume</span>Continue Match</span>';
+    btnContinue.innerHTML = label;
+  }
+}
+
 function goToMenu(): void {
+  persistProgress();
   state = null;
   uiPaused = false;
   spectatorMode = false;
@@ -306,11 +388,13 @@ function goToMenu(): void {
   menu.hidden = false;
   setMenuMode(true);
   setEnemyTurn(false);
+  syncContinueButton();
   syncHud();
 }
 
 function openPause(): void {
   if (!state || state.phase !== "play") return;
+  persistProgress();
   uiPaused = true;
   closeEventLog();
   cardInspect.close();
@@ -497,9 +581,106 @@ function pushEventLog(msg: string, kind: string | null = null): void {
 }
 
 /** Toast + durable log — every game beat must be readable. */
-function explain(msg: string, ms = 2000, kind: string | null = null): void {
+function explain(msg: string, ms = 3400, kind: string | null = null): void {
   pushEventLog(msg, kind);
-  flashToast(msg, ms, kind);
+  enqueueToast(msg, ms, kind);
+}
+
+function enqueueToast(msg: string, ms = 3400, kind: string | null = null): void {
+  const hold = Math.max(paceMs(ms), paceMs(2800));
+  if (toastQueue.length >= TOAST_QUEUE_MAX) toastQueue.shift();
+  toastQueue.push({ msg, ms: hold, kind });
+  if (!toastBusy) pumpToastQueue();
+}
+
+function pumpToastQueue(): void {
+  const next = toastQueue.shift();
+  if (!next) {
+    toastBusy = false;
+    flashTimer = 0;
+    return;
+  }
+  toastBusy = true;
+  showToast(next.msg, next.kind);
+  flashTimer = next.ms;
+}
+
+function clearToastQueue(): void {
+  toastQueue.length = 0;
+  toastBusy = false;
+  flashTimer = 0;
+}
+
+function flashToast(msg: string, ms = 3400, kind: string | null = null): void {
+  enqueueToast(msg, ms, kind);
+}
+
+/** Big on-lane label so status changes aren't silent icons. */
+function floatLaneCue(alt: Altitude, text: string, kind: string): void {
+  const hit = altHits.find((h) => Number(h.dataset.alt) === alt);
+  if (!hit) return;
+  hit.querySelectorAll(".lane-cue").forEach((n) => n.remove());
+  const el = document.createElement("div");
+  el.className = `lane-cue lane-cue--${kind}`;
+  el.textContent = text;
+  el.setAttribute("aria-hidden", "true");
+  hit.appendChild(el);
+  const reduce = document.body.classList.contains("reduce-motion");
+  window.setTimeout(() => el.remove(), reduce ? 1200 : 2400);
+}
+
+const BADGE_TITLES: Record<string, string> = {
+  VEIL: "VEIL — Half-real armor. Can lose a fight but cannot Fall (die) until Forced Exposed or Witnessed.",
+  A: "Stance A — printed Veiled / Witnessed powers (Motley).",
+  B: "Stance B — Motley power swap. While Veiled B, resists normal Ink Erase.",
+  WAGER: "WAGER — betting on winning this lane while still Veiled.",
+  ANTE: "ANTE — Sight already paid into this Wager.",
+  FAVOR: "FAVOR ante — Motley currency staked on this Wager.",
+  STR: "STRAINED — lost once while Witnessed. One more Witnessed loss = Fall (dies).",
+  STAIN: "STAIN — Ink Mark. Lets Ink Press / Erase toward Forced Expose.",
+  PRESS: "PRESS — marked by Ink. If Ink wins Resolve here → Forced Expose. If Ink loses → backlash.",
+  SCR: "SCRUTINY — stacks toward Forced Expose (at 2 the Veil breaks).",
+  INH: "INHABITANT — a Figure tucked inside this Vessel / Urn.",
+  SITE: "SITE — landmark on this lane (not a fighter).",
+};
+
+const METER_HELP: Record<string, { kind: string; text: string }> = {
+  essence: {
+    kind: "play",
+    text: "ESSENCE — spend to play cards from your hand (gold pip on the card). You · foe. Refills each new round.",
+  },
+  sight: {
+    kind: "witness",
+    text: "SIGHT — looking currency. Spend to Witness, Gaze, Press, Peal, or ante a Wager. Gain from turn yields, Sites, and craft verbs — Blind lanes block Sight income.",
+  },
+  favor: {
+    kind: "eclipse",
+    text: "FAVOR — Motley currency (max 3). Spend into Wagers and Motley payoffs. Not Essence or Sight.",
+  },
+  turn: {
+    kind: "pass",
+    text: "ROUND — current window number. After both Pass, lanes Resolve, then a new round begins. Match ends at round 10 if nobody Broke or Eclipsed.",
+  },
+  will: {
+    kind: "resolve",
+    text: "WILL — life total. When lanes Resolve, winners chip the loser's Will. Hit 0 and you Break (lose).",
+  },
+  eclipse: {
+    kind: "eclipse",
+    text: "ECLIPSE — second win track (Motley loves it). Reach 10 Eclipse to Ascend — you win without Breaking Will. You · foe.",
+  },
+  law: {
+    kind: "law",
+    text: "LAW — Unblinking Law. Witness 3 different heresies, then Pass to score Eclipse. A long-game win lever beside Break and Eclipse.",
+  },
+};
+
+function explainMeterHelp(key: string): void {
+  const help = METER_HELP[key];
+  if (!help) return;
+  playSfx("ui-tap");
+  clearToastQueue();
+  flashToast(help.text, paceMs(5200), help.kind);
 }
 
 function whoLabel(side: Side): string {
@@ -531,11 +712,6 @@ function eclipseReasonLabel(reason: string): string {
     default:
       return reason;
   }
-}
-
-function flashToast(msg: string, ms = 1600, kind: string | null = null): void {
-  showToast(msg, kind);
-  flashTimer = ms;
 }
 
 function hidePhaseBanner(): void {
@@ -589,7 +765,7 @@ function flashPhase(
   void vfxWash.offsetWidth;
   vfxWash.classList.add("vfx-wash-on");
 
-  phaseTimer = opts?.ms ?? (kind === "resolve" || kind === "fall" || kind === "eclipse" || kind === "victory" || kind === "break" ? 2400 : 1800);
+  phaseTimer = opts?.ms ?? (kind === "resolve" || kind === "fall" || kind === "eclipse" || kind === "victory" || kind === "break" ? paceMs(3800) : paceMs(2600));
   if (reduce) phaseTimer = Math.min(phaseTimer, 900);
 }
 
@@ -696,6 +872,7 @@ function syncBadge(
   on: boolean,
   text: string | undefined,
   pop: boolean,
+  title?: string,
 ): void {
   if (!el) return;
   const was = !el.hidden;
@@ -703,10 +880,15 @@ function syncBadge(
   el.hidden = !on;
   if (on && text != null) {
     el.setAttribute("data-label", text);
-    el.setAttribute("aria-label", text);
-    el.title = text;
+    const tip = title ?? BADGE_TITLES[text] ?? BADGE_TITLES[text.replace(/\s+\d+$/, "")] ?? text;
+    el.setAttribute("aria-label", tip);
+    el.title = tip;
     // Sprite badges keep empty visible text; label lives in title/aria.
-    if (!el.classList.contains("alt-badge--toll") && !el.classList.contains("alt-badge--wager") && !el.classList.contains("alt-badge--stain")) {
+    if (
+      !el.classList.contains("alt-badge--toll") &&
+      !el.classList.contains("alt-badge--wager") &&
+      !el.classList.contains("alt-stain")
+    ) {
       el.textContent = text;
     } else {
       el.textContent = "";
@@ -745,7 +927,10 @@ function syncSideStatus(
   const stance = row.querySelector("[data-stance-mark]") as HTMLElement | null;
   const wager = row.querySelector("[data-wager]") as HTMLElement | null;
   const strain = row.querySelector("[data-strain]") as HTMLElement | null;
-  const stain = row.querySelector("[data-stain]") as HTMLElement | null;
+  const stain = hit.querySelector(
+    `[data-stain][data-side="${side}"]`,
+  ) as HTMLElement | null;
+  const press = row.querySelector("[data-press]") as HTMLElement | null;
   const scrutiny = row.querySelector("[data-scrutiny]") as HTMLElement | null;
   const inh = row.querySelector("[data-inh]") as HTMLButtonElement | null;
   const graft = row.querySelector("[data-graft]") as HTMLButtonElement | null;
@@ -760,6 +945,7 @@ function syncSideStatus(
     u?.hasThirdFace ? 1 : 0,
     u?.strained ? 1 : 0,
     u?.stained ? 1 : 0,
+    u?.pressed ? 1 : 0,
     u?.scrutiny ?? 0,
     u?.inhabitant ? 1 : 0,
     u?.grafts.length ?? 0,
@@ -774,11 +960,18 @@ function syncSideStatus(
   syncBadge(wager, !!u?.wagered, u?.wagerAnteFavor ? "FAVOR" : u?.wagerAntePaid ? "ANTE" : "WAGER", pop);
   syncBadge(strain, !!u?.strained, "STR", pop);
   syncBadge(stain, !!u?.stained, "STAIN", pop);
+  syncBadge(press, !!u?.pressed, "PRESS", pop);
   const scr = u?.scrutiny ?? 0;
-  syncBadge(scrutiny, !!u && u.veiled && scr > 0, scr > 0 ? `SCR ${scr}` : "SCR", pop);
+  syncBadge(
+    scrutiny,
+    !!u && u.veiled && scr > 0,
+    scr > 0 ? `SCR ${scr}` : "SCR",
+    pop,
+    BADGE_TITLES.SCR,
+  );
   syncBadge(inh, !!u?.inhabitant, "INH", pop);
   const gn = u?.grafts.length ?? 0;
-  syncBadge(graft, gn > 0, `×${gn}`, pop);
+  syncBadge(graft, gn > 0, `×${gn}`, pop, "Charm(s) Grafted — tap to inspect Relics on this Figure.");
   syncBadge(siteBtn, !!siteId, "SITE", pop);
 }
 
@@ -887,6 +1080,39 @@ function openBuilder(heresy?: Heresy): void {
   deckBuilder.open(heresy ? { heresy } : undefined);
 }
 
+function openTutorialPick(): void {
+  hideAllSheets();
+  buildTutorialList();
+  tutorialPickPanel.hidden = false;
+  menu.hidden = true;
+  setMenuMode(true);
+}
+
+function closeTutorialPick(): void {
+  tutorialPickPanel.hidden = true;
+  menu.hidden = false;
+  setMenuMode(true);
+}
+
+function buildTutorialList(): void {
+  tutorialListEl.innerHTML = "";
+  for (const entry of TUTORIAL_HUB) {
+    const card = document.createElement("article");
+    card.className = `tutorial-card tutorial-card--${entry.id}`;
+    card.setAttribute("role", "listitem");
+    card.innerHTML = `
+      <header class="tutorial-card-head">
+        <h2 class="tutorial-card-name">${entry.title}</h2>
+      </header>
+      <p class="tutorial-card-blurb">${entry.blurb}</p>
+      <button type="button" class="cta tutorial-start" data-tutorial="${entry.id}">
+        <span class="btn-label"><span class="btn-kicker">Learn</span>Begin</span>
+      </button>
+    `;
+    tutorialListEl.appendChild(card);
+  }
+}
+
 function openHeresyPick(): void {
   hideAllSheets();
   setMenuMode(true);
@@ -921,7 +1147,10 @@ function buildHeresyList(): void {
       <p class="heresy-card-arch"><span class="heresy-arch-label">Archetype</span> ${pitch.archetype}</p>
       <div class="heresy-card-actions">
         <button type="button" class="cta heresy-enter" data-enter="${id}">
-          <span class="btn-label"><span class="btn-kicker">Teach</span>Enter Gaze</span>
+          <span class="btn-label"><span class="btn-kicker">Play</span>Enter Gaze</span>
+        </button>
+        <button type="button" class="ghost heresy-learn" data-learn="${id}">
+          <span class="btn-label">Learn · Full Teach</span>
         </button>
         <button type="button" class="ghost heresy-build" data-build="${id}">
           <span class="btn-label">Build this craft</span>
@@ -932,7 +1161,74 @@ function buildHeresyList(): void {
   }
 }
 
-function startMatch(tutorial: boolean, constructedDeck?: string[]): void {
+function queueHandDeal(count: number): void {
+  if (!state || count <= 0) return;
+  const start = Math.max(0, state.hand.length - count);
+  for (let i = start; i < state.hand.length; i++) dealingSlots.add(i);
+}
+
+function queueOpeningDeal(): void {
+  dealingSlots.clear();
+  if (!state) return;
+  for (let i = 0; i < state.hand.length; i++) dealingSlots.add(i);
+}
+
+function syncMulliganChrome(): void {
+  const n = mulliganSelected.size;
+  btnMulliganRedraw.disabled = n === 0;
+  mulliganHint.textContent =
+    n === 0
+      ? "None selected — Keep as dealt, or tap cards to redraw."
+      : n === 1
+        ? "1 card marked — will return to library and redraw."
+        : `${n} cards marked — will return to library and redraw.`;
+}
+
+function beginMulligan(): void {
+  if (!state || state.tutorial || spectatorMode || mulliganActive) return;
+  mulliganActive = true;
+  mulliganSelected.clear();
+  mode = "play";
+  selectedHand = null;
+  drag = null;
+  document.body.classList.add("mulligan-open");
+  mulliganPanel.hidden = false;
+  syncMulliganChrome();
+  syncHud();
+  showToast("Mulligan — tap to put back, hold to read a card, then Keep or Redraw once.");
+}
+
+async function finishMulligan(keepAll: boolean): Promise<void> {
+  if (!state || !mulliganActive) return;
+  const indices = keepAll ? [] : [...mulliganSelected];
+  mulliganActive = false;
+  mulliganSelected.clear();
+  mulliganPanel.hidden = true;
+  document.body.classList.remove("mulligan-open");
+
+  if (!indices.length) {
+    syncHud();
+    showToast("Hand kept — your Gaze begins.");
+    persistProgress();
+    return;
+  }
+
+  const drawn = applyMulligan(state, indices);
+  takeEvents(state);
+  queueHandDeal(drawn.length);
+  syncHud();
+  if (drawn.length) {
+    await enqueueFx(() => animateHandDeals(drawn));
+  }
+  showToast(
+    drawn.length === 1
+      ? "Redrawn 1 card — Round 1 begins."
+      : `Redrawn ${drawn.length} cards — Round 1 begins.`,
+  );
+  persistProgress();
+}
+
+function startMatch(tutorial: boolean, constructedDeck?: string[], tutorialId?: TutorialId): void {
   spectatorMode = false;
   spectateGen += 1;
   spectateBusy = false;
@@ -940,17 +1236,31 @@ function startMatch(tutorial: boolean, constructedDeck?: string[]): void {
   document.body.classList.remove("spectating");
   hideAllSheets();
   uiPaused = false;
-  if (tutorial) lastConstructedDeck = null;
-  else if (constructedDeck) lastConstructedDeck = [...constructedDeck];
-  else lastConstructedDeck = null;
+  clearMatchProgress();
+  if (tutorial) {
+    lastConstructedDeck = null;
+    saveLastConstructedDeck(null);
+  } else if (constructedDeck) {
+    lastConstructedDeck = [...constructedDeck];
+    saveLastConstructedDeck(lastConstructedDeck);
+  } else {
+    lastConstructedDeck = null;
+    saveLastConstructedDeck(null);
+  }
   const settings = loadSettings();
   state = createMatch({
     tutorial,
+    tutorialId: tutorial ? (tutorialId ?? "first_gaze") : undefined,
     deck: !tutorial && constructedDeck ? constructedDeck : undefined,
     aiDifficulty: settings.aiDifficulty,
   });
   selectedHand = null;
   mode = "play";
+  mulliganActive = false;
+  mulliganSelected.clear();
+  mulliganPanel.hidden = true;
+  document.body.classList.remove("mulligan-open");
+  dealingSlots.clear();
   hudSnap = {
     essence: -1,
     enemyEssence: -1,
@@ -977,22 +1287,113 @@ function startMatch(tutorial: boolean, constructedDeck?: string[]): void {
     if (um) mode = um;
   }
   takeEvents(state);
-  handDealCount = state.hand.length;
+  queueOpeningDeal();
   clearEventLog();
+  clearToastQueue();
+  syncContinueButton();
   syncHud();
   hidePhaseBanner();
+  persistProgress();
   if (!tutorial) {
     flashPhase("Round 1", {
       kicker: "Match begin",
       sub: "Play Veiled · Witness with Sight · Pass to Resolve",
       kind: "round",
-      ms: 2600,
+      ms: paceMs(3400),
     });
-    explain("Round 1 — play cards Veiled, spend Sight to Witness, Pass when done. Both Pass → Resolve.", 2800, "round");
+    explain(
+      "Round 1 — Play cards Veiled (half-real). Spend Sight to Witness them. Pass when done. When both Pass, lanes Resolve and Will chips. Watch the toast — it explains every beat.",
+      paceMs(4200),
+      "round",
+    );
+  } else {
+    explain(
+      "First Gaze — follow the coach. When a Site or Relic appears, the big card pops up — read it, then tap Continue.",
+      paceMs(3800),
+      "round",
+    );
   }
   if (state.hand.length) {
-    void enqueueFx(() => animateHandDeals([...state!.hand]));
+    void enqueueFx(async () => {
+      await animateHandDeals([...state!.hand]);
+      if (!tutorial) beginMulligan();
+    });
+  } else if (!tutorial) {
+    beginMulligan();
   }
+}
+
+function resumeSavedMatch(): boolean {
+  const p = loadProgress();
+  if (!canContinue(p) || !p.match) return false;
+  spectatorMode = false;
+  spectateGen += 1;
+  spectateBusy = false;
+  spectateChip.hidden = true;
+  document.body.classList.remove("spectating");
+  hideAllSheets();
+  uiPaused = false;
+  state = p.match;
+  state.events = [];
+  // Unknown / legacy interactive First Gaze saves → restart soft curriculum
+  if (state.tutorial && state.tutorialStep !== "done" && !isKnownTutorialStep(state.tutorialStep)) {
+    setupTutorial(state, state.tutorialId ?? "first_gaze");
+  }
+  // Craft saves missing tutorialId — infer from step prefix
+  if (state.tutorial && !state.tutorialId && state.tutorialStep !== "done") {
+    const prefix = state.tutorialStep.split("_")[0];
+    if (prefix === "ink" || prefix === "motley" || prefix === "toll" || prefix === "breach") {
+      state.tutorialId = prefix;
+    } else {
+      state.tutorialId = "first_gaze";
+    }
+  }
+  selectedHand = p.selectedHand;
+  const savedMode = p.mode;
+  mode =
+    savedMode === "witness" ||
+    savedMode === "reveil" ||
+    savedMode === "stance" ||
+    savedMode === "wager" ||
+    savedMode === "press" ||
+    savedMode === "peal" ||
+    savedMode === "play"
+      ? savedMode
+      : "play";
+  if (p.lastConstructedDeck) lastConstructedDeck = [...p.lastConstructedDeck];
+  mulliganActive = false;
+  mulliganSelected.clear();
+  mulliganPanel.hidden = true;
+  document.body.classList.remove("mulligan-open");
+  dealingSlots.clear();
+  hudSnap = {
+    essence: -1,
+    enemyEssence: -1,
+    sight: -1,
+    enemySight: -1,
+    favor: -1,
+    enemyFavor: -1,
+    eclipse: -1,
+    enemyEclipse: -1,
+    will: -1,
+    enemyWill: -1,
+  };
+  for (const hit of altHits) {
+    for (const row of hit.querySelectorAll<HTMLElement>(".alt-status")) delete row.dataset.sig;
+  }
+  setMenuMode(false);
+  setEnemyTurn(state.active === "enemy");
+  setMusicBed("match");
+  void unlockAudio();
+  clearEventLog();
+  syncContinueButton();
+  syncHud();
+  hidePhaseBanner();
+  showToast(state.tutorial ? "First Gaze resumed." : "Match resumed.");
+  if (state.active === "enemy" && !state.tutorial) {
+    window.setTimeout(runEnemy, 400);
+  }
+  return true;
 }
 
 type LiveCraft = "ink" | "motley" | "toll" | "breach";
@@ -1095,7 +1496,7 @@ function startSpectateBots(
   setMusicBed("match");
   void unlockAudio();
   takeEvents(state);
-  handDealCount = state.hand.length;
+  queueOpeningDeal();
   clearEventLog();
   syncHud();
   hidePhaseBanner();
@@ -1140,6 +1541,8 @@ function clearTutorGuide(): void {
   tutorGuide.hidden = true;
   tutorGuide.classList.remove("is-card", "is-hud");
   tutorCardStage.hidden = true;
+  tutorCardKicker.textContent = "";
+  tutorCardRules.textContent = "";
   tutorRing.hidden = true;
   tutorPin.hidden = true;
   tutorArrowPath.setAttribute("d", "");
@@ -1155,6 +1558,16 @@ function pinLabelForStep(step: string): string {
       return "Witness";
     case "card_power":
       return "Power";
+    case "types_figure":
+      return "Figure";
+    case "types_site":
+      return "Site";
+    case "types_relic":
+      return "Relic";
+    case "types_rite":
+      return "Rite";
+    case "types_vessel":
+      return "Urn";
     case "hud_will":
       return "Will";
     case "hud_sight":
@@ -1237,19 +1650,35 @@ function syncTutorGuide(s: MatchState | null): void {
     if (tutorCardFace.dataset.card !== cardId) {
       tutorCardFace.src = handCardSrc(cardId);
       tutorCardFace.dataset.card = cardId;
+      tutorCardFace.alt = getCard(cardId).name;
     }
-    const stageRect = tutorCardStage.getBoundingClientRect();
+    const caption = tutorialCardCaption(step);
+    if (caption) {
+      tutorCardKicker.textContent = caption.kicker;
+      tutorCardRules.textContent = caption.rules;
+    } else {
+      tutorCardKicker.textContent = "";
+      tutorCardRules.textContent = "";
+    }
+    const stageRect = tutorCardFace.getBoundingClientRect();
     const anchor = CARD_ANCHORS[target.anchor];
     const ax = stageRect.left + stageRect.width * anchor.x;
     const ay = stageRect.top + stageRect.height * anchor.y;
-    const hit = 28;
-    const fake = new DOMRect(ax - hit / 2, ay - hit / 2, hit, hit);
-    placeTutorCallout(fake, coachRect, label);
+    const hit = caption ? 0 : 28;
+    if (hit > 0) {
+      const fake = new DOMRect(ax - hit / 2, ay - hit / 2, hit, hit);
+      placeTutorCallout(fake, coachRect, label);
+    } else {
+      // Type lessons: card + caption are the focus — light ring on the face
+      placeTutorCallout(stageRect, coachRect, label);
+    }
     return;
   }
 
   document.body.classList.remove("tutorial-card-open");
   tutorCardStage.hidden = true;
+  tutorCardKicker.textContent = "";
+  tutorCardRules.textContent = "";
   tutorGuide.classList.remove("is-card");
   tutorGuide.classList.add("is-hud");
 
@@ -1298,7 +1727,7 @@ function hint(s: MatchState): string {
   if (s.tutorial && s.tutorialStep !== "done") {
     return tutorialHint(s.tutorialStep);
   }
-  if (s.active !== "player") return "Enemy turn ? they act in the Gaze?";
+  if (s.active !== "player") return "Enemy turn — they are acting.";
   if (mode === "witness") {
     const intents = legalIntents(s);
     const canGaze = intents.some((i) => i.kind === "witness" && i.enemy);
@@ -1358,6 +1787,7 @@ function syncHud(): void {
   if (!state || state.phase !== "play") {
     handEl.innerHTML = "";
     handArea.hidden = true;
+    enemyDeckEl.hidden = true;
     actionsEl.hidden = true;
     metersEl.hidden = true;
     willrowEl.hidden = true;
@@ -1386,7 +1816,8 @@ function syncHud(): void {
   metersEl.hidden = false;
   willrowEl.hidden = false;
   handArea.hidden = !inMatch;
-  actionsEl.hidden = !inMatch;
+  actionsEl.hidden = !inMatch || mulliganActive;
+  enemyDeckEl.hidden = !inMatch;
   setEnemyTurn(state.active === "enemy");
 
   if (!inMatch) {
@@ -1396,6 +1827,7 @@ function syncHud(): void {
     btnStance.disabled = true;
     btnPass.disabled = true;
     handEl.innerHTML = "";
+    syncDeckPiles();
     for (const hit of altHits) {
       const alt = Number(hit.dataset.alt) as Altitude;
       const pow = hit.querySelector(".alt-pow-n") ?? hit.querySelector(".alt-pow");
@@ -1416,7 +1848,7 @@ function syncHud(): void {
     willFoe.style.transform = `scaleX(${Math.max(0, state.enemyWill / START_WILL)})`;
     eclYou.textContent = String(state.eclipse);
     eclFoe.textContent = String(state.enemyEclipse);
-    if (flashTimer <= 0) showToast("Paused");
+    if (flashTimer <= 0 && !toastBusy && toastQueue.length === 0) showToast("Paused");
     return;
   }
 
@@ -1437,10 +1869,38 @@ function syncHud(): void {
   {
     const youLabel = document.querySelector(".will-side.you .will-label");
     const foeLabel = document.querySelector(".will-side.foe .will-label");
-    if (youLabel) youLabel.textContent = spectatorMode ? SPECTATE_SHORT[lastSpectate.bottom].toUpperCase() : "YOU";
-    if (foeLabel) foeLabel.textContent = spectatorMode ? SPECTATE_SHORT[lastSpectate.top].toUpperCase() : "FOE";
+    const demoPair =
+      state.tutorial && state.tutorialStep !== "done"
+        ? tutorialDemoCrafts(state.tutorialStep)
+        : null;
+    if (youLabel) {
+      youLabel.textContent = spectatorMode
+        ? SPECTATE_SHORT[lastSpectate.bottom].toUpperCase()
+        : demoPair
+          ? SPECTATE_SHORT[demoPair.bottom].toUpperCase()
+          : "YOU";
+    }
+    if (foeLabel) {
+      foeLabel.textContent = spectatorMode
+        ? SPECTATE_SHORT[lastSpectate.top].toUpperCase()
+        : demoPair
+          ? SPECTATE_SHORT[demoPair.top].toUpperCase()
+          : "FOE";
+    }
   }
-  if (spectateChip) spectateChip.hidden = !spectatorMode;
+  if (spectateChip) {
+    if (spectatorMode) {
+      spectateChip.hidden = false;
+    } else if (state.tutorial && isTutorialDemoStep(state.tutorialStep)) {
+      const pair = tutorialDemoCrafts(state.tutorialStep);
+      spectateChip.hidden = false;
+      spectateChip.textContent = pair
+        ? `DEMO · ${SPECTATE_LABEL[pair.bottom]} vs ${SPECTATE_LABEL[pair.top]}`
+        : "DEMO";
+    } else {
+      spectateChip.hidden = true;
+    }
+  }
 
   if (hudSnap.essence >= 0) {
     if (hudSnap.essence !== state.essence) punchMeter(mEssence);
@@ -1478,7 +1938,7 @@ function syncHud(): void {
     lawChip.classList.toggle("ready", n >= 3 && state.active === "player");
   }
 
-  if (flashTimer <= 0) {
+  if (flashTimer <= 0 && !toastBusy && toastQueue.length === 0) {
     showToast(hint(state));
   }
   syncCoach(state);
@@ -1517,8 +1977,8 @@ function syncHud(): void {
         tollEl.classList.toggle("is-foe", tollOwner === "enemy");
         tollEl.title =
           tollOwner === "player"
-            ? "Your Toll — your Figures here +1; enemy Witness/Gaze pays tax"
-            : "Enemy Toll — their trap on this altitude";
+            ? "Your Toll — tap for explanation"
+            : "Enemy Toll — tap for explanation";
       }
       if (on && !wasToll) {
         tollEl.classList.remove("badge-pop");
@@ -1530,6 +1990,10 @@ function syncHud(): void {
       const wasPeal = !pealEl.hidden;
       const pealOn = !!state.pealArmed[alt];
       pealEl.hidden = !pealOn;
+      if (pealOn) {
+        pealEl.title = "Peal armed — tap for explanation";
+        pealEl.setAttribute("aria-label", "Peal armed");
+      }
       if (pealOn && !wasPeal) {
         pealEl.classList.remove("badge-pop");
         void pealEl.offsetWidth;
@@ -1571,7 +2035,7 @@ function syncHud(): void {
   const canBoardAct = intents.some(
     (i) => i.kind === "play" || i.kind === "rite" || i.kind === "graft",
   );
-  btnWitness.disabled = spectatorMode || state.active !== "player" || !canWitness;
+  btnWitness.disabled = spectatorMode || state.active !== "player";
   btnReveil.disabled = spectatorMode || state.active !== "player" || !canReveil;
   btnStance.disabled = spectatorMode || state.active !== "player" || !canStance;
   btnWager.disabled = spectatorMode || state.active !== "player" || !canWager;
@@ -1582,6 +2046,8 @@ function syncHud(): void {
     (!canPress && !sidePlaysHeresy(state, "player", "ink"));
   btnPeal.disabled = spectatorMode || state.active !== "player" || !canPeal;
   btnPass.disabled = spectatorMode || state.active !== "player" || !canPass;
+  // Dim when no legal Witness/Gaze — keep clickable so we can explain why
+  btnWitness.classList.toggle("unavailable", !canWitness && mode !== "witness");
   if (spectatorMode) {
     actionsEl.hidden = true;
   }
@@ -1595,17 +2061,30 @@ function syncHud(): void {
   const teachStance = false;
   const teachPass =
     state.tutorial && (state.tutorialStep === "pass1" || state.tutorialStep === "pass2");
-  // First Gaze: only show the action button the lesson needs
+  // Soft coach curricula hide action chrome (CSS). Legacy interactive steps gate buttons.
   if (state.tutorial && state.tutorialStep !== "done") {
     const step = state.tutorialStep;
+    const soft = isTutorialSoftPass(step);
     const laneOnly = step === "play" || step === "site" || step === "graft";
-    btnWitness.hidden = step !== "witness";
-    btnReveil.hidden = true;
-    btnStance.hidden = true;
-    btnWager.hidden = true;
-    btnPress.hidden = true;
-    btnPeal.hidden = true;
-    btnPass.hidden = !teachPass;
+    if (soft) {
+      btnWitness.hidden = true;
+      btnReveil.hidden = true;
+      btnStance.hidden = true;
+      btnWager.hidden = true;
+      btnPress.hidden = true;
+      btnPeal.hidden = true;
+      btnPass.hidden = true;
+      actionsEl.style.visibility = "hidden";
+    } else {
+      btnWitness.hidden = step !== "witness";
+      btnReveil.hidden = true;
+      btnStance.hidden = true;
+      btnWager.hidden = true;
+      btnPress.hidden = true;
+      btnPeal.hidden = true;
+      btnPass.hidden = !teachPass;
+      actionsEl.style.visibility = laneOnly ? "hidden" : "";
+    }
     btnWitness.style.visibility = "";
     btnReveil.style.visibility = "";
     btnStance.style.visibility = "";
@@ -1613,7 +2092,6 @@ function syncHud(): void {
     btnPress.style.visibility = "";
     btnPeal.style.visibility = "";
     btnPass.style.visibility = "";
-    actionsEl.style.visibility = laneOnly ? "hidden" : "";
   } else {
     // Craft kit buttons stay visible for that craft (disabled until legal)
     const ink = sidePlaysHeresy(state, "player", "ink");
@@ -1707,8 +2185,6 @@ function syncHud(): void {
 
   handEl.innerHTML = "";
   handEl.dataset.n = String(state.hand.length);
-  const dealN = handDealCount;
-  handDealCount = 0;
   state.hand.forEach((id, index) => {
     const def = getCard(id);
     const btn = document.createElement("button");
@@ -1716,15 +2192,22 @@ function syncHud(): void {
     btn.className = "hand-card";
     btn.dataset.slot = String(index);
     btn.style.setProperty("--i", String(index));
-    if (dealN > 0 && index >= state!.hand.length - dealN) {
+    if (dealingSlots.has(index)) {
       btn.classList.add("dealing");
     }
     const playable = intents.some(
       (i) =>
         (i.kind === "play" || i.kind === "graft" || i.kind === "rite") && i.handIndex === index,
     );
-    const canSelect = playable && state!.active === "player" && mode === "play";
-    if (!canSelect) btn.classList.add("disabled");
+    const canSelect =
+      !mulliganActive && playable && state!.active === "player" && mode === "play";
+    if (mulliganActive) {
+      btn.classList.add("mulligan-pick");
+      if (mulliganSelected.has(index)) btn.classList.add("mulligan-out");
+      btn.classList.remove("disabled");
+    } else if (!canSelect) {
+      btn.classList.add("disabled");
+    }
     if (selectedHand === index) btn.classList.add("selected");
     if (
       canSelect &&
@@ -1744,9 +2227,11 @@ function syncHud(): void {
     img.src = handCardSrc(id);
     btn.appendChild(img);
     // Hand stays flat + opaque (foil tilt reserved for inspect / codex)
-    btn.title = `${def.name} ? ${def.essence}E ? hold to inspect ? drag to play`;
+    btn.title = mulliganActive
+      ? `${def.name} — tap to ${mulliganSelected.has(index) ? "keep" : "mulligan"} · hold to inspect`
+      : `${def.name} ? ${def.essence}E ? hold to inspect ? drag to play`;
     const wasSelected = selectedHand === index;
-    if (canSelect) {
+    if (!mulliganActive && canSelect) {
       btn.addEventListener("pointerdown", (ev) => {
         if (ev.button != null && ev.button !== 0) return;
         if (uiPaused || drag?.dropping) return;
@@ -1782,6 +2267,15 @@ function syncHud(): void {
       () => id,
       cardInspect,
       () => {
+        if (mulliganActive) {
+          if (uiPaused) return;
+          if (mulliganSelected.has(index)) mulliganSelected.delete(index);
+          else mulliganSelected.add(index);
+          playSfx("select");
+          syncMulliganChrome();
+          syncHud();
+          return;
+        }
         if (drag?.active || drag?.dropping) return;
         // Tutorial: short tap never opens inspect ? hold only
         if (!(state?.tutorial) && canSelect && wasSelected) {
@@ -1795,8 +2289,8 @@ function syncHud(): void {
         window.requestAnimationFrame(() => syncHud());
       },
       {
-        // Hold-to-inspect always. Short tap inspect only outside tutorial, unplayable cards.
-        inspectOnTap: !(state?.tutorial) && !canSelect,
+        // Hold-to-inspect always (including mulligan). Short tap inspect only outside tutorial, unplayable cards.
+        inspectOnTap: !mulliganActive && !(state?.tutorial) && !canSelect,
         onInspectOpen: () => {
           // Hold won over drag ? disarm pending drag so release is clean
           if (drag && !drag.active && drag.handIndex === index) drag = null;
@@ -1805,6 +2299,40 @@ function syncHud(): void {
     );
     handEl.appendChild(btn);
   });
+  syncDeckPiles();
+}
+
+function syncDeckPiles(): void {
+  const youN = state?.deck.length ?? 0;
+  const foeN = state?.enemyDeck.length ?? 0;
+  playerDeckN.textContent = String(youN);
+  enemyDeckN.textContent = String(foeN);
+  const youDepth = youN <= 0 ? 0 : youN === 1 ? 1 : youN === 2 ? 2 : 3;
+  const foeDepth = foeN <= 0 ? 0 : foeN === 1 ? 1 : foeN === 2 ? 2 : 3;
+  playerDeckEl.dataset.depth = String(youDepth);
+  enemyDeckEl.dataset.depth = String(foeDepth);
+  playerDeckEl.classList.toggle("is-empty", youN <= 0);
+  enemyDeckEl.classList.toggle("is-empty", foeN <= 0);
+  playerDeckEl.setAttribute(
+    "aria-label",
+    youN <= 0 ? "Your library — empty" : `Your library — ${youN} cards`,
+  );
+  enemyDeckEl.setAttribute(
+    "aria-label",
+    foeN <= 0 ? "Foe library — empty" : `Foe library — ${foeN} cards`,
+  );
+  // Keep card-back src fresh if cache-busted
+  for (const img of document.querySelectorAll<HTMLImageElement>(".match-deck-back")) {
+    if (!img.getAttribute("src")?.includes("card-back")) img.src = cardBackSrc();
+  }
+}
+
+function punchDeck(side: "player" | "enemy"): void {
+  const el = side === "player" ? playerDeckEl : enemyDeckEl;
+  el.classList.remove("is-drawing");
+  void el.offsetWidth;
+  el.classList.add("is-drawing");
+  window.setTimeout(() => el.classList.remove("is-drawing"), 450);
 }
 
 function reduceMotionOn(): boolean {
@@ -1821,9 +2349,456 @@ type FlySpec = {
   toScale?: number;
   fromRot?: number;
   durationMs?: number;
-  /** land = figure stays vibe; cast = rite bloom + dissolve (not a board permanent) */
-  exit?: "land" | "cast";
+  /** Arc lift in px (negative = up). */
+  arcLift?: number;
+  /** land = figure/site settle; cast = rite bloom; graft = charm attach */
+  exit?: "land" | "cast" | "graft" | "site";
 };
+
+function spawnFlightMotes(
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  kind: string,
+): void {
+  if (reduceMotionOn() || !fxMotes) return;
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const t = (i + 1) / (n + 1);
+    const el = document.createElement("span");
+    el.className = `fx-mote fx-mote--${kind}`;
+    const x = fromX + (toX - fromX) * t + (Math.random() - 0.5) * 28;
+    const y = fromY + (toY - fromY) * t - 40 * Math.sin(Math.PI * t) + (Math.random() - 0.5) * 18;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    el.style.setProperty("--delay", `${i * 28}ms`);
+    fxMotes.appendChild(el);
+    window.setTimeout(() => el.remove(), 700);
+  }
+}
+
+type CombatBeamKind = "witness" | "gaze" | "press" | "peal" | "graft" | "stance" | "wager";
+
+function hideCombatArrow(): void {
+  combatFxSvg.hidden = true;
+  combatArrowPath.setAttribute("d", "");
+  combatFxSvg.className = "";
+}
+
+function showCombatArrow(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  kind: CombatBeamKind,
+  holdMs = 700,
+): Promise<void> {
+  return new Promise((resolve) => {
+    if (reduceMotionOn() || !combatFxSvg || !combatArrowPath) {
+      resolve();
+      return;
+    }
+    try {
+      const mx = (from.x + to.x) / 2;
+      const my = Math.min(from.y, to.y) - 48;
+      combatFxSvg.hidden = false;
+      combatFxSvg.className = `combat-fx combat-fx--${kind}`;
+      combatArrowPath.setAttribute("d", `M ${from.x} ${from.y} Q ${mx} ${my} ${to.x} ${to.y}`);
+      let len = 240;
+      try {
+        len = combatArrowPath.getTotalLength?.() || 240;
+      } catch {
+        len = 240;
+      }
+      combatArrowPath.style.strokeDasharray = `${len}`;
+      combatArrowPath.style.strokeDashoffset = `${len}`;
+      void combatArrowPath.getBoundingClientRect();
+      combatArrowPath.style.transition = `stroke-dashoffset ${Math.min(480, holdMs * 0.55)}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+      combatArrowPath.style.strokeDashoffset = "0";
+      window.setTimeout(() => {
+        combatFxSvg.classList.add("is-fading");
+        window.setTimeout(() => {
+          hideCombatArrow();
+          resolve();
+        }, 220);
+      }, holdMs);
+    } catch {
+      hideCombatArrow();
+      resolve();
+    }
+  });
+}
+
+function sightMeterOrigin(side: Side = "player"): { x: number; y: number } {
+  const el = document.getElementById(side === "player" ? "m-sight" : "m-sight-foe");
+  if (el) {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+  const r = metersEl.getBoundingClientRect();
+  return {
+    x: side === "player" ? r.left + r.width * 0.3 : r.left + r.width * 0.7,
+    y: r.top + r.height / 2,
+  };
+}
+
+function unitBadgeOrigin(alt: Altitude, side: Side): { x: number; y: number } {
+  const hit = altHits.find((h) => Number(h.dataset.alt) === alt);
+  const row = hit?.querySelector(`.alt-status.${side === "player" ? "you" : "foe"}`) as HTMLElement | null;
+  if (row) {
+    const r = row.getBoundingClientRect();
+    if (r.width > 0) return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+  return laneLanding(alt, side);
+}
+
+async function playBoardVerbFx(intent: Intent, caster: Side = "player"): Promise<void> {
+  if (!state || reduceMotionOn()) return;
+  if (!("altitude" in intent) || intent.altitude == null) return;
+  const alt = intent.altitude;
+  const foe: Side = caster === "player" ? "enemy" : "player";
+  if (intent.kind === "witness") {
+    const gaze = !!intent.enemy;
+    const from = sightMeterOrigin(caster);
+    const to = laneLanding(alt, gaze ? foe : caster);
+    await showCombatArrow(from, to, gaze ? "gaze" : "witness", paceMs(780));
+    punchAltitude(alt, gaze ? "gaze" : "witness");
+    floatLaneCue(alt, gaze ? "Gaze" : "Witness", gaze ? "gaze" : "witness");
+  } else if (intent.kind === "press") {
+    const from = unitBadgeOrigin(alt, caster);
+    const to = laneLanding(alt, foe);
+    await showCombatArrow(from, to, "press", paceMs(820));
+    punchAltitude(alt, "stain");
+    floatLaneCue(alt, "Press", "press");
+  } else if (intent.kind === "peal") {
+    const from = sightMeterOrigin(caster);
+    const hit = altHits.find((h) => Number(h.dataset.alt) === alt);
+    const r = hit?.getBoundingClientRect();
+    const to = r
+      ? { x: r.left + r.width * 0.5, y: r.top + 24 }
+      : laneLanding(alt, caster);
+    await showCombatArrow(from, to, "peal", paceMs(720));
+    punchAltitude(alt, "rite");
+    floatLaneCue(alt, "Peal", "peal");
+  } else if (intent.kind === "stance") {
+    const origin = unitBadgeOrigin(alt, caster);
+    await showCombatArrow(origin, { x: origin.x, y: origin.y - 36 }, "stance", paceMs(520));
+    punchAltitude(alt, "stance");
+  } else if (intent.kind === "wager") {
+    const from = sightMeterOrigin(caster);
+    const to = unitBadgeOrigin(alt, caster);
+    await showCombatArrow(from, to, "wager", paceMs(700));
+    punchAltitude(alt, "stance");
+  } else if (intent.kind === "reveil") {
+    const to = laneLanding(alt, caster);
+    await showCombatArrow(sightMeterOrigin(caster), to, "witness", paceMs(640));
+    punchAltitude(alt, "stance");
+  } else if (intent.kind === "graft") {
+    const land = laneLanding(alt, caster);
+    await showCombatArrow(sightMeterOrigin(caster), land, "graft", paceMs(500));
+  }
+}
+
+function flyCardFace(spec: FlySpec): Promise<void> {
+  return new Promise((resolve) => {
+    if (reduceMotionOn()) {
+      resolve();
+      return;
+    }
+    const exit = spec.exit ?? "land";
+    const dur = spec.durationMs ?? (exit === "cast" ? 460 : exit === "site" ? 560 : exit === "graft" ? 440 : 480);
+    const fromScale = spec.fromScale ?? 0.94;
+    const toScale = spec.toScale ?? (exit === "cast" ? 0.52 : exit === "site" ? 0.58 : 0.4);
+    const fromRot = spec.fromRot ?? -8;
+    const arcLift = spec.arcLift ?? (exit === "cast" ? 56 : 78);
+    const mx = (spec.fromX + spec.toX) / 2 + (spec.toX - spec.fromX) * 0.06;
+    const my = Math.min(spec.fromY, spec.toY) - arcLift;
+
+    fxCardImg.src = spec.src;
+    fxLayer.hidden = false;
+    fxGhost.classList.add("is-flying");
+    fxGhost.classList.toggle("is-casting", exit === "cast");
+    fxGhost.classList.toggle("is-grafting", exit === "graft");
+    fxGhost.classList.toggle("is-site", exit === "site");
+    fxGhost.style.transition = "none";
+    fxGhost.style.opacity = "1";
+    fxGhost.style.filter = "drop-shadow(0 18px 26px rgba(0, 0, 0, 0.65)) brightness(1.1)";
+    fxGhost.style.left = `${spec.fromX}px`;
+    fxGhost.style.top = `${spec.fromY}px`;
+    fxGhost.style.transform = `translate(-50%, -50%) rotate(${fromRot}deg) scale(${fromScale})`;
+    spawnFlightMotes(spec.fromX, spec.fromY, spec.toX, spec.toY, exit === "land" ? "summon" : exit);
+
+    const start = performance.now();
+    const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+    const tick = (now: number): void => {
+      const t = Math.min(1, (now - start) / dur);
+      const e = easeOut(t);
+      const x = (1 - e) * (1 - e) * spec.fromX + 2 * (1 - e) * e * mx + e * e * spec.toX;
+      const y = (1 - e) * (1 - e) * spec.fromY + 2 * (1 - e) * e * my + e * e * spec.toY;
+      const scale = fromScale + (toScale - fromScale) * e;
+      const rot = fromRot * (1 - e);
+      fxGhost.style.left = `${x}px`;
+      fxGhost.style.top = `${y}px`;
+      fxGhost.style.transform = `translate(-50%, -50%) rotate(${rot}deg) scale(${scale})`;
+      if (t < 1) {
+        window.requestAnimationFrame(tick);
+        return;
+      }
+      // Impact flash on land
+      fxGhost.style.filter =
+        exit === "cast"
+          ? "drop-shadow(0 0 28px rgba(140, 180, 255, 0.9)) brightness(1.45)"
+          : exit === "graft"
+            ? "drop-shadow(0 0 22px rgba(180, 220, 255, 0.85)) brightness(1.3)"
+            : exit === "site"
+              ? "drop-shadow(0 0 26px rgba(212, 175, 55, 0.9)) brightness(1.35)"
+              : "drop-shadow(0 10px 18px rgba(0, 0, 0, 0.4)) brightness(1.2)";
+
+      if (exit === "cast") {
+        const burn = 480;
+        fxGhost.style.transition = `top ${burn}ms cubic-bezier(0.2, 0.8, 0.2, 1), transform ${burn}ms ease, filter ${burn}ms ease, opacity ${burn}ms ease`;
+        fxGhost.style.top = `${spec.toY - 42}px`;
+        fxGhost.style.transform = `translate(-50%, -50%) rotate(0deg) scale(${toScale * 1.18})`;
+        fxGhost.style.filter =
+          "drop-shadow(0 0 40px rgba(160, 200, 255, 0.98)) brightness(1.75) saturate(1.25)";
+        fxGhost.style.opacity = "0";
+        window.setTimeout(() => {
+          fxLayer.hidden = true;
+          fxGhost.classList.remove("is-flying", "is-casting", "is-grafting", "is-site");
+          fxGhost.style.transition = "";
+          fxGhost.style.transform = "";
+          fxGhost.style.filter = "";
+          fxGhost.style.opacity = "";
+          resolve();
+        }, burn);
+        return;
+      }
+
+      if (exit === "graft") {
+        const snap = 280;
+        fxGhost.style.transition = `transform ${snap}ms cubic-bezier(0.34, 1.4, 0.64, 1), opacity ${snap}ms ease`;
+        fxGhost.style.transform = `translate(-50%, -50%) scale(${toScale * 0.72}) rotate(12deg)`;
+        fxGhost.style.opacity = "0";
+        window.setTimeout(() => {
+          fxLayer.hidden = true;
+          fxGhost.classList.remove("is-flying", "is-casting", "is-grafting", "is-site");
+          fxGhost.style.transition = "";
+          fxGhost.style.transform = "";
+          fxGhost.style.filter = "";
+          fxGhost.style.opacity = "";
+          resolve();
+        }, snap);
+        return;
+      }
+
+      // Site / summon settle — brief hold then fade
+      const settle = exit === "site" ? 160 : 100;
+      window.setTimeout(() => {
+        fxGhost.style.transition = "opacity 140ms ease, transform 140ms ease";
+        fxGhost.style.opacity = "0";
+        fxGhost.style.transform = `translate(-50%, -50%) scale(${toScale * 0.92})`;
+        window.setTimeout(() => {
+          fxLayer.hidden = true;
+          fxGhost.classList.remove("is-flying", "is-casting", "is-grafting", "is-site");
+          fxGhost.style.transition = "";
+          fxGhost.style.transform = "";
+          fxGhost.style.filter = "";
+          fxGhost.style.opacity = "";
+          resolve();
+        }, 140);
+      }, settle);
+    };
+    window.requestAnimationFrame(tick);
+  });
+}
+
+type RevealKind =
+  | "witness"
+  | "gaze"
+  | "expose"
+  | "figure"
+  | "site"
+  | "relic"
+  | "vessel"
+  | "rite";
+
+type RevealSpec = {
+  cardId: string;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  kind: RevealKind;
+  /** Optional start face (defaults to handCardSrc). */
+  src?: string;
+  fromScale?: number;
+  peakScale?: number;
+  landScale?: number;
+  holdMs?: number;
+  caption?: string;
+};
+
+function revealKindForPlay(cardId: string, intentKind?: Intent["kind"]): RevealKind {
+  if (intentKind === "graft") return "relic";
+  if (intentKind === "rite") return "rite";
+  const t = getCard(cardId).type;
+  if (t === "site" || t === "sigil") return "site";
+  if (t === "vessel") return "vessel";
+  if (t === "relic") return "relic";
+  if (t === "rite") return "rite";
+  return "figure";
+}
+
+function revealCaption(kind: RevealKind): string {
+  switch (kind) {
+    case "witness":
+      return "Witnessed";
+    case "gaze":
+      return "Gaze";
+    case "expose":
+      return "Forced Exposed";
+    case "site":
+      return "Site";
+    case "relic":
+      return "Graft";
+    case "vessel":
+      return "Vessel";
+    case "rite":
+      return "Rite";
+    default:
+      return "Summoned";
+  }
+}
+
+function resetFxGhost(): void {
+  fxLayer.hidden = true;
+  fxLayer.classList.remove("is-revealing");
+  fxDim.classList.remove("is-on");
+  fxCaption.classList.remove("is-on");
+  fxCaption.hidden = true;
+  fxCaption.textContent = "";
+  fxGhost.className = "";
+  fxGhost.style.transition = "";
+  fxGhost.style.transform = "";
+  fxGhost.style.filter = "";
+  fxGhost.style.opacity = "";
+  fxGhost.style.left = "";
+  fxGhost.style.top = "";
+}
+
+function animateFxGhost(
+  from: { x: number; y: number; scale: number; rot: number },
+  to: { x: number; y: number; scale: number; rot: number },
+  durationMs: number,
+  arcLift = 0,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const start = performance.now();
+    const mx = (from.x + to.x) / 2;
+    const my = Math.min(from.y, to.y) - arcLift;
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+    const tick = (now: number): void => {
+      const t = Math.min(1, (now - start) / durationMs);
+      const e = ease(t);
+      const x = (1 - e) * (1 - e) * from.x + 2 * (1 - e) * e * mx + e * e * to.x;
+      const y = (1 - e) * (1 - e) * from.y + 2 * (1 - e) * e * my + e * e * to.y;
+      const scale = from.scale + (to.scale - from.scale) * e;
+      const rot = from.rot + (to.rot - from.rot) * e;
+      fxGhost.style.left = `${x}px`;
+      fxGhost.style.top = `${y}px`;
+      fxGhost.style.transform = `translate(-50%, -50%) rotate(${rot}deg) scale(${scale})`;
+      if (t < 1) {
+        window.requestAnimationFrame(tick);
+        return;
+      }
+      resolve();
+    };
+    window.requestAnimationFrame(tick);
+  });
+}
+
+/**
+ * High-level CCG reveal: lift from origin → big center hover (readable) → fall to board.
+ */
+function revealCardCeremony(spec: RevealSpec): Promise<void> {
+  return new Promise((resolve) => {
+    void (async () => {
+      if (reduceMotionOn()) {
+        resolve();
+        return;
+      }
+      const cx = window.innerWidth * 0.5;
+      const cy = window.innerHeight * 0.4;
+      const fromScale = spec.fromScale ?? 0.85;
+      const peakScale = spec.peakScale ?? Math.min(2.85, Math.max(2.15, (window.innerHeight * 0.52) / 162));
+      const landScale = spec.landScale ?? (spec.kind === "rite" ? 0.55 : spec.kind === "relic" ? 0.42 : 0.48);
+      const holdMs = spec.holdMs ?? paceMs(spec.kind === "witness" || spec.kind === "gaze" || spec.kind === "expose" ? 1700 : 1300);
+      const riseMs = paceMs(520);
+      const fallMs = paceMs(spec.kind === "rite" ? 420 : 500);
+      const caption = spec.caption ?? revealCaption(spec.kind);
+
+      fxCardImg.src = spec.src ?? handCardSrc(spec.cardId);
+      fxLayer.hidden = false;
+      fxLayer.classList.add("is-revealing");
+      fxGhost.className = `is-flying is-revealing is-reveal-${spec.kind}`;
+      fxGhost.style.transition = "none";
+      fxGhost.style.opacity = "1";
+      fxGhost.style.left = `${spec.fromX}px`;
+      fxGhost.style.top = `${spec.fromY}px`;
+      fxGhost.style.transform = `translate(-50%, -50%) rotate(-7deg) scale(${fromScale})`;
+      fxCaption.textContent = caption;
+      fxCaption.hidden = false;
+      // Dim + caption after a frame so transitions fire
+      window.requestAnimationFrame(() => {
+        fxDim.classList.add("is-on");
+        fxCaption.classList.add("is-on");
+      });
+      spawnFlightMotes(spec.fromX, spec.fromY, cx, cy, spec.kind === "rite" ? "cast" : "summon");
+
+      await animateFxGhost(
+        { x: spec.fromX, y: spec.fromY, scale: fromScale, rot: -7 },
+        { x: cx, y: cy, scale: peakScale, rot: 0 },
+        riseMs,
+        36,
+      );
+
+      fxGhost.classList.add("is-hovering");
+      await waitMs(holdMs);
+      fxGhost.classList.remove("is-hovering");
+      fxCaption.classList.remove("is-on");
+      fxDim.classList.remove("is-on");
+
+      spawnFlightMotes(cx, cy, spec.toX, spec.toY, spec.kind === "relic" ? "graft" : "summon");
+
+      if (spec.kind === "rite") {
+        await animateFxGhost(
+          { x: cx, y: cy, scale: peakScale, rot: 0 },
+          { x: spec.toX, y: spec.toY - 24, scale: landScale * 1.15, rot: 0 },
+          fallMs,
+          20,
+        );
+        fxGhost.style.transition = `opacity ${paceMs(380)}ms ease, transform ${paceMs(380)}ms ease, filter ${paceMs(380)}ms ease`;
+        fxGhost.style.filter = "drop-shadow(0 0 40px rgba(160, 200, 255, 0.98)) brightness(1.7)";
+        fxGhost.style.transform = `translate(-50%, -50%) scale(${landScale * 1.28})`;
+        fxGhost.style.opacity = "0";
+        await waitMs(paceMs(380));
+      } else {
+        await animateFxGhost(
+          { x: cx, y: cy, scale: peakScale, rot: 0 },
+          { x: spec.toX, y: spec.toY, scale: landScale, rot: 0 },
+          fallMs,
+          48,
+        );
+        fxGhost.style.transition = `opacity 160ms ease, transform 160ms ease`;
+        fxGhost.style.opacity = "0";
+        fxGhost.style.transform = `translate(-50%, -50%) scale(${landScale * 0.92})`;
+        await waitMs(160);
+      }
+
+      resetFxGhost();
+      resolve();
+    })();
+  });
+}
 
 function enqueueFx(fn: () => Promise<void>): Promise<void> {
   const run = fxChain.then(fn, fn);
@@ -1835,6 +2810,24 @@ function enqueueFx(fn: () => Promise<void>): Promise<void> {
 }
 
 const ALT_NAMES = ["High", "Mid", "Low"] as const;
+
+/** Scale feedback timing — beginners need more air; reduce-motion stays snappy. */
+function paceMs(base: number): number {
+  const reduce = document.body.classList.contains("reduce-motion");
+  if (reduce) return Math.max(280, Math.round(base * 0.5));
+  if (state?.tutorial && state.tutorialStep !== "done") return Math.round(base * 1.2);
+  return base;
+}
+
+/** Wait until toasts settle (capped) so Resolve doesn't slam into the foe turn. */
+async function waitToastQuiet(maxMs = 9000, extra = 500): Promise<void> {
+  const start = performance.now();
+  while (toastBusy || toastQueue.length > 0) {
+    if (performance.now() - start > maxMs) break;
+    await waitMs(180);
+  }
+  await waitMs(paceMs(extra));
+}
 
 function hideRiteReveal(): void {
   riteReveal.hidden = true;
@@ -2155,6 +3148,9 @@ async function presentMatchEndBeat(s: MatchState): Promise<void> {
 
 function beginEndSequence(): void {
   if (!state?.winner) return;
+  clearMatchProgress();
+  if (state.tutorial) markTutorialCompleted();
+  syncContinueButton();
   const snap = state;
   const reduce = document.body.classList.contains("reduce-motion");
   // Let Resolve / Final Seal banners from narrateEvents finish first
@@ -2168,146 +3164,64 @@ function beginEndSequence(): void {
   });
 }
 
-function summarizeRiteOutcome(events: OculusEvent[], side: Side): string[] {
-  const lines: string[] = [];
+/** Cinematic card reveals — Witness / Forced Expose (plays already reveal in the fly path). */
+function queueCardMoments(events: OculusEvent[]): void {
   for (const ev of events) {
-    if (ev.type === "rite" || ev.type === "pass" || ev.type === "turn" || ev.type === "end") continue;
-    if (ev.type === "blind") {
-      lines.push(`${ALT_NAMES[ev.altitude]} Blinded`);
-    } else if (ev.type === "draw" && ev.side === side && ev.to === "hand") {
-      lines.push(`Drew ${getCard(ev.cardId).name}`);
-    } else if (ev.type === "eclipse" && ev.side === side) {
-      lines.push(`+${ev.amount} Eclipse`);
-    } else if (ev.type === "favor" && ev.side === side) {
-      lines.push(`+${ev.amount} Favor`);
-    } else if (ev.type === "stain") {
-      lines.push(`Stained ${getCard(ev.cardId).name}`);
-    } else if (ev.type === "toll" && ev.side === side) {
-      lines.push(`Toll placed on ${ALT_NAMES[ev.altitude]}`);
-    } else if (ev.type === "toll_pay") {
-      lines.push(
-        ev.paid
-          ? `Toll tax — Sight paid on ${ALT_NAMES[ev.altitude]}`
-          : `Toll touched on ${ALT_NAMES[ev.altitude]}`,
+    if (ev.type === "witness") {
+      const land = laneLanding(ev.altitude, ev.enemyTarget ? (ev.side === "player" ? "enemy" : "player") : ev.side);
+      const kind: RevealKind = ev.enemyTarget ? "gaze" : "witness";
+      void enqueueFx(() =>
+        revealCardCeremony({
+          cardId: ev.cardId,
+          fromX: land.x,
+          fromY: land.y,
+          toX: land.x,
+          toY: land.y,
+          kind,
+          fromScale: 0.72,
+          landScale: 0.5,
+          holdMs: paceMs(kind === "gaze" ? 1600 : 1800),
+        }),
       );
-    } else if (ev.type === "lure") {
-      lines.push(`Lure — ${getCard(ev.cardId).name}`);
-    } else if (ev.type === "resonance" && ev.side === side) {
-      lines.push(`Resonance on ${ALT_NAMES[ev.altitude]}`);
-    } else if (ev.type === "fall") {
-      const who = ev.side === "player" ? "Your" : "Foe";
-      lines.push(`${who} ${getCard(ev.cardId).name} Fell`);
-    } else if (ev.type === "overwrite") {
-      lines.push(`${getCard(ev.bouncedId).name} bounced to hand`);
-    } else if (ev.type === "tuck") {
-      lines.push(
-        `Tucked ${getCard(ev.inhabitantId).name} into ${getCard(ev.vesselId).name}`,
-      );
-    } else if (ev.type === "scrutiny") {
-      lines.push(
-        ev.stacks >= 2
-          ? `${getCard(ev.cardId).name} Forced Exposed`
-          : `Scrutiny ${ev.stacks}/2 on ${getCard(ev.cardId).name}`,
-      );
-    } else if (ev.type === "witness") {
-      lines.push(
-        ev.enemyTarget
-          ? `Gaze stole ${getCard(ev.cardId).name}'s Revelation`
-          : `Witnessed ${getCard(ev.cardId).name}`,
+    } else if (ev.type === "scrutiny" && ev.stacks >= 2) {
+      const land = laneLanding(ev.altitude, ev.side);
+      void enqueueFx(() =>
+        revealCardCeremony({
+          cardId: ev.cardId,
+          fromX: land.x,
+          fromY: land.y,
+          toX: land.x,
+          toY: land.y,
+          kind: "expose",
+          fromScale: 0.72,
+          landScale: 0.5,
+          holdMs: paceMs(1700),
+        }),
       );
     }
   }
-  if (!lines.length) lines.push("Rite resolved — board updated");
-  return lines;
 }
 
-/** Large rite face → Continue → concrete outcome → Continue. */
-function presentRiteCast(cardId: string, effectLines: string[], caster: Side): Promise<void> {
-  return new Promise((resolve) => {
-    const def = getCard(cardId);
-    const who = caster === "player" ? "You cast" : "Foe casts";
-    const whoSpectate = caster === "player" ? "Bellward casts" : "Motley casts";
-    cardInspect.close();
-    uiPaused = true;
-    riteRevealKicker.textContent = spectatorMode ? whoSpectate : who;
-    riteRevealTitle.textContent = def.name;
-    riteRevealFace.src = handCardSrc(cardId);
-    riteRevealFace.alt = def.name;
-    riteRevealBody.innerHTML = cardMetaHtml(def);
-    riteReveal.classList.remove("is-effect");
-    riteRevealContinue.querySelector(".btn-label")!.textContent = spectatorMode
-      ? "Continue · auto"
-      : "Continue";
-    riteReveal.hidden = false;
-    document.body.classList.add("rite-reveal-open");
-    playSfx("rite", { vary: false });
-
-    let step: "read" | "effect" = "read";
-    let autoTimer: number | null = null;
-    const clearAuto = (): void => {
-      if (autoTimer != null) {
-        window.clearTimeout(autoTimer);
-        autoTimer = null;
-      }
-    };
-    const finish = (): void => {
-      clearAuto();
-      riteRevealContinue.removeEventListener("click", onContinue);
-      window.removeEventListener("keydown", onKey);
-      hideRiteReveal();
-      uiPaused = false;
-      syncHud();
-      resolve();
-    };
-    const armAuto = (ms: number): void => {
-      clearAuto();
-      if (!spectatorMode) return;
-      autoTimer = window.setTimeout(() => onContinue(), ms);
-    };
-    const onContinue = (): void => {
-      playSfx("ui-tap");
-      if (step === "read") {
-        step = "effect";
-        riteReveal.classList.add("is-effect");
-        riteRevealKicker.textContent = "Effect";
-        riteRevealTitle.textContent = def.name;
-        riteRevealBody.innerHTML = `<ul class="rite-reveal-effect-list">${effectLines
-          .map((l) => `<li>${l}</li>`)
-          .join("")}</ul>`;
-        riteRevealContinue.querySelector(".btn-label")!.textContent = spectatorMode
-          ? "Done · auto"
-          : "Done";
-        armAuto(3200);
-        return;
-      }
-      finish();
-    };
-    const onKey = (ev: KeyboardEvent): void => {
-      if (ev.key === "Escape" || ev.key === "Enter" || ev.key === " ") {
-        ev.preventDefault();
-        onContinue();
-      }
-    };
-    riteRevealContinue.addEventListener("click", onContinue);
-    window.addEventListener("keydown", onKey);
-    armAuto(4800);
-  });
-}
-
+/** @deprecated use queueCardMoments */
 function queueRiteReveal(events: OculusEvent[]): void {
-  const rite = events.find((e): e is Extract<OculusEvent, { type: "rite" }> => e.type === "rite");
-  if (!rite) return;
-  const effects = summarizeRiteOutcome(events, rite.side);
-  void enqueueFx(() => presentRiteCast(rite.cardId, effects, rite.side));
+  queueCardMoments(events);
 }
 
-function deckOrigin(): { x: number; y: number } {
-  const r = deckAnchor.getBoundingClientRect();
+function deckOrigin(side: "player" | "enemy" = "player"): { x: number; y: number } {
+  const el = side === "player" ? playerDeckEl : enemyDeckEl;
+  const r = el.getBoundingClientRect();
   if (r.width > 0 || r.height > 0) {
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }
-  const ha = handArea.getBoundingClientRect();
-  return { x: ha.right - 28, y: ha.bottom - 36 };
+  if (side === "player") {
+    const a = deckAnchor.getBoundingClientRect();
+    if (a.width > 0 || a.height > 0) {
+      return { x: a.left + a.width / 2, y: a.top + a.height / 2 };
+    }
+    const ha = handArea.getBoundingClientRect();
+    return { x: ha.right - 36, y: ha.bottom - 40 };
+  }
+  return { x: window.innerWidth - 48, y: 96 };
 }
 
 function laneLanding(alt: Altitude, side: "player" | "enemy"): { x: number; y: number } {
@@ -2320,67 +3234,89 @@ function laneLanding(alt: Altitude, side: "player" | "enemy"): { x: number; y: n
   };
 }
 
-function flyCardFace(spec: FlySpec): Promise<void> {
-  return new Promise((resolve) => {
-    if (reduceMotionOn()) {
-      resolve();
-      return;
-    }
-    const exit = spec.exit ?? "land";
-    const dur = spec.durationMs ?? (exit === "cast" ? 280 : 280);
-    const fromScale = spec.fromScale ?? 0.92;
-    const toScale = spec.toScale ?? (exit === "cast" ? 0.55 : 0.4);
-    const fromRot = spec.fromRot ?? -6;
-    fxCardImg.src = spec.src;
-    fxLayer.hidden = false;
-    fxGhost.classList.add("is-flying");
-    if (exit === "cast") fxGhost.classList.add("is-casting");
-    fxGhost.style.transition = "none";
-    fxGhost.style.opacity = "1";
-    fxGhost.style.filter = "drop-shadow(0 18px 26px rgba(0, 0, 0, 0.65)) brightness(1.08)";
-    fxGhost.style.left = `${spec.fromX}px`;
-    fxGhost.style.top = `${spec.fromY}px`;
-    fxGhost.style.transform = `translate(-50%, -50%) rotate(${fromRot}deg) scale(${fromScale})`;
-    void fxGhost.offsetWidth;
-    fxGhost.style.transition = `left ${dur}ms cubic-bezier(0.18, 0.9, 0.22, 1), top ${dur}ms cubic-bezier(0.18, 0.9, 0.22, 1), transform ${dur}ms cubic-bezier(0.18, 0.9, 0.22, 1), filter ${dur}ms ease, opacity ${Math.max(120, dur - 80)}ms ease`;
-    fxGhost.style.left = `${spec.toX}px`;
-    fxGhost.style.top = `${spec.toY}px`;
-    fxGhost.style.transform = `translate(-50%, -50%) rotate(0deg) scale(${toScale})`;
-    fxGhost.style.filter =
-      exit === "cast"
-        ? "drop-shadow(0 0 22px rgba(120, 160, 220, 0.75)) brightness(1.35)"
-        : "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35)) brightness(1.15)";
-    window.setTimeout(() => {
-      if (exit === "cast") {
-        // Bloom dissolve — reads as cast, not a vanished summon
-        const burn = 420;
-        fxGhost.style.transition = `top ${burn}ms cubic-bezier(0.2, 0.8, 0.2, 1), transform ${burn}ms ease, filter ${burn}ms ease, opacity ${burn}ms ease`;
-        fxGhost.style.top = `${spec.toY - 36}px`;
-        fxGhost.style.transform = `translate(-50%, -50%) rotate(0deg) scale(${toScale * 1.15})`;
-        fxGhost.style.filter = "drop-shadow(0 0 36px rgba(160, 200, 255, 0.95)) brightness(1.7) saturate(1.2)";
-        fxGhost.style.opacity = "0";
-        window.setTimeout(() => {
-          fxLayer.hidden = true;
-          fxGhost.classList.remove("is-flying", "is-casting");
-          fxGhost.style.transition = "";
-          fxGhost.style.transform = "";
-          fxGhost.style.filter = "";
-          fxGhost.style.opacity = "";
-          resolve();
-        }, burn);
+/**
+ * CCG draw: lift card-back from library → arc → mid-flight flip to face → land in hand.
+ */
+async function flyDrawToHand(
+  cardId: string | null,
+  toX: number,
+  toY: number,
+  side: "player" | "enemy" = "player",
+): Promise<void> {
+  if (reduceMotionOn()) return;
+  const origin = deckOrigin(side);
+  punchDeck(side);
+  syncDeckPiles();
+
+  const dur = paceMs(side === "player" ? 520 : 440);
+  const fromScale = 0.78;
+  const toScale = side === "player" ? 1.05 : 0.72;
+  const fromRot = side === "player" ? -12 : 10;
+  const arcLift = side === "player" ? 70 : 48;
+  const mx = (origin.x + toX) / 2 + (toX - origin.x) * 0.04;
+  const my = Math.min(origin.y, toY) - arcLift;
+  const backSrc = cardBackSrc();
+  const faceSrc = cardId && side === "player" ? handCardSrc(cardId) : backSrc;
+
+  fxCardImg.src = backSrc;
+  fxLayer.hidden = false;
+  fxGhost.classList.add("is-flying", "is-draw-flip");
+  fxGhost.style.transition = "none";
+  fxGhost.style.opacity = "1";
+  fxGhost.style.filter = "drop-shadow(0 18px 26px rgba(0, 0, 0, 0.7)) brightness(1.08)";
+  fxGhost.style.left = `${origin.x}px`;
+  fxGhost.style.top = `${origin.y}px`;
+  fxGhost.style.transform = `translate(-50%, -50%) rotate(${fromRot}deg) scale(${fromScale})`;
+  spawnFlightMotes(origin.x, origin.y, toX, toY, "summon");
+
+  await new Promise<void>((resolve) => {
+    const start = performance.now();
+    const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+    let flipped = false;
+    const tick = (now: number): void => {
+      const t = Math.min(1, (now - start) / dur);
+      const e = easeOut(t);
+      const x = (1 - e) * (1 - e) * origin.x + 2 * (1 - e) * e * mx + e * e * toX;
+      const y = (1 - e) * (1 - e) * origin.y + 2 * (1 - e) * e * my + e * e * toY;
+      const scale = fromScale + (toScale - fromScale) * e;
+      const rot = fromRot * (1 - e);
+      // Flip window ~42%–58% of travel
+      let flipScaleX = 1;
+      if (t >= 0.42 && t < 0.58) {
+        const u = (t - 0.42) / 0.16;
+        flipScaleX = Math.max(0.04, Math.abs(1 - u * 2));
+        if (!flipped && u >= 0.5) {
+          flipped = true;
+          fxCardImg.src = faceSrc;
+        }
+      } else if (t >= 0.58) {
+        if (!flipped) {
+          flipped = true;
+          fxCardImg.src = faceSrc;
+        }
+        flipScaleX = 1;
+      }
+      fxGhost.style.left = `${x}px`;
+      fxGhost.style.top = `${y}px`;
+      fxGhost.style.transform = `translate(-50%, -50%) rotate(${rot}deg) scale(${scale * flipScaleX}, ${scale})`;
+      if (t < 1) {
+        window.requestAnimationFrame(tick);
         return;
       }
+      fxGhost.style.transition = "opacity 120ms ease, transform 120ms ease";
       fxGhost.style.opacity = "0";
+      fxGhost.style.transform = `translate(-50%, -50%) scale(${toScale * 0.94})`;
       window.setTimeout(() => {
         fxLayer.hidden = true;
-        fxGhost.classList.remove("is-flying", "is-casting");
+        fxGhost.classList.remove("is-flying", "is-draw-flip");
         fxGhost.style.transition = "";
         fxGhost.style.transform = "";
         fxGhost.style.filter = "";
         fxGhost.style.opacity = "";
         resolve();
-      }, 90);
-    }, dur);
+      }, 120);
+    };
+    window.requestAnimationFrame(tick);
   });
 }
 
@@ -2391,37 +3327,48 @@ async function animateHandDeals(cardIds: string[]): Promise<void> {
       btn.classList.remove("dealing");
       btn.classList.add("dealt");
     }
+    dealingSlots.clear();
+    syncDeckPiles();
     return;
   }
   const startSlot = Math.max(0, state.hand.length - cardIds.length);
   for (let i = 0; i < cardIds.length; i++) {
     const slot = startSlot + i;
     const btn = handEl.querySelector(`.hand-card[data-slot="${slot}"]`) as HTMLElement | null;
-    const origin = deckOrigin();
-    let toX = origin.x - 20;
-    let toY = origin.y - 48;
+    let toX = deckOrigin("player").x - 24;
+    let toY = deckOrigin("player").y - 56;
     if (btn) {
       const r = btn.getBoundingClientRect();
       toX = r.left + r.width / 2;
       toY = r.top + r.height / 2;
     }
     playSfx("draw");
-    await flyCardFace({
-      src: handCardSrc(cardIds[i]),
-      fromX: origin.x,
-      fromY: origin.y,
-      toX,
-      toY,
-      fromScale: 0.7,
-      toScale: 0.96,
-      fromRot: -10,
-      durationMs: 250,
-    });
+    await flyDrawToHand(cardIds[i], toX, toY, "player");
+    dealingSlots.delete(slot);
     if (btn) {
       btn.classList.remove("dealing");
       btn.classList.add("dealt");
     }
+    await waitMs(paceMs(70));
   }
+  syncDeckPiles();
+}
+
+/** Foe draws into hidden hand — back flies from their library toward top rail. */
+async function animateEnemyDraws(count: number): Promise<void> {
+  if (!count || !state || reduceMotionOn()) {
+    syncDeckPiles();
+    return;
+  }
+  const origin = deckOrigin("enemy");
+  for (let i = 0; i < count; i++) {
+    playSfx("draw");
+    const toX = origin.x - 28 - i * 6;
+    const toY = origin.y - 36;
+    await flyDrawToHand(null, toX, toY, "enemy");
+    await waitMs(paceMs(50));
+  }
+  syncDeckPiles();
 }
 
 function narrateEvents(events: ReturnType<typeof applyIntent>): void {
@@ -2429,19 +3376,45 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
   const turnAfterResolve = didResolve
     ? events.find((e): e is Extract<(typeof events)[number], { type: "turn" }> => e.type === "turn")
     : undefined;
-  const holdMs = spectatorMode ? 2400 : 2000;
+  const holdMs = paceMs(spectatorMode ? 3600 : 3400);
 
   for (const ev of events) {
     if (ev.type === "play") {
       const def = getCard(ev.cardId);
       const lane = ALT_NAMES[ev.altitude];
       punchAltitude(ev.altitude, ev.veiled ? "summon" : "play");
+      floatLaneCue(
+        ev.altitude,
+        def.type === "site" || def.type === "sigil"
+          ? "Site"
+          : def.type === "vessel"
+            ? "Vessel"
+            : ev.veiled
+              ? "Veiled"
+              : "Played",
+        "play",
+      );
+      const moment =
+        def.type === "site" || def.type === "sigil" || def.type === "vessel";
       if (def.type === "site" || def.type === "sigil") {
-        explain(
-          `${whoVerb(ev.side, "play", "plays")} Site ${def.name} on ${lane} — landmark stays Witnessed and helps that lane.`,
-          holdMs,
-          "play",
-        );
+        const msg = `${whoVerb(ev.side, "play", "plays")} Site ${def.name} on ${lane} — landmark stays Witnessed and helps that lane.`;
+        if (moment) pushEventLog(msg, "play");
+        else explain(msg, holdMs, "play");
+        flashPhase(def.name, {
+          kicker: `${whoLabel(ev.side)} · Site`,
+          sub: `${lane} — landmark, not a fighter`,
+          kind: "pass",
+          ms: paceMs(2800),
+        });
+      } else if (def.type === "vessel") {
+        const msg = `${whoVerb(ev.side, "play", "plays")} Vessel ${def.name} on ${lane} — can tuck a Figure (INH).`;
+        pushEventLog(msg, "play");
+        flashPhase(def.name, {
+          kicker: `${whoLabel(ev.side)} · Vessel`,
+          sub: `${lane} — Urn / tuck`,
+          kind: "pass",
+          ms: paceMs(2800),
+        });
       } else if (ev.veiled) {
         explain(
           `${whoVerb(ev.side, "summon", "summons")} ${def.name} Veiled on ${lane} — half-real (usually weaker) until Witnessed.`,
@@ -2474,11 +3447,11 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
             kicker: whoLabel("player"),
             sub: "Window closed — foe may act. Resolve needs both Passes.",
             kind: "pass",
-            ms: 1600,
+            ms: paceMs(2400),
           });
           explain(
             `${whoLabel("player")} Passes — no more actions this window. ${whoLabel("enemy")} acts next. When both have Passed, lanes Resolve.`,
-            holdMs + 200,
+            holdMs + 400,
             "pass",
           );
         } else {
@@ -2486,11 +3459,11 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
             kicker: whoLabel("enemy"),
             sub: "Window closed — other side may act.",
             kind: "pass",
-            ms: 1600,
+            ms: paceMs(2400),
           });
           explain(
             `${whoLabel("enemy")} Passes. ${whoLabel("player")}'s turn — Pass again when ready to Resolve.`,
-            holdMs + 200,
+            holdMs + 400,
             "pass",
           );
         }
@@ -2500,6 +3473,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       const lane = ALT_NAMES[ev.altitude];
       playSfx(ev.enemyTarget ? "gaze" : "witness");
       punchAltitude(ev.altitude, ev.enemyTarget ? "gaze" : "witness");
+      floatLaneCue(ev.altitude, ev.enemyTarget ? "Gaze" : "Witnessed", ev.enemyTarget ? "gaze" : "witness");
       if (ev.enemyTarget) {
         explain(
           `Gaze on ${lane}: ${whoVerb(ev.side, "spend", "spends")} Sight to Witness enemy ${def.name} — steals their one-time Revelation.`,
@@ -2552,29 +3526,55 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       );
     } else if (ev.type === "graft") {
       const def = getCard(ev.relicId);
+      playSfx("graft");
       punchAltitude(ev.altitude, "play");
-      explain(
+      floatLaneCue(ev.altitude, "Graft", "play");
+      flashPhase(def.name, {
+        kicker: `${whoLabel(ev.side)} · Relic`,
+        sub: `Grafted on ${ALT_NAMES[ev.altitude]} — Charm on a Figure`,
+        kind: "pass",
+        ms: paceMs(2800),
+      });
+      pushEventLog(
         `Graft: ${def.name} attaches as a Charm on ${ALT_NAMES[ev.altitude]} — boosts or triggers with that figure.`,
-        holdMs,
         "graft",
       );
     } else if (ev.type === "rite") {
       const def = getCard(ev.cardId);
-      if (ev.altitude != null) punchAltitude(ev.altitude, "rite");
-      explain(
+      playSfx("rite");
+      if (ev.altitude != null) {
+        punchAltitude(ev.altitude, "rite");
+        floatLaneCue(ev.altitude, "Rite", "rite");
+      }
+      flashPhase(def.name, {
+        kicker: `${whoLabel(ev.side)} · Rite`,
+        sub: "One-shot spell — read the card",
+        kind: "rite",
+        ms: paceMs(2600),
+      });
+      pushEventLog(
         `Rite cast: ${def.name}${ev.altitude != null ? ` aiming ${ALT_NAMES[ev.altitude]}` : ""} — one-shot spell (see effect).`,
-        holdMs,
         "rite",
       );
     } else if (ev.type === "toll") {
+      playSfx("rite");
       punchAltitude(ev.altitude, "rite");
+      floatLaneCue(ev.altitude, "Toll placed", "toll");
+      flashPhase("Toll", {
+        kicker: whoLabel(ev.side),
+        sub: `${ALT_NAMES[ev.altitude]} — tax on looking`,
+        kind: "rite",
+        ms: paceMs(2400),
+      });
       explain(
         `Toll placed on ${ALT_NAMES[ev.altitude]} by ${whoLabel(ev.side)} — their figures there +1; enemy Witness/Gaze into it pays tax.`,
-        holdMs + 200,
+        holdMs + 400,
         "rite",
       );
     } else if (ev.type === "toll_pay") {
+      playSfx("law");
       punchAltitude(ev.altitude, "rite");
+      floatLaneCue(ev.altitude, ev.paid ? "Toll tax paid" : "Toll — no Sight", "toll");
       explain(
         ev.paid
           ? `Toll tax on ${ALT_NAMES[ev.altitude]} — Sight paid to the Toll owner; Resonance may fire. Mark stays.`
@@ -2583,28 +3583,42 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         "rite",
       );
     } else if (ev.type === "lure") {
+      playSfx("witness");
       punchAltitude(ev.altitude, "witness");
+      floatLaneCue(ev.altitude, "Lure", "witness");
       explain(
         `Lure on ${ALT_NAMES[ev.altitude]}: forces a true Witness on ${getCard(ev.cardId).name} and clears the Toll.`,
         holdMs + 200,
         "witness",
       );
     } else if (ev.type === "resonance") {
+      playSfx("eclipse");
       punchAltitude(ev.altitude, "rite");
+      floatLaneCue(ev.altitude, "Resonance", "peal");
       explain(
         `Resonance on ${ALT_NAMES[ev.altitude]} — Toll/Lure payoff (Sight or draw for Bellward pieces).`,
         holdMs,
         "rite",
       );
     } else if (ev.type === "peal") {
+      playSfx("law");
       punchAltitude(ev.altitude, "rite");
+      floatLaneCue(ev.altitude, "Peal armed", "peal");
+      flashPhase("Peal", {
+        kicker: ALT_NAMES[ev.altitude],
+        sub: "Toll will pay Sight + draw when spent",
+        kind: "rite",
+        ms: paceMs(2400),
+      });
       explain(
         `Peal armed on ${ALT_NAMES[ev.altitude]} (−1 Sight) — when Resolve spends that Toll, Peal pays Sight + a card.`,
-        holdMs + 200,
+        holdMs + 400,
         "rite",
       );
     } else if (ev.type === "peal_pay") {
+      playSfx("eclipse");
       punchAltitude(ev.altitude, "eclipse");
+      floatLaneCue(ev.altitude, "Peal pays", "peal");
       explain(
         `Peal pays on ${ALT_NAMES[ev.altitude]} — ${whoVerb(ev.side, "gain", "gains")} Sight and draw 1.`,
         holdMs,
@@ -2613,6 +3627,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "stance") {
       playSfx("stance");
       punchAltitude(ev.altitude, "stance");
+      floatLaneCue(ev.altitude, ev.stanceB ? "Stance B" : "Stance A", "stance");
       const stanceEl = altHits
         .find((h) => Number(h.dataset.alt) === ev.altitude)
         ?.querySelector(".alt-stance");
@@ -2629,19 +3644,27 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         "stance",
       );
     } else if (ev.type === "wager") {
-      playSfx("stance");
+      playSfx("select");
       punchAltitude(ev.altitude, "stance");
+      floatLaneCue(ev.altitude, "Wager", "wager");
+      flashPhase("Wager", {
+        kicker: getCard(ev.cardId).name,
+        sub: ev.free ? "Free ante" : "Ante 1 Sight",
+        kind: "pass",
+        ms: paceMs(2200),
+      });
       const who = getCard(ev.cardId).name;
       explain(
         ev.free
           ? `Free Wager on ${who} (${ALT_NAMES[ev.altitude]}) — no ante. Win Veiled = Cash; lose/expose = Bust.`
           : `Wager on ${who} (${ALT_NAMES[ev.altitude]}) — ante 1 Sight. Win still Veiled = Cash (refund + reward); lose = Bust (ante gone).`,
-        holdMs + 400,
+        holdMs + 600,
         "stance",
       );
     } else if (ev.type === "cash") {
       playSfx("eclipse");
       punchAltitude(ev.altitude, "resolve");
+      floatLaneCue(ev.altitude, "Cash!", "wager");
       playWagerFlip(ev.altitude, "cash");
       explain(
         `Cash — ${getCard(ev.cardId).name} won ${ALT_NAMES[ev.altitude]} while Veiled + Wagered. Ante refunded + Cash reward. (Trick seals need Favor.)`,
@@ -2651,6 +3674,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "bust") {
       playSfx("strain");
       punchAltitude(ev.altitude, "strain");
+      floatLaneCue(ev.altitude, "Bust", "strain");
       playWagerFlip(ev.altitude, "bust");
       explain(
         `Bust — ${getCard(ev.cardId).name} lost or was Forced Exposed while Wagered. Ante is gone; no Cash.`,
@@ -2659,32 +3683,44 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       );
     } else if (ev.type === "fold") {
       punchAltitude(ev.altitude, "stance");
+      floatLaneCue(ev.altitude, "Fold", "stance");
       explain(
         `Fold — ${whoVerb(ev.side, "Witness", "Witnesses")} their own Wagered ${getCard(ev.cardId).name}. Wager clears; ante not refunded. (Bad for Eclipse.)`,
         holdMs,
         "stance",
       );
     } else if (ev.type === "overexpose") {
+      playSfx("strain");
       punchAltitude(ev.altitude, "strain");
+      floatLaneCue(ev.altitude, "Overexpose", "strain");
       explain(
         `Overexpose — ${getCard(ev.cardId).name} lost Resolve while freshly Witnessed (Scar Breach). Controller loses 1 Sight if able and 1 Will.`,
         holdMs + 200,
         "strain",
       );
     } else if (ev.type === "press") {
-      playSfx("stain");
+      playSfx("strain");
       punchAltitude(ev.altitude, "stain");
+      floatLaneCue(ev.altitude, "Pressed", "press");
+      flashPhase("Press", {
+        kicker: whoLabel(ev.side),
+        sub: "Win this lane to Forced Expose",
+        kind: "rite",
+        ms: paceMs(2400),
+      });
       const dahaka =
         ev.bonusWill && ev.bonusWill > 0
           ? ` Dahaka Witnessed: foe −${ev.bonusWill} Will.`
           : "";
       explain(
         `Press — ${whoVerb(ev.side, "mark", "marks")} ${getCard(ev.cardId).name}. Win that lane to pierce Stance B / Erase; fail = backlash. (Free into Motley Stance B; Stain not required there.)${dahaka}`,
-        holdMs + 400,
+        holdMs + 600,
         "stain",
       );
     } else if (ev.type === "press_backlash") {
+      playSfx("blind");
       punchAltitude(ev.altitude, "strain");
+      floatLaneCue(ev.altitude, "Press backlash", "strain");
       explain(
         `Press backlash — the Press failed on ${ALT_NAMES[ev.altitude]} (${getCard(ev.cardId).name}). Smother cost hits the Presser.`,
         holdMs + 200,
@@ -2708,10 +3744,18 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "resolve") {
       const { player, enemy } = ev.damages;
       playSfx("resolve");
-      for (const hit of altHits) hit.classList.add("fx-resolve");
-      window.setTimeout(() => {
-        for (const hit of altHits) hit.classList.remove("fx-resolve");
-      }, 520);
+      void enqueueFx(async () => {
+        for (let a = 0; a < 3; a++) {
+          const hit = altHits.find((h) => Number(h.dataset.alt) === a);
+          hit?.classList.add("fx-resolve");
+          punchAltitude(a as Altitude, "resolve");
+          floatLaneCue(a as Altitude, ALT_NAMES[a], "resolve");
+          await waitMs(paceMs(320));
+        }
+        window.setTimeout(() => {
+          for (const hit of altHits) hit.classList.remove("fx-resolve");
+        }, 520);
+      });
       const bits: string[] = [];
       if (enemy > 0) bits.push(`${whoLabel("enemy")} −${enemy} Will`);
       if (player > 0) bits.push(`${whoLabel("player")} −${player} Will`);
@@ -2720,17 +3764,18 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         kicker: "Both passed",
         sub,
         kind: "resolve",
-        ms: 2600,
+        ms: paceMs(4200),
       });
       explain(
         `Resolve — each lane compares power. Winner chips Will. Veiled losers Hold; Witnessed losers Fall. ${sub}.`,
-        holdMs + 800,
+        holdMs + 1200,
         "resolve",
       );
     } else if (ev.type === "strain") {
       const def = getCard(ev.cardId);
       playSfx("strain");
       punchAltitude(ev.altitude, "strain");
+      floatLaneCue(ev.altitude, "Strained", "strain");
       explain(
         `Strain — ${whose(ev.side)} Witnessed ${def.name} lost a lane. Next loss while Witnessed = Fall (destroyed).`,
         holdMs + 200,
@@ -2740,6 +3785,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       const def = getCard(ev.cardId);
       playSfx("stain");
       punchAltitude(ev.altitude, "stain");
+      floatLaneCue(ev.altitude, "Stained", "stain");
       explain(
         `Stain — ${def.name} marked (${ALT_NAMES[ev.altitude]}). Ink can Press / Erase from here toward Forced Exposed.`,
         holdMs,
@@ -2748,6 +3794,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "blind") {
       playSfx("blind");
       punchAltitude(ev.altitude, "blind");
+      floatLaneCue(ev.altitude, "Blinded", "blind");
       explain(
         `Blind — ${ALT_NAMES[ev.altitude]} yields no Sight this turn (Cash / Witness income shut on that lane).`,
         holdMs,
@@ -2792,6 +3839,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       const def = getCard(ev.cardId);
       playSfx("fall");
       punchAltitude(ev.altitude, "fall");
+      floatLaneCue(ev.altitude, "Fall", "fall");
       flashPhase("Fall", {
         kicker: "Unmake",
         sub: `${whose(ev.side)} ${def.name}`,
@@ -2809,21 +3857,21 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         window.setTimeout(() => {
           flashPhase(`Round ${n}`, {
             kicker: "New window",
-            sub: "Essence · Sight · draw — then act or Pass",
+            sub: "Essence refreshes · play Veiled · spend Sight · Pass",
             kind: "round",
-            ms: 2200,
+            ms: paceMs(3400),
           });
           explain(
-            `Round ${n} — new Essence and Sight, draw a card, then act or Pass.`,
-            2200,
+            `Round ${n} — new action window. Play Veiled, spend Sight, then Pass. Give each toast a beat to land.`,
+            holdMs + 800,
             "round",
           );
-        }, 1100);
+        }, paceMs(1800));
       } else if (ev.side === "enemy" && !didResolve) {
         playSfx("enemy");
-        explain(`${whoLabel("enemy")}'s turn — they act now.`, 1600);
+        explain(`${whoLabel("enemy")}'s turn — watch what they do.`, holdMs, "pass");
       } else if (ev.side === "player" && ev.turn > 1 && !didResolve) {
-        explain(`${whoLabel("player")}'s turn ${ev.turn}.`, 1400, "round");
+        explain(`${whoLabel("player")}'s turn ${ev.turn}.`, holdMs, "round");
       }
     } else if (ev.type === "end") {
       const reason =
@@ -2842,7 +3890,10 @@ function afterPlayer(events: ReturnType<typeof applyIntent>): void {
     (e): e is Extract<(typeof events)[number], { type: "draw" }> =>
       e.type === "draw" && e.side === "player" && e.to === "hand",
   );
-  handDealCount = draws.length;
+  const foeDraws = events.filter(
+    (e) => e.type === "draw" && e.side === "enemy" && e.to === "hand",
+  ).length;
+  queueHandDeal(draws.length);
   stage.onEvents(events);
   narrateEvents(events);
   queueRiteReveal(events);
@@ -2856,45 +3907,58 @@ function afterPlayer(events: ReturnType<typeof applyIntent>): void {
   if (draws.length) {
     void enqueueFx(() => animateHandDeals(draws.map((d) => d.cardId)));
   }
+  if (foeDraws > 0) {
+    void enqueueFx(() => animateEnemyDraws(foeDraws));
+  }
   if (state?.tutorial && state.tutorialStep === "done" && state.winner == null) {
-    flashToast("First Gaze complete ? free play", 1600);
+    markTutorialCompleted();
+    flashToast("First Gaze complete — free play", paceMs(2800));
   } else if (state?.tutorial && state.tutorialStep === "play") {
     cardInspect.close();
   }
   if (state!.winner != null) {
+    clearMatchProgress();
+    if (state!.tutorial) markTutorialCompleted();
+    syncContinueButton();
     showEnd();
     return;
   }
+  persistProgress();
   if (spectatorMode) return;
   if (state!.active === "enemy") {
-    void fxChain.then(() => {
-      if (!uiPaused) window.setTimeout(runEnemy, 320);
+    const hadResolve = events.some((e) => e.type === "resolve");
+    void fxChain.then(async () => {
+      if (hadResolve) {
+        await waitToastQuiet(paceMs(10000), paceMs(900));
+      } else {
+        await waitMs(paceMs(700));
+      }
+      if (!uiPaused) window.setTimeout(runEnemy, paceMs(700));
     });
   }
 }
 
 function enemyDelayMs(intent: Intent, events: OculusEvent[]): number {
-  const reduce = document.body.classList.contains("reduce-motion");
-  const scale = (n: number) => (reduce ? Math.min(n, Math.round(n * 0.55)) : n);
-  if (events.some((e) => e.type === "end")) return scale(600);
-  if (events.some((e) => e.type === "resolve")) return scale(3800);
-  if (events.some((e) => e.type === "eclipse")) return scale(3200);
-  if (events.some((e) => e.type === "rite")) return scale(2800);
-  if (events.some((e) => e.type === "fall")) return scale(2600);
-  if (intent.kind === "pass") return scale(1800);
-  if (intent.kind === "witness") return scale(2600);
-  if (intent.kind === "play" || intent.kind === "graft") return scale(2800);
+  const scale = (n: number) => paceMs(n);
+  if (events.some((e) => e.type === "end")) return scale(800);
+  if (events.some((e) => e.type === "resolve")) return scale(5200);
+  if (events.some((e) => e.type === "eclipse")) return scale(4200);
+  if (events.some((e) => e.type === "rite" || e.type === "graft" || e.type === "witness")) return scale(4200);
+  if (events.some((e) => e.type === "fall")) return scale(3600);
+  if (intent.kind === "pass") return scale(2600);
+  if (intent.kind === "witness") return scale(4200);
+  if (intent.kind === "play" || intent.kind === "graft") return scale(4200);
   if (intent.kind === "stance" || intent.kind === "wager" || intent.kind === "press" || intent.kind === "peal") {
-    return scale(2200);
+    return scale(3000);
   }
-  return scale(2000);
+  return scale(2800);
 }
 
 /** Banner + toast so the player can read what the foe is about to do. */
 async function announceEnemyIntent(intent: Intent): Promise<void> {
   if (!state) return;
   const reduce = document.body.classList.contains("reduce-motion");
-  const beat = reduce ? 400 : 1100;
+  const beat = paceMs(reduce ? 500 : 2000);
 
   if (intent.kind === "play" || intent.kind === "graft" || intent.kind === "rite") {
     const cardId = state.enemyHand[intent.handIndex];
@@ -2906,16 +3970,23 @@ async function announceEnemyIntent(intent: Intent): Promise<void> {
         ? "Site"
         : def.type === "relic"
           ? "Graft"
-          : intent.kind === "rite"
-            ? "Rite"
-            : "Summon";
+          : def.type === "vessel"
+            ? "Vessel"
+            : intent.kind === "rite"
+              ? "Rite"
+              : "Summon";
     flashPhase(def.name, {
       kicker: `Foe · ${kindLabel}`,
-      sub: `${lane}${def.type === "figure" ? " · enters Veiled" : ""}`,
+      sub:
+        def.type === "site" || def.type === "sigil"
+          ? `${lane} — landmark (not a fighter)`
+          : def.type === "relic"
+            ? `${lane} — Charm attaches`
+            : `${lane}${def.type === "figure" ? " · enters Veiled" : ""}`,
       kind: intent.kind === "rite" ? "rite" : "pass",
-      ms: reduce ? 1000 : 2000,
+      ms: paceMs(reduce ? 1200 : 2800),
     });
-    flashToast(`Foe ${kindLabel}: ${def.name} → ${lane}`, reduce ? 1000 : 2200, "play");
+    flashToast(`Foe ${kindLabel}: ${def.name} → ${lane}`, paceMs(reduce ? 1200 : 3000), "play");
     punchAltitude(intent.altitude, intent.kind === "rite" ? "rite" : "summon");
     await waitMs(beat);
     return;
@@ -2928,14 +3999,14 @@ async function announceEnemyIntent(intent: Intent): Promise<void> {
       kicker: "Foe",
       sub: gaze ? `${lane} — steals your Revelation` : `${lane} — opens their figure`,
       kind: "pass",
-      ms: reduce ? 900 : 1800,
+      ms: paceMs(reduce ? 1000 : 2400),
     });
     flashToast(
-      gaze ? `Foe Gazes ${lane}` : `Foe Witnesses ${lane}`,
-      reduce ? 900 : 2000,
-      "witness",
+      gaze ? `Foe Gazes ${lane}` : `Foe Witnesses on ${lane}`,
+      paceMs(reduce ? 1000 : 2600),
+      gaze ? "gaze" : "witness",
     );
-    punchAltitude(intent.altitude, "witness");
+    punchAltitude(intent.altitude, gaze ? "gaze" : "witness");
     await waitMs(beat);
     return;
   }
@@ -2945,10 +4016,10 @@ async function announceEnemyIntent(intent: Intent): Promise<void> {
       kicker: "Enemy window",
       sub: "Their actions are done this window",
       kind: "pass",
-      ms: reduce ? 800 : 1400,
+      ms: paceMs(reduce ? 900 : 2200),
     });
-    flashToast("Foe Passes", reduce ? 800 : 1600, "pass");
-    await waitMs(reduce ? 300 : 700);
+    flashToast("Foe Passes", paceMs(reduce ? 900 : 2400), "pass");
+    await waitMs(paceMs(reduce ? 400 : 900));
     return;
   }
 
@@ -2957,9 +4028,9 @@ async function announceEnemyIntent(intent: Intent): Promise<void> {
       kicker: "Foe",
       sub: `${ALT_NAMES[intent.altitude]} — power swap`,
       kind: "pass",
-      ms: reduce ? 800 : 1600,
+      ms: paceMs(reduce ? 900 : 2200),
     });
-    flashToast(`Foe Stance on ${ALT_NAMES[intent.altitude]}`, reduce ? 800 : 1800, "play");
+    flashToast(`Foe Stance on ${ALT_NAMES[intent.altitude]}`, paceMs(reduce ? 900 : 2400), "stance");
     punchAltitude(intent.altitude, "stance");
     await waitMs(beat);
     return;
@@ -2970,10 +4041,36 @@ async function announceEnemyIntent(intent: Intent): Promise<void> {
       kicker: "Foe",
       sub: `${ALT_NAMES[intent.altitude]} — ante`,
       kind: "pass",
-      ms: reduce ? 800 : 1600,
+      ms: paceMs(reduce ? 900 : 2200),
     });
-    flashToast(`Foe Wagers on ${ALT_NAMES[intent.altitude]}`, reduce ? 800 : 1800, "play");
+    flashToast(`Foe Wagers on ${ALT_NAMES[intent.altitude]}`, paceMs(reduce ? 900 : 2400), "stance");
     punchAltitude(intent.altitude, "summon");
+    await waitMs(beat);
+    return;
+  }
+
+  if (intent.kind === "peal") {
+    flashPhase("Peal", {
+      kicker: "Foe · Bellward",
+      sub: `${ALT_NAMES[intent.altitude]} — arms their Toll`,
+      kind: "pass",
+      ms: paceMs(reduce ? 900 : 2200),
+    });
+    flashToast(`Foe Peals on ${ALT_NAMES[intent.altitude]}`, paceMs(reduce ? 900 : 2400), "toll");
+    punchAltitude(intent.altitude, "witness");
+    await waitMs(beat);
+    return;
+  }
+
+  if (intent.kind === "press") {
+    flashPhase("Press", {
+      kicker: "Foe",
+      sub: `${ALT_NAMES[intent.altitude]} — Ink mark`,
+      kind: "pass",
+      ms: paceMs(reduce ? 900 : 2200),
+    });
+    flashToast(`Foe Presses ${ALT_NAMES[intent.altitude]}`, paceMs(reduce ? 900 : 2400), "stain");
+    punchAltitude(intent.altitude, "gaze");
     await waitMs(beat);
   }
 }
@@ -2982,40 +4079,103 @@ function runEnemy(): void {
   if (spectatorMode) return;
   if (uiPaused) return;
   if (!state || state.phase !== "play" || state.active !== "enemy") return;
-  let guard = 12;
+  let guard = 28;
+  const finishEnemyStall = (): void => {
+    if (!state || state.phase !== "play" || state.active !== "enemy") {
+      syncHud();
+      if (state?.winner != null) showEnd();
+      return;
+    }
+    // Force Pass so the seat cannot soft-lock the match
+    const events = applyIntent(state, { kind: "pass" });
+    stage.onEvents(events);
+    narrateEvents(events);
+    syncHud();
+    if (state.winner != null) {
+      clearMatchProgress();
+      syncContinueButton();
+      showEnd();
+      return;
+    }
+    persistProgress();
+    if (state.active === "enemy" && !uiPaused) {
+      window.setTimeout(runEnemy, paceMs(700));
+    }
+  };
   const step = (): void => {
     void (async () => {
-      if (spectatorMode || uiPaused) return;
-      if (!state || state.phase !== "play" || state.active !== "enemy" || guard-- <= 0) {
+      try {
+        if (spectatorMode) return;
+        if (uiPaused) {
+          // Pause menu / reveal — retry shortly instead of abandoning the seat
+          window.setTimeout(() => {
+            if (!uiPaused && state?.active === "enemy") step();
+          }, 400);
+          return;
+        }
+        if (!state || state.phase !== "play" || state.active !== "enemy") {
+          syncHud();
+          if (state?.winner != null) showEnd();
+          return;
+        }
+        if (guard-- <= 0) {
+          finishEnemyStall();
+          return;
+        }
+        const intent = chooseAiMove(state);
+        await announceEnemyIntent(intent);
+        await flyEnemyIntent(intent);
+        const beforeActive = state.active;
+        const events = applyIntent(state, intent);
+        // Rejected / no-op intent — don't spin forever
+        if (
+          intent.kind !== "pass" &&
+          events.length === 0 &&
+          state.active === beforeActive &&
+          state.active === "enemy"
+        ) {
+          finishEnemyStall();
+          return;
+        }
+        const draws = events.filter(
+          (e): e is Extract<(typeof events)[number], { type: "draw" }> =>
+            e.type === "draw" && e.side === "player" && e.to === "hand",
+        );
+        const foeDraws = events.filter(
+          (e) => e.type === "draw" && e.side === "enemy" && e.to === "hand",
+        ).length;
+        queueHandDeal(draws.length);
+        stage.onEvents(events);
+        narrateEvents(events);
+        queueRiteReveal(events);
         syncHud();
-        if (state?.winner != null) showEnd();
-        return;
-      }
-      const intent = chooseAiMove(state);
-      await announceEnemyIntent(intent);
-      await flyEnemyIntent(intent);
-      const events = applyIntent(state, intent);
-      const draws = events.filter(
-        (e): e is Extract<(typeof events)[number], { type: "draw" }> =>
-          e.type === "draw" && e.side === "player" && e.to === "hand",
-      );
-      handDealCount = draws.length;
-      stage.onEvents(events);
-      narrateEvents(events);
-      queueRiteReveal(events);
-      syncHud();
-      if (draws.length) {
-        void enqueueFx(() => animateHandDeals(draws.map((d) => d.cardId)));
-      }
-      if (state.winner != null) {
-        showEnd();
-        return;
-      }
-      if (state.active === "enemy") {
-        const delay = enemyDelayMs(intent, events);
-        void fxChain.then(() => {
-          if (!uiPaused) window.setTimeout(step, delay);
-        });
+        if (draws.length) {
+          void enqueueFx(() => animateHandDeals(draws.map((d) => d.cardId)));
+        }
+        if (foeDraws > 0) {
+          void enqueueFx(() => animateEnemyDraws(foeDraws));
+        }
+        if (state.winner != null) {
+          clearMatchProgress();
+          syncContinueButton();
+          showEnd();
+          return;
+        }
+        persistProgress();
+        if (state.active === "enemy") {
+          const delay = enemyDelayMs(intent, events);
+          void fxChain.then(() => {
+            if (!uiPaused) window.setTimeout(step, delay);
+            else {
+              window.setTimeout(() => {
+                if (!uiPaused && state?.active === "enemy") step();
+              }, 400);
+            }
+          });
+        }
+      } catch (err) {
+        console.error("runEnemy step failed", err);
+        finishEnemyStall();
       }
     })();
   };
@@ -3023,15 +4183,15 @@ function runEnemy(): void {
 }
 
 function spectateDelayMs(intent: Intent, events: OculusEvent[]): number {
-  if (events.some((e) => e.type === "end")) return 4200;
-  if (events.some((e) => e.type === "eclipse")) return 3200;
-  if (events.some((e) => e.type === "resolve")) return 3400;
-  if (events.some((e) => e.type === "rite")) return 2800;
-  if (events.some((e) => e.type === "fall")) return 2400;
-  if (intent.kind === "pass") return 1600;
-  if (intent.kind === "witness") return 2400;
-  if (intent.kind === "play" || intent.kind === "graft") return 2600;
-  return 2000;
+  if (events.some((e) => e.type === "end")) return paceMs(5200);
+  if (events.some((e) => e.type === "eclipse")) return paceMs(4200);
+  if (events.some((e) => e.type === "resolve")) return paceMs(4800);
+  if (events.some((e) => e.type === "rite" || e.type === "graft" || e.type === "witness")) return paceMs(4200);
+  if (events.some((e) => e.type === "fall")) return paceMs(3600);
+  if (intent.kind === "pass") return paceMs(2400);
+  if (intent.kind === "witness") return paceMs(4200);
+  if (intent.kind === "play" || intent.kind === "graft") return paceMs(4200);
+  return paceMs(2800);
 }
 
 async function flySpectateIntent(intent: Intent, side: Side): Promise<void> {
@@ -3052,32 +4212,29 @@ async function flySpectateIntent(intent: Intent, side: Side): Promise<void> {
         : r
           ? r.bottom + 20
           : land.y + 60;
-    const isRite = intent.kind === "rite";
-    const def = getCard(cardId);
-    const isSite = def.type === "site" || def.type === "sigil";
     playSfx(
       intent.kind === "graft"
         ? "graft"
         : intent.kind === "rite"
           ? "ui-tap"
-          : isSite
+          : getCard(cardId).type === "site" || getCard(cardId).type === "sigil"
             ? "site"
             : "play",
     );
-    await enqueueFx(() =>
-      flyCardFace({
-        src: handCardSrc(cardId),
+    await enqueueFx(() => {
+      const kind = revealKindForPlay(cardId, intent.kind);
+      return revealCardCeremony({
+        cardId,
         fromX,
         fromY,
         toX: land.x,
         toY: land.y,
-        fromScale: side === "player" ? 0.85 : 0.7,
-        toScale: isRite ? 0.52 : isSite ? 0.48 : 0.38,
-        fromRot: side === "enemy" ? 8 : -6,
-        durationMs: isRite ? 320 : isSite ? 420 : 300,
-        exit: isRite ? "cast" : "land",
-      }),
-    );
+        kind,
+        fromScale: side === "player" ? 0.92 : 0.82,
+        landScale: kind === "rite" ? 0.52 : kind === "site" ? 0.58 : kind === "relic" ? 0.42 : 0.48,
+        holdMs: paceMs(kind === "rite" || kind === "site" ? 1450 : 1200),
+      });
+    });
   }
 }
 
@@ -3111,13 +4268,19 @@ function runSpectateStep(gen: number): void {
         (e): e is Extract<(typeof events)[number], { type: "draw" }> =>
           e.type === "draw" && e.side === "player" && e.to === "hand",
       );
-      handDealCount = draws.length;
+      const foeDraws = events.filter(
+        (e) => e.type === "draw" && e.side === "enemy" && e.to === "hand",
+      ).length;
+      queueHandDeal(draws.length);
       stage.onEvents(events);
       narrateEvents(events);
       queueRiteReveal(events);
       syncHud();
       if (draws.length) {
         void enqueueFx(() => animateHandDeals(draws.map((d) => d.cardId)));
+      }
+      if (foeDraws > 0) {
+        void enqueueFx(() => animateEnemyDraws(foeDraws));
       }
       if (state.winner != null) {
         spectateBusy = false;
@@ -3154,40 +4317,53 @@ async function flyEnemyIntent(intent: Intent): Promise<void> {
     const hit = altHits.find((h) => Number(h.dataset.alt) === intent.altitude);
     const r = hit?.getBoundingClientRect();
     const fromX = r ? r.left + r.width / 2 : land.x;
-    const fromY = r ? r.top - 56 : land.y - 100;
+    const fromY = r ? r.top - 72 : land.y - 120;
     const isSite = def.type === "site" || def.type === "sigil";
-    playSfx(intent.kind === "graft" ? "graft" : isSite ? "site" : "play");
-    await enqueueFx(() =>
-      flyCardFace({
-        src: handCardSrc(cardId),
+    const isGraft = intent.kind === "graft";
+    playSfx(isGraft ? "graft" : isSite ? "site" : "play");
+    await enqueueFx(async () => {
+      if (isGraft) {
+        await showCombatArrow({ x: fromX, y: fromY }, land, "graft", paceMs(400));
+      }
+      const kind = revealKindForPlay(cardId, intent.kind);
+      await revealCardCeremony({
+        cardId,
         fromX,
         fromY,
         toX: land.x,
         toY: land.y,
+        kind,
         fromScale: 0.92,
-        toScale: isSite ? 0.62 : 0.55,
-        fromRot: 6,
-        durationMs: isSite ? 520 : 480,
-      }),
-    );
+        landScale: kind === "site" ? 0.58 : kind === "relic" ? 0.42 : 0.5,
+        holdMs: paceMs(kind === "site" ? 1400 : 1150),
+      });
+      punchAltitude(intent.altitude, isSite ? "summon" : "play");
+    });
   } else if (intent.kind === "rite" && intent.altitude != null) {
     const cardId = state.enemyHand[intent.handIndex];
     if (!cardId) return;
     const land = laneLanding(intent.altitude, "enemy");
     playSfx("ui-tap");
     await enqueueFx(() =>
-      flyCardFace({
-        src: handCardSrc(cardId),
+      revealCardCeremony({
+        cardId,
         fromX: land.x,
-        fromY: land.y - 90,
+        fromY: land.y - 100,
         toX: land.x,
         toY: land.y,
+        kind: "rite",
         fromScale: 0.88,
-        toScale: 0.58,
-        durationMs: 420,
-        exit: "cast",
+        holdMs: paceMs(1400),
       }),
     );
+  } else if (
+    intent.kind === "witness" ||
+    intent.kind === "press" ||
+    intent.kind === "peal" ||
+    intent.kind === "stance" ||
+    intent.kind === "wager"
+  ) {
+    await enqueueFx(() => playBoardVerbFx(intent, "enemy"));
   }
 }
 
@@ -3314,38 +4490,44 @@ function animateDropToAltitude(alt: Altitude, exit: "land" | "cast" = "land"): P
     const r = hit.getBoundingClientRect();
     const tx = r.left + r.width / 2;
     const ty = r.top + r.height * (exit === "cast" ? 0.48 : 0.38);
-    const landScale = exit === "cast" ? 0.52 : 0.38;
+    const landScale = exit === "cast" ? 0.52 : 0.4;
     dragGhost.classList.add("is-dropping");
     if (exit === "cast") dragGhost.classList.add("is-casting");
-    dragGhost.style.transition =
-      "left 0.24s cubic-bezier(0.18, 0.9, 0.22, 1), top 0.24s cubic-bezier(0.18, 0.9, 0.22, 1), transform 0.24s cubic-bezier(0.18, 0.9, 0.22, 1), filter 0.24s ease";
+    const dropMs = paceMs(exit === "cast" ? 360 : 420);
+    dragGhost.style.transition = `left ${dropMs}ms cubic-bezier(0.18, 0.9, 0.22, 1), top ${dropMs}ms cubic-bezier(0.18, 0.9, 0.22, 1), transform ${dropMs}ms cubic-bezier(0.18, 0.9, 0.22, 1), filter ${dropMs}ms ease`;
     void dragGhost.offsetWidth;
     dragGhost.style.left = `${tx}px`;
     dragGhost.style.top = `${ty}px`;
     dragGhost.style.transform = `translate(-50%, -50%) scale(${landScale}) rotate(0deg)`;
     dragGhost.style.filter =
       exit === "cast"
-        ? "drop-shadow(0 0 22px rgba(120, 160, 220, 0.75)) brightness(1.35)"
-        : "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))";
+        ? "drop-shadow(0 0 28px rgba(140, 180, 255, 0.85)) brightness(1.35)"
+        : "drop-shadow(0 12px 20px rgba(0, 0, 0, 0.45)) brightness(1.18)";
     window.setTimeout(() => {
       if (exit !== "cast") {
-        resolve();
+        dragGhost.style.opacity = "0";
+        window.setTimeout(() => resolve(), 100);
         return;
       }
-      const burn = 400;
+      const burn = paceMs(460);
       dragGhost.style.transition = `top ${burn}ms cubic-bezier(0.2, 0.8, 0.2, 1), transform ${burn}ms ease, filter ${burn}ms ease, opacity ${burn}ms ease`;
       dragGhost.style.top = `${ty - 36}px`;
       dragGhost.style.transform = `translate(-50%, -50%) scale(${landScale * 1.15}) rotate(0deg)`;
       dragGhost.style.filter = "drop-shadow(0 0 36px rgba(160, 200, 255, 0.95)) brightness(1.7)";
       dragGhost.style.opacity = "0";
       window.setTimeout(() => resolve(), burn);
-    }, 250);
+    }, dropMs);
   });
 }
 
 function tryAltitude(alt: Altitude): boolean {
-  if (spectatorMode || uiPaused || intentBusy) return false;
+  if (spectatorMode || uiPaused || mulliganActive) return false;
+  if (intentBusy) {
+    showToast("Wait — resolving the last action…");
+    return true; // consume tap so we don't open inspect / false "nothing to Witness"
+  }
   if (!state || state.phase !== "play" || state.active !== "player") return false;
+  if (cardInspect.isOpen()) cardInspect.close();
   const intents = legalIntents(state);
   let intent: Intent | undefined;
 
@@ -3387,7 +4569,7 @@ function tryAltitude(alt: Altitude): boolean {
 }
 
 async function commitPlayerIntent(intent: Intent, alt: Altitude): Promise<void> {
-  if (!state || intentBusy) return;
+  if (!state || intentBusy || mulliganActive) return;
   intentBusy = true;
   const handIndex = selectedHand;
   const shouldFly =
@@ -3399,28 +4581,71 @@ async function commitPlayerIntent(intent: Intent, alt: Altitude): Promise<void> 
   selectedHand = null;
   mode = "play";
 
+  const isBoardVerb =
+    intent.kind === "witness" ||
+    intent.kind === "press" ||
+    intent.kind === "peal" ||
+    intent.kind === "stance" ||
+    intent.kind === "wager" ||
+    intent.kind === "reveil";
+
   try {
+    // Board verbs: apply rules before FX, then narrate — VFX must never swallow Witness.
+    if (isBoardVerb) {
+      if (intent.kind === "stance") playSfx("stance");
+      else if (intent.kind === "reveil") playSfx("witness");
+      else if (intent.kind === "press") playSfx("strain");
+      else if (intent.kind === "peal") playSfx("law");
+      else if (intent.kind === "wager") playSfx("select");
+      else if (intent.kind === "witness") playSfx(intent.enemy ? "gaze" : "witness");
+      const events = applyIntent(state, intent);
+      try {
+        await enqueueFx(() => playBoardVerbFx(intent));
+      } catch {
+        /* VFX is best-effort */
+      }
+      afterPlayer(events);
+      return;
+    }
+
     if (shouldFly && handIndex !== null) {
       const btn = handEl.querySelectorAll(".hand-card")[handIndex] as HTMLElement | undefined;
       const cardId = state.hand[handIndex];
       const land = laneLanding(alt, "player");
+      const def = cardId ? getCard(cardId) : null;
       const isRite = intent.kind === "rite";
+      const isGraft = intent.kind === "graft";
+      const isSite = !!(def && (def.type === "site" || def.type === "sigil"));
       if (btn && cardId) {
         btn.classList.add("dragging");
         const r = btn.getBoundingClientRect();
-        await enqueueFx(() =>
-          flyCardFace({
-            src: handCardSrc(cardId),
-            fromX: r.left + r.width / 2,
-            fromY: r.top + r.height / 2,
-            toX: land.x,
-            toY: land.y,
-            fromScale: 1.02,
-            toScale: isRite ? 0.55 : 0.38,
-            durationMs: isRite ? 280 : 240,
-            exit: isRite ? "cast" : "land",
-          }),
-        );
+        try {
+          await enqueueFx(async () => {
+            if (isGraft) {
+              await showCombatArrow(
+                { x: r.left + r.width / 2, y: r.top + r.height / 2 },
+                land,
+                "graft",
+                paceMs(420),
+              );
+            }
+            const kind = revealKindForPlay(cardId, intent.kind);
+            await revealCardCeremony({
+              cardId,
+              fromX: r.left + r.width / 2,
+              fromY: r.top + r.height / 2,
+              toX: land.x,
+              toY: land.y,
+              kind,
+              fromScale: 1.02,
+              landScale: kind === "rite" ? 0.52 : kind === "site" ? 0.58 : kind === "relic" ? 0.42 : 0.48,
+              holdMs: paceMs(kind === "rite" || kind === "site" ? 1500 : 1200),
+            });
+            punchAltitude(alt, isRite ? "rite" : isSite ? "summon" : isGraft ? "play" : "summon");
+          });
+        } catch {
+          /* summon VFX best-effort — still apply the play */
+        }
       }
     }
 
@@ -3429,10 +4654,7 @@ async function commitPlayerIntent(intent: Intent, alt: Altitude): Promise<void> 
       const def = cardId ? getCard(cardId) : null;
       playSfx(def && (def.type === "site" || def.type === "sigil") ? "site" : "play");
     } else if (intent.kind === "graft") playSfx("graft");
-    // Rite musical sting plays once in presentRiteCast
-  else if (intent.kind === "stance") playSfx("stance");
-  else if (intent.kind === "reveil") playSfx("witness");
-  const events = applyIntent(state, intent);
+    const events = applyIntent(state, intent);
     afterPlayer(events);
   } finally {
     intentBusy = false;
@@ -3445,7 +4667,26 @@ const unlockAnd = (fn: () => void) => () => {
   fn();
 };
 document.getElementById("btn-play")!.addEventListener("click", unlockAnd(() => openHeresyPick()));
-document.getElementById("btn-tutorial")!.addEventListener("click", unlockAnd(() => startMatch(true)));
+document.getElementById("btn-continue")!.addEventListener(
+  "click",
+  unlockAnd(() => {
+    if (!resumeSavedMatch()) {
+      showToast("No saved match to resume.");
+      syncContinueButton();
+    }
+  }),
+);
+document.getElementById("btn-tutorial")!.addEventListener("click", unlockAnd(() => openTutorialPick()));
+document.getElementById("tutorial-back")!.addEventListener("click", () => closeTutorialPick());
+tutorialListEl.addEventListener("click", (ev) => {
+  const btn = (ev.target as HTMLElement | null)?.closest?.("[data-tutorial]") as HTMLElement | null;
+  if (!btn) return;
+  const id = btn.getAttribute("data-tutorial") as TutorialId | null;
+  if (!id) return;
+  void unlockAudio();
+  playSfx("ui-tap");
+  startMatch(true, undefined, id);
+});
 document.getElementById("btn-spectate")!.addEventListener("click", unlockAnd(() => openSpectatePick()));
 document.getElementById("spectate-back")!.addEventListener("click", () => {
   document.getElementById("spectate-pick")!.hidden = true;
@@ -3473,6 +4714,7 @@ document.getElementById("heresy-back")!.addEventListener("click", () => closeHer
 heresyListEl.addEventListener("click", (ev) => {
   const t = ev.target as HTMLElement | null;
   const enter = t?.closest?.("[data-enter]") as HTMLElement | null;
+  const learn = t?.closest?.("[data-learn]") as HTMLElement | null;
   const build = t?.closest?.("[data-build]") as HTMLElement | null;
   if (enter) {
     const id = enter.getAttribute("data-enter") as Heresy | null;
@@ -3480,6 +4722,14 @@ heresyListEl.addEventListener("click", (ev) => {
     void unlockAudio();
     playSfx("ui-tap");
     startMatch(false, fullCraftDeck(id));
+    return;
+  }
+  if (learn) {
+    const id = learn.getAttribute("data-learn") as TutorialId | null;
+    if (!id || id === "first_gaze") return;
+    void unlockAudio();
+    playSfx("ui-tap");
+    startMatch(true, undefined, id);
     return;
   }
   if (build) {
@@ -3511,7 +4761,7 @@ document.getElementById("btn-again")!.addEventListener("click", () => {
     }
     return;
   }
-  if (state?.tutorial) startMatch(true);
+  if (state?.tutorial) startMatch(true, undefined, state.tutorialId ?? "first_gaze");
   else if (lastConstructedDeck) startMatch(false, lastConstructedDeck);
   else openHeresyPick();
 });
@@ -3521,6 +4771,52 @@ btnHudMenu.addEventListener("click", () => openPause());
 btnHudSettings.addEventListener("click", () => openSettings("play"));
 btnHudLog.addEventListener("click", () => toggleEventLog());
 btnEventLogClose.addEventListener("click", () => closeEventLog());
+document.getElementById("event-log-backdrop")?.addEventListener("click", () => closeEventLog());
+document.querySelectorAll<HTMLElement>("[data-meter-help]").forEach((el) => {
+  el.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const key = el.dataset.meterHelp;
+    if (key) explainMeterHelp(key);
+  });
+});
+playerDeckEl.addEventListener("click", () => {
+  if (!state || state.phase !== "play") return;
+  playSfx("ui-tap");
+  const n = state.deck.length;
+  flashToast(
+    n <= 0
+      ? "Your library is empty — no more draws."
+      : `Your library — ${n} card${n === 1 ? "" : "s"} left to draw.`,
+    paceMs(3200),
+    "play",
+  );
+});
+enemyDeckEl.addEventListener("click", () => {
+  if (!state || state.phase !== "play") return;
+  playSfx("ui-tap");
+  const n = state.enemyDeck.length;
+  flashToast(
+    n <= 0
+      ? "Foe library is empty."
+      : `Foe library — ${n} card${n === 1 ? "" : "s"} left.`,
+    paceMs(3200),
+    "play",
+  );
+});
+window.addEventListener("oculum-keyword", ((ev: CustomEvent<{ id: string }>) => {
+  const line = explainKeyword(ev.detail?.id ?? "");
+  if (!line) return;
+  playSfx("ui-tap");
+  flashToast(line, paceMs(4800), "play");
+}) as EventListener);
+document.getElementById("codex-meta")?.addEventListener("click", (ev) => {
+  const btn = (ev.target as HTMLElement | null)?.closest?.("[data-kw]") as HTMLElement | null;
+  if (!btn) return;
+  const id = btn.getAttribute("data-kw");
+  if (!id) return;
+  window.dispatchEvent(new CustomEvent("oculum-keyword", { detail: { id } }));
+});
 document.getElementById("pause-resume")!.addEventListener("click", () => resumeMatch());
 document.getElementById("pause-settings")!.addEventListener("click", () => openSettings("pause"));
 document.getElementById("pause-menu")!.addEventListener("click", () => goToMenu());
@@ -3673,9 +4969,36 @@ for (const hit of altHits) {
   bindLiftInspect(hit, boardCardId, cardInspect, () => {
     if (drag?.active || drag?.dropping) return;
     if (tryAltitude(alt)) return;
+    const targeting =
+      mode === "witness" ||
+      mode === "reveil" ||
+      mode === "stance" ||
+      mode === "wager" ||
+      mode === "press" ||
+      mode === "peal" ||
+      selectedHand !== null;
+    if (targeting) {
+      if (mode === "press") {
+        showToast("Not Pressable — need a Veiled + Stained enemy here (or Motley Stance B).");
+      } else if (mode === "witness") {
+        showToast("Nothing to Witness / Gaze on this lane.");
+      } else if (mode === "peal") {
+        showToast("Peal needs your Toll on this lane.");
+      }
+      return;
+    }
     openBoardInspect();
   }, {
     openCard: () => openBoardInspect(),
+    // Press / Witness taps must not lose to hold-to-inspect (common on phones)
+    suppressHoldInspect: () =>
+      mode === "witness" ||
+      mode === "reveil" ||
+      mode === "stance" ||
+      mode === "wager" ||
+      mode === "press" ||
+      mode === "peal" ||
+      selectedHand !== null,
   });
   hit.addEventListener("keydown", (ev) => {
     if (ev.key !== "Enter" && ev.key !== " ") return;
@@ -3707,6 +5030,70 @@ for (const hit of altHits) {
       openBoardInspect(prefer);
     });
   }
+  for (const btn of hit.querySelectorAll<HTMLButtonElement>("[data-toll], [data-peal]")) {
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (uiPaused) return;
+      const isToll = btn.hasAttribute("data-toll");
+      playSfx("ui-tap");
+      if (isToll) {
+        const foe = btn.classList.contains("is-foe");
+        const line = foe
+          ? "FOE TOLL — Enemy Bellward trap on this altitude. Their Figures here +1. If you Witness or Gaze into this lane, you pay Sight tax."
+          : "TOLL — Your Bellward lane mark. Your Figures here +1. When the foe Witnesses or Gazes into this lane, they pay Sight tax. Peal arms the Toll for Sight + draw when Resolve spends it.";
+        flashToast(line, paceMs(5200), "toll");
+      } else {
+        const line =
+          explainKeyword("peal") ??
+          "PEAL — Arm your Toll (1 Sight). When Resolve spends that Toll, you gain Sight and draw.";
+        flashToast(line, paceMs(4800), "peal");
+      }
+    });
+  }
+
+  // Status chips (VEIL / SCR / …) and lane rules — tap for toast help
+  const badgeHelpClick = (ev: Event, text: string, kind = "pass"): void => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (uiPaused) return;
+    playSfx("ui-tap");
+    clearToastQueue();
+    flashToast(text, paceMs(5200), kind);
+  };
+  for (const el of hit.querySelectorAll<HTMLElement>(
+    "[data-veil], [data-scrutiny], [data-strain], [data-press], [data-stance-mark], [data-wager], [data-blind]",
+  )) {
+    el.setAttribute("role", "button");
+    el.tabIndex = 0;
+    el.style.cursor = "pointer";
+    el.addEventListener("click", (ev) => {
+      const label = (el.getAttribute("data-label") ?? el.textContent ?? "").trim();
+      const key = label.replace(/\s+\d+$/, "");
+      const tip =
+        el.title ||
+        BADGE_TITLES[label] ||
+        BADGE_TITLES[key] ||
+        (el.hasAttribute("data-blind")
+          ? "BLIND — this lane yields no Sight this round."
+          : null);
+      if (!tip) return;
+      badgeHelpClick(ev, tip, key === "SCR" || key === "STAIN" || key === "PRESS" ? "stain" : "witness");
+    });
+  }
+  const ruleEl = hit.querySelector<HTMLElement>(".alt-rule");
+  if (ruleEl) {
+    ruleEl.setAttribute("role", "button");
+    ruleEl.tabIndex = 0;
+    ruleEl.style.cursor = "pointer";
+    ruleEl.title = ruleEl.title || hit.getAttribute("aria-label") || ruleEl.textContent || "";
+    ruleEl.addEventListener("click", (ev) => {
+      const line =
+        hit.getAttribute("aria-label") ||
+        `${hit.querySelector(".alt-tag")?.textContent ?? "Lane"} — ${ruleEl.textContent}`;
+      badgeHelpClick(ev, line, "pass");
+    });
+  }
 }
 // Swipe on codex face
 let codexTouchX: number | null = null;
@@ -3730,10 +5117,27 @@ codexFace.addEventListener(
   { passive: true },
 );
 btnWitness.addEventListener("click", () => {
-  if (uiPaused) return;
-  mode = mode === "witness" ? "play" : "witness";
+  if (uiPaused || mulliganActive || !state || state.active !== "player") return;
+  if (intentBusy) {
+    showToast("Wait — resolving the last action…");
+    return;
+  }
   selectedHand = null;
+  if (mode === "witness") {
+    mode = "play";
+    syncHud();
+    return;
+  }
+  const can = legalIntents(state).some((i) => i.kind === "witness");
+  if (!can) {
+    showToast("Nothing to Witness — need a Veiled Figure and enough Sight (or Gaze on a foe).");
+    syncHud();
+    return;
+  }
+  mode = "witness";
+  playSfx("select");
   syncHud();
+  showToast("Witness: tap a glowing lane. Your Veiled first — Gaze steals an enemy Revelation.");
 });
 
 btnReveil.addEventListener("click", () => {
@@ -3761,14 +5165,16 @@ btnPress.addEventListener("click", () => {
   if (uiPaused || !state) return;
   if (state.active !== "player" || state.pressUsed.player) return;
   selectedHand = null;
-  const can = legalIntents(state).some((i) => i.kind === "press");
-  if (!can) {
-    mode = "press";
-    showToast("Press needs a Veiled enemy with Stain (1 Sight) — or Motley Stance B (free).");
+  if (mode === "press") {
+    mode = "play";
     syncHud();
     return;
   }
-  mode = mode === "press" ? "play" : "press";
+  mode = "press";
+  const can = legalIntents(state).some((i) => i.kind === "press");
+  if (!can) {
+    showToast("Press needs a Veiled enemy with Stain (1 Sight) — or Motley Stance B (free).");
+  }
   syncHud();
 });
 
@@ -3780,7 +5186,7 @@ btnPeal.addEventListener("click", () => {
 });
 
 btnPass.addEventListener("click", () => {
-  if (uiPaused) return;
+  if (uiPaused || mulliganActive) return;
   if (!state || state.active !== "player") return;
   playSfx("pass");
   const events = applyIntent(state, { kind: "pass" });
@@ -3789,17 +5195,91 @@ btnPass.addEventListener("click", () => {
   afterPlayer(events);
 });
 
+btnMulliganKeep.addEventListener("click", () => {
+  if (!mulliganActive) return;
+  playSfx("select");
+  void finishMulligan(true);
+});
+
+btnMulliganRedraw.addEventListener("click", () => {
+  if (!mulliganActive || mulliganSelected.size === 0) return;
+  playSfx("draw");
+  void finishMulligan(false);
+});
+
 coachCta.addEventListener("click", () => {
-  if (uiPaused || !state || !state.tutorial) return;
+  if (uiPaused || tutorialDemoBusy || !state || !state.tutorial) return;
   if (!isTutorialSoftPass(state.tutorialStep)) return;
   playSfx("ui-tap");
   cardInspect.close();
+  if (isTutorialDemoStep(state.tutorialStep)) {
+    void runTutorialDemoThenAdvance();
+    return;
+  }
   const events = applyIntent(state, { kind: "pass" });
   mode = "play";
   selectedHand = null;
   afterPlayer(events);
 });
 
+async function runTutorialDemoThenAdvance(): Promise<void> {
+  if (!state || tutorialDemoBusy) return;
+  const step = state.tutorialStep;
+  const beats = tutorialDemoBeats(step);
+  tutorialDemoBusy = true;
+  uiPaused = true;
+  coachCta.disabled = true;
+  coachCta.textContent = "Watching…";
+  clearToastQueue();
+  const reduce = loadSettings().reduceMotion;
+  const hold = reduce ? 1600 : 5200;
+  try {
+    for (const beat of beats) {
+      if (!state || state.tutorialStep !== step) break;
+      beat.setup?.(state);
+      coachBody.textContent = beat.line;
+      coachAction.textContent = "Read the toast · watch the badge";
+      // Force badge pop on every demo beat
+      for (const hit of altHits) {
+        for (const row of hit.querySelectorAll<HTMLElement>(".alt-status")) delete row.dataset.sig;
+      }
+      syncHud();
+      const cue = beat.cue;
+      if (cue?.sfx) playSfx(cue.sfx);
+      if (cue?.float != null && cue.altitude != null) {
+        floatLaneCue(cue.altitude, cue.float, cue.floatKind ?? "play");
+        punchAltitude(cue.altitude, "play");
+      }
+      if (cue?.toast) {
+        clearToastQueue();
+        enqueueToast(cue.toast, reduce ? 1400 : 4200, cue.toastKind ?? "play");
+        pushEventLog(cue.toast, cue.toastKind ?? "play");
+      }
+      document.querySelectorAll(".tutor-focus").forEach((el) => el.classList.remove("tutor-focus"));
+      if (cue?.focusSel) {
+        const el = document.querySelector(cue.focusSel) as HTMLElement | null;
+        if (el && !el.hidden) {
+          el.classList.add("tutor-focus");
+          el.classList.remove("badge-pop");
+          void el.offsetWidth;
+          el.classList.add("badge-pop");
+        }
+      }
+      await waitMs(hold);
+    }
+  } finally {
+    document.querySelectorAll(".tutor-focus").forEach((el) => el.classList.remove("tutor-focus"));
+    tutorialDemoBusy = false;
+    uiPaused = false;
+    coachCta.disabled = false;
+  }
+  if (!state || state.tutorialStep !== step) return;
+  clearToastQueue();
+  const events = applyIntent(state, { kind: "pass" });
+  mode = "play";
+  selectedHand = null;
+  afterPlayer(events);
+}
 window.addEventListener("pointermove", (ev) => {
   if (!drag || ev.pointerId !== drag.pointerId || drag.dropping) return;
   const dx = ev.clientX - drag.startX;
@@ -3845,10 +5325,7 @@ window.addEventListener("pointerup", (ev) => {
       drag.dropping = true;
       selectedHand = handIndex;
       mode = "play";
-      skipNextSummonFly = true;
-      const cardId = state?.hand[handIndex];
-      const castExit = cardId && getCard(cardId).type === "rite" ? "cast" : "land";
-      await animateDropToAltitude(alt, castExit);
+      // Big summon/graft/rite ceremony runs inside commitPlayerIntent — don't skip it
       endDragVisual();
       tryAltitude(alt);
       return;
@@ -3881,7 +5358,14 @@ function frame(now: number): void {
   fps.tick(now);
   if (flashTimer > 0) {
     flashTimer -= dt * 1000;
-    if (flashTimer <= 0 && state?.phase === "play") showToast(hint(state));
+    if (flashTimer <= 0) {
+      if (toastQueue.length > 0) {
+        pumpToastQueue();
+      } else {
+        toastBusy = false;
+        if (state?.phase === "play") showToast(hint(state));
+      }
+    }
   }
   if (phaseTimer > 0) {
     phaseTimer -= dt * 1000;
@@ -3974,6 +5458,7 @@ function frame(now: number): void {
         events: [],
         nextId: 0,
         tutorial: false,
+        tutorialId: null,
         tutorialStep: "done",
         aiDifficulty: "normal",
       },
@@ -3986,6 +5471,7 @@ function frame(now: number): void {
 setMenuMode(true);
 setMusicBed("menu");
 armUnlockOnGesture();
+syncContinueButton();
 syncHud();
 const onViewportChange = (): void => {
   if (state?.tutorial && state.tutorialStep !== "done") syncTutorGuide(state);
@@ -3997,6 +5483,13 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener("resize", onViewportChange);
   window.visualViewport.addEventListener("scroll", onViewportChange);
 }
+const flushSave = (): void => {
+  persistProgress();
+};
+window.addEventListener("pagehide", flushSave);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushSave();
+});
 void preloadCardChrome().then(() => {
   clearCardFaceCache();
   stage.invalidateCardTextures();

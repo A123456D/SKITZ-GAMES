@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chooseAiMove } from "./ai";
-import { applyIntent, createMatch, legalIntents, takeEvents, unitPower } from "./match";
+import { applyIntent, applyMulligan, createMatch, legalIntents, takeEvents, unitPower } from "./match";
 
 describe("oculum match", () => {
   it("starts with essence and sight on turn 1", () => {
@@ -11,6 +11,32 @@ describe("oculum match", () => {
     expect(s.hand.length).toBe(4);
     expect(s.tutorialStep).toBe("done");
     expect(s.prophecies).toEqual([]);
+  });
+
+  it("opening mulligan returns selected cards and redraws the same count", () => {
+    const s = createMatch({ seed: 77 });
+    const beforeHand = [...s.hand];
+    const beforeDeck = s.deck.length;
+    expect(beforeHand.length).toBe(4);
+    const drawn = applyMulligan(s, [0, 2]);
+    expect(drawn.length).toBe(2);
+    expect(s.hand.length).toBe(4);
+    // Kept cards stay; returned indices 0 and 2 are gone from those positions
+    expect(s.hand).not.toEqual(beforeHand);
+    expect(s.deck.length).toBe(beforeDeck);
+    // Returned cards are somewhere in the shuffled library (or redrawn back)
+    const pool = [...s.hand, ...s.deck];
+    expect(pool).toContain(beforeHand[0]);
+    expect(pool).toContain(beforeHand[2]);
+  });
+
+  it("opening mulligan with empty selection is a no-op", () => {
+    const s = createMatch({ seed: 78 });
+    const hand = [...s.hand];
+    const deck = [...s.deck];
+    expect(applyMulligan(s, [])).toEqual([]);
+    expect(s.hand).toEqual(hand);
+    expect(s.deck).toEqual(deck);
   });
 
   it("emits draw events from beginTurn", () => {
@@ -233,5 +259,99 @@ describe("oculum match", () => {
     s.active = "enemy";
     const move = chooseAiMove(s);
     expect(move).toBeTruthy();
+  });
+
+  it("Bellward AI Witnesses its own Veiled figure instead of Passing", () => {
+    const s = createMatch({ seed: 91 });
+    s.active = "enemy";
+    s.enemySight = 4;
+    s.enemyEssence = 0;
+    s.enemyHand = [];
+    s.altitudes[1].enemy = {
+      instanceId: "t1",
+      cardId: "bell_siren",
+      veiled: true,
+      hybridSite: false,
+      stanceB: false,
+      grafts: [],
+      inhabitant: null,
+      hasThirdFace: false,
+      strained: false,
+      stained: false,
+      revelationFired: false,
+      scrutiny: 0,
+      wagered: false,
+      wagerAntePaid: false,
+      wagerAnteFavor: false,
+      openedSinceResolve: false,
+      lastBreachOpened: false,
+      pressed: false,
+      pressedBy: null,
+    };
+    // Many seeds: Witness should beat Pass
+    let witnessed = 0;
+    for (let i = 0; i < 20; i++) {
+      const move = chooseAiMove(s);
+      if (move.kind === "witness" && !move.enemy && move.altitude === 1) witnessed += 1;
+    }
+    expect(witnessed).toBeGreaterThanOrEqual(18);
+  });
+
+  it("Bellward AI Gazes a Motley Stance B wall that is winning the lane", () => {
+    const s = createMatch({ seed: 92 });
+    s.active = "enemy";
+    s.enemySight = 5;
+    s.enemyEssence = 0;
+    s.enemyHand = [];
+    // Toll on High opens Bellward Gaze there
+    s.tollOwner[0] = "enemy";
+    s.altitudes[0].enemy = {
+      instanceId: "t3",
+      cardId: "bell_debt_walker",
+      veiled: false,
+      hybridSite: false,
+      stanceB: false,
+      grafts: [],
+      inhabitant: null,
+      hasThirdFace: false,
+      strained: false,
+      stained: false,
+      revelationFired: true,
+      scrutiny: 0,
+      wagered: false,
+      wagerAntePaid: false,
+      wagerAnteFavor: false,
+      openedSinceResolve: false,
+      lastBreachOpened: false,
+      pressed: false,
+      pressedBy: null,
+    };
+    s.altitudes[0].player = {
+      instanceId: "m2",
+      cardId: "scarlet_dealer",
+      veiled: true,
+      hybridSite: false,
+      stanceB: true,
+      grafts: [],
+      inhabitant: null,
+      hasThirdFace: false,
+      strained: false,
+      stained: false,
+      revelationFired: false,
+      scrutiny: 0,
+      wagered: true,
+      wagerAntePaid: true,
+      wagerAnteFavor: false,
+      openedSinceResolve: false,
+      lastBreachOpened: false,
+      pressed: false,
+      pressedBy: null,
+    };
+    let gazed = 0;
+    for (let i = 0; i < 20; i++) {
+      const move = chooseAiMove(s);
+      if (move.kind === "witness" && move.enemy && move.altitude === 0) gazed += 1;
+    }
+    expect(gazed).toBeGreaterThanOrEqual(15);
   });
 });

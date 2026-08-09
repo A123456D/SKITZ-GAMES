@@ -71,6 +71,11 @@ export function hasFullCardArt(cardId: string): boolean {
   return fullCardImgs.has(cardId);
 }
 
+/** URL for shared OCULUM card back (deck piles / draw flips). */
+export function cardBackSrc(): string {
+  return `./assets/cards/card-back.jpg?v=1`;
+}
+
 /** URL for DOM hand display — full art when available (never veiled in hand). */
 export function handCardSrc(cardId: string): string {
   if (fullCardImgs.has(cardId)) {
@@ -726,10 +731,11 @@ export function bakePowerChip(power: number, mood: PowerChipMood): HTMLCanvasEle
   return c;
 }
 
-export type WitnessChipMood = "base" | "cheap" | "taxed";
+export type WitnessChipMood = "base" | "cheap" | "taxed" | "spent";
 
 /**
  * Live Witness / Gaze Sight-cost seal — teal pip language, not Motley chrome.
+ * `spent` = already Witnessed (show 0 until Fall / Unmake).
  */
 export function bakeWitnessChip(cost: number, mood: WitnessChipMood): HTMLCanvasElement {
   const key = `w:${cost}:${mood}`;
@@ -766,15 +772,25 @@ export function bakeWitnessChip(cost: number, mood: WitnessChipMood): HTMLCanvas
             num: "#c8ddd8",
             glow: "rgba(60,120,110,0.35)",
           }
-        : {
-            rim: "#3ecfc0",
-            rimSoft: "rgba(62,207,192,0.6)",
-            core0: "#1e4a46",
-            core1: "#0e2220",
-            core2: "#060e0e",
-            num: "#d8fff8",
-            glow: "rgba(62,207,192,0.42)",
-          };
+        : mood === "spent"
+          ? {
+              rim: "#4a6e6a",
+              rimSoft: "rgba(74,110,106,0.45)",
+              core0: "#1a2a28",
+              core1: "#0c1414",
+              core2: "#060a0a",
+              num: "#9eb8b4",
+              glow: "rgba(40,80,75,0.28)",
+            }
+          : {
+              rim: "#3ecfc0",
+              rimSoft: "rgba(62,207,192,0.6)",
+              core0: "#1e4a46",
+              core1: "#0e2220",
+              core2: "#060e0e",
+              num: "#d8fff8",
+              glow: "rgba(62,207,192,0.42)",
+            };
 
   ctx.clearRect(0, 0, size, size);
 
