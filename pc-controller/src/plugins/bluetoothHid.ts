@@ -41,6 +41,7 @@ export interface BluetoothHidPlugin {
     ly: number
     rx: number
     ry: number
+    lookGain?: number
     buttons: Record<string, boolean>
   }): Promise<void>
   addListener(

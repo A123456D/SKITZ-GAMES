@@ -30,5 +30,7 @@ export type GamepadState = {
   ly: number
   rx: number
   ry: number
+  /** Right-stick mouse look multiplier (native HID). */
+  lookGain?: number
   buttons: Record<string, boolean>
 }

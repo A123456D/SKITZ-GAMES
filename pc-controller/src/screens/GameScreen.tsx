@@ -1,10 +1,14 @@
-import { useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { SensSlider } from '../components/SensSlider'
 import { haptic } from '../haptics'
+import { loadInputSettings, saveInputSettings, type InputSettings } from '../settings'
 import type { GamepadState, Transport } from '../transport'
 
 type Props = {
   transport: Transport
 }
+
+const LOOK_BASE = 36
 
 const EMPTY: GamepadState = {
   lx: 0,
@@ -16,10 +20,38 @@ const EMPTY: GamepadState = {
 
 export function GameScreen({ transport }: Props) {
   const state = useRef<GamepadState>({ ...EMPTY, buttons: {} })
+  const stickPtr = useRef<{ l: number | null; r: number | null }>({ l: null, r: null })
+  const sensRef = useRef(loadInputSettings())
+
   const [knobs, setKnobs] = useState({ lx: 0, ly: 0, rx: 0, ry: 0 })
   const [down, setDown] = useState<Record<string, boolean>>({})
+  const [sens, setSens] = useState<InputSettings>(() => sensRef.current)
 
-  const publish = () => transport.gamepad(state.current)
+  const updateSens = (patch: Partial<InputSettings>) => {
+    const next = { ...sensRef.current, ...patch }
+    sensRef.current = next
+    setSens(next)
+    saveInputSettings(next)
+    state.current.lookGain = LOOK_BASE * next.look
+  }
+
+  const publish = () => {
+    state.current.lookGain = LOOK_BASE * sensRef.current.look
+    transport.gamepad(state.current)
+  }
+
+  // Continuous stick sampling while held — keeps look/WASD flowing without new pointer events.
+  useEffect(() => {
+    let frame = 0
+    const tick = () => {
+      const s = state.current
+      if (s.lx || s.ly || s.rx || s.ry) publish()
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transport])
 
   const setAxis = (side: 'l' | 'r', x: number, y: number) => {
     if (side === 'l') {
@@ -35,16 +67,11 @@ export function GameScreen({ transport }: Props) {
   }
 
   const bindStick = (side: 'l' | 'r') => {
-    const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-      e.currentTarget.setPointerCapture(e.pointerId)
-      haptic('selection')
-      move(e)
-    }
     const move = (e: PointerEvent<HTMLDivElement>) => {
       const rect = e.currentTarget.getBoundingClientRect()
       const cx = rect.left + rect.width / 2
       const cy = rect.top + rect.height / 2
-      const max = rect.width * 0.32
+      const max = rect.width * 0.38
       let dx = e.clientX - cx
       let dy = e.clientY - cy
       const dist = Math.hypot(dx, dy)
@@ -54,14 +81,28 @@ export function GameScreen({ transport }: Props) {
       }
       setAxis(side, dx / max, dy / max)
     }
-    const end = () => setAxis(side, 0, 0)
+
     return {
-      onPointerDown,
-      onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
-        if (e.buttons || e.pressure > 0) move(e)
+      onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
+        e.currentTarget.setPointerCapture(e.pointerId)
+        stickPtr.current[side] = e.pointerId
+        haptic('selection')
+        move(e)
       },
-      onPointerUp: end,
-      onPointerCancel: end,
+      onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
+        if (stickPtr.current[side] !== e.pointerId) return
+        move(e)
+      },
+      onPointerUp: (e: PointerEvent<HTMLDivElement>) => {
+        if (stickPtr.current[side] !== e.pointerId) return
+        stickPtr.current[side] = null
+        setAxis(side, 0, 0)
+      },
+      onPointerCancel: (e: PointerEvent<HTMLDivElement>) => {
+        if (stickPtr.current[side] !== e.pointerId) return
+        stickPtr.current[side] = null
+        setAxis(side, 0, 0)
+      },
     }
   }
 
@@ -96,7 +137,15 @@ export function GameScreen({ transport }: Props) {
     <section className="screen game-screen">
       <div className="game-intro">
         <h1 className="headline">Gamepad</h1>
-        <p className="sub">Rotate for a full controller layout.</p>
+        <p className="sub">Left stick WASD · Right stick look. Rotate for full layout.</p>
+        <div className="sens-panel compact">
+          <SensSlider
+            label="Look"
+            setting="look"
+            value={sens.look}
+            onChange={(look) => updateSens({ look })}
+          />
+        </div>
       </div>
 
       <div className="game-layout">

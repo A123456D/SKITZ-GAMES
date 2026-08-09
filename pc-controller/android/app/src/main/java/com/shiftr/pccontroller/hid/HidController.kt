@@ -567,19 +567,32 @@ class HidController(private val context: Context) {
         rx: Float,
         ry: Float,
         buttons: Map<String, Boolean>,
+        lookGain: Float = 34f,
     ) {
         // Stick → mouse look / WASD-style keys for PC games over keyboard+mouse HID
-        val mdx = (rx * 18).toInt()
-        val mdy = (ry * 18).toInt()
+        fun axis(v: Float): Float {
+            val dead = 0.06f
+            val a = kotlin.math.abs(v)
+            if (a < dead) return 0f
+            val t = ((a - dead) / (1f - dead)).coerceIn(0f, 1f)
+            // Mild ease-in keeps fine aim, still strong near edge
+            val shaped = t * (0.35f + 0.65f * t)
+            return if (v < 0f) -shaped else shaped
+        }
+
+        val gain = lookGain.coerceIn(8f, 96f)
+        val mdx = (axis(rx) * gain).toInt()
+        val mdy = (axis(ry) * gain).toInt()
         if (mdx != 0 || mdy != 0) sendMouse(mdx, mdy)
 
         fun stickKey(code: String, active: Boolean) {
             keyEvent(code, active)
         }
-        stickKey("KeyA", lx < -0.45f)
-        stickKey("KeyD", lx > 0.45f)
-        stickKey("KeyW", ly < -0.45f)
-        stickKey("KeyS", ly > 0.45f)
+        // Lower deadzone so left stick feels snappier
+        stickKey("KeyA", lx < -0.22f)
+        stickKey("KeyD", lx > 0.22f)
+        stickKey("KeyW", ly < -0.22f)
+        stickKey("KeyS", ly > 0.22f)
 
         val map =
             mapOf(

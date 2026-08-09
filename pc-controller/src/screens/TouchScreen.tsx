@@ -1,13 +1,16 @@
 import { useRef, useState, type PointerEvent } from 'react'
 import { KeyboardPanel } from '../components/KeyboardPanel'
+import { SensSlider } from '../components/SensSlider'
 import { haptic } from '../haptics'
+import { loadInputSettings, saveInputSettings, type InputSettings } from '../settings'
 import type { Transport } from '../transport'
 
 type Props = {
   transport: Transport
 }
 
-const SCROLL_GAIN = 0.12
+/** Base scroll px → HID wheel units (before user multiplier). */
+const SCROLL_BASE = 0.28
 const SWIPE_OPEN = 56
 const SWIPE_CLOSE = 48
 
@@ -18,12 +21,21 @@ export function TouchScreen({ transport }: Props) {
   const sheetDrag = useRef<{ y: number; moved: boolean } | null>(null)
   const sheetOffsetRef = useRef(0)
   const scrollTick = useRef(0)
+  const sensRef = useRef(loadInputSettings())
 
   const [active, setActive] = useState(false)
   const [glint, setGlint] = useState({ x: 50, y: 50 })
   const [down, setDown] = useState<Record<string, boolean>>({})
   const [keysOpen, setKeysOpen] = useState(false)
   const [sheetOffset, setSheetOffset] = useState(0)
+  const [sens, setSens] = useState<InputSettings>(() => sensRef.current)
+
+  const updateSens = (patch: Partial<InputSettings>) => {
+    const next = { ...sensRef.current, ...patch }
+    sensRef.current = next
+    setSens(next)
+    saveInputSettings(next)
+  }
 
   const setOffset = (value: number) => {
     sheetOffsetRef.current = value
@@ -59,7 +71,8 @@ export function TouchScreen({ transport }: Props) {
     const dx = e.clientX - last.current.x
     const dy = e.clientY - last.current.y
     last.current = { x: e.clientX, y: e.clientY }
-    if (dx || dy) transport.mouseMove(dx, dy)
+    const g = sensRef.current.pointer
+    if (dx || dy) transport.mouseMove(dx * g, dy * g)
     updateGlint(e)
   }
 
@@ -95,13 +108,13 @@ export function TouchScreen({ transport }: Props) {
     if (scrollLastY.current == null) return
     const dy = e.clientY - scrollLastY.current
     scrollLastY.current = e.clientY
-    if (dy) {
-      transport.mouseScroll(0, dy * SCROLL_GAIN)
-      scrollTick.current += Math.abs(dy)
-      if (scrollTick.current > 28) {
-        scrollTick.current = 0
-        haptic('light')
-      }
+    if (!dy) return
+    const gain = SCROLL_BASE * sensRef.current.scroll
+    transport.mouseScroll(0, dy * gain)
+    scrollTick.current += Math.abs(dy)
+    if (scrollTick.current > 48) {
+      scrollTick.current = 0
+      haptic('light')
     }
   }
 
@@ -174,6 +187,21 @@ export function TouchScreen({ transport }: Props) {
   return (
     <section className="screen touch-screen">
       <div className="pad-wrap">
+        <div className="sens-panel">
+          <SensSlider
+            label="Pointer"
+            setting="pointer"
+            value={sens.pointer}
+            onChange={(pointer) => updateSens({ pointer })}
+          />
+          <SensSlider
+            label="Scroll"
+            setting="scroll"
+            value={sens.scroll}
+            onChange={(scroll) => updateSens({ scroll })}
+          />
+        </div>
+
         <div className="pad-row">
           <div
             className={`touchpad${active ? ' active' : ''}`}

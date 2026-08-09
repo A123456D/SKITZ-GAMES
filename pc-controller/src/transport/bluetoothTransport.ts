@@ -51,6 +51,10 @@ export function createBluetoothTransport(): Transport & {
   let nativeMessage = 'Tap Scan to find PCs (Bluetooth) and Smart TVs (Wi‑Fi)'
   let nativeDetail = ''
   let link: LinkMode = 'none'
+  let moveAccX = 0
+  let moveAccY = 0
+  let scrollAccX = 0
+  let scrollAccY = 0
   const listeners = new Set<Listener>()
 
   const notify = () => listeners.forEach((fn) => fn())
@@ -281,7 +285,14 @@ export function createBluetoothTransport(): Transport & {
     },
     mouseMove(dx: number, dy: number) {
       if (link !== 'bluetooth') return
-      void BluetoothHid.mouseMove({ dx: Math.round(dx), dy: Math.round(dy) })
+      moveAccX += dx
+      moveAccY += dy
+      const ix = Math.trunc(moveAccX)
+      const iy = Math.trunc(moveAccY)
+      if (!ix && !iy) return
+      moveAccX -= ix
+      moveAccY -= iy
+      void BluetoothHid.mouseMove({ dx: ix, dy: iy })
     },
     mouseButton(button: 'left' | 'right' | 'middle', down: boolean) {
       if (link !== 'bluetooth') return
@@ -289,7 +300,14 @@ export function createBluetoothTransport(): Transport & {
     },
     mouseScroll(dx: number, dy: number) {
       if (link !== 'bluetooth') return
-      void BluetoothHid.mouseScroll({ dx: Math.round(dx), dy: Math.round(dy) })
+      scrollAccX += dx
+      scrollAccY += dy
+      const ix = Math.trunc(scrollAccX)
+      const iy = Math.trunc(scrollAccY)
+      if (!ix && !iy) return
+      scrollAccX -= ix
+      scrollAccY -= iy
+      void BluetoothHid.mouseScroll({ dx: ix, dy: iy })
     },
     key(code: string, down: boolean) {
       if (link === 'wifi-tv') {
@@ -315,6 +333,7 @@ export function createBluetoothTransport(): Transport & {
         ly: next.ly,
         rx: next.rx,
         ry: next.ry,
+        lookGain: next.lookGain ?? 34,
         buttons: next.buttons,
       })
     },

@@ -270,6 +270,7 @@ class BluetoothHidPlugin : Plugin() {
         val ly = call.getFloat("ly") ?: 0f
         val rx = call.getFloat("rx") ?: 0f
         val ry = call.getFloat("ry") ?: 0f
+        val lookGain = call.getFloat("lookGain") ?: 34f
         val buttonsObj = call.getObject("buttons") ?: JSObject()
         val buttons = HashMap<String, Boolean>()
         val keys = buttonsObj.keys()
@@ -277,7 +278,7 @@ class BluetoothHidPlugin : Plugin() {
             val k = keys.next()
             buttons[k] = buttonsObj.getBool(k) == true
         }
-        controller?.gamepad(lx, ly, rx, ry, buttons)
+        controller?.gamepad(lx, ly, rx, ry, buttons, lookGain)
         call.resolve()
     }
 
