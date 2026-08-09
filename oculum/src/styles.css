@@ -111,6 +111,12 @@ img {
   width: 100%;
   height: 100%;
   display: block;
+  /* WebGL layers can steal taps on Android even under #hud — only enable in-match. */
+  pointer-events: none;
+}
+
+body:not(.on-menu) #stage {
+  pointer-events: auto;
 }
 
 #hud {
@@ -4224,6 +4230,7 @@ button.ghost,
   text-transform: uppercase;
   cursor: pointer;
   isolation: isolate;
+  touch-action: manipulation;
   transition:
     transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
     background 0.16s ease,
@@ -5736,8 +5743,22 @@ body.on-menu #altitudes {
   visibility: hidden;
 }
 
+/* Android Chrome: pointer-events:none on #hud can skip hit-testing for sheets inside it.
+   Visibility-hidden match chrome already ignores taps — keep HUD interactive on the title screen. */
+body.on-menu {
+  touch-action: manipulation;
+}
+
 body.on-menu #hud {
-  pointer-events: none;
+  pointer-events: auto;
+}
+
+body.on-menu #menu,
+body.on-menu #menu button,
+body.on-menu .panel.sheet,
+body.on-menu .panel.sheet button {
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 @keyframes seal-breath {

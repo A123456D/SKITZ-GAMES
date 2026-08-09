@@ -4666,9 +4666,32 @@ const unlockAnd = (fn: () => void) => () => {
   playSfx("ui-tap");
   fn();
 };
-document.getElementById("btn-play")!.addEventListener("click", unlockAnd(() => openHeresyPick()));
-document.getElementById("btn-continue")!.addEventListener(
-  "click",
+
+/** Android: body touch-action:none can drop click synthesis — also fire on touch pointerup. */
+function bindTap(el: HTMLElement | null, handler: (ev: Event) => void): void {
+  if (!el) return;
+  let last = 0;
+  const run = (ev: Event): void => {
+    const now = performance.now();
+    if (now - last < 450) return;
+    last = now;
+    handler(ev);
+  };
+  el.addEventListener("click", run);
+  el.addEventListener(
+    "pointerup",
+    (ev) => {
+      if (ev.pointerType !== "touch" && ev.pointerType !== "pen") return;
+      if (ev.button != null && ev.button !== 0) return;
+      run(ev);
+    },
+    { passive: true },
+  );
+}
+
+bindTap(document.getElementById("btn-play"), unlockAnd(() => openHeresyPick()));
+bindTap(
+  document.getElementById("btn-continue"),
   unlockAnd(() => {
     if (!resumeSavedMatch()) {
       showToast("No saved match to resume.");
@@ -4676,7 +4699,7 @@ document.getElementById("btn-continue")!.addEventListener(
     }
   }),
 );
-document.getElementById("btn-tutorial")!.addEventListener("click", unlockAnd(() => openTutorialPick()));
+bindTap(document.getElementById("btn-tutorial"), unlockAnd(() => openTutorialPick()));
 document.getElementById("tutorial-back")!.addEventListener("click", () => closeTutorialPick());
 tutorialListEl.addEventListener("click", (ev) => {
   const btn = (ev.target as HTMLElement | null)?.closest?.("[data-tutorial]") as HTMLElement | null;
@@ -4687,18 +4710,15 @@ tutorialListEl.addEventListener("click", (ev) => {
   playSfx("ui-tap");
   startMatch(true, undefined, id);
 });
-document.getElementById("btn-spectate")!.addEventListener("click", unlockAnd(() => openSpectatePick()));
+bindTap(document.getElementById("btn-spectate"), unlockAnd(() => openSpectatePick()));
 document.getElementById("spectate-back")!.addEventListener("click", () => {
   document.getElementById("spectate-pick")!.hidden = true;
   menu.hidden = false;
   setMenuMode(true);
 });
-document.getElementById("spectate-random")!.addEventListener(
-  "click",
-  unlockAnd(() => startRandomSpectate()),
-);
-document.getElementById("spectate-start")!.addEventListener(
-  "click",
+bindTap(document.getElementById("spectate-random"), unlockAnd(() => startRandomSpectate()));
+bindTap(
+  document.getElementById("spectate-start"),
   unlockAnd(() => {
     const bottom = (document.getElementById("spectate-bottom") as HTMLSelectElement).value as LiveCraft;
     const top = (document.getElementById("spectate-top") as HTMLSelectElement).value as LiveCraft;
@@ -4706,10 +4726,10 @@ document.getElementById("spectate-start")!.addEventListener(
     startSpectateBots(bottom, top, { seed, random: false });
   }),
 );
-document.getElementById("btn-codex")!.addEventListener("click", unlockAnd(() => openCodex()));
-document.getElementById("btn-builder")!.addEventListener("click", unlockAnd(() => openBuilder()));
-document.getElementById("btn-howto")!.addEventListener("click", unlockAnd(() => openHowto("menu")));
-document.getElementById("btn-settings")!.addEventListener("click", unlockAnd(() => openSettings("menu")));
+bindTap(document.getElementById("btn-codex"), unlockAnd(() => openCodex()));
+bindTap(document.getElementById("btn-builder"), unlockAnd(() => openBuilder()));
+bindTap(document.getElementById("btn-howto"), unlockAnd(() => openHowto("menu")));
+bindTap(document.getElementById("btn-settings"), unlockAnd(() => openSettings("menu")));
 document.getElementById("heresy-back")!.addEventListener("click", () => closeHeresyPick());
 heresyListEl.addEventListener("click", (ev) => {
   const t = ev.target as HTMLElement | null;
