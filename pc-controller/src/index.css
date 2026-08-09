@@ -1088,6 +1088,14 @@ button.status-pill:active {
   transform: scale(0.94);
 }
 
+.game-key.wide {
+  grid-column: span 2;
+  aspect-ratio: auto;
+  min-height: 0;
+  font-size: clamp(0.62rem, 2.6vw, 0.82rem);
+  letter-spacing: 0.04em;
+}
+
 .look-pad {
   position: relative;
   width: min(100%, 120px);

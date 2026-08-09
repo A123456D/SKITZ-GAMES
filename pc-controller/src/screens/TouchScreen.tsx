@@ -53,11 +53,11 @@ export function TouchScreen({ transport }: Props) {
   const lastTapUp = useRef(0)
 
   const [active, setActive] = useState(false)
-  const [glint, setGlint] = useState({ x: 50, y: 50 })
   const [down, setDown] = useState<Record<string, boolean>>({})
   const [keysOpen, setKeysOpen] = useState(false)
   const [sheetOffset, setSheetOffset] = useState(0)
   const [sens, setSens] = useState<InputSettings>(() => sensRef.current)
+  const glintRef = useRef<HTMLDivElement | null>(null)
 
   const updateSens = (patch: Partial<InputSettings>) => {
     const next = { ...sensRef.current, ...patch }
@@ -284,11 +284,13 @@ export function TouchScreen({ transport }: Props) {
   }
 
   const updateGlint = (e: PointerEvent<HTMLDivElement>) => {
+    const el = glintRef.current
+    if (!el) return
     const rect = e.currentTarget.getBoundingClientRect()
-    setGlint({
-      x: ((e.clientX - rect.left) / rect.width) * 100,
-      y: ((e.clientY - rect.top) / rect.height) * 100,
-    })
+    const x = ((e.clientX - rect.left) / rect.width) * 100
+    const y = ((e.clientY - rect.top) / rect.height) * 100
+    el.style.left = `${x}%`
+    el.style.top = `${y}%`
   }
 
   const onScrollDown = (e: PointerEvent<HTMLDivElement>) => {
@@ -404,7 +406,7 @@ export function TouchScreen({ transport }: Props) {
             onPointerUp={onPadUp}
             onPointerCancel={onPadCancel}
           >
-            <div className="cursor-glint" style={{ left: `${glint.x}%`, top: `${glint.y}%` }} />
+            <div className="cursor-glint" ref={glintRef} style={{ left: '50%', top: '50%' }} />
             <div className="pad-edge-hint" aria-hidden>
               tap · dbl-tap drag · swipe up for keys
             </div>

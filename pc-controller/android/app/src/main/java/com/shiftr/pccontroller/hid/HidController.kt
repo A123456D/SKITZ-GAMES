@@ -467,7 +467,8 @@ class HidController(private val context: Context) {
         mouseButtons = buttons and 0x03
         val host = hostDevice
         val hid = hidDevice
-        if (host == null || hid == null || !registered || !isConnectedTo(host)) return false
+        // Hot path: skip getConnectionState — it adds lag under high-rate moves.
+        if (host == null || hid == null || !registered) return false
         val x = dx.coerceIn(-2047, 2047)
         val y = dy.coerceIn(-2047, 2047)
         val report =
@@ -483,6 +484,8 @@ class HidController(private val context: Context) {
         return try {
             hid.sendReport(host, HidDescriptors.MOUSE_REPORT_ID, report)
         } catch (_: SecurityException) {
+            false
+        } catch (_: Exception) {
             false
         }
     }

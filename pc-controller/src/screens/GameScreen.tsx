@@ -19,7 +19,7 @@ const EMPTY: GamepadState = {
 }
 
 /** Middle keys — no WASD / arrows (left stick covers movement). */
-const MID_KEYS: { label: string; code: string }[] = [
+const MID_KEYS: { label: string; code: string; wide?: boolean }[] = [
   { label: 'G', code: 'KeyG' },
   { label: 'T', code: 'KeyT' },
   { label: 'F', code: 'KeyF' },
@@ -35,6 +35,8 @@ const MID_KEYS: { label: string; code: string }[] = [
   { label: '3', code: 'Digit3' },
   { label: '4', code: 'Digit4' },
   { label: '5', code: 'Digit5' },
+  { label: '⇧', code: 'ShiftLeft', wide: true },
+  { label: 'Ctrl', code: 'ControlLeft', wide: true },
 ]
 
 export function GameScreen({ transport }: Props) {
@@ -267,11 +269,11 @@ export function GameScreen({ transport }: Props) {
 
         <div className="game-cluster game-cluster-keys">
           <div className="game-key-grid" role="group" aria-label="Game keys">
-            {MID_KEYS.map(({ label, code }) => (
+            {MID_KEYS.map(({ label, code, wide }) => (
               <button
                 key={code}
                 type="button"
-                className={`game-key${down[code] ? ' down' : ''}`}
+                className={`game-key${wide ? ' wide' : ''}${down[code] ? ' down' : ''}`}
                 {...bindKey(code)}
               >
                 {label}

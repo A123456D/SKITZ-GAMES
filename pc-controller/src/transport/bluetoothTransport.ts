@@ -55,11 +55,72 @@ export function createBluetoothTransport(): Transport & {
   let moveAccY = 0
   let scrollAccX = 0
   let scrollAccY = 0
+  let moveInFlight = false
+  let scrollInFlight = false
+  let moveRaf = 0
+  let scrollRaf = 0
   let gamepadLatest: GamepadState | null = null
   let gamepadFlushScheduled = false
   const listeners = new Set<Listener>()
 
   const notify = () => listeners.forEach((fn) => fn())
+
+  /** One bridge call at a time — queued Capacitor moves cause post-lift ghost motion. */
+  const flushMouseMove = () => {
+    moveRaf = 0
+    if (link !== 'bluetooth') {
+      moveAccX = 0
+      moveAccY = 0
+      moveInFlight = false
+      return
+    }
+    if (moveInFlight) return
+    const ix = Math.trunc(moveAccX)
+    const iy = Math.trunc(moveAccY)
+    if (!ix && !iy) return
+    moveAccX -= ix
+    moveAccY -= iy
+    moveInFlight = true
+    void BluetoothHid.mouseMove({ dx: ix, dy: iy }).finally(() => {
+      moveInFlight = false
+      if (Math.trunc(moveAccX) || Math.trunc(moveAccY)) {
+        if (!moveRaf) moveRaf = requestAnimationFrame(flushMouseMove)
+      }
+    })
+  }
+
+  const scheduleMouseMove = () => {
+    if (moveRaf || moveInFlight) return
+    moveRaf = requestAnimationFrame(flushMouseMove)
+  }
+
+  const flushMouseScroll = () => {
+    scrollRaf = 0
+    if (link !== 'bluetooth') {
+      scrollAccX = 0
+      scrollAccY = 0
+      scrollInFlight = false
+      return
+    }
+    if (scrollInFlight) return
+    const ix = Math.trunc(scrollAccX)
+    const iy = Math.trunc(scrollAccY)
+    if (!ix && !iy) return
+    scrollAccX -= ix
+    scrollAccY -= iy
+    scrollInFlight = true
+    void BluetoothHid.mouseScroll({ dx: ix, dy: iy }).finally(() => {
+      scrollInFlight = false
+      if (Math.trunc(scrollAccX) || Math.trunc(scrollAccY)) {
+        if (!scrollRaf) scrollRaf = requestAnimationFrame(flushMouseScroll)
+      }
+    })
+  }
+
+  const scheduleMouseScroll = () => {
+    if (scrollRaf || scrollInFlight) return
+    scrollRaf = requestAnimationFrame(flushMouseScroll)
+  }
 
   const applyNative = (s: HidNativeState) => {
     if (link === 'wifi-tv') return
@@ -289,27 +350,29 @@ export function createBluetoothTransport(): Transport & {
       if (link !== 'bluetooth') return
       moveAccX += dx
       moveAccY += dy
-      const ix = Math.trunc(moveAccX)
-      const iy = Math.trunc(moveAccY)
-      if (!ix && !iy) return
-      moveAccX -= ix
-      moveAccY -= iy
-      void BluetoothHid.mouseMove({ dx: ix, dy: iy })
+      scheduleMouseMove()
     },
     mouseButton(button: 'left' | 'right' | 'middle', down: boolean) {
       if (link !== 'bluetooth') return
+      // Flush pending cursor motion before the click (don't wait on bridge).
+      if (moveRaf) {
+        cancelAnimationFrame(moveRaf)
+        moveRaf = 0
+      }
+      const ix = Math.trunc(moveAccX)
+      const iy = Math.trunc(moveAccY)
+      if (ix || iy) {
+        moveAccX -= ix
+        moveAccY -= iy
+        void BluetoothHid.mouseMove({ dx: ix, dy: iy })
+      }
       void BluetoothHid.mouseButton({ button, down })
     },
     mouseScroll(dx: number, dy: number) {
       if (link !== 'bluetooth') return
       scrollAccX += dx
       scrollAccY += dy
-      const ix = Math.trunc(scrollAccX)
-      const iy = Math.trunc(scrollAccY)
-      if (!ix && !iy) return
-      scrollAccX -= ix
-      scrollAccY -= iy
-      void BluetoothHid.mouseScroll({ dx: ix, dy: iy })
+      scheduleMouseScroll()
     },
     key(code: string, down: boolean) {
       if (link === 'wifi-tv') {

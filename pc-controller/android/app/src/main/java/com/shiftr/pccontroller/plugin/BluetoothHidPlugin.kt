@@ -48,6 +48,31 @@ class BluetoothHidPlugin : Plugin() {
     private var bound = false
     private val handler = Handler(Looper.getMainLooper())
     private var pendingGamepad: Runnable? = null
+    private var pendingMouseDx = 0
+    private var pendingMouseDy = 0
+    private var mouseFlushPosted = false
+    private val mouseLock = Any()
+
+    private fun flushPendingMouse() {
+        val dx: Int
+        val dy: Int
+        synchronized(mouseLock) {
+            dx = pendingMouseDx
+            dy = pendingMouseDy
+            pendingMouseDx = 0
+            pendingMouseDy = 0
+            mouseFlushPosted = false
+        }
+        if (dx != 0 || dy != 0) {
+            controller?.sendMouse(dx, dy)
+        }
+        synchronized(mouseLock) {
+            if ((pendingMouseDx != 0 || pendingMouseDy != 0) && !mouseFlushPosted) {
+                mouseFlushPosted = true
+                handler.post { flushPendingMouse() }
+            }
+        }
+    }
 
     private val connection =
         object : ServiceConnection {
@@ -227,7 +252,15 @@ class BluetoothHidPlugin : Plugin() {
     fun mouseMove(call: PluginCall) {
         val dx = call.getInt("dx") ?: 0
         val dy = call.getInt("dy") ?: 0
-        controller?.sendMouse(dx, dy)
+        // Coalesce on the main handler so a Capacitor backlog merges into one report.
+        synchronized(mouseLock) {
+            pendingMouseDx += dx
+            pendingMouseDy += dy
+            if (!mouseFlushPosted) {
+                mouseFlushPosted = true
+                handler.post { flushPendingMouse() }
+            }
+        }
         call.resolve()
     }
 
