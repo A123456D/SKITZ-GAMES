@@ -11,7 +11,7 @@ const destFresh = join(root, "..", "website", "public", "games", "oculum", "b9")
 const siteImg = join(root, "..", "website", "public", "images", "oculum-seal.png");
 const seal = join(root, "public", "assets", "ui", "seal-eye.png");
 /** Bump whenever shipping a critical client fix so phones drop stale SW caches. */
-const SW_CACHE = "oculum-beta-v9-kill";
+const SW_CACHE = "oculum-beta-v10";
 
 if (!existsSync(dist)) {
   console.error("Missing dist/ — run npm run build first");
@@ -35,7 +35,7 @@ if (existsSync(seal)) {
 
 const bustScript = `<script>
 (function () {
-  var KEY = "oculum-bust-v9";
+  var KEY = "oculum-bust-v10";
   try {
     if (sessionStorage.getItem(KEY) === "1") return;
     sessionStorage.setItem(KEY, "1");
@@ -43,8 +43,8 @@ const bustScript = `<script>
   var done = function () {
     try {
       var u = new URL(location.href);
-      if (u.searchParams.get("v") !== "9") {
-        u.searchParams.set("v", "9");
+      if (u.searchParams.get("v") !== "10") {
+        u.searchParams.set("v", "10");
         location.replace(u.toString());
       }
     } catch (e2) {}
@@ -79,7 +79,7 @@ self.addEventListener("activate", (e) => {
     for (const c of clients) {
       try {
         const u = new URL(c.url);
-        u.searchParams.set("v", "9");
+        u.searchParams.set("v", "10");
         await c.navigate(u.toString());
       } catch (_) {
         /* ignore */
@@ -95,7 +95,7 @@ self.addEventListener("fetch", (e) => {
 function patchShell(target) {
   const indexPath = join(target, "index.html");
   const indexHtml = readFileSync(indexPath, "utf8");
-  if (!indexHtml.includes("oculum-bust-v9")) {
+  if (!indexHtml.includes("oculum-bust-v10")) {
     writeFileSync(
       indexPath,
       indexHtml.replace(/<head[^>]*>/i, (m) => `${m}\n    ${bustScript}`),
@@ -123,10 +123,10 @@ writeFileSync(
       await Promise.all(keys.map((k) => caches.delete(k)));
     }
   } catch (e) {}
-  location.replace("../b9/?v=9");
+  location.replace("../b9/?v=10");
 })();
 </script>
-<p style="font-family:system-ui;color:#eee;background:#111;padding:2rem">Opening OCULUM build 9…</p>
+<p style="font-family:system-ui;color:#eee;background:#111;padding:2rem">Opening OCULUM build 10…</p>
 `,
 );
 

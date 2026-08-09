@@ -4768,7 +4768,12 @@ body.reduce-motion .heresy-card {
   top: 0;
   transform: none;
   max-height: none;
-  overflow: hidden;
+  /* Short Android Chrome viewports must scroll — never clip Build Deck / Codex */
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
   z-index: 40;
 }
 
@@ -4793,17 +4798,19 @@ body.reduce-motion .heresy-card {
   z-index: 1;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 10px;
+  /* Grow with content so parent can scroll; fill tall screens via min-height */
   min-height: 100%;
-  height: 100%;
+  height: auto;
   max-width: 30rem;
   margin: 0 auto;
   padding:
-    max(36px, calc(env(safe-area-inset-top, 0px) + 28px))
-    max(20px, env(safe-area-inset-right, 0px))
-    max(20px, calc(env(safe-area-inset-bottom, 0px) + 14px))
-    max(20px, env(safe-area-inset-left, 0px));
+    max(28px, calc(env(safe-area-inset-top, 0px) + 16px))
+    max(16px, env(safe-area-inset-right, 0px))
+    max(28px, calc(env(safe-area-inset-bottom, 0px) + 24px))
+    max(16px, env(safe-area-inset-left, 0px));
   background: transparent !important;
   box-shadow: none !important;
   text-align: center;
@@ -5088,28 +5095,29 @@ button.menu-link:active {
   }
 }
 
+/* Phones: compact so Continue + links fit above the Android nav / Chrome chrome */
 @media (max-width: 720px) {
-  .menu-home-content {
-    padding-bottom: max(72px, calc(env(safe-area-inset-bottom, 0px) + 56px));
-  }
-
-  .menu-actions {
-    margin-bottom: 12px;
-  }
-}
-
-@media (max-height: 640px) {
   .menu-hero {
-    padding-top: 8px;
+    padding-top: 2px;
   }
 
   .menu-seal {
-    width: clamp(56px, 14vw, 76px);
+    width: clamp(64px, 15vw, 92px);
     margin-bottom: 8px;
   }
 
   .menu-wordmark {
-    font-size: clamp(1.85rem, 8vw, 2.4rem);
+    font-size: clamp(1.9rem, 9vw, 2.55rem);
+  }
+
+  .menu-tag {
+    margin-top: 8px;
+  }
+
+  .menu-build {
+    margin-top: 6px;
+    font-size: 0.64rem;
+    padding: 0.22em 0.7em;
   }
 
   .menu-blurb {
@@ -5117,24 +5125,118 @@ button.menu-link:active {
   }
 
   .menu-actions {
-    padding: 12px 10px 8px;
-    margin-bottom: 8px;
+    gap: 8px;
+    padding: 10px 10px 10px;
+    margin-top: 4px;
+    margin-bottom: 0;
+  }
+
+  .menu-cta {
+    min-height: 52px;
+  }
+
+  .menu-cta .btn-label {
+    padding: 10px 14px 12px;
+    font-size: 0.98rem;
+  }
+
+  .menu-cta .btn-kicker {
+    margin-bottom: 2px;
+  }
+
+  .menu-secondary-cta {
+    min-height: 42px;
+  }
+
+  .menu-secondary-cta .btn-label {
+    font-size: 0.8rem;
+  }
+
+  .menu-links {
+    padding-top: 8px;
+    gap: 6px;
+  }
+
+  button.menu-link {
+    min-height: 40px;
+  }
+
+  button.menu-link .btn-label {
+    padding: 8px 6px;
   }
 
   .menu-home-content {
-    padding-top: max(20px, calc(env(safe-area-inset-top, 0px) + 10px));
-    padding-bottom: max(48px, calc(env(safe-area-inset-bottom, 0px) + 36px));
+    gap: 6px;
+    padding-top: max(16px, calc(env(safe-area-inset-top, 0px) + 8px));
+    padding-bottom: max(24px, calc(env(safe-area-inset-bottom, 0px) + 20px));
   }
 }
 
-@media (min-width: 720px) and (min-height: 700px) {
+@media (max-height: 700px) {
+  .menu-hero {
+    padding-top: 0;
+  }
+
+  .menu-seal {
+    width: clamp(48px, 12vw, 68px);
+    margin-bottom: 4px;
+  }
+
+  .menu-wordmark {
+    font-size: clamp(1.7rem, 7.5vw, 2.2rem);
+  }
+
+  .menu-tag {
+    margin-top: 6px;
+    font-size: 0.58rem;
+  }
+
+  .menu-blurb {
+    display: none;
+  }
+
+  .menu-actions {
+    gap: 6px;
+    padding: 8px 8px 8px;
+  }
+
+  .menu-cta {
+    min-height: 48px;
+  }
+
+  .menu-secondary-cta {
+    min-height: 40px;
+  }
+
+  button.menu-link {
+    min-height: 38px;
+  }
+
+  .menu-home-content {
+    padding-top: max(12px, calc(env(safe-area-inset-top, 0px) + 6px));
+    padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 16px));
+  }
+}
+
+@media (min-width: 720px) and (min-height: 760px) {
   .menu-home-content {
     max-width: 32rem;
+    justify-content: space-between;
+    gap: 0;
   }
 
   .menu-links {
     grid-template-columns: repeat(4, 1fr);
   }
+}
+
+body.on-menu {
+  /* Allow vertical pan on the title sheet despite global touch-action: none */
+  touch-action: manipulation;
+}
+
+body.on-menu #menu.menu-home {
+  touch-action: pan-y;
 }
 
 .settings-select {
