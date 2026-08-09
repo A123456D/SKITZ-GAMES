@@ -78,10 +78,15 @@ body {
   margin: 0;
   width: 100%;
   height: 100%;
+  min-height: 100%;
+  min-height: -webkit-fill-available;
   height: 100dvh;
   overflow: hidden;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
   background: #0e0a12;
 }
 
@@ -294,6 +299,7 @@ img {
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1508,6 +1514,8 @@ body.reduce-motion .victory-reveal.is-juiced .victory-score {
   flex-direction: column;
   gap: 4px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   overscroll-behavior: contain;
   padding-right: 2px;
   pointer-events: auto;
@@ -2594,6 +2602,8 @@ body.reduce-motion .fx-wager-flip {
 
 body.dragging-card {
   cursor: grabbing;
+  touch-action: none;
+  overflow: hidden;
 }
 
 body.dragging-card #hand-area {
@@ -2932,7 +2942,8 @@ body.enemy-turn #toast-text {
   transform: translate(-50%, 0) translateY(var(--slot-y)) rotate(var(--slot-rot));
   transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
   z-index: calc(2 + var(--i, 0));
-  touch-action: manipulation;
+  /* none: allow drag without iOS scroll/gesture steal; sheets use pan-y */
+  touch-action: none;
   -webkit-user-select: none;
   user-select: none;
   opacity: 1;
@@ -3577,6 +3588,7 @@ button.ghost:active:not(:disabled),
   padding: 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -4416,6 +4428,8 @@ button.menu-link:active {
   max-height: 7.5rem;
   overflow-x: hidden;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   text-align: center;
   min-height: 0;
   padding: 8px 10px;
@@ -5475,6 +5489,7 @@ body.inspect-open #end {
   overflow-y: auto;
   padding: 8px 6px;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   background: rgba(8, 6, 12, 0.35);
   border-radius: 6px;
   box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.12);

@@ -43,11 +43,10 @@ const SFX_FILES: Record<SfxId, string> = {
   lose: "lose.mp3",
   enemy: "enemy.mp3",
   fall: "fall.mp3",
-  // Semantic aliases until dedicated stems ship
-  stain: "gaze.mp3",
-  strain: "resolve.mp3",
-  blind: "pass.mp3",
-  draw: "select.mp3",
+  stain: "stain.mp3",
+  strain: "strain.mp3",
+  blind: "blind.mp3",
+  draw: "draw.mp3",
 };
 
 const MUSIC_FILES: Record<MusicBed, string> = {
@@ -59,33 +58,49 @@ const MUSIC_FILES: Record<MusicBed, string> = {
 
 const MUTE_KEY = "oculum.muted";
 const MUSIC_MUTE_KEY = "oculum.musicMuted";
-const SFX_VERSION = 5;
+const SFX_VERSION = 9;
 const MUSIC_VOLUME = 0.32;
 const END_MUSIC_VOLUME = 0.4;
 
-const DEFAULT_VOL: Partial<Record<SfxId, number>> = {
-  "ui-tap": 0.45,
-  select: 0.55,
-  play: 0.7,
-  site: 0.82,
-  witness: 0.85,
-  gaze: 0.88,
-  graft: 0.7,
-  stance: 0.65,
-  rite: 0.88,
-  pass: 0.5,
-  resolve: 0.9,
-  law: 0.85,
-  eclipse: 0.9,
-  win: 0.95,
-  lose: 0.92,
-  enemy: 0.55,
-  stain: 0.78,
-  strain: 0.72,
-  blind: 0.62,
-  fall: 0.88,
-  draw: 0.48,
+/** Keep UI dry; only a few combat stingers get light pitch vary. */
+const PITCH_VARY: Partial<Record<SfxId, boolean>> = {
+  play: true,
+  resolve: true,
+  fall: true,
+  stain: true,
+  strain: true,
 };
+
+const DEFAULT_VOL: Partial<Record<SfxId, number>> = {
+  "ui-tap": 0.28,
+  select: 0.32,
+  play: 0.42,
+  site: 0.48,
+  witness: 0.28,
+  gaze: 0.5,
+  graft: 0.4,
+  stance: 0.38,
+  rite: 0.5,
+  pass: 0.3,
+  resolve: 0.55,
+  law: 0.5,
+  eclipse: 0.52,
+  win: 0.58,
+  lose: 0.55,
+  enemy: 0.3,
+  stain: 0.42,
+  strain: 0.4,
+  blind: 0.38,
+  fall: 0.52,
+  draw: 0.28,
+};
+
+type AudioCtxCtor = typeof AudioContext;
+
+function AudioContextCtor(): AudioCtxCtor {
+  const w = window as Window & { webkitAudioContext?: AudioCtxCtor };
+  return window.AudioContext || w.webkitAudioContext || AudioContext;
+}
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -98,6 +113,7 @@ let loadPromise: Promise<void> | null = null;
 let musicEl: HTMLAudioElement | null = null;
 let currentBed: MusicBed | null = null;
 let desiredBed: MusicBed = "menu";
+let gestureArmed = false;
 
 function readFlag(key: string): boolean {
   try {
@@ -120,7 +136,7 @@ musicMuted = readFlag(MUSIC_MUTE_KEY);
 
 function ensureCtx(): AudioContext {
   if (!ctx) {
-    ctx = new AudioContext();
+    ctx = new (AudioContextCtor())();
     master = ctx.createGain();
     master.gain.value = muted ? 0 : masterVol;
     master.connect(ctx.destination);
@@ -128,11 +144,25 @@ function ensureCtx(): AudioContext {
   return ctx;
 }
 
+/** iOS Safari: play a silent buffer inside the user-gesture turn. */
+function pokeSilentUnlock(audio: AudioContext): void {
+  try {
+    const buf = audio.createBuffer(1, 1, audio.sampleRate || 22050);
+    const src = audio.createBufferSource();
+    src.buffer = buf;
+    src.connect(audio.destination);
+    src.start(0);
+  } catch {
+    /* ignore */
+  }
+}
+
 async function decodeOne(id: SfxId, audio: AudioContext): Promise<boolean> {
   try {
     const res = await fetch(`./sfx/${SFX_FILES[id]}?v=${SFX_VERSION}`);
     if (!res.ok) return false;
     const raw = await res.arrayBuffer();
+    // Safari may detach the buffer — always decode a copy
     const buf = await audio.decodeAudioData(raw.slice(0));
     buffers.set(id, buf);
     return true;
@@ -150,9 +180,24 @@ export function loadSfx(): Promise<void> {
   return loadPromise;
 }
 
+function ensureMusicEl(): HTMLAudioElement {
+  if (!musicEl) {
+    musicEl = new Audio();
+    musicEl.loop = true;
+    musicEl.preload = "auto";
+    musicEl.volume = MUSIC_VOLUME;
+    // Critical for iPhone Safari — without this, HTMLAudio may refuse to play
+    musicEl.setAttribute("playsinline", "true");
+    musicEl.setAttribute("webkit-playsinline", "true");
+    (musicEl as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
+  }
+  return musicEl;
+}
+
 export async function unlockAudio(): Promise<void> {
   unlocked = true;
   const audio = ensureCtx();
+  pokeSilentUnlock(audio);
   // Start HTML music while still inside the user-gesture turn (before any await).
   syncMusic();
   void loadSfx();
@@ -162,24 +207,34 @@ export async function unlockAudio(): Promise<void> {
     } catch {
       /* ignore */
     }
+    pokeSilentUnlock(audio);
     syncMusic();
   }
 }
 
-/** Browsers block Audio until a gesture — arm once, then start the desired bed. */
+/**
+ * Browsers block Audio until a gesture.
+ * iOS Safari only treats certain events as activation (touchend / pointerup, not touchstart).
+ */
 export function armUnlockOnGesture(): void {
   if (unlocked) {
     syncMusic();
     return;
   }
+  if (gestureArmed) return;
+  gestureArmed = true;
+
   const once = (): void => {
+    window.removeEventListener("pointerup", once, true);
+    window.removeEventListener("touchend", once, true);
     window.removeEventListener("pointerdown", once, true);
-    window.removeEventListener("touchstart", once, true);
     window.removeEventListener("keydown", once, true);
     void unlockAudio();
   };
+  // Prefer Safari-qualifying activation events first
+  window.addEventListener("pointerup", once, { capture: true });
+  window.addEventListener("touchend", once, { capture: true, passive: true });
   window.addEventListener("pointerdown", once, { capture: true });
-  window.addEventListener("touchstart", once, { capture: true, passive: true });
   window.addEventListener("keydown", once, { capture: true });
 }
 
@@ -214,21 +269,21 @@ export function playSfx(
 ): void {
   if (!unlocked || muted) return;
   const audio = ensureCtx();
+  if (audio.state === "suspended") void audio.resume();
   const buf = buffers.get(id);
   if (!buf || !master) {
     void playHtmlFallback(id, opts?.volume ?? DEFAULT_VOL[id] ?? 1);
     return;
   }
-  if (audio.state === "suspended") void audio.resume();
 
   const src = audio.createBufferSource();
   src.buffer = buf;
-  const vary = opts?.vary !== false;
+  const vary = opts?.vary ?? PITCH_VARY[id] === true;
   const base = opts?.rate ?? 1;
-  src.playbackRate.value = vary ? base * (0.94 + Math.random() * 0.12) : base;
+  src.playbackRate.value = vary ? base * (0.97 + Math.random() * 0.06) : base;
 
   const gain = audio.createGain();
-  gain.gain.value = opts?.volume ?? DEFAULT_VOL[id] ?? 1;
+  gain.gain.value = opts?.volume ?? DEFAULT_VOL[id] ?? 0.45;
   src.connect(gain);
   gain.connect(master);
   try {
@@ -241,6 +296,8 @@ export function playSfx(
 function playHtmlFallback(id: SfxId, volume: number): void {
   try {
     const el = new Audio(`./sfx/${SFX_FILES[id]}?v=${SFX_VERSION}`);
+    el.setAttribute("playsinline", "true");
+    (el as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
     el.volume = Math.max(0, Math.min(1, volume));
     void el.play();
   } catch {
@@ -253,20 +310,15 @@ function playBed(bed: MusicBed): void {
     stopMusic();
     return;
   }
-  if (!musicEl) {
-    musicEl = new Audio();
-    musicEl.loop = true;
-    musicEl.preload = "auto";
-    musicEl.volume = MUSIC_VOLUME;
-  }
+  const el = ensureMusicEl();
   if (currentBed !== bed) {
-    musicEl.src = `./sfx/${MUSIC_FILES[bed]}?v=${SFX_VERSION}`;
+    el.src = `./sfx/${MUSIC_FILES[bed]}?v=${SFX_VERSION}`;
     currentBed = bed;
   }
-  musicEl.loop = true;
-  musicEl.volume = bed === "victory" || bed === "defeat" ? END_MUSIC_VOLUME : MUSIC_VOLUME;
-  void musicEl.play().catch(() => {
-    /* wait for gesture */
+  el.loop = true;
+  el.volume = bed === "victory" || bed === "defeat" ? END_MUSIC_VOLUME : MUSIC_VOLUME;
+  void el.play().catch(() => {
+    /* wait for another gesture */
   });
 }
 

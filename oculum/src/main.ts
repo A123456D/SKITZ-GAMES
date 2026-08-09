@@ -1757,6 +1757,12 @@ function syncHud(): void {
           active: false,
           cardSrc: img.src,
         };
+        // Keep the gesture through iOS Safari gesture cancellation
+        try {
+          btn.setPointerCapture(ev.pointerId);
+        } catch {
+          /* ignore */
+        }
         playSfx("select");
         highlightAltitudesForHand(index);
         for (const el of handEl.querySelectorAll(".hand-card")) {
@@ -3780,13 +3786,25 @@ window.addEventListener("pointermove", (ev) => {
     beginDragVisual(drag);
   }
   if (drag.active) {
+    // Stop page scroll / bounce while dragging on iOS
+    if (ev.cancelable) ev.preventDefault();
     moveDragGhost(ev.clientX, ev.clientY);
     const alt = altitudeAtPoint(ev.clientX, ev.clientY);
     for (const hit of altHits) {
       hit.classList.toggle("drop-target", alt !== null && Number(hit.dataset.alt) === alt);
     }
   }
-});
+}, { passive: false });
+
+// Extra belt for older iOS that emits touchmove without pointermove
+window.addEventListener(
+  "touchmove",
+  (ev) => {
+    if (!drag?.active) return;
+    if (ev.cancelable) ev.preventDefault();
+  },
+  { passive: false },
+);
 
 window.addEventListener("pointerup", (ev) => {
   void (async () => {
@@ -3942,9 +3960,16 @@ setMenuMode(true);
 setMusicBed("menu");
 armUnlockOnGesture();
 syncHud();
-window.addEventListener("resize", () => {
+const onViewportChange = (): void => {
   if (state?.tutorial && state.tutorialStep !== "done") syncTutorGuide(state);
-});
+  // Safari chrome show/hide changes layout without a window resize alone
+  stage.syncLanes(altHits);
+};
+window.addEventListener("resize", onViewportChange);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", onViewportChange);
+  window.visualViewport.addEventListener("scroll", onViewportChange);
+}
 void preloadCardChrome().then(() => {
   clearCardFaceCache();
   stage.invalidateCardTextures();

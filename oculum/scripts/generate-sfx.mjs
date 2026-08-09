@@ -68,6 +68,10 @@ if (!jobs.length) {
 
 async function generateOne(entry) {
   const dest = join(outDir, entry.file);
+  if (entry.skipGenerate) {
+    console.log(`keep  ${entry.id} (hand-picked, skip API)`);
+    return;
+  }
   if (!force && existsSync(dest)) {
     console.log(`skip  ${entry.id} (exists)`);
     return;
@@ -77,7 +81,7 @@ async function generateOne(entry) {
   const body = {
     text: entry.text,
     duration_seconds: Math.max(0.5, Math.min(30, entry.duration)),
-    prompt_influence: entry.loop ? 0.45 : 0.55,
+    prompt_influence: entry.loop ? 0.35 : 0.4,
     model_id: "eleven_text_to_sound_v2",
   };
   if (entry.loop) body.loop = true;

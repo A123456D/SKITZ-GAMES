@@ -216,7 +216,17 @@ export class OculusStage {
       powerPreference: "high-performance",
       failIfMajorPerformanceCaveat: false,
     });
-    if (!gl) throw new Error("WebGL2 unavailable");
+    if (!gl) {
+      const msg =
+        "OCULUM needs WebGL2. Update iOS/Safari (iOS 15+) or try another browser.";
+      const banner = document.createElement("div");
+      banner.setAttribute("role", "alert");
+      banner.style.cssText =
+        "position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;background:#0e0a12;color:#f6ecd8;font:600 1rem/1.4 system-ui,sans-serif;text-align:center";
+      banner.textContent = msg;
+      document.body.appendChild(banner);
+      throw new Error("WebGL2 unavailable");
+    }
     this.canvas = canvas;
     this.gl = gl;
     this.cardProg = program(gl, VERT, FRAG);
