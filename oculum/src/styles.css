@@ -622,6 +622,9 @@ body.paused #altitudes {
 
 .will-side.foe {
   justify-content: flex-end;
+  /* Keep the Will track clear of the foe library pile */
+  padding-right: clamp(4px, 1.5vw, 8px);
+  margin-right: clamp(48px, 12vw, 68px);
 }
 
 .will-label {
@@ -1487,52 +1490,48 @@ body.reduce-motion .victory-reveal.is-juiced .victory-score {
 }
 
 #toast {
-  grid-area: board;
+  /* Pin to the action row — small status line at the bottom of the screen */
+  grid-area: actions;
   position: absolute;
   left: 50%;
-  /* Sit above the hand fan — never cover HIGH / MID / LOW tags */
-  top: auto;
-  bottom: 6px;
-  transform: translateX(-50%);
-  width: min(calc(100% - 2 * var(--pad)), 420px);
+  top: 0;
+  bottom: auto;
+  transform: translate(-50%, -100%);
+  width: min(calc(100% - 8px), 360px);
   max-width: 100%;
-  max-height: 88px;
+  max-height: 44px;
   min-height: 0;
   display: grid;
   place-items: center;
   overflow: hidden;
-  padding: 8px 12px;
-  background:
-    linear-gradient(180deg, rgba(40, 30, 36, 0.55) 0%, transparent 50%),
-    var(--plate-strong);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 236, 200, 0.12),
-    inset 0 0 0 1px var(--plate-line),
-    inset 0 0 0 2px rgba(0, 0, 0, 0.3),
-    var(--plate-shadow);
-  border-radius: calc(var(--plate-radius) + 2px);
-  border-left: 3px solid var(--gold);
-  z-index: 40;
+  padding: 2px 8px 4px;
+  /* Text + shadow only — no plate */
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  border: none;
+  border-left: none;
+  z-index: 42;
   pointer-events: none;
-  transition: border-color 0.15s ease;
+  transition: none;
 }
 
 #toast-text {
-  font-size: 0.78rem;
-  line-height: 1.4;
+  font-size: 0.68rem;
+  line-height: 1.25;
   text-align: center;
-  font-weight: 550;
+  font-weight: 600;
 }
 
 body.tutorial-soft #toast {
-  max-height: 120px;
-  bottom: 10px;
-  border-left-width: 4px;
+  max-height: 56px;
+  padding-bottom: 6px;
+  border-left-width: 0;
 }
 
 body.tutorial-soft #toast-text {
-  font-size: 0.86rem;
-  line-height: 1.45;
+  font-size: 0.74rem;
+  line-height: 1.3;
 }
 
 .lane-cue {
@@ -1840,61 +1839,61 @@ body.spectating #actions {
   display: none !important;
 }
 
-#toast.toast-witness {
-  border-left-color: var(--gold);
+#toast.toast-witness #toast-text {
+  color: var(--gold-bright);
 }
 
-#toast.toast-gaze {
-  border-left-color: #e89078;
+#toast.toast-gaze #toast-text {
+  color: #f0b098;
 }
 
-#toast.toast-resolve {
-  border-left-color: #d4886a;
+#toast.toast-resolve #toast-text {
+  color: #f0b898;
 }
 
-#toast.toast-round {
-  border-left-color: var(--sigil);
+#toast.toast-round #toast-text {
+  color: #9eefe6;
 }
 
-#toast.toast-pass {
-  border-left-color: #8ca0be;
+#toast.toast-pass #toast-text {
+  color: #c0d0e8;
 }
 
-#toast.toast-law {
-  border-left-color: var(--sigil);
+#toast.toast-law #toast-text {
+  color: #9eefe6;
 }
 
-#toast.toast-play,
-#toast.toast-graft {
-  border-left-color: #c9a84c;
+#toast.toast-play #toast-text,
+#toast.toast-graft #toast-text {
+  color: #e8d090;
 }
 
-#toast.toast-stance {
-  border-left-color: #e6c98a;
+#toast.toast-stance #toast-text {
+  color: #f0e0b0;
 }
 
-#toast.toast-rite {
-  border-left-color: #8aa0c8;
+#toast.toast-rite #toast-text {
+  color: #b8c8e8;
 }
 
-#toast.toast-stain {
-  border-left-color: #6ecfb0;
+#toast.toast-stain #toast-text {
+  color: #9ee8d0;
 }
 
-#toast.toast-strain {
-  border-left-color: #c07090;
+#toast.toast-strain #toast-text {
+  color: #e0a0c0;
 }
 
-#toast.toast-blind {
-  border-left-color: #7a8aa8;
+#toast.toast-blind #toast-text {
+  color: #b0b8c8;
 }
 
-#toast.toast-fall {
-  border-left-color: #9a7ab0;
+#toast.toast-fall #toast-text {
+  color: #d0b0e0;
 }
 
-#toast.toast-eclipse {
-  border-left-color: #5a6a90;
+#toast.toast-eclipse #toast-text {
+  color: #c0c8e0;
 }
 
 #toast[hidden] {
@@ -1904,46 +1903,44 @@ body.spectating #actions {
 #toast-text {
   position: relative;
   z-index: 1;
-  padding: 6px 12px;
-  font-size: 0.7rem;
+  padding: 0 4px;
+  font-size: 0.66rem;
   letter-spacing: 0.02em;
-  text-shadow: 0 1px 4px #000;
+  text-shadow:
+    0 0 6px rgba(0, 0, 0, 0.95),
+    0 1px 2px #000,
+    0 2px 10px rgba(0, 0, 0, 0.9);
   text-align: center;
   max-width: 100%;
-  line-height: 1.3;
+  line-height: 1.25;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   overflow: hidden;
+  color: rgba(245, 236, 220, 0.95);
 }
 
 #phase-banner {
   grid-area: board;
   position: absolute;
   left: 50%;
-  top: 42%;
+  top: 38%;
   transform: translate(-50%, -50%);
   z-index: 14;
   pointer-events: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  min-width: min(88%, 340px);
-  padding: 22px 32px 24px;
+  gap: 4px;
+  min-width: min(84%, 300px);
+  padding: 10px 14px;
   text-align: center;
-  overflow: hidden;
+  overflow: visible;
   isolation: isolate;
-  background:
-    radial-gradient(ellipse 80% 70% at 50% 40%, rgba(255, 236, 200, 0.1), transparent 60%),
-    linear-gradient(180deg, rgba(48, 36, 28, 0.55) 0%, transparent 42%),
-    rgba(10, 8, 14, 0.9);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 236, 200, 0.22),
-    inset 0 0 0 1px rgba(212, 175, 55, 0.5),
-    0 0 40px rgba(212, 175, 55, 0.18),
-    0 18px 48px rgba(0, 0, 0, 0.6);
-  border-radius: 14px;
+  /* Keep burst / ring / spark — drop the plate */
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
 }
 
 .phase-burst,
@@ -1989,66 +1986,17 @@ body.spectating #actions {
   animation: phase-spark 1s ease-out forwards;
 }
 
-#phase-banner.phase-resolve {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 200, 160, 0.28),
-    inset 0 0 0 1px rgba(212, 136, 106, 0.7),
-    0 0 48px rgba(200, 90, 50, 0.35),
-    0 18px 48px rgba(0, 0, 0, 0.6);
-}
-
-#phase-banner.phase-round {
-  box-shadow:
-    inset 0 1px 0 rgba(200, 255, 240, 0.22),
-    inset 0 0 0 1px rgba(62, 207, 192, 0.65),
-    0 0 48px rgba(62, 207, 192, 0.28),
-    0 18px 48px rgba(0, 0, 0, 0.6);
-}
-
-#phase-banner.phase-pass {
-  box-shadow:
-    inset 0 1px 0 rgba(200, 210, 230, 0.16),
-    inset 0 0 0 1px rgba(140, 160, 190, 0.5),
-    0 0 32px rgba(120, 140, 180, 0.2),
-    0 18px 48px rgba(0, 0, 0, 0.55);
-}
-
-#phase-banner.phase-rite {
-  box-shadow:
-    inset 0 1px 0 rgba(180, 210, 255, 0.2),
-    inset 0 0 0 1px rgba(120, 160, 220, 0.65),
-    0 0 40px rgba(100, 140, 220, 0.28),
-    0 18px 48px rgba(0, 0, 0, 0.55);
-}
-
-#phase-banner.phase-fall {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 160, 160, 0.22),
-    inset 0 0 0 1px rgba(200, 70, 70, 0.7),
-    0 0 52px rgba(180, 40, 40, 0.4),
-    0 18px 48px rgba(0, 0, 0, 0.65);
-}
-
-#phase-banner.phase-eclipse {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 220, 160, 0.3),
-    inset 0 0 0 1px rgba(240, 190, 90, 0.75),
-    0 0 56px rgba(212, 160, 40, 0.45),
-    0 0 90px rgba(80, 40, 120, 0.35),
-    0 18px 48px rgba(0, 0, 0, 0.65);
-  background:
-    radial-gradient(ellipse 90% 80% at 50% 35%, rgba(255, 210, 120, 0.18), transparent 55%),
-    radial-gradient(ellipse 70% 60% at 50% 70%, rgba(60, 30, 90, 0.45), transparent 70%),
-    rgba(8, 6, 14, 0.94);
-}
-
+/* Phase accents live in title/kicker color + VFX glow only */
+#phase-banner.phase-resolve,
+#phase-banner.phase-round,
+#phase-banner.phase-pass,
+#phase-banner.phase-rite,
+#phase-banner.phase-fall,
+#phase-banner.phase-eclipse,
 #phase-banner.phase-victory,
 #phase-banner.phase-break {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 236, 200, 0.35),
-    inset 0 0 0 1px rgba(240, 200, 120, 0.8),
-    0 0 64px rgba(212, 175, 55, 0.5),
-    0 18px 52px rgba(0, 0, 0, 0.7);
+  background: transparent;
+  box-shadow: none;
 }
 
 .phase-kicker,
@@ -2060,12 +2008,15 @@ body.spectating #actions {
 
 .phase-kicker {
   font-family: var(--font-ui);
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.28em;
   text-transform: uppercase;
   color: var(--ochre);
   opacity: 0;
+  text-shadow:
+    0 0 8px rgba(0, 0, 0, 0.9),
+    0 1px 3px #000;
 }
 
 #phase-banner.phase-pop .phase-kicker {
@@ -2074,14 +2025,15 @@ body.spectating #actions {
 
 .phase-title {
   font-family: var(--font-display);
-  font-size: clamp(1.55rem, 6vw, 2.15rem);
+  font-size: clamp(1.25rem, 5vw, 1.85rem);
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--bone);
   text-shadow:
     0 0 18px rgba(255, 236, 200, 0.35),
-    0 2px 12px rgba(0, 0, 0, 0.7);
+    0 0 8px rgba(0, 0, 0, 0.95),
+    0 2px 12px rgba(0, 0, 0, 0.85);
   display: flex;
   justify-content: center;
   flex-wrap: nowrap;
@@ -2100,12 +2052,15 @@ body.spectating #actions {
 
 .phase-sub {
   font-family: var(--font-ui);
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   font-weight: 600;
   letter-spacing: 0.06em;
-  color: rgba(237, 228, 212, 0.88);
+  color: rgba(237, 228, 212, 0.92);
   max-width: 30ch;
   opacity: 0;
+  text-shadow:
+    0 0 8px rgba(0, 0, 0, 0.95),
+    0 1px 3px #000;
 }
 
 #phase-banner.phase-pop .phase-sub {
@@ -3487,10 +3442,11 @@ body.enemy-turn #toast-text {
 
 .match-deck--foe {
   position: absolute;
-  top: calc(6px + env(safe-area-inset-top, 0px) + 48px);
-  right: max(8px, var(--pad));
-  z-index: 6;
-  width: clamp(44px, 10vw, 60px);
+  /* Below topbar + willrow — never cover foe Will */
+  top: calc(env(safe-area-inset-top, 0px) + 6px + 42px + 34px);
+  right: max(6px, var(--pad));
+  z-index: 5;
+  width: clamp(40px, 9vw, 56px);
   pointer-events: auto;
 }
 

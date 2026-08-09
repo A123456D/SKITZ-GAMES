@@ -3,7 +3,7 @@
   <head>
     <script>
 (function () {
-  var KEY = "oculum-bust-v10";
+  var KEY = "oculum-bust-v11";
   try {
     if (sessionStorage.getItem(KEY) === "1") return;
     sessionStorage.setItem(KEY, "1");
@@ -11,8 +11,8 @@
   var done = function () {
     try {
       var u = new URL(location.href);
-      if (u.searchParams.get("v") !== "10") {
-        u.searchParams.set("v", "10");
+      if (u.searchParams.get("v") !== "11") {
+        u.searchParams.set("v", "11");
         location.replace(u.toString());
       }
     } catch (e2) {}
@@ -57,8 +57,8 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-BMMeQgIT.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-D_wHQd4u.css">
+    <script type="module" crossorigin src="./assets/index-J1UkoZuc.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BYaHDXBR.css">
   </head>
   <body class="on-menu">
     <div id="app">
@@ -409,7 +409,7 @@
               <img class="menu-seal" src="./assets/ui/seal-eye.png" alt="" draggable="false" />
               <h1 class="menu-wordmark">OCULUM <span class="wordmark-beta">beta</span></h1>
               <p class="menu-tag">VEIL · WITNESS · ASCEND</p>
-              <p class="menu-build" id="menu-build">build 10</p>
+              <p class="menu-build" id="menu-build">build 11</p>
               <p class="menu-blurb">Things only fully exist when seen.</p>
             </header>
             <nav class="menu-actions" aria-label="Main">
