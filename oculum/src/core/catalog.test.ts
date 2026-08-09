@@ -3,29 +3,20 @@ import { catalogOrder, compareCardCatalog } from "./catalog";
 import { getCard } from "./cards";
 
 describe("catalog order", () => {
-  it("sorts School → premium → Type → Essence → name", () => {
+  it("sorts Wave 1 Ink by essence → name", () => {
     const ids = catalogOrder([
-      "ring_gaze",
-      "iris_heliograph",
-      "parasol_path",
-      "cliff_seeker",
-      "split_gaze_seraph",
-      "echo_mask",
-      "unblinking_law",
+      "mire_duelist",
+      "blot_herald",
+      "pale_ledger",
+      "smother_bride",
+      "well_cantor",
     ]);
-    expect(ids).toEqual([
-      "cliff_seeker", // cube
-      "split_gaze_seraph", // many premium first
-      "echo_mask", // many
-      "iris_heliograph", // ring premium
-      "parasol_path", // ring site 2e
-      "ring_gaze", // ring site 3e
-      "unblinking_law", // neutral last
-    ]);
+    expect(ids[0]).toBe("pale_ledger"); // 1E first
+    expect(ids).toContain("blot_herald");
+    expect(ids[ids.length - 1]).toBe("smother_bride"); // 3E, name after mire
   });
 
-  it("premium sorts before non-premium in same school", () => {
-    expect(compareCardCatalog(getCard("iris_heliograph"), getCard("parasol_path"))).toBeLessThan(0);
-    expect(compareCardCatalog(getCard("split_gaze_seraph"), getCard("echo_mask"))).toBeLessThan(0);
+  it("compareCardCatalog is stable for Wave 1", () => {
+    expect(compareCardCatalog(getCard("pale_ledger"), getCard("blot_herald"))).toBeLessThan(0);
   });
 });

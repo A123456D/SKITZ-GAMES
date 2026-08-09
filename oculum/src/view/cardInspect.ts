@@ -5,13 +5,25 @@
  */
 import { getCard } from "../core/cards";
 import { handCardSrc } from "./cardBake";
-import { cardMetaHtml } from "./cardMeta";
+import { cardMetaHtml, liveStatusHtml } from "./cardMeta";
 import { bindFoilStage } from "./foilCard";
 import { CARD_SKINS_ENABLED } from "./skins";
 import { hasArtLayers, setStackArtLayers } from "./cardLayers";
 
+export type InspectExtras = {
+  statusLines?: string[];
+  /** Graft / charm card ids on the unit */
+  grafts?: string[];
+  /** Vessel inhabitant card id */
+  inhabitant?: string | null;
+  /** Figure / vessel hosting the charm being inspected */
+  hostId?: string;
+  /** Site / sigil on the same altitude */
+  siteId?: string | null;
+};
+
 export type CardInspectApi = {
-  open: (id: string) => void;
+  open: (id: string, extras?: InspectExtras) => void;
   close: () => void;
   isOpen: () => boolean;
 };
@@ -21,27 +33,47 @@ export function initCardInspect(root: HTMLElement): CardInspectApi {
   const foil = root.querySelector("#inspect-foil") as HTMLElement;
   const face = root.querySelector("#inspect-face") as HTMLImageElement;
   const meta = root.querySelector("#inspect-meta") as HTMLElement;
+  const companions = root.querySelector("#inspect-companions") as HTMLElement | null;
   const closeBtn = root.querySelector("#inspect-close") as HTMLButtonElement | null;
   const backdrop = root.querySelector(".inspect-backdrop") as HTMLElement | null;
 
   bindFoilStage(foil);
 
   let openId: string | null = null;
+  let lastExtras: InspectExtras | undefined;
 
   const close = (): void => {
     if (!openId) return;
     openId = null;
+    lastExtras = undefined;
     root.hidden = true;
-    root.classList.remove("is-open");
+    root.classList.remove("is-open", "has-companions");
     document.body.classList.remove("inspect-open");
+    if (companions) {
+      companions.hidden = true;
+      companions.innerHTML = "";
+    }
   };
 
-  const open = (id: string): void => {
+  const companionHtml = (kind: string, cardId: string): string => {
+    const c = getCard(cardId);
+    return `<button type="button" class="inspect-companion" data-open-card="${cardId}">
+      <img class="inspect-companion-face" src="${handCardSrc(cardId)}" alt="" draggable="false" />
+      <div class="inspect-companion-meta">
+        <span class="inspect-companion-kicker">${kind}</span>
+        ${cardMetaHtml(c)}
+      </div>
+    </button>`;
+  };
+
+  const open = (id: string, extras?: InspectExtras): void => {
     const def = getCard(id);
     openId = id;
+    if (extras) lastExtras = extras;
+    const ctx = extras ?? lastExtras;
     face.src = handCardSrc(id);
     face.alt = def.name;
-    const useSkin = CARD_SKINS_ENABLED && !!def.premium;
+    const useSkin = CARD_SKINS_ENABLED && !!def.sovereign;
     foil.classList.toggle("is-premium", useSkin);
     const stack = foil.querySelector(".foil-stack") as HTMLElement | null;
     if (stack) {
@@ -49,11 +81,62 @@ export function initCardInspect(root: HTMLElement): CardInspectApi {
       foil.classList.toggle("has-layers", layered);
       setStackArtLayers(stack, layered ? id : null, { alt: def.name });
     }
-    meta.innerHTML = cardMetaHtml(def);
+
+    const sideBits: string[] = [];
+    if (ctx?.hostId && ctx.hostId !== id) {
+      sideBits.push(companionHtml("Host", ctx.hostId));
+    }
+    if (ctx?.grafts?.length) {
+      for (const gid of ctx.grafts) {
+        if (gid === id) continue;
+        sideBits.push(companionHtml("Charm", gid));
+      }
+    }
+    if (ctx?.inhabitant && ctx.inhabitant !== id) {
+      sideBits.push(companionHtml("Inhabitant", ctx.inhabitant));
+    }
+    if (ctx?.siteId && ctx.siteId !== id) {
+      sideBits.push(companionHtml("Site", ctx.siteId));
+    }
+
+    if (companions) {
+      if (sideBits.length) {
+        companions.innerHTML = sideBits.join("");
+        companions.hidden = false;
+        root.classList.add("has-companions");
+      } else {
+        companions.innerHTML = "";
+        companions.hidden = true;
+        root.classList.remove("has-companions");
+      }
+    }
+
+    const opened = getCard(id);
+    const showStatus =
+      !!ctx?.statusLines?.length &&
+      (!ctx.hostId ||
+        ctx.hostId === id ||
+        opened.type === "site" ||
+        opened.type === "sigil");
+    meta.innerHTML = cardMetaHtml(def) + (showStatus ? liveStatusHtml(ctx!.statusLines!) : "");
     root.hidden = false;
     document.body.classList.add("inspect-open");
     requestAnimationFrame(() => root.classList.add("is-open"));
   };
+
+  const onOpenCard = (ev: Event): void => {
+    const t = ev.target as HTMLElement | null;
+    const btn = t?.closest?.("[data-open-card]") as HTMLElement | null;
+    if (!btn) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const id = btn.getAttribute("data-open-card");
+    if (!id) return;
+    open(id, lastExtras);
+  };
+
+  meta.addEventListener("click", onOpenCard);
+  companions?.addEventListener("click", onOpenCard);
 
   closeBtn?.addEventListener("click", (ev) => {
     ev.stopPropagation();
@@ -81,6 +164,8 @@ export type LiftInspectOpts = {
   inspectOnTap?: boolean;
   /** Fired when inspect opens (hold or tap). */
   onInspectOpen?: () => void;
+  /** Custom open (board sites / live status). Default: inspect.open(id). */
+  openCard?: (id: string) => void;
 };
 
 export function bindLiftInspect(
@@ -110,7 +195,8 @@ export function bindLiftInspect(
     if (!id) return;
     el.classList.add("lift-armed");
     opts?.onInspectOpen?.();
-    inspect.open(id);
+    if (opts?.openCard) opts.openCard(id);
+    else inspect.open(id);
     window.setTimeout(() => el.classList.remove("lift-armed"), 200);
   };
 
@@ -118,12 +204,14 @@ export function bindLiftInspect(
     if (!tracking) return;
     tracking = false;
     const wasLong = longFired;
-    const far = movedFar;
     clearTimer();
+    longFired = false;
     activePointer = null;
-    if (wasLong) return;
-    if (far) return;
-    if (opts?.inspectOnTap) openInspect();
+    if (wasLong || movedFar) return;
+    if (opts?.inspectOnTap) {
+      openInspect();
+      return;
+    }
     onTap?.();
   };
 
@@ -135,24 +223,23 @@ export function bindLiftInspect(
     startX = ev.clientX;
     startY = ev.clientY;
     activePointer = ev.pointerId;
-    clearTimer();
     try {
       el.setPointerCapture(ev.pointerId);
     } catch {
       /* ignore */
     }
-    // Hold-to-inspect — forgiving so finger jitter doesn't cancel
+    clearTimer();
     timer = window.setTimeout(() => {
-      timer = null;
-      if (!tracking || movedFar) return;
       longFired = true;
       openInspect();
     }, LONG_MS);
   };
 
   const onPointerMove = (ev: PointerEvent): void => {
-    if (!tracking) return;
-    if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > MOVE_CANCEL_PX) {
+    if (!tracking || activePointer !== ev.pointerId) return;
+    const dx = ev.clientX - startX;
+    const dy = ev.clientY - startY;
+    if (dx * dx + dy * dy > MOVE_CANCEL_PX * MOVE_CANCEL_PX) {
       movedFar = true;
       clearTimer();
     }
@@ -163,28 +250,23 @@ export function bindLiftInspect(
     finish();
   };
 
-  const onPointerCancel = (ev: PointerEvent): void => {
-    if (activePointer != null && ev.pointerId !== activePointer) return;
-    // Mobile often cancels on tiny scroll — still treat as tap if we barely moved
-    finish();
-  };
-
-  const onContextMenu = (ev: Event): void => {
-    if (longFired || timer != null || opts?.inspectOnTap) ev.preventDefault();
+  const onPointerCancel = (): void => {
+    tracking = false;
+    clearTimer();
+    longFired = false;
+    activePointer = null;
   };
 
   el.addEventListener("pointerdown", onPointerDown);
+  el.addEventListener("pointermove", onPointerMove);
   el.addEventListener("pointerup", onPointerUp);
   el.addEventListener("pointercancel", onPointerCancel);
-  el.addEventListener("pointermove", onPointerMove);
-  el.addEventListener("contextmenu", onContextMenu);
 
   return () => {
     clearTimer();
     el.removeEventListener("pointerdown", onPointerDown);
+    el.removeEventListener("pointermove", onPointerMove);
     el.removeEventListener("pointerup", onPointerUp);
     el.removeEventListener("pointercancel", onPointerCancel);
-    el.removeEventListener("pointermove", onPointerMove);
-    el.removeEventListener("contextmenu", onContextMenu);
   };
 }

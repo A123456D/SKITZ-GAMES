@@ -1,15 +1,15 @@
 import { CARDS, getCard } from "./cards";
 import type { CardDef } from "./types";
 
-export const CONSTRUCTED_DECK_SIZE = 30;
+export const CONSTRUCTED_DECK_SIZE = 20;
 
 export type ConstructIssue = {
   code:
     | "size"
     | "unknown"
     | "copy_limit"
-    | "premium_copy"
-    | "premium_total"
+    | "sovereign_copy"
+    | "sovereign_total"
     | "prophecy_total";
   message: string;
 };
@@ -27,7 +27,13 @@ function tryGet(id: string): CardDef | null {
   }
 }
 
-/** Constructed: exactly 30, ≤2 non-premium, ≤1 premium total / per id, ≤1 prophecy. */
+/** Per-craft rebuild: crafts with <16 cards allow 4 copies so Teach can stay size 20. */
+function nonSovereignCopyLimit(heresy: CardDef["heresy"]): number {
+  const craftSize = CARDS.filter((c) => c.heresy === heresy).length;
+  return craftSize < 16 ? 4 : 2;
+}
+
+/** Constructed: exactly 20, ≤2 non-Sovereign (≤4 while craft rebuilds), ≤1 Sovereign total / per id, ≤1 prophecy. */
 export function validateConstructedDeck(ids: string[]): ConstructValidation {
   const issues: ConstructIssue[] = [];
 
@@ -43,7 +49,7 @@ export function validateConstructedDeck(ids: string[]): ConstructValidation {
     counts.set(id, (counts.get(id) ?? 0) + 1);
   }
 
-  let premiumPieces = 0;
+  let sovereignPieces = 0;
   let prophecyPieces = 0;
 
   for (const [id, n] of counts) {
@@ -52,27 +58,30 @@ export function validateConstructedDeck(ids: string[]): ConstructValidation {
       issues.push({ code: "unknown", message: `Unknown card id: ${id}.` });
       continue;
     }
-    if (def.premium) {
-      premiumPieces += n;
+    if (def.sovereign) {
+      sovereignPieces += n;
       if (n > 1) {
         issues.push({
-          code: "premium_copy",
-          message: `Premium ${def.name} may appear at most once (got ${n}).`,
+          code: "sovereign_copy",
+          message: `Sovereign ${def.name} may appear at most once (got ${n}).`,
         });
       }
-    } else if (n > 2) {
-      issues.push({
-        code: "copy_limit",
-        message: `${def.name} may appear at most twice (got ${n}).`,
-      });
+    } else {
+      const copyCap = nonSovereignCopyLimit(def.heresy);
+      if (n > copyCap) {
+        issues.push({
+          code: "copy_limit",
+          message: `${def.name} may appear at most ${copyCap} times (got ${n}).`,
+        });
+      }
     }
     if (def.type === "prophecy") prophecyPieces += n;
   }
 
-  if (premiumPieces > 1) {
+  if (sovereignPieces > 1) {
     issues.push({
-      code: "premium_total",
-      message: `At most one premium card in the deck (got ${premiumPieces}).`,
+      code: "sovereign_total",
+      message: `At most one Sovereign card in the deck (got ${sovereignPieces}).`,
     });
   }
   if (prophecyPieces > 1) {
@@ -91,7 +100,7 @@ export function collectiblePool(): string[] {
 }
 
 export function maxCopiesFor(def: CardDef): number {
-  return def.premium ? 1 : 2;
+  return def.sovereign ? 1 : nonSovereignCopyLimit(def.heresy);
 }
 
 export function countInDeck(deck: readonly string[], id: string): number {
@@ -100,13 +109,13 @@ export function countInDeck(deck: readonly string[], id: string): number {
   return n;
 }
 
-/** Whether adding one more copy of `id` would stay under copy / premium / prophecy caps (size ignored). */
+/** Whether adding one more copy of `id` would stay under copy / Sovereign / prophecy caps (size ignored). */
 export function canAddToDeck(deck: readonly string[], id: string): boolean {
   const def = tryGet(id);
   if (!def) return false;
   const n = countInDeck(deck, id);
   if (n >= maxCopiesFor(def)) return false;
-  if (def.premium && deck.some((x) => tryGet(x)?.premium)) return false;
+  if (def.sovereign && deck.some((x) => tryGet(x)?.sovereign)) return false;
   if (def.type === "prophecy" && deck.some((x) => tryGet(x)?.type === "prophecy")) return false;
   return true;
 }
@@ -131,200 +140,86 @@ function shuffleInPlace<T>(arr: T[], rng: () => number): void {
 
 type TypeQuota = { type: CardDef["type"]; target: number };
 
-/** Synergy clusters — pick 1–2 then fill quotas so Auto decks play real packages. */
-const SYNERGY_CLUSTERS: { school: CardDef["school"]; cards: string[] }[] = [
+/** Synergy clusters — live craft Teach cores. */
+const SYNERGY_CLUSTERS: { heresy: CardDef["heresy"]; cards: string[] }[] = [
   {
-    school: "cube",
-    cards: [
-      "cliff_seeker",
-      "veil_banner",
-      "ochre_dancer",
-      "stake_cache",
-      "mesa_bell",
-      "saltglass_courier",
-      "stake_field_pilgrim",
-      "ace_of_hollows",
-    ],
+    heresy: "ink",
+    cards: ["blot_herald", "smother_bride", "well_cantor", "pale_ledger", "mire_duelist"],
   },
   {
-    school: "ring",
+    heresy: "motley",
     cards: [
-      "ring_gaze",
-      "parasol_path",
-      "perforated_abbess",
-      "coral_crown",
-      "bell_debt_walker",
-      "bell_siren",
-      "ace_of_hollows",
-      "bone_wick_charm",
-    ],
-  },
-  {
-    school: "deal",
-    cards: [
-      "dust_ledger",
-      "stake_field_pilgrim",
-      "ledger_jackal",
-      "debt_coin",
-      "dusk_tithe",
-      "hatline_trickster",
-      "ochre_vanguard",
-      "ace_of_hollows",
-    ],
-  },
-  {
-    school: "graft",
-    cards: [
-      "suture_mill",
-      "key_shrine",
-      "ace_of_hollows",
-      "splice_token",
-      "canister_hound",
-      "keywright_scarecrow",
-      "sail_widow",
-      "coral_crown",
-    ],
-  },
-  {
-    school: "many",
-    cards: [
-      "third_face",
-      "twinspoke_banner",
-      "mask_gallery",
-      "echo_mask",
-      "horn_cantor",
-      "face_charm",
-      "ace_of_hollows",
-      "cliff_seeker",
-    ],
-  },
-  {
-    school: "coral",
-    cards: [
-      "branch_rune_reliquary",
-      "ribbon_bride",
-      "coral_crown",
-      "pillar_cantor",
-      "ace_of_hollows",
-      "ring_gaze",
-      "cliff_seeker",
-      "veil_banner",
-    ],
-  },
-  {
-    school: "hollow",
-    cards: [
-      "pale_arch",
-      "pale_silence",
-      "hole_choir",
-      "inkdrip_acolyte",
-      "perforated_abbess",
-      "ace_of_hollows",
-      "ring_gaze",
-      "cliff_seeker",
+      "whitecard_mummer",
+      "diamond_widow",
+      "split_hymn_cantor",
+      "masked_usher",
+      "grinning_debtor",
+      "scarlet_dealer",
+      "velvet_antehall",
+      "masque_urn",
+      "coinface_charm",
+      "raise_the_ante",
+      "spire_caprice",
+      "pit_capper",
+      "favor_broker",
+      "gala_mirrorhall",
+      "gala_call",
+      "blindfold_charm",
+      "carnival_urn",
+      "antewell",
+      "final_raise",
     ],
   },
 ];
 
 /**
- * Build a legal Constructed 30 — curve + type mix, optional school bias, no premiums.
- * Seeds 1–2 synergy clusters so the list has real combo packages.
+ * Build a legal Constructed 20 — prefer selected craft cluster, then live pool fill.
  */
-export function buildAutoDeck(opts?: { seed?: number; school?: CardDef["school"] | "all" }): string[] {
+export function buildAutoDeck(opts?: { seed?: number; heresy?: CardDef["heresy"] | "all" }): string[] {
   const rng = mulberry32(opts?.seed ?? Date.now());
-  const school = opts?.school && opts.school !== "all" ? opts.school : null;
+  const prefer = opts?.heresy && opts.heresy !== "all" ? opts.heresy : null;
   const deck: string[] = [];
 
   const tryAdd = (id: string): boolean => {
     if (deck.length >= CONSTRUCTED_DECK_SIZE) return false;
     if (!canAddToDeck(deck, id)) return false;
     const def = tryGet(id);
-    if (!def || def.premium) return false;
+    if (!def || def.sovereign) return false;
     deck.push(id);
     return true;
   };
 
-  // Pick clusters (school-biased when requested)
-  let clusters = [...SYNERGY_CLUSTERS];
-  if (school) {
-    const matched = clusters.filter((c) => c.school === school);
-    const rest = clusters.filter((c) => c.school !== school);
-    shuffleInPlace(rest, rng);
-    clusters = matched.length ? [...matched, ...rest] : rest;
-  } else {
-    shuffleInPlace(clusters, rng);
-  }
-
-  const seedClusters = clusters.slice(0, school ? 2 : 2);
-  for (const cluster of seedClusters) {
+  const clusters = prefer
+    ? SYNERGY_CLUSTERS.filter((c) => c.heresy === prefer)
+    : SYNERGY_CLUSTERS;
+  for (const cluster of clusters) {
     for (const id of cluster.cards) {
       tryAdd(id);
-      if (rng() > 0.5) tryAdd(id);
-    }
-  }
-
-  // Light staple glue
-  const glue = ["cliff_seeker", "ace_of_hollows", "unblinking_law", "pale_silence", "coral_crown"];
-  for (const id of glue) {
-    tryAdd(id);
-    if (rng() > 0.55) tryAdd(id);
-  }
-
-  const quotas: TypeQuota[] = [
-    { type: "figure", target: 14 },
-    { type: "site", target: 5 },
-    { type: "relic", target: 5 },
-    { type: "sigil", target: 2 },
-    { type: "rite", target: 3 },
-    { type: "vessel", target: 1 },
-    { type: "prophecy", target: 1 },
-  ];
-
-  const pool = CARDS.filter((c) => !c.premium).map((c) => c.id);
-  shuffleInPlace(pool, rng);
-
-  const countType = (t: CardDef["type"]) =>
-    deck.reduce((n, id) => n + (tryGet(id)?.type === t ? 1 : 0), 0);
-
-  for (const q of quotas) {
-    while (countType(q.type) < q.target && deck.length < CONSTRUCTED_DECK_SIZE) {
-      const candidates = pool.filter((id) => {
-        const def = tryGet(id)!;
-        if (def.type !== q.type) return false;
-        if (school && def.school !== school && def.school !== "neutral") return false;
-        return canAddToDeck(deck, id);
-      });
-      if (candidates.length === 0) break;
-      candidates.sort((a, b) => {
-        const da = tryGet(a)!;
-        const db = tryGet(b)!;
-        return da.essence - db.essence || rng() - 0.5;
-      });
-      const pick = candidates[Math.floor(rng() * Math.min(6, candidates.length))];
-      if (!tryAdd(pick)) break;
-    }
-  }
-
-  const fillPass = (strictSchool: boolean) => {
-    const ids = [...pool];
-    shuffleInPlace(ids, rng);
-    for (const id of ids) {
-      if (deck.length >= CONSTRUCTED_DECK_SIZE) break;
-      const def = tryGet(id);
-      if (!def) continue;
-      if (strictSchool && school && def.school !== school && def.school !== "neutral") continue;
+      tryAdd(id);
+      tryAdd(id);
       tryAdd(id);
     }
-  };
-  fillPass(true);
-  fillPass(false);
+  }
 
-  const pads = ["cliff_seeker", "hatline_trickster", "inkdrip_acolyte", "veil_banner", "ace_of_hollows"];
+  const pool = CARDS.filter((c) => {
+    if (c.sovereign) return false;
+    if (prefer && c.heresy !== prefer) return false;
+    return true;
+  }).map((c) => c.id);
+  shuffleInPlace(pool, rng);
   let guard = 0;
   while (deck.length < CONSTRUCTED_DECK_SIZE && guard++ < 80) {
-    const id = pads[guard % pads.length];
-    if (!tryAdd(id)) {
-      for (const p of pool) {
+    for (const p of pool) {
+      if (tryAdd(p)) break;
+    }
+  }
+
+  if (deck.length < CONSTRUCTED_DECK_SIZE) {
+    const fill = CARDS.filter((c) => !c.sovereign).map((c) => c.id);
+    shuffleInPlace(fill, rng);
+    guard = 0;
+    while (deck.length < CONSTRUCTED_DECK_SIZE && guard++ < 80) {
+      for (const p of fill) {
         if (tryAdd(p)) break;
       }
     }

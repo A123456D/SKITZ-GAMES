@@ -1,0 +1,107 @@
+---
+description: OCULUM card design checklist — text, art, school, and engine must stay aligned
+alwaysApply: true
+---
+
+# OCULUM — Card creation checklist
+
+Every time you add or regenerate a card, do this **before** shipping Codex entries or finished art.
+
+## 0. Placeholders before GenerateImage (required)
+
+**Do not GenerateImage full faces in the same pass as Wave defs/engine** unless the user explicitly asks for art now.
+
+Order:
+
+1. **Defs + engine + tests + docs** — cards live in `CARDS`; missing `public/assets/cards/{id}.jpg` is fine
+2. Runtime uses **procedural placeholder faces** (`cardBake.ts` heresy colors + glyph) until art exists
+3. **Art pass only after greenlight** — then GenerateImage finished 2:3 faces, **anatomy QA**, `install-card-faces.mjs`, cache bust
+
+- **Do not** pass Motley/Ink finished card JPGs as GenerateImage `reference_image_paths` — motif bleed copies wrong craft chrome (masks/dice into Bellward, etc.). Use same-craft faces or `docs/ref/{craft}/` palette refs only.
+- Figures must print `Veiled N / Witnessed M.` matching CardDef powers — never omit.
+- Gender / cast mix (e.g. not Motley-stacking glamorous women; Bellward: 2 creature ♀ + 1 human ♀ modest + males) is locked in the placeholder / text pass, then honored in art prompts. Never default female Figures to exaggerated breasts.
+
+Never leave a craft permanently on placeholders when the user has greenlit art — finished faces are still the end state.
+
+## 0b. Anatomy QA — detect AI slop, then regenerate (required)
+
+After every GenerateImage (and before `install-card-faces`), **Read the image** and inspect limbs/hands/faces. If any anomaly below is present, **do not install** — regenerate that id (retry until clean, or simplify pose: sleeves, mitts, hidden hands).
+
+**Fail and regenerate on:**
+- Extra arm / leg / hand / finger
+- Arm or hand facing the wrong way (mirrored joint, thumb on wrong side of grip)
+- Melted / fused / tangled fingers; claw-cluster hands; missing palm
+- Impossible grip (rope/staff clipping through wrong anatomy)
+- Disembodied or floating limb
+- Wrist thinner than fingers / broken elbow silhouette
+- Face-veil “holes” that accidentally show a second face when veil should be opaque
+
+**Prefer on regenerate prompts:** long sleeves, cloth-wrapped mitt fists, one hand hidden, simple closed fist with correct thumb — less bare-finger detail.
+
+This pass is mandatory for OCULUM card faces so we do not ship AI-slop limbs.
+
+## 1. Read the set first
+
+- Review existing cards in `src/core/cards.ts` and `docs/CARD_TEXT.md`
+- Avoid duplicate roles (another cheap Cube seeker, another Ring Gaze clone, etc.) unless intentional upgrade/sidegrade
+- Check schools, costs, and win paths (Break / Eclipse / Law) so the new card has a clear niche
+
+## 2. Mechanics must match printed text
+
+- `CardDef.text`, Codex copy, `docs/CARD_TEXT.md`, and (when art exists) baked art rules must say the **same** thing
+- Wire the ability in `src/core/match.ts` (or confirm an existing generic path covers it)
+- Stats on the face (Essence, Witness/Sight cost, power, Sight/turn) must match `CardDef` fields
+- After wiring: add/adjust a focused test that asserts the printed effect
+
+## 3. Art ↔ school ↔ role (after greenlight)
+
+- Art subject must fit the **school** visual cues in `docs/ART_STYLE.md` (never copy reference sheets literally)
+- Style refs include `docs/ref/` + `docs/ref/inspo-2026-08/` — remix mood/motifs only
+- Silhouette/mood should read as the card’s job (Site landmark vs Figure vs Relic vs Rite)
+- Full-face art stays **2:3**; export JPGs without cover-cropping into another ratio
+- **Premium / future skins:** keep `premium: true` + optional `layers/{id}/` assets; presentation stays flat until `CARD_SKINS_ENABLED` is turned on
+- **Never print “Rare”** on faces, Codex type lines, or docs headers — School · Type · cost only; `premium` is internal (sort pin / skins)
+
+## 3b. How many special (premium) cards
+
+Premiums are **mechanically top-level** pieces (unique win levers), not foil sidegrades. Keep the pool sparse:
+
+| Pool size | Target premiums | Rough share |
+|-----------|----------------:|------------:|
+| ~25–30 (current) | **3** | ~10% |
+| Soft launch ~45–60 | **4–6** | ~10% |
+| 1.0 ~80–100 | **8–10** | ~10% |
+| Large set later | stay near **~10%**, not a rare every wave |
+
+Rules of thumb when adding cards:
+
+- Waves of 6–8: **0–1 premium max** (do not dump 3 mythics in one wave again)
+- **At most one premium per school** until the collectible pool is well past soft launch
+- Prefer filling commons/uncommons that support schools over another mythic
+- A new premium must beat or clearly outclass existing mid pieces in its niche (not a +1 body Abbess clone)
+- If unsure whether a card is premium: **ship it without `premium: true`**
+
+## 4. Fit the game (combos / curve / decks)
+
+Ask before locking design:
+
+- What existing cards does this **combo** with? (Gaze, grafts, Eclipse, Law schools, Stance, Vessels, Toll/Lure)
+- Does it clog the curve or starve Sight/Essence?
+- Is it buildable in a coherent deck theme (Cube veil, Hollow Gaze, Deal Eclipse, Ring steal, Bellward Toll, etc.)?
+- Prefer effects that use keywords already in the rules (Revelation, Gaze, Blind, Graft, Stance, Eclipse, Toll, Lure, Resonance)
+
+## 5. Definition of done
+
+**Mechanics pass (placeholders OK):**
+- [ ] In `CARDS` + Teach/Codex lists if collectible
+- [ ] Engine behavior matches text
+- [ ] Docs updated
+- [ ] Tests cover the new effect
+- [ ] No full-face assets yet → procedural placeholders
+
+**Art pass (after user greenlight):**
+- [ ] GenerateImage finished faces
+- [ ] Anatomy QA passed (no extra/wrong limbs, no melted hands) — regenerate failures before install
+- [ ] Installed under `public/assets/cards/` + cache bust
+- [ ] Readable at hand size; printed bake text matches `CardDef` (including Veiled/Witnessed powers)
+- [ ] Craft frame DNA correct (no Motley motif bleed onto other crafts)

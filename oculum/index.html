@@ -37,18 +37,45 @@
             </div>
           </div>
           <div id="meters" hidden>
-            <div class="meter essence" title="Essence">
+            <div class="meter essence" title="Essence — you · foe">
               <span class="meter-label">ESS</span>
-              <span id="m-essence" class="meter-val">0</span>
+              <span class="meter-pair">
+                <span id="m-essence" class="meter-val">0</span>
+                <span class="meter-sep">·</span>
+                <span id="m-essence-foe" class="meter-val foe">0</span>
+              </span>
             </div>
-            <div class="meter sight" title="Sight">
+            <div class="meter sight" title="Sight — you · foe">
               <span class="meter-label">SIGHT</span>
-              <span id="m-sight" class="meter-val">0</span>
+              <span class="meter-pair">
+                <span id="m-sight" class="meter-val">0</span>
+                <span class="meter-sep">·</span>
+                <span id="m-sight-foe" class="meter-val foe">0</span>
+              </span>
+            </div>
+            <div class="meter favor" title="Favor — you · foe (Motley ante, max 3)">
+              <span class="meter-label">FAV</span>
+              <span class="meter-pair">
+                <span id="m-favor" class="meter-val">0</span>
+                <span class="meter-sep">·</span>
+                <span id="m-favor-foe" class="meter-val foe">0</span>
+              </span>
             </div>
             <div class="meter turn" title="Turn">
               <span class="meter-label">T</span>
               <span id="m-turn" class="meter-val">1</span>
             </div>
+            <button
+              type="button"
+              id="btn-hud-log"
+              class="hud-icon"
+              hidden
+              aria-label="Event log"
+              aria-expanded="false"
+              aria-controls="event-log-panel"
+            >
+              <span class="btn-label">Log</span>
+            </button>
             <button type="button" id="btn-hud-settings" class="hud-icon" hidden aria-label="Settings">
               <span class="btn-label">Set</span>
             </button>
@@ -66,12 +93,13 @@
             <span id="will-you-n" class="will-n">15</span>
           </div>
           <div class="center-pips">
-            <div class="ecl-pip" title="Eclipse">
+            <div class="ecl-pip" title="Eclipse — you · foe (10 to win)">
+              <span class="ecl-label">ECL</span>
               <span id="ecl-you">0</span>
               <span class="ecl-sep">·</span>
               <span id="ecl-foe">0</span>
             </div>
-            <div id="law-chip" hidden title="Unblinking Law — Witness 3 schools, then Pass">
+            <div id="law-chip" hidden title="Unblinking Law — Witness 3 heresies, then Pass">
               <span class="law-label">LAW</span>
               <span id="law-progress">0/3</span>
             </div>
@@ -90,6 +118,28 @@
         <div id="toast" hidden>
           <span id="toast-text"></span>
         </div>
+        <div id="event-log-panel" hidden>
+          <div class="event-log-sheet" role="dialog" aria-label="Event log">
+            <header class="event-log-head">
+              <p class="event-log-title">Chronicle</p>
+              <button type="button" id="event-log-close" class="ghost mini">
+                <span class="btn-label">Close</span>
+              </button>
+            </header>
+            <div id="event-log" aria-live="polite"></div>
+          </div>
+        </div>
+        <div id="spectate-chip" hidden>WATCHING · Bellward vs Motley</div>
+
+        <div id="phase-banner" hidden aria-live="polite">
+          <div class="phase-burst" aria-hidden="true"></div>
+          <div class="phase-ring" aria-hidden="true"></div>
+          <div class="phase-spark" aria-hidden="true"></div>
+          <span id="phase-kicker" class="phase-kicker"></span>
+          <span id="phase-title" class="phase-title"></span>
+          <span id="phase-sub" class="phase-sub"></span>
+        </div>
+        <div id="vfx-wash" hidden aria-hidden="true"></div>
 
         <div id="coach" hidden>
           <p id="coach-title" class="coach-title"></p>
@@ -98,37 +148,140 @@
           <button type="button" id="coach-cta" hidden>Got it</button>
         </div>
 
+        <div id="tutor-guide" hidden aria-hidden="true">
+          <div id="tutor-dim"></div>
+          <div id="tutor-card-stage" hidden>
+            <img id="tutor-card-face" alt="" draggable="false" />
+          </div>
+          <div id="tutor-ring" hidden></div>
+          <svg id="tutor-arrow-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <marker
+                id="tutor-arrowhead"
+                markerWidth="10"
+                markerHeight="10"
+                refX="8"
+                refY="3"
+                orient="auto"
+              >
+                <path d="M0,0 L8,3 L0,6 Z" fill="currentColor" />
+              </marker>
+            </defs>
+            <path id="tutor-arrow-path" fill="none" stroke="currentColor" stroke-width="2.5" marker-end="url(#tutor-arrowhead)" />
+          </svg>
+          <div id="tutor-pin" hidden></div>
+        </div>
+
         <div id="altitudes" aria-label="Altitudes">
-          <button type="button" class="alt-hit" data-alt="0" aria-label="High">
+          <div role="button" tabindex="0" class="alt-hit" data-alt="0" aria-label="High — Gaze costs one less Sight">
             <span class="alt-tag">HIGH</span>
+            <span class="alt-rule">Gaze −1</span>
+            <span class="alt-badge alt-badge--blind" data-blind hidden>BLIND</span>
+            <span class="alt-badge alt-badge--toll" data-toll hidden>TOLL</span>
+            <span class="alt-badge alt-badge--peal" data-peal hidden>PEAL</span>
+            <div class="alt-status foe" data-side="enemy" aria-hidden="true">
+              <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
+              <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
+              <span class="alt-badge alt-badge--wager" data-wager hidden>WAGER</span>
+              <span class="alt-badge alt-badge--strain" data-strain hidden>STR</span>
+              <span class="alt-badge alt-badge--stain" data-stain hidden>STAIN</span>
+              <span class="alt-badge alt-badge--scrutiny" data-scrutiny hidden>SCR</span>
+              <button type="button" class="alt-badge alt-badge--inh" data-inh hidden title="Inspect Inhabitant">INH</button>
+              <button type="button" class="alt-badge alt-badge--graft" data-graft hidden title="Inspect charms">×0</button>
+              <button type="button" class="alt-badge alt-badge--site" data-site hidden title="Inspect Site">SITE</button>
+            </div>
             <span class="alt-meta">
               <span class="alt-stance" data-stance="0"></span>
               <span class="alt-pow" data-pow="0">
                 <span class="alt-pow-n">0–0</span>
               </span>
             </span>
-          </button>
-          <button type="button" class="alt-hit" data-alt="1" aria-label="Mid">
+            <div class="alt-status you" data-side="player" aria-hidden="true">
+              <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
+              <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
+              <span class="alt-badge alt-badge--wager" data-wager hidden>WAGER</span>
+              <span class="alt-badge alt-badge--strain" data-strain hidden>STR</span>
+              <span class="alt-badge alt-badge--stain" data-stain hidden>STAIN</span>
+              <span class="alt-badge alt-badge--scrutiny" data-scrutiny hidden>SCR</span>
+              <button type="button" class="alt-badge alt-badge--inh" data-inh hidden title="Inspect Inhabitant">INH</button>
+              <button type="button" class="alt-badge alt-badge--graft" data-graft hidden title="Inspect charms">×0</button>
+              <button type="button" class="alt-badge alt-badge--site" data-site hidden title="Inspect Site">SITE</button>
+            </div>
+          </div>
+          <div role="button" tabindex="0" class="alt-hit" data-alt="1" aria-label="Mid — Witness your figure to draw">
             <span class="alt-tag">MID</span>
+            <span class="alt-rule">Witness draw</span>
+            <span class="alt-badge alt-badge--blind" data-blind hidden>BLIND</span>
+            <span class="alt-badge alt-badge--toll" data-toll hidden>TOLL</span>
+            <span class="alt-badge alt-badge--peal" data-peal hidden>PEAL</span>
+            <div class="alt-status foe" data-side="enemy" aria-hidden="true">
+              <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
+              <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
+              <span class="alt-badge alt-badge--wager" data-wager hidden>WAGER</span>
+              <span class="alt-badge alt-badge--strain" data-strain hidden>STR</span>
+              <span class="alt-badge alt-badge--stain" data-stain hidden>STAIN</span>
+              <span class="alt-badge alt-badge--scrutiny" data-scrutiny hidden>SCR</span>
+              <button type="button" class="alt-badge alt-badge--inh" data-inh hidden title="Inspect Inhabitant">INH</button>
+              <button type="button" class="alt-badge alt-badge--graft" data-graft hidden title="Inspect charms">×0</button>
+              <button type="button" class="alt-badge alt-badge--site" data-site hidden title="Inspect Site">SITE</button>
+            </div>
             <span class="alt-meta">
               <span class="alt-stance" data-stance="1"></span>
               <span class="alt-pow" data-pow="1">
                 <span class="alt-pow-n">0–0</span>
               </span>
             </span>
-          </button>
-          <button type="button" class="alt-hit" data-alt="2" aria-label="Low">
+            <div class="alt-status you" data-side="player" aria-hidden="true">
+              <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
+              <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
+              <span class="alt-badge alt-badge--wager" data-wager hidden>WAGER</span>
+              <span class="alt-badge alt-badge--strain" data-strain hidden>STR</span>
+              <span class="alt-badge alt-badge--stain" data-stain hidden>STAIN</span>
+              <span class="alt-badge alt-badge--scrutiny" data-scrutiny hidden>SCR</span>
+              <button type="button" class="alt-badge alt-badge--inh" data-inh hidden title="Inspect Inhabitant">INH</button>
+              <button type="button" class="alt-badge alt-badge--graft" data-graft hidden title="Inspect charms">×0</button>
+              <button type="button" class="alt-badge alt-badge--site" data-site hidden title="Inspect Site">SITE</button>
+            </div>
+          </div>
+          <div role="button" tabindex="0" class="alt-hit" data-alt="2" aria-label="Low — Witness and Gaze cost one more Sight">
             <span class="alt-tag">LOW</span>
+            <span class="alt-rule">Veil +1 Sight</span>
+            <span class="alt-badge alt-badge--blind" data-blind hidden>BLIND</span>
+            <span class="alt-badge alt-badge--toll" data-toll hidden>TOLL</span>
+            <span class="alt-badge alt-badge--peal" data-peal hidden>PEAL</span>
+            <div class="alt-status foe" data-side="enemy" aria-hidden="true">
+              <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
+              <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
+              <span class="alt-badge alt-badge--wager" data-wager hidden>WAGER</span>
+              <span class="alt-badge alt-badge--strain" data-strain hidden>STR</span>
+              <span class="alt-badge alt-badge--stain" data-stain hidden>STAIN</span>
+              <span class="alt-badge alt-badge--scrutiny" data-scrutiny hidden>SCR</span>
+              <button type="button" class="alt-badge alt-badge--inh" data-inh hidden title="Inspect Inhabitant">INH</button>
+              <button type="button" class="alt-badge alt-badge--graft" data-graft hidden title="Inspect charms">×0</button>
+              <button type="button" class="alt-badge alt-badge--site" data-site hidden title="Inspect Site">SITE</button>
+            </div>
             <span class="alt-meta">
               <span class="alt-stance" data-stance="2"></span>
               <span class="alt-pow" data-pow="2">
                 <span class="alt-pow-n">0–0</span>
               </span>
             </span>
-          </button>
+            <div class="alt-status you" data-side="player" aria-hidden="true">
+              <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
+              <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
+              <span class="alt-badge alt-badge--wager" data-wager hidden>WAGER</span>
+              <span class="alt-badge alt-badge--strain" data-strain hidden>STR</span>
+              <span class="alt-badge alt-badge--stain" data-stain hidden>STAIN</span>
+              <span class="alt-badge alt-badge--scrutiny" data-scrutiny hidden>SCR</span>
+              <button type="button" class="alt-badge alt-badge--inh" data-inh hidden title="Inspect Inhabitant">INH</button>
+              <button type="button" class="alt-badge alt-badge--graft" data-graft hidden title="Inspect charms">×0</button>
+              <button type="button" class="alt-badge alt-badge--site" data-site hidden title="Inspect Site">SITE</button>
+            </div>
+          </div>
         </div>
 
         <div id="hand-area" hidden>
+          <div id="deck-anchor" aria-hidden="true"></div>
           <div id="hand" class="hand-fan" data-n="0"></div>
         </div>
 
@@ -136,11 +289,23 @@
           <button type="button" id="btn-witness" class="ghost" disabled>
             <span class="btn-label"><span class="btn-kicker">Reveal</span>Witness</span>
           </button>
+          <button type="button" id="btn-pass" class="ghost" disabled>
+            <span class="btn-label"><span class="btn-kicker">End</span>Pass</span>
+          </button>
+          <button type="button" id="btn-reveil" class="ghost" disabled>
+            <span class="btn-label"><span class="btn-kicker">Close</span>Re-Veil</span>
+          </button>
           <button type="button" id="btn-stance" class="ghost" disabled>
             <span class="btn-label"><span class="btn-kicker">Flip</span>Stance</span>
           </button>
-          <button type="button" id="btn-pass" class="ghost" disabled>
-            <span class="btn-label"><span class="btn-kicker">End</span>Pass</span>
+          <button type="button" id="btn-wager" class="ghost" disabled>
+            <span class="btn-label"><span class="btn-kicker">Ante</span>Wager</span>
+          </button>
+          <button type="button" id="btn-press" class="ghost" disabled>
+            <span class="btn-label"><span class="btn-kicker">Mark</span>Press</span>
+          </button>
+          <button type="button" id="btn-peal" class="ghost" disabled>
+            <span class="btn-label"><span class="btn-kicker">Arm</span>Peal</span>
           </button>
         </div>
 
@@ -160,6 +325,9 @@
               <button type="button" id="btn-tutorial" class="ghost menu-secondary-cta">
                 <span class="btn-label">First Gaze · Tutorial</span>
               </button>
+              <button type="button" id="btn-spectate" class="ghost menu-secondary-cta">
+                <span class="btn-label">Watch · Bot Sim</span>
+              </button>
               <div class="menu-links">
                 <button type="button" id="btn-builder" class="menu-link">
                   <span class="btn-label">Build Deck</span>
@@ -175,6 +343,52 @@
                 </button>
               </div>
             </nav>
+          </div>
+        </div>
+
+        <div id="spectate-pick" class="panel sheet" hidden>
+          <div class="sheet-content">
+            <button type="button" id="spectate-back" class="ghost mini panel-back">
+              <span class="btn-label">Back</span>
+            </button>
+            <p class="tag">BOT SIM</p>
+            <p class="heresy-pick-blurb">Watch two AI crafts fight. Random picks crafts + shuffle each time.</p>
+            <button type="button" id="spectate-random" class="cta">
+              <span class="btn-label"><span class="btn-kicker">Watch</span>Random Sim</span>
+            </button>
+            <p class="heresy-pick-blurb" style="margin-top: 1rem">Or pick crafts:</p>
+            <label class="settings-row">
+              <span>Bottom seat</span>
+              <select id="spectate-bottom" class="settings-select">
+                <option value="toll">Bellward Toll</option>
+                <option value="ink">Ink Abyss</option>
+                <option value="motley">Motley Masquerade</option>
+                <option value="breach">Scar Breach</option>
+              </select>
+            </label>
+            <label class="settings-row">
+              <span>Top seat</span>
+              <select id="spectate-top" class="settings-select">
+                <option value="motley">Motley Masquerade</option>
+                <option value="toll">Bellward Toll</option>
+                <option value="ink">Ink Abyss</option>
+                <option value="breach">Scar Breach</option>
+              </select>
+            </label>
+            <button type="button" id="spectate-start" class="ghost">
+              <span class="btn-label">Watch these crafts</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="heresy-pick" class="panel sheet" hidden>
+          <div class="sheet-content heresy-pick-content">
+            <button type="button" id="heresy-back" class="ghost mini panel-back">
+              <span class="btn-label">Back</span>
+            </button>
+            <p class="tag">CHOOSE YOUR HERESY</p>
+            <p class="heresy-pick-blurb">Each craft is a private keyword kit under shared Gaze law. Pick one to Enter.</p>
+            <div id="heresy-list" class="heresy-list" role="list"></div>
           </div>
         </div>
 
@@ -212,14 +426,14 @@
                 <h3>Resources</h3>
                 <p><strong>Essence</strong> — pay to play cards from hand.</p>
                 <p><strong>Sight</strong> — pay to Witness (yours or, with Gaze, an enemy's).</p>
-                <p><strong>Will</strong> — your life. Hit 0 and you lose by Break.</p>
+                <p><strong>Will</strong> — your life (start at 40). Hit 0 and you lose by Break.</p>
               </section>
               <section class="howto-block">
                 <h3>Three lanes</h3>
-                <p>The board has three altitudes. Each side can hold one Figure (plus Sites/relics) per lane.</p>
-                <p><strong>HIGH</strong> — when you win this lane at Resolve, you deal +1 damage. Sites here also grant more Sight.</p>
-                <p><strong>MID</strong> — the default lane. No special bonus.</p>
-                <p><strong>LOW</strong> — your <em>Veiled</em> figures get +1 power here.</p>
+                <p>Each altitude has a standing Reveal rule — pick lanes on purpose.</p>
+                <p><strong>HIGH</strong> — Gaze Witness costs 1 less Sight. Winning here deals +1 before soft damage.</p>
+                <p><strong>MID</strong> — Witness your own figure here to draw 1.</p>
+                <p><strong>LOW</strong> — Veiled figures get +1 power, but Witness and Gaze cost +1 Sight.</p>
               </section>
               <section class="howto-block">
                 <h3>Reading a card</h3>
@@ -231,7 +445,7 @@
               <section class="howto-block">
                 <h3>Witness vs Gaze</h3>
                 <p><strong>Witness</strong> — spend Sight on <em>your</em> Veiled card to reveal it.</p>
-                <p><strong>Gaze</strong> — the same Witness action, but on an <em>enemy</em> Veiled card, so you steal their Revelation. You need a Gaze landmark on that lane (for example Ring Gaze).</p>
+                <p><strong>Gaze</strong> — the same Witness action, but on an <em>enemy</em> Veiled card, so you steal their Revelation. You need a Gaze landmark on that lane (for example Iris Gaze).</p>
               </section>
               <section class="howto-block">
                 <h3>Sites, Graft, Stance, Rites</h3>
@@ -243,13 +457,13 @@
               <section class="howto-block">
                 <h3>How you win</h3>
                 <p><strong>Break</strong> — reduce enemy Will to 0.</p>
-                <p><strong>Eclipse</strong> — if they end a turn at 0 Sight, you gain Eclipse. Reach 5 Eclipse to win.</p>
+                <p><strong>Eclipse</strong> — Motley Trick seals and card payoffs bank Eclipse. Reach 10 Eclipse to win without Breaking Will.</p>
                 <p><strong>Time</strong> — after 10 rounds, highest Will wins.</p>
-                <p>When both players Pass, lanes <strong>Resolve</strong>: higher power on each lane damages the loser.</p>
+                <p>When both players Pass, lanes <strong>Resolve</strong>: higher power chips Will. <strong>Veiled</strong> losers Hold (cannot die while Veiled). <strong>Witnessed</strong> losers Fall. Expose first to kill.</p>
               </section>
               <section class="howto-block">
                 <h3>Controls</h3>
-                <p>Drag a hand card onto a lane, or select it and tap the lane. Hold a card to inspect. Use Witness / Stance, then tap a glowing lane. New? Try <strong>First Gaze</strong>.</p>
+                <p>Drag a hand card onto a lane, or select it and tap the lane. Hold a card to inspect. Use Witness / Stance, then tap a glowing lane. New? Run <strong>First Gaze</strong> — it teaches card anatomy, Will / Sight / Eclipse, then a guided match.</p>
               </section>
             </div>
             <button type="button" id="howto-close" class="ghost">
@@ -285,7 +499,7 @@
               </select>
             </label>
             <p class="settings-hint">Hold any card to inspect. Drag hand cards onto altitudes to play.</p>
-            <p class="settings-hint">Constructed: 30 cards · ≤2 copies · ≤1 premium · ≤1 prophecy.</p>
+            <p class="settings-hint">Constructed: 20 cards · ≤2 copies · ≤1 Sovereign · ≤1 prophecy.</p>
             <p class="settings-hint">First Gaze: short lessons — tap the glowing lane. Hold a card to inspect.</p>
             <button type="button" id="settings-close" class="ghost">
               <span class="btn-label">Back</span>
@@ -299,9 +513,9 @@
               <button type="button" id="builder-back" class="ghost mini panel-back">
                 <span class="btn-label">Back</span>
               </button>
-              <p class="tag">CONSTRUCTED · <span id="builder-count">0/30</span></p>
+              <p class="tag">CONSTRUCTED · <span id="builder-count">0/20</span></p>
             </div>
-            <p id="builder-issues" class="builder-issues">Build a 30-card deck.</p>
+            <p id="builder-issues" class="builder-issues">Build a 20-card deck.</p>
             <div class="builder-preview">
               <div id="builder-foil" class="foil-card foil-card--codex foil-card--builder">
                 <div class="foil-stack">
@@ -327,19 +541,13 @@
               <div id="builder-deck" class="builder-deck"></div>
             </div>
             <div class="builder-filter-row">
-              <label for="builder-filter">School</label>
+              <label for="builder-filter">Craft</label>
               <select id="builder-filter">
                 <option value="all">All</option>
-                <option value="cube">Cube</option>
-                <option value="deal">Deal</option>
-                <option value="many">Many</option>
-                <option value="graft">Graft</option>
-                <option value="hollow">Hollow</option>
-                <option value="coral">Coral</option>
-                <option value="shell">Shell</option>
-                <option value="deep">Deep</option>
-                <option value="ring">Ring</option>
-                <option value="neutral">Neutral</option>
+                <option value="ink">Ink Abyss</option>
+                <option value="motley">Motley Masquerade</option>
+                <option value="deal">Dusk Ledger</option>
+                <option value="shell">Bonewick</option>
               </select>
             </div>
             <div id="builder-pool" class="builder-pool"></div>
@@ -371,15 +579,37 @@
           </div>
         </div>
 
+        <div id="fx-layer" hidden>
+          <div id="fx-ghost">
+            <img id="fx-card" alt="" draggable="false" />
+          </div>
+        </div>
+
+        <div id="rite-reveal" class="rite-reveal" hidden>
+          <div class="rite-reveal-backdrop" aria-hidden="true"></div>
+          <div class="rite-reveal-sheet" role="dialog" aria-modal="true" aria-labelledby="rite-reveal-title">
+            <p class="rite-reveal-kicker" id="rite-reveal-kicker">Rite</p>
+            <h2 class="rite-reveal-title" id="rite-reveal-title"></h2>
+            <img id="rite-reveal-face" class="rite-reveal-face" alt="" draggable="false" />
+            <div id="rite-reveal-body" class="rite-reveal-body codex-meta"></div>
+            <button type="button" id="rite-reveal-continue" class="cta">
+              <span class="btn-label">Continue</span>
+            </button>
+          </div>
+        </div>
+
         <div id="card-inspect" class="card-inspect" hidden>
           <div class="inspect-backdrop" aria-hidden="true"></div>
           <div class="inspect-sheet">
-            <div id="inspect-foil" class="foil-card foil-card--codex foil-card--inspect">
-              <div class="foil-stack">
-                <img id="inspect-face" class="codex-face foil-face" alt="" draggable="false" />
-                <div class="foil-sheen" aria-hidden="true"></div>
-                <div class="foil-glare" aria-hidden="true"></div>
+            <div class="inspect-stage">
+              <div id="inspect-foil" class="foil-card foil-card--codex foil-card--inspect">
+                <div class="foil-stack">
+                  <img id="inspect-face" class="codex-face foil-face" alt="" draggable="false" />
+                  <div class="foil-sheen" aria-hidden="true"></div>
+                  <div class="foil-glare" aria-hidden="true"></div>
+                </div>
               </div>
+              <div id="inspect-companions" class="inspect-companions" hidden></div>
             </div>
             <div id="inspect-meta" class="codex-meta inspect-meta"></div>
             <button type="button" id="inspect-close" class="ghost">
@@ -390,10 +620,22 @@
 
         <div id="codex" class="panel sheet codex" hidden>
           <div class="sheet-content codex-content">
-            <button type="button" id="codex-back" class="ghost mini panel-back">
-              <span class="btn-label">Back</span>
-            </button>
-            <p class="tag">CARD CODEX</p>
+            <div class="codex-top">
+              <button type="button" id="codex-back" class="ghost mini panel-back">
+                <span class="btn-label">Back</span>
+              </button>
+              <p class="tag">CARD CODEX</p>
+              <div class="builder-filter-row codex-filter-row">
+                <label for="codex-filter">Craft</label>
+                <select id="codex-filter">
+                  <option value="all">All</option>
+                  <option value="ink">Ink Abyss</option>
+                  <option value="motley">Motley Masquerade</option>
+                  <option value="deal">Dusk Ledger</option>
+                  <option value="shell">Bonewick</option>
+                </select>
+              </div>
+            </div>
             <div class="codex-stage">
               <button type="button" id="codex-prev" class="codex-nav" aria-label="Previous card">‹</button>
               <div id="codex-foil" class="foil-card foil-card--codex">
@@ -407,16 +649,38 @@
             </div>
             <div id="codex-meta" class="codex-meta"></div>
             <div id="codex-thumbs" class="codex-thumbs"></div>
-            <button type="button" id="codex-close" class="ghost">
-              <span class="btn-label">Back</span>
+          </div>
+        </div>
+
+        <div id="victory-reveal" class="victory-reveal" hidden>
+          <div class="victory-backdrop" aria-hidden="true"></div>
+          <div class="victory-flash" aria-hidden="true"></div>
+          <div id="victory-sparks" class="victory-sparks" aria-hidden="true"></div>
+          <div class="victory-sheet" role="dialog" aria-modal="true" aria-labelledby="victory-title">
+            <div class="victory-burst" aria-hidden="true"></div>
+            <div class="victory-ring" aria-hidden="true"></div>
+            <div class="victory-ring victory-ring--late" aria-hidden="true"></div>
+            <p class="victory-outcome" id="victory-outcome"></p>
+            <img class="victory-seal" id="victory-seal" src="./assets/ui/seal-eye.png" alt="" draggable="false" />
+            <p class="victory-kicker" id="victory-kicker"></p>
+            <h2 class="victory-title" id="victory-title"></h2>
+            <p class="victory-sub" id="victory-sub"></p>
+            <p class="victory-explain" id="victory-explain"></p>
+            <div class="victory-score" id="victory-score"></div>
+            <button type="button" id="victory-continue" class="cta victory-cta">
+              <span class="btn-label">Continue</span>
             </button>
           </div>
         </div>
 
         <div id="end" class="panel sheet" hidden>
-          <div class="sheet-content">
+          <div class="sheet-content end-sheet">
+            <p class="end-outcome" id="end-outcome"></p>
+            <img class="end-seal" src="./assets/ui/seal-eye.png" alt="" draggable="false" />
+            <p class="end-kicker" id="end-kicker"></p>
             <h2 id="end-title">You Ascend</h2>
             <p id="end-detail"></p>
+            <p id="end-explain" class="end-explain"></p>
             <button type="button" id="btn-again" class="cta">
               <span class="btn-label">Rematch</span>
             </button>

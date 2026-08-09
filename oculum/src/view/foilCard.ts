@@ -130,11 +130,11 @@ function ensureStack(root: HTMLElement, face: HTMLElement): HTMLElement {
 /** Wrap an <img> in a tiltable stage. */
 export function mountFoilCard(
   face: HTMLElement,
-  opts?: { premium?: boolean },
+  opts?: { sovereign?: boolean; premium?: boolean },
 ): FoilHandle {
   const root = document.createElement("div");
   root.className = "foil-card foil-card--hand";
-  if (CARD_SKINS_ENABLED && opts?.premium) root.classList.add("is-premium");
+  if (CARD_SKINS_ENABLED && (opts?.sovereign || opts?.premium)) root.classList.add("is-premium");
   const parent = face.parentElement;
   if (!parent) throw new Error("foil face needs a parent");
   parent.insertBefore(root, face);

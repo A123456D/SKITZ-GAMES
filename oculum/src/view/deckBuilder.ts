@@ -1,4 +1,4 @@
-import { getCard, teachDeck } from "../core/cards";
+import { getCard, teachDeck, teachDeckMotley, teachDeckToll, teachDeckDusk, teachDeckBonewick } from "../core/cards";
 import { catalogOrder } from "../core/catalog";
 import {
   CONSTRUCTED_DECK_SIZE,
@@ -15,12 +15,12 @@ import type { CardInspectApi } from "./cardInspect";
 import { bindLiftInspect } from "./cardInspect";
 import { bindFoilStage } from "./foilCard";
 import { CARD_SKINS_ENABLED } from "./skins";
-import type { School } from "../core/types";
+import type { Heresy } from "../core/types";
 
 const STORAGE_KEY = "oculum.constructedDeck";
 
 export type DeckBuilderApi = {
-  open: () => void;
+  open: (opts?: { heresy?: Heresy }) => void;
   close: () => void;
   isOpen: () => boolean;
   getDeck: () => string[];
@@ -78,7 +78,7 @@ export function initDeckBuilder(opts: {
     const def = getCard(id);
     previewFace.src = handCardSrc(id);
     previewFace.alt = def.name;
-    previewFoil.classList.toggle("is-premium", CARD_SKINS_ENABLED && !!def.premium);
+    previewFoil.classList.toggle("is-premium", CARD_SKINS_ENABLED && !!def.sovereign);
     previewMeta.innerHTML = cardMetaHtml(def);
     const n = countInDeck(deck, id);
     const max = maxCopiesFor(def);
@@ -118,7 +118,7 @@ export function initDeckBuilder(opts: {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "builder-deck-chip";
-      if (def.premium) btn.classList.add("is-premium");
+      if (def.sovereign) btn.classList.add("is-premium");
       btn.dataset.id = id;
       const img = document.createElement("img");
       img.src = handCardSrc(id);
@@ -149,8 +149,8 @@ export function initDeckBuilder(opts: {
       el.classList.toggle("in-deck", n > 0);
       el.classList.toggle("full", !canAddToDeck(deck, id) && n > 0);
       const def = getCard(id);
-      const school = filterEl.value;
-      el.hidden = school !== "all" && def.school !== school;
+      const filter = filterEl.value;
+      el.hidden = filter !== "all" && def.heresy !== filter;
     }
   };
 
@@ -165,7 +165,7 @@ export function initDeckBuilder(opts: {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "builder-thumb";
-      if (def.premium) btn.classList.add("is-premium");
+      if (def.sovereign) btn.classList.add("is-premium");
       btn.dataset.id = id;
       btn.title = def.name;
       const img = document.createElement("img");
@@ -221,16 +221,26 @@ export function initDeckBuilder(opts: {
     refreshStatus();
   });
   btnTeach.addEventListener("click", () => {
-    deck = [...teachDeck()];
+    deck = [
+      ...(filterEl.value === "motley"
+        ? teachDeckMotley()
+        : filterEl.value === "toll"
+          ? teachDeckToll()
+          : filterEl.value === "deal"
+            ? teachDeckDusk()
+            : filterEl.value === "shell"
+              ? teachDeckBonewick()
+              : teachDeck()),
+    ];
     renderDeck();
     renderPoolCounts();
     refreshStatus();
   });
   btnAuto.addEventListener("click", () => {
-    const school = filterEl.value;
+    const filter = filterEl.value;
     deck = buildAutoDeck({
       seed: Date.now(),
-      school: school === "all" ? "all" : (school as School),
+      heresy: filter === "all" ? "all" : (filter as Heresy),
     });
     renderDeck();
     renderPoolCounts();
@@ -254,10 +264,24 @@ export function initDeckBuilder(opts: {
   bindLiftInspect(previewFoil, () => selectedId, inspect, () => inspect.open(selectedId));
 
   return {
-    open: () => {
+    open: (opts?: { heresy?: Heresy }) => {
       open = true;
       root.hidden = false;
       deck = loadSavedDeck();
+      if (opts?.heresy) {
+        filterEl.value = opts.heresy;
+        deck = [
+          ...(opts.heresy === "motley"
+            ? teachDeckMotley()
+            : opts.heresy === "toll"
+              ? teachDeckToll()
+              : opts.heresy === "deal"
+                ? teachDeckDusk()
+                : opts.heresy === "shell"
+                  ? teachDeckBonewick()
+                  : teachDeck()),
+        ];
+      }
       buildPool();
       renderDeck();
       refreshStatus();

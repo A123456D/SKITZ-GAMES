@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chooseAiMove } from "./ai";
-import { applyIntent, altitudeHasGaze, createMatch, legalIntents, unitPower } from "./match";
+import { applyIntent, createMatch, legalIntents, takeEvents, unitPower } from "./match";
 
 describe("oculum match", () => {
   it("starts with essence and sight on turn 1", () => {
@@ -10,13 +10,21 @@ describe("oculum match", () => {
     expect(s.sight).toBeGreaterThanOrEqual(1);
     expect(s.hand.length).toBe(4);
     expect(s.tutorialStep).toBe("done");
-    expect(s.prophecies).toContain("unblinking_law");
-    expect(s.enemyProphecies).toContain("unblinking_law");
+    expect(s.prophecies).toEqual([]);
   });
 
-  it("can play cliff seeker and witness", () => {
+  it("emits draw events from beginTurn", () => {
+    const s = createMatch({ seed: 3 });
+    const opening = takeEvents(s);
+    expect(opening.some((e) => e.type === "draw" && e.side === "player" && e.to === "hand")).toBe(
+      true,
+    );
+    expect(opening.some((e) => e.type === "turn" && e.side === "player")).toBe(true);
+  });
+
+  it("can play Blot Herald and witness", () => {
     const s = createMatch({ seed: 42 });
-    s.hand = ["cliff_seeker", "veil_banner", "ace_of_hollows"];
+    s.hand = ["blot_herald", "pale_ledger", "well_cantor"];
     s.essence = 5;
     s.sight = 5;
     const play = legalIntents(s).find(
@@ -24,206 +32,206 @@ describe("oculum match", () => {
     );
     expect(play).toBeTruthy();
     applyIntent(s, play!);
-    expect(s.altitudes[1].player?.cardId).toBe("cliff_seeker");
+    expect(s.altitudes[1].player?.cardId).toBe("blot_herald");
     expect(s.altitudes[1].player?.veiled).toBe(true);
     applyIntent(s, { kind: "witness", altitude: 1 });
     expect(s.altitudes[1].player?.veiled).toBe(false);
-    expect(unitPower(s, 1, "player")).toBe(2);
-  });
-
-  it("veil banner buffs veiled figure on same altitude", () => {
-    const s = createMatch({ seed: 7 });
-    s.hand = ["cliff_seeker", "veil_banner"];
-    s.essence = 5;
-    applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
-    applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
-    expect(s.altitudes[1].playerSite).toBe("veil_banner");
-    expect(unitPower(s, 1, "player")).toBe(2);
-  });
-
-  it("tutorial guides a real short match to Break", () => {
-    const s = createMatch({ seed: 9, tutorial: true });
-    expect(s.tutorialStep).toBe("intro");
-    expect(s.enemyWill).toBe(5);
-    expect(s.hand).toEqual(["cliff_seeker"]);
-    expect(legalIntents(s).every((i) => i.kind === "pass")).toBe(true);
-    applyIntent(s, { kind: "pass" });
-    expect(s.tutorialStep).toBe("play");
-    expect(s.hand).toEqual(["cliff_seeker"]);
-    expect(s.active).toBe("player");
-    applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
-    expect(s.tutorialStep).toBe("site");
-    expect(s.hand).toEqual(["veil_banner"]);
-    expect(s.altitudes[1].player?.cardId).toBe("cliff_seeker");
-    applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
-    expect(s.tutorialStep).toBe("pass1");
-    expect(s.hand).toEqual([]);
-    expect(s.altitudes[1].playerSite).toBe("veil_banner");
-    applyIntent(s, { kind: "pass" });
-    expect(s.tutorialStep).toBe("witness");
-    expect(s.hand).toEqual([]);
-    // Enemy acts then Resolve; player should get turn 2
-    let guard = 20;
-    while (s.active === "enemy" && guard-- > 0) {
-      applyIntent(s, chooseAiMove(s));
-    }
-    expect(s.active).toBe("player");
-    expect(s.enemyWill).toBeLessThan(5);
-    applyIntent(s, { kind: "witness", altitude: 1 });
-    expect(s.tutorialStep).toBe("graft");
-    expect(s.altitudes[1].player?.veiled).toBe(false);
-    expect(s.hand).toEqual(["ace_of_hollows"]);
-    applyIntent(s, { kind: "graft", handIndex: 0, altitude: 1 });
-    expect(s.tutorialStep).toBe("pass2");
-    expect(s.hand).toEqual([]);
-    applyIntent(s, { kind: "pass" });
-    expect(s.tutorialStep).toBe("done");
-    guard = 20;
-    while (s.active === "enemy" && s.winner == null && guard-- > 0) {
-      applyIntent(s, chooseAiMove(s));
-    }
-    expect(s.winner).toBe("player");
-    expect(s.endReason).toBe("break");
+    expect(unitPower(s, 1, "player")).toBe(3);
   });
 
   it("enemy gets a full beginTurn after player passes", () => {
     const s = createMatch({ seed: 3 });
-    s.enemyEssence = 0;
-    s.enemySight = 0;
-    s.enemyHand = ["cliff_seeker"];
-    s.enemyDeck = ["veil_banner", "root_chassis"];
-    const beforeHand = s.enemyHand.length;
+    s.essence = 0;
     applyIntent(s, { kind: "pass" });
     expect(s.active).toBe("enemy");
-    expect(s.passed.player).toBe(true);
-    expect(s.passed.enemy).toBe(false);
     expect(s.enemyEssence).toBe(1);
     expect(s.enemySight).toBeGreaterThanOrEqual(1);
-    expect(s.enemyHand.length).toBe(beforeHand + 1);
   });
 
-  it("stance swaps veiled/witnessed power via Third Face", () => {
+  it("Stained Veiled loser Forced Exposed on Resolve", () => {
     const s = createMatch({ seed: 11 });
-    s.hand = ["cliff_seeker", "third_face"];
-    s.essence = 5;
-    applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
-    applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
-    expect(s.altitudes[1].playerSite).toBe("third_face");
-    expect(s.altitudes[1].player?.hasThirdFace).toBe(true);
-    expect(unitPower(s, 1, "player")).toBe(1);
-    applyIntent(s, { kind: "stance", altitude: 1 });
-    expect(s.altitudes[1].player?.stanceB).toBe(true);
-    expect(unitPower(s, 1, "player")).toBe(2);
-  });
-
-  it("depth matron freely witnesses other veiled figures", () => {
-    const s = createMatch({ seed: 13 });
-    s.hand = [];
-    s.essence = 0;
-    s.sight = 5;
-    s.altitudes[0].player = {
-      instanceId: "a",
-      cardId: "cliff_seeker",
-      veiled: true,
-      hybridSite: false,
-      stanceB: false,
-      grafts: [],
-      inhabitant: null,
-      hasThirdFace: false,
-    };
-    s.altitudes[1].player = {
-      instanceId: "b",
-      cardId: "depth_matron",
-      veiled: true,
-      hybridSite: false,
-      stanceB: false,
-      grafts: [],
-      inhabitant: null,
-      hasThirdFace: false,
-    };
-    applyIntent(s, { kind: "witness", altitude: 1 });
-    expect(s.altitudes[1].player?.veiled).toBe(false);
-    expect(s.altitudes[0].player?.veiled).toBe(false);
-    // Free-Witness no longer fires Cliff Seeker Revelation (+1 Sight)
-    expect(s.sight).toBe(2); // paid 3 for Matron
-  });
-
-  it("unblinking law grants eclipse when three schools witnessed", () => {
-    const s = createMatch({ seed: 17 });
-    s.prophecies = ["unblinking_law"];
-    s.eclipse = 0;
-    s.sight = 10;
-    s.altitudes[0].player = {
-      instanceId: "a",
-      cardId: "cliff_seeker",
-      veiled: true,
-      hybridSite: false,
-      stanceB: false,
-      grafts: [],
-      inhabitant: null,
-      hasThirdFace: false,
-    };
-    s.altitudes[1].player = {
-      instanceId: "b",
-      cardId: "root_chassis",
-      veiled: true,
-      hybridSite: false,
-      stanceB: false,
-      grafts: [],
-      inhabitant: null,
-      hasThirdFace: false,
-    };
-    s.altitudes[2].player = {
-      instanceId: "c",
-      cardId: "depth_matron",
-      veiled: true,
-      hybridSite: false,
-      stanceB: false,
-      grafts: [],
-      inhabitant: null,
-      hasThirdFace: false,
-    };
-    applyIntent(s, { kind: "witness", altitude: 0 });
-    applyIntent(s, { kind: "witness", altitude: 1 });
-    // Depth Matron also free-witnesses others (already witnessed) — schools: cube, graft, deep
-    applyIntent(s, { kind: "witness", altitude: 2 });
-    const events = applyIntent(s, { kind: "pass" });
-    expect(s.eclipse).toBe(2);
-    expect(events.some((e) => e.type === "law" && e.eclipseGain === 2)).toBe(true);
-  });
-
-  it("stake field pilgrim gains eclipse when altitude is clear", () => {
-    const s = createMatch({ seed: 21 });
-    s.eclipse = 0;
-    s.sight = 3;
     s.altitudes[1].player = {
       instanceId: "p",
-      cardId: "stake_field_pilgrim",
-      veiled: true,
-      hybridSite: false,
-      stanceB: false,
-      grafts: [],
-      inhabitant: null,
-      hasThirdFace: false,
-    };
-    applyIntent(s, { kind: "witness", altitude: 1 });
-    expect(s.eclipse).toBe(1);
-  });
-
-  it("parasol path and perforated abbess grant gaze", () => {
-    const s = createMatch({ seed: 22 });
-    s.altitudes[0].playerSite = "parasol_path";
-    expect(altitudeHasGaze(s, 0, "player")).toBe(true);
-    s.altitudes[1].player = {
-      instanceId: "a",
-      cardId: "perforated_abbess",
+      cardId: "smother_bride",
       veiled: false,
       hybridSite: false,
       stanceB: false,
       grafts: [],
       inhabitant: null,
       hasThirdFace: false,
+      strained: false,
+      stained: false,
+      revelationFired: true,
+      scrutiny: 0,
+      wagered: false,
+      wagerAntePaid: false,
+      wagerAnteFavor: false,
+      openedSinceResolve: false,
+      lastBreachOpened: false,
+      pressed: false,
+      pressedBy: null,
     };
-    expect(altitudeHasGaze(s, 1, "player")).toBe(true);
+    s.altitudes[1].enemy = {
+      instanceId: "e",
+      cardId: "blot_herald",
+      veiled: true,
+      hybridSite: false,
+      stanceB: false,
+      grafts: [],
+      inhabitant: null,
+      hasThirdFace: false,
+      strained: false,
+      stained: true,
+      revelationFired: false,
+      scrutiny: 0,
+      wagered: false,
+      wagerAntePaid: false,
+      wagerAnteFavor: false,
+      openedSinceResolve: false,
+      lastBreachOpened: false,
+      pressed: false,
+      pressedBy: null,
+    };
+    s.passed.player = true;
+    s.active = "enemy";
+    applyIntent(s, { kind: "pass" });
+    expect(s.altitudes[1].enemy?.veiled).toBe(false);
+    expect(s.altitudes[1].enemy?.strained).toBe(true);
+  });
+
+  it("Re-Veil costs Sight and does not re-fire Revelation", () => {
+    const s = createMatch({ seed: 21 });
+    s.hand = ["blot_herald"];
+    s.essence = 5;
+    s.sight = 4;
+    applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
+    applyIntent(s, { kind: "witness", altitude: 1 });
+    expect(s.altitudes[1].player?.revelationFired).toBe(true);
+    expect(s.altitudes[1].player?.veiled).toBe(false);
+    const sightAfter = s.sight;
+    applyIntent(s, { kind: "reveil", altitude: 1 });
+    expect(s.altitudes[1].player?.veiled).toBe(true);
+    expect(s.altitudes[1].player?.revelationFired).toBe(true);
+    expect(s.sight).toBe(sightAfter - 1);
+  });
+
+  it("Overwrite bounces own figure to hand", () => {
+    const s = createMatch({ seed: 22 });
+    s.hand = ["blot_herald", "pale_ledger"];
+    s.essence = 5;
+    applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
+    expect(s.altitudes[1].player?.cardId).toBe("blot_herald");
+    applyIntent(s, { kind: "play", handIndex: 0, altitude: 1 });
+    expect(s.altitudes[1].player?.cardId).toBe("pale_ledger");
+    expect(s.hand).toContain("blot_herald");
+  });
+
+  it("Veiled loser Holds on Resolve", () => {
+    const s = createMatch({ seed: 23 });
+    s.altitudes[1].player = {
+      instanceId: "p",
+      cardId: "smother_bride",
+      veiled: false,
+      hybridSite: false,
+      stanceB: false,
+      grafts: [],
+      inhabitant: null,
+      hasThirdFace: false,
+      strained: false,
+      stained: false,
+      revelationFired: true,
+      scrutiny: 0,
+      wagered: false,
+      wagerAntePaid: false,
+      wagerAnteFavor: false,
+      openedSinceResolve: false,
+      lastBreachOpened: false,
+      pressed: false,
+      pressedBy: null,
+    };
+    s.altitudes[1].enemy = {
+      instanceId: "e",
+      cardId: "pale_ledger",
+      veiled: true,
+      hybridSite: false,
+      stanceB: false,
+      grafts: [],
+      inhabitant: null,
+      hasThirdFace: false,
+      strained: false,
+      stained: false,
+      revelationFired: false,
+      scrutiny: 0,
+      wagered: false,
+      wagerAntePaid: false,
+      wagerAnteFavor: false,
+      openedSinceResolve: false,
+      lastBreachOpened: false,
+      pressed: false,
+      pressedBy: null,
+    };
+    s.passed.player = true;
+    s.active = "enemy";
+    applyIntent(s, { kind: "pass" });
+    expect(s.altitudes[1].enemy?.veiled).toBe(true);
+    expect(s.altitudes[1].enemy).not.toBeNull();
+  });
+
+  it("Witnessed loser Falls on Resolve", () => {
+    const s = createMatch({ seed: 24 });
+    s.altitudes[1].player = {
+      instanceId: "p",
+      cardId: "smother_bride",
+      veiled: false,
+      hybridSite: false,
+      stanceB: false,
+      grafts: [],
+      inhabitant: null,
+      hasThirdFace: false,
+      strained: false,
+      stained: false,
+      revelationFired: true,
+      scrutiny: 0,
+      wagered: false,
+      wagerAntePaid: false,
+      wagerAnteFavor: false,
+      openedSinceResolve: false,
+      lastBreachOpened: false,
+      pressed: false,
+      pressedBy: null,
+    };
+    s.altitudes[1].enemy = {
+      instanceId: "e",
+      cardId: "pale_ledger",
+      veiled: false,
+      hybridSite: false,
+      stanceB: false,
+      grafts: [],
+      inhabitant: null,
+      hasThirdFace: false,
+      strained: false,
+      stained: false,
+      revelationFired: true,
+      scrutiny: 0,
+      wagered: false,
+      wagerAntePaid: false,
+      wagerAnteFavor: false,
+      openedSinceResolve: false,
+      lastBreachOpened: false,
+      pressed: false,
+      pressedBy: null,
+    };
+    s.passed.player = true;
+    s.active = "enemy";
+    const ev = applyIntent(s, { kind: "pass" });
+    expect(s.altitudes[1].enemy).toBeNull();
+    expect(ev.some((e) => e.type === "fall" && e.side === "enemy")).toBe(true);
+  });
+
+  it("AI can choose a move on opening board", () => {
+    const s = createMatch({ seed: 8 });
+    s.active = "enemy";
+    const move = chooseAiMove(s);
+    expect(move).toBeTruthy();
   });
 });

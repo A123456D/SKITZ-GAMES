@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "sim:bots": "vitest run src/core/botSim.test.ts",
     "icons": "node scripts/make-icons.mjs",
     "sfx:generate": "node scripts/generate-sfx.mjs",
     "punch-ui": "node scripts/punch-ui-alpha.mjs",

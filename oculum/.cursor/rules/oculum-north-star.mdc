@@ -1,0 +1,34 @@
+---
+description: OCULUM north star — epic CCG standards across all development
+alwaysApply: true
+---
+
+# OCULUM — Development north star
+
+Keep this in mind for **all** OCULUM work (rules, code, art, UX, balance)—not only when adding cards.
+
+## The goal
+
+Build toward an **epic, deep CCG** with lasting identity—not a shallow prototype that piles on content.
+
+Tagline fantasy: *Things only fully exist when Witnessed.*
+
+## Never lose the core
+
+- Loop: **Play Veiled → spend Sight to Witness → Gaze / Graft / Rite / Stance → Pass → Resolve altitudes**
+- Resources: **Essence** (play) · **Sight** (Witness / Gaze)
+- Board: **High / Mid / Low** with distinct incentives
+- Wins: **Break** (Will) · **Eclipse** · **Law / turns**
+- Schools are heresies of one Eye faith—expand them, don’t blur them into generic fantasy
+
+## Quality bar every change
+
+- Prefer depth and clarity over feature spam
+- New systems must combo with the existing set, not ignore it
+- Printed text, Codex, art, and `match.ts` behavior stay aligned (see card-design rule)
+- Feel-pass UX (Law, Gaze, Stance, enemy turns, Resolve) stays honest and readable
+- Art: original subjects in OCULUM style; never copy reference sheets
+
+## When unsure
+
+Ask: *Does this make Witnessing matter more, decks more interesting, or the world more itself?* If no, cut or rethink.

@@ -1,5 +1,14 @@
+import { getCard } from "../../core/cards";
+import { printedFacePower, unitPower, witnessCostAt } from "../../core/match";
 import type { Altitude, MatchState, OculusEvent, Side } from "../../core/types";
-import { bakeCardFace, bakeLaneToken } from "../cardBake";
+import {
+  bakeCardFace,
+  bakeLaneToken,
+  bakePowerChip,
+  bakeWitnessChip,
+  type PowerChipMood,
+  type WitnessChipMood,
+} from "../cardBake";
 import { effectiveDpr } from "../perf";
 
 const VERT = `#version 300 es
@@ -167,9 +176,13 @@ export class OculusStage {
   private bgQuad: WebGLBuffer;
   private texCache = new Map<string, TexEntry>();
   private bgTex: TexEntry | null = null;
-  private bgTexMatch: TexEntry | null = null;
-  private bgTexMenu: TexEntry | null = null;
+  private bgTexMatchPortrait: TexEntry | null = null;
+  private bgTexMatchLandscape: TexEntry | null = null;
+  private bgTexMenuPortrait: TexEntry | null = null;
+  private bgTexMenuLandscape: TexEntry | null = null;
   private menuBg = true;
+  /** true when viewport is taller than wide — mobile board / home plate */
+  private matchPortrait = true;
   private dprCap = 2;
   private time = 0;
   private reduceMotion = false;
@@ -179,6 +192,17 @@ export class OculusStage {
     { player: null, enemy: null },
   ];
   private resolveFlash = 0;
+  /** Brief pop when live power changes (keyed alt*2+side). */
+  private powerPulse: [{ player: number; enemy: number }, { player: number; enemy: number }, { player: number; enemy: number }] = [
+    { player: 0, enemy: 0 },
+    { player: 0, enemy: 0 },
+    { player: 0, enemy: 0 },
+  ];
+  private lastPower: [{ player: number | null; enemy: number | null }, { player: number | null; enemy: number | null }, { player: number | null; enemy: number | null }] = [
+    { player: null, enemy: null },
+    { player: null, enemy: null },
+    { player: null, enemy: null },
+  ];
   private lastBw = 0;
   private lastBh = 0;
   layout: StageLayout = { cssW: 1, cssH: 1, laneRects: [] };
@@ -234,22 +258,76 @@ export class OculusStage {
 
   private async loadBackground(): Promise<void> {
     try {
-      const [matchImg, menuImg] = await Promise.all([
-        loadImage("./assets/ui/bg-canyon.jpg"),
-        loadImage("./assets/ui/bg-menu.jpg"),
+      const [matchPortrait, matchLandscape, menuPortrait, menuLandscape] = await Promise.all([
+        loadImage("./assets/ui/bg-board-mobile.jpg?v=lanes3"),
+        loadImage("./assets/ui/bg-board-desktop.jpg?v=lanes3"),
+        loadImage("./assets/ui/bg-menu-mobile.jpg?v=home2"),
+        loadImage("./assets/ui/bg-menu-desktop.jpg?v=home2"),
       ]);
-      this.bgTexMatch = uploadImage(this.gl, matchImg, matchImg.naturalWidth, matchImg.naturalHeight);
-      this.bgTexMenu = uploadImage(this.gl, menuImg, menuImg.naturalWidth, menuImg.naturalHeight);
-      this.bgTex = this.menuBg ? this.bgTexMenu : this.bgTexMatch;
+      this.bgTexMatchPortrait = uploadImage(
+        this.gl,
+        matchPortrait,
+        matchPortrait.naturalWidth,
+        matchPortrait.naturalHeight,
+      );
+      this.bgTexMatchLandscape = uploadImage(
+        this.gl,
+        matchLandscape,
+        matchLandscape.naturalWidth,
+        matchLandscape.naturalHeight,
+      );
+      this.bgTexMenuPortrait = uploadImage(
+        this.gl,
+        menuPortrait,
+        menuPortrait.naturalWidth,
+        menuPortrait.naturalHeight,
+      );
+      this.bgTexMenuLandscape = uploadImage(
+        this.gl,
+        menuLandscape,
+        menuLandscape.naturalWidth,
+        menuLandscape.naturalHeight,
+      );
+      this.applyBackgroundChoice();
     } catch (e) {
       console.warn(e);
+      // Legacy plates if dual assets fail to load
+      try {
+        const [fallbackBoard, fallbackMenu] = await Promise.all([
+          loadImage("./assets/ui/bg-canyon.jpg"),
+          loadImage("./assets/ui/bg-menu.jpg").catch(() => loadImage("./assets/ui/bg-canyon.jpg")),
+        ]);
+        this.bgTexMatchPortrait = uploadImage(this.gl, fallbackBoard, fallbackBoard.naturalWidth, fallbackBoard.naturalHeight);
+        this.bgTexMatchLandscape = this.bgTexMatchPortrait;
+        this.bgTexMenuPortrait = uploadImage(this.gl, fallbackMenu, fallbackMenu.naturalWidth, fallbackMenu.naturalHeight);
+        this.bgTexMenuLandscape = this.bgTexMenuPortrait;
+        this.applyBackgroundChoice();
+      } catch (e2) {
+        console.warn(e2);
+      }
     }
   }
 
-  /** Title screen uses a distinct world plate from the match canyon. */
+  private matchBoardTex(): TexEntry | null {
+    return this.matchPortrait
+      ? (this.bgTexMatchPortrait ?? this.bgTexMatchLandscape)
+      : (this.bgTexMatchLandscape ?? this.bgTexMatchPortrait);
+  }
+
+  private homeBgTex(): TexEntry | null {
+    return this.matchPortrait
+      ? (this.bgTexMenuPortrait ?? this.bgTexMenuLandscape)
+      : (this.bgTexMenuLandscape ?? this.bgTexMenuPortrait);
+  }
+
+  private applyBackgroundChoice(): void {
+    this.bgTex = this.menuBg ? this.homeBgTex() ?? this.matchBoardTex() : this.matchBoardTex() ?? this.homeBgTex();
+  }
+
+  /** Home / title screen uses distinct pilgrimage plates from the match canyon. */
   setMenuBackground(on: boolean): void {
     this.menuBg = on;
-    this.bgTex = on ? this.bgTexMenu ?? this.bgTexMatch : this.bgTexMatch ?? this.bgTexMenu;
+    this.applyBackgroundChoice();
   }
 
   setDprCap(cap: number): void {
@@ -265,6 +343,11 @@ export class OculusStage {
     const parent = this.canvas.parentElement!;
     const cssW = parent.clientWidth;
     const cssH = parent.clientHeight;
+    const portrait = cssH >= cssW;
+    if (portrait !== this.matchPortrait) {
+      this.matchPortrait = portrait;
+      this.applyBackgroundChoice();
+    }
     const dpr = effectiveDpr(this.dprCap);
     const bw = Math.max(1, Math.floor(cssW * dpr));
     const bh = Math.max(1, Math.floor(cssH * dpr));
@@ -338,6 +421,88 @@ export class OculusStage {
     return t;
   }
 
+  private texForPower(power: number, mood: PowerChipMood): TexEntry {
+    const key = `power:${power}:${mood}`;
+    let t = this.texCache.get(key);
+    if (t) return t;
+    const baked = bakePowerChip(power, mood);
+    t = uploadImage(this.gl, baked, baked.width, baked.height);
+    this.texCache.set(key, t);
+    return t;
+  }
+
+  private texForWitness(cost: number, mood: WitnessChipMood): TexEntry {
+    const key = `witness:${cost}:${mood}`;
+    let t = this.texCache.get(key);
+    if (t) return t;
+    const baked = bakeWitnessChip(cost, mood);
+    t = uploadImage(this.gl, baked, baked.width, baked.height);
+    this.texCache.set(key, t);
+    return t;
+  }
+
+  private powerMood(live: number, printed: number, veiled: boolean): PowerChipMood {
+    if (live > printed) return "up";
+    if (live < printed) return "down";
+    return veiled ? "veil" : "wit";
+  }
+
+  private witnessMood(live: number, printed: number): WitnessChipMood {
+    if (live < printed) return "cheap";
+    if (live > printed) return "taxed";
+    return "base";
+  }
+
+  private drawSealChip(
+    tex: TexEntry,
+    x: number,
+    y: number,
+    size: number,
+    opts: { pulse: number; alpha: number; z: number; fxColor: [number, number, number] },
+  ): void {
+    const pop = 1 + opts.pulse * 0.35;
+    const s = size * pop;
+    const ox = x - (s - size) / 2;
+    const oy = y - (s - size) / 2;
+    this.drawCardQuad(ox + 2, oy + 3, s, s, tex, {
+      veil: 0,
+      pulse: 0,
+      tint: [0, 0, 0],
+      alpha: 0.42 * opts.alpha,
+      z: opts.z + 0.01,
+    });
+    this.drawCardQuad(ox, oy, s, s, tex, {
+      veil: 0,
+      pulse: opts.pulse * 0.85,
+      tint: [1, 1, 1],
+      alpha: opts.alpha,
+      z: opts.z,
+      fxColor: opts.fxColor,
+    });
+  }
+
+  private drawPowerChip(
+    live: number,
+    mood: PowerChipMood,
+    x: number,
+    y: number,
+    size: number,
+    opts: { pulse: number; alpha: number; z: number; fxColor: [number, number, number] },
+  ): void {
+    this.drawSealChip(this.texForPower(live, mood), x, y, size, opts);
+  }
+
+  private drawWitnessChip(
+    cost: number,
+    mood: WitnessChipMood,
+    x: number,
+    y: number,
+    size: number,
+    opts: { pulse: number; alpha: number; z: number; fxColor: [number, number, number] },
+  ): void {
+    this.drawSealChip(this.texForWitness(cost, mood), x, y, size, opts);
+  }
+
   private drawToken(
     cardId: string,
     x: number,
@@ -399,20 +564,34 @@ export class OculusStage {
           : [0.55, 0.4, 0.14];
         this.bump(ev.altitude, ev.enemyTarget ? (ev.side === "player" ? "enemy" : "player") : ev.side, 1.15 * soft, color, 0.08 * soft);
       } else if (ev.type === "play") {
-        this.bump(ev.altitude, ev.side, 0.85 * soft, [0.5, 0.42, 0.22], 0.12 * soft);
+        const amount = (ev.veiled ? 1.05 : 0.85) * soft;
+        const pop = (ev.veiled ? 0.16 : 0.12) * soft;
+        this.bump(ev.altitude, ev.side, amount, [0.5, 0.42, 0.22], pop);
       } else if (ev.type === "graft") {
         this.bump(ev.altitude, ev.side, 0.7 * soft, [0.45, 0.55, 0.62], 0.06 * soft);
       } else if (ev.type === "stance") {
         this.bump(ev.altitude, ev.side, 0.75 * soft, [0.55, 0.48, 0.28], 0.1 * soft);
       } else if (ev.type === "rite" && ev.altitude != null) {
-        this.bump(ev.altitude, "player", 0.55 * soft, [0.35, 0.4, 0.55], 0);
-        this.bump(ev.altitude, "enemy", 0.55 * soft, [0.35, 0.4, 0.55], 0);
+        this.bump(ev.altitude, "player", 1.05 * soft, [0.4, 0.52, 0.72], 0.12 * soft);
+        this.bump(ev.altitude, "enemy", 1.05 * soft, [0.4, 0.52, 0.72], 0.12 * soft);
       } else if (ev.type === "resolve") {
-        this.resolveFlash = Math.max(this.resolveFlash, 0.9 * soft);
+        this.resolveFlash = Math.max(this.resolveFlash, 1.35 * soft);
         for (let a = 0; a < 3; a++) {
-          this.bump(a as Altitude, "player", 0.55 * soft, [0.5, 0.3, 0.16], 0.04 * soft);
-          this.bump(a as Altitude, "enemy", 0.55 * soft, [0.5, 0.3, 0.16], 0.04 * soft);
+          this.bump(a as Altitude, "player", 0.95 * soft, [0.72, 0.38, 0.18], 0.1 * soft);
+          this.bump(a as Altitude, "enemy", 0.95 * soft, [0.72, 0.38, 0.18], 0.1 * soft);
         }
+      } else if (ev.type === "fall") {
+        this.bump(ev.altitude, ev.side, 1.55 * soft, [0.85, 0.18, 0.16], 0.28 * soft);
+        this.resolveFlash = Math.max(this.resolveFlash, 0.75 * soft);
+      } else if (ev.type === "stain") {
+        this.bump(ev.altitude, ev.side, 1.05 * soft, [0.25, 0.55, 0.42], 0.1 * soft);
+      } else if (ev.type === "strain") {
+        this.bump(ev.altitude, ev.side, 1.0 * soft, [0.7, 0.45, 0.2], 0.08 * soft);
+      } else if (ev.type === "blind") {
+        this.bump(ev.altitude, "player", 0.7 * soft, [0.2, 0.22, 0.35], 0);
+        this.bump(ev.altitude, "enemy", 0.7 * soft, [0.2, 0.22, 0.35], 0);
+      } else if (ev.type === "eclipse") {
+        this.resolveFlash = Math.max(this.resolveFlash, 0.55 * soft);
       } else if (ev.type === "law") {
         this.resolveFlash = Math.max(this.resolveFlash, 0.7 * soft);
       }
@@ -442,6 +621,10 @@ export class OculusStage {
       }
     }
     this.resolveFlash = Math.max(0, this.resolveFlash - dt * 2.4);
+    for (const lane of this.powerPulse) {
+      lane.player = Math.max(0, lane.player - dt * 2.8);
+      lane.enemy = Math.max(0, lane.enemy - dt * 2.8);
+    }
     const gl = this.gl;
     const { cssW, cssH, laneRects } = this.layout;
     const L = this.cardLoc;
@@ -569,6 +752,66 @@ export class OculusStage {
           });
         }
       }
+
+      // Live Resolve power seal — sits in the mid-lane gutter, facing the rival
+      if (!u.hybridSite && getCard(u.cardId).type !== "site") {
+        const live = unitPower(state, alt, side);
+        const printed = printedFacePower(u);
+        const mood = this.powerMood(live, printed, u.veiled);
+        const prev = this.lastPower[alt][side];
+        if (prev !== null && prev !== live) {
+          this.powerPulse[alt][side] = Math.max(this.powerPulse[alt][side], this.reduceMotion ? 0.45 : 0.85);
+        }
+        this.lastPower[alt][side] = live;
+        const chip = Math.min(cardW * 0.4, lane.w * 0.34, 52);
+        // Slightly left of center so Motley graft seals on the right stay clear
+        const px = cx + cardW * 0.08;
+        const gutterMid = lane.y + lane.h * 0.5;
+        const py = top
+          ? Math.min(cy + cardH - chip * 0.18, gutterMid - chip * 0.62)
+          : Math.max(cy - chip * 0.82, gutterMid - chip * 0.38);
+        const moodFx: [number, number, number] =
+          mood === "up"
+            ? [0.85, 0.55, 0.2]
+            : mood === "down"
+              ? [0.7, 0.28, 0.24]
+              : mood === "veil"
+                ? [0.35, 0.55, 0.52]
+                : [0.55, 0.42, 0.18];
+        this.drawPowerChip(live, mood, px, py, chip, {
+          pulse: Math.max(pulse * 0.4, this.powerPulse[alt][side]),
+          alpha: 1,
+          z: top ? 0.055 : 0.025,
+          fxColor: moodFx,
+        });
+
+        // Live Witness / Gaze Sight cost — top-right of Veiled figures (matches printed teal pip)
+        if (u.veiled) {
+          const def = getCard(u.cardId);
+          if (def.type === "figure" || def.type === "vessel") {
+            // Player POV: your unit = own Witness; foe unit = Gaze cost (High −1)
+            const liveWit = witnessCostAt(alt, def.witnessCost, side === "enemy");
+            const witMood = this.witnessMood(liveWit, def.witnessCost);
+            const ws = Math.min(cardW * 0.3, lane.w * 0.26, 38);
+            const wx = cx + cardW - ws * 0.95;
+            const wy = cy + ws * 0.06;
+            const witFx: [number, number, number] =
+              witMood === "cheap"
+                ? [0.4, 0.85, 0.78]
+                : witMood === "taxed"
+                  ? [0.35, 0.5, 0.48]
+                  : [0.25, 0.7, 0.65];
+            this.drawWitnessChip(liveWit, witMood, wx, wy, ws, {
+              pulse: pulse * 0.35,
+              alpha: 1,
+              z: top ? 0.05 : 0.02,
+              fxColor: witFx,
+            });
+          }
+        }
+      }
+    } else {
+      this.lastPower[alt][side] = null;
     }
 
     if (site) {

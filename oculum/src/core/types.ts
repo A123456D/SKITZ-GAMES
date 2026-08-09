@@ -1,17 +1,31 @@
 export const ALTITUDE_COUNT = 3;
 export const MAX_TURNS = 10;
 export const HAND_MAX = 5;
-export const START_WILL = 20;
+export const START_WILL = 40;
 export const SIGHT_CARRY_CAP = 6;
 export const ESSENCE_CAP = 8;
-export const ECLIPSE_WIN = 5;
+export const ECLIPSE_WIN = 10;
+/** Motley Favor track (Cash / Trick fuel). */
+export const FAVOR_CAP = 3;
+/** Veiled Holds → Forced Exposed + Strain at this stack count. */
+export const SCRUTINY_FORCE = 2;
 
 /** Tutorial foe Will — Break climax after two guided Resolves. */
-export const TUTORIAL_ENEMY_WILL = 5;
+export const TUTORIAL_ENEMY_WILL = 3;
 
 export type Side = "player" | "enemy";
 export type Altitude = 0 | 1 | 2; // High, Mid, Low
-export type School =
+
+/**
+ * Craft / heresy id on CardDef.
+ * Live soft-reboot: ink · motley · toll · breach.
+ * Shelved / seal leftovers stay typed for leftover hooks and HERESY_LORE.
+ */
+export type Heresy =
+  | "ink"
+  | "motley"
+  | "toll"
+  | "breach"
   | "cube"
   | "deal"
   | "many"
@@ -28,10 +42,10 @@ export type CardType = "figure" | "site" | "relic" | "sigil" | "vessel" | "rite"
 export type CardDef = {
   id: string;
   name: string;
-  school: School;
+  heresy: Heresy;
   type: CardType;
   essence: number;
-  /** Sight to Witness; 0 = N/A or auto */
+  /** Sight to Witness; 0 = N/A or auto (Sites) */
   witnessCost: number;
   veiledPower: number;
   witnessedPower: number;
@@ -39,8 +53,14 @@ export type CardDef = {
   /** Short subject for art prompts / procedural face */
   artSubject: string;
   text: string;
-  /** Internal flag: Codex sort pin + future skins (not printed rarity) */
+  /** Printed Veiled: ability (Figures) */
+  veiledAbility?: string;
+  /** Printed Revelation: (Figures / some Vessels) */
+  revelation?: string;
+  /** Internal: Codex sort pin + future skins (not printed rarity) */
   premium?: boolean;
+  /** Sovereign singleton — constructed ≤1 total / per id */
+  sovereign?: boolean;
 };
 
 export type Grafted = {
@@ -60,6 +80,28 @@ export type BoardUnit = {
   inhabitant: string | null;
   /** Sigil Third Face on this altitude */
   hasThirdFace: boolean;
+  /** Witnessed loser already Strained — next Witnessed loss Falls */
+  strained: boolean;
+  /** Ink Abyss Stain mark */
+  stained: boolean;
+  /** Revelation already fired this board life */
+  revelationFired: boolean;
+  /** Veiled Hold stacks toward SCRUTINY_FORCE */
+  scrutiny: number;
+  /** Motley: ante committed — Cash on Veiled win / Bust on lose or Forced Expose */
+  wagered: boolean;
+  /** True if ante spent a resource (refund on Cash); false for Free Wager */
+  wagerAntePaid: boolean;
+  /** True if ante was Favor (not Sight); only when wagerAntePaid */
+  wagerAnteFavor: boolean;
+  /** Iron Breach: became Witnessed via own Open since last Resolve (Overexpose eligible) */
+  openedSinceResolve: boolean;
+  /** Iron Breach Last Breach: Opened by that rite this round (Overexpose → draw) */
+  lastBreachOpened: boolean;
+  /** Ink Press: currently Pressed (−1 power until Resolve) */
+  pressed: boolean;
+  /** Side that Pressed this unit (for backlash / pierce) */
+  pressedBy: Side | null;
 };
 
 export type AltitudeSlot = {
@@ -76,12 +118,35 @@ export type AltitudeSlot = {
 export type OculusEvent =
   | { type: "play"; side: Side; altitude: Altitude; cardId: string; veiled: boolean }
   | { type: "witness"; side: Side; altitude: Altitude; cardId: string; enemyTarget?: boolean }
+  | { type: "reveil"; side: Side; altitude: Altitude; cardId: string }
   | { type: "graft"; side: Side; altitude: Altitude; relicId: string }
   | { type: "rite"; side: Side; cardId: string; altitude?: Altitude }
   | { type: "stance"; side: Side; altitude: Altitude; stanceB: boolean }
+  | { type: "wager"; side: Side; altitude: Altitude; cardId: string; free: boolean }
+  | { type: "cash"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "bust"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "fold"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "favor"; side: Side; amount: number }
+  | { type: "press"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "press_backlash"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "peal"; side: Side; altitude: Altitude }
+  | { type: "peal_pay"; side: Side; altitude: Altitude }
+  | { type: "toll"; side: Side; altitude: Altitude }
+  | { type: "toll_pay"; side: Side; altitude: Altitude; paid: boolean }
+  | { type: "lure"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "resonance"; side: Side; altitude: Altitude }
+  | { type: "overexpose"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "stain"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "blind"; altitude: Altitude }
+  | { type: "scrutiny"; side: Side; altitude: Altitude; cardId: string; stacks: number }
+  | { type: "overwrite"; side: Side; altitude: Altitude; bouncedId: string }
+  | { type: "draw"; side: Side; cardId: string; to: "hand" | "law" }
   | { type: "law"; side: Side; cardId: string; eclipseGain: number }
+  | { type: "eclipse"; side: Side; amount: number; reason?: string }
   | { type: "pass"; side: Side }
   | { type: "resolve"; damages: { player: number; enemy: number } }
+  | { type: "strain"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "fall"; side: Side; altitude: Altitude; cardId: string }
   | { type: "turn"; turn: number; side: Side }
   | { type: "end"; winner: Side | "draw"; reason: "break" | "eclipse" | "turns" };
 
@@ -90,6 +155,7 @@ export type MatchPhase = "menu" | "play" | "end";
 /**
  * First Gaze — real guided match (not isolated lesson scenes).
  * Soft CTA only on intro; later beats are legal match actions with real Pass/Resolve.
+ * Extra hud/card anatomy steps reserved for upcoming tutorial work.
  */
 export type TutorialStep =
   | "intro"
@@ -99,6 +165,13 @@ export type TutorialStep =
   | "witness"
   | "graft"
   | "pass2"
+  | "card_essence"
+  | "card_sight"
+  | "card_power"
+  | "hud_will"
+  | "hud_sight"
+  | "hud_eclipse"
+  | "hud_lanes"
   | "done";
 
 export type AiDifficulty = "easy" | "normal" | "hard";
@@ -108,8 +181,64 @@ export type MatchState = {
   turn: number;
   active: Side;
   passed: { player: boolean; enemy: boolean };
-  /** Third Face Stance used this action window */
+  /** Third Face / Motley Stance used this action window */
   stanceUsed: { player: boolean; enemy: boolean };
+  /** Re-Veil used this action window */
+  reveilUsed: { player: boolean; enemy: boolean };
+  /** Motley Wager used this action window */
+  wagerUsed: { player: boolean; enemy: boolean };
+  /** Ink Press used this action window */
+  pressUsed: { player: boolean; enemy: boolean };
+  /** Bellward Peal used this action window */
+  pealUsed: { player: boolean; enemy: boolean };
+  /** Sound the Toll — Peal pays even without Resolve spend */
+  soundTollPealBonus: { player: boolean; enemy: boolean };
+  /** Debtor of Caprice — Bust draw used this match */
+  debtorBustDrawUsed: { player: boolean; enemy: boolean };
+  /** Smile That Holds / False Hold — next Forced Exposed cancel arm */
+  falseHoldArmed: { player: boolean; enemy: boolean };
+  /** False Face — cancel Forced Exposed once */
+  falseFaceArmed: { player: boolean; enemy: boolean };
+  /** Mire Surge rite armed */
+  mireSurgeArmed: { player: boolean; enemy: boolean };
+  /** Gala Surge rite armed */
+  galaSurgeArmed: { player: boolean; enemy: boolean };
+  /** Encore buff altitude (null = none) */
+  encoreBuffAlt: { player: Altitude | null; enemy: Altitude | null };
+  /** Debt Surge armed */
+  debtSurgeArmed: { player: boolean; enemy: boolean };
+  /** Vessel Surge armed */
+  vesselSurgeArmed: { player: boolean; enemy: boolean };
+  /** Mesa buff altitude */
+  mesaBuffAlt: { player: Altitude | null; enemy: Altitude | null };
+  /** Well Cantor choir buff until Resolve */
+  inkChoirBuff: { player: boolean; enemy: boolean };
+  /** Smother Bride Sight tax used this turn */
+  smotherTaxUsed: { player: boolean; enemy: boolean };
+  /** Toll owner per altitude (null = untolled) */
+  tollOwner: [Side | null, Side | null, Side | null];
+  /** Peal armed on altitude */
+  pealArmed: [boolean, boolean, boolean];
+  /** Bell Debt Walker resonance buff */
+  walkerResonanceBuff: { player: boolean; enemy: boolean };
+  /** Path Bellman buff */
+  pathBellmanBuff: { player: boolean; enemy: boolean };
+  /** Rope Auditor — enemy Tolled Witness/Lure Sight tax used this turn */
+  ropeAuditorTaxUsed: { player: boolean; enemy: boolean };
+  /** Iron Breach Full Breach — +1 Breach Will until Resolve */
+  fullBreachArmed: { player: boolean; enemy: boolean };
+  /** Iron Breach — Breach Will payouts already dealt this Resolve (cap 2/side) */
+  breachDealtThisResolve: { player: number; enemy: number };
+  /** Overexpose already taken this Resolve */
+  overexposeTakenThisResolve: { player: boolean; enemy: boolean };
+  /** Ashcoil buff stacks */
+  ashcoilBuff: { player: number; enemy: number };
+  /** Skaroth first-Breach power arm */
+  skarothPowerArmed: { player: boolean; enemy: boolean };
+  /** Rivet Charm draw used */
+  rivetCharmDrawUsed: { player: boolean; enemy: boolean };
+  /** Slag Reaper strain draw used */
+  slagStrainDrawUsed: { player: boolean; enemy: boolean };
   altitudes: [AltitudeSlot, AltitudeSlot, AltitudeSlot];
   hand: string[];
   enemyHand: string[];
@@ -122,12 +251,17 @@ export type MatchState = {
   enemyEssence: number;
   sight: number;
   enemySight: number;
+  favor: number;
+  enemyFavor: number;
+  favorGainedThisTurn: { player: boolean; enemy: boolean };
+  /** Motley Cash count this Resolve (Trick / Lady Masque) */
+  cashThisResolve: { player: number; enemy: number };
   will: number;
   enemyWill: number;
   eclipse: number;
   enemyEclipse: number;
-  /** Schools Witnessed this turn (for Unblinking Law) */
-  witnessedSchoolsThisTurn: School[];
+  /** Distinct heresies Witnessed this turn (for Unblinking Law) */
+  witnessedHeresiesThisTurn: Heresy[];
   prophecyProgress: number;
   winner: Side | "draw" | null;
   endReason: "break" | "eclipse" | "turns" | null;
@@ -141,7 +275,11 @@ export type MatchState = {
 export type Intent =
   | { kind: "play"; handIndex: number; altitude: Altitude }
   | { kind: "witness"; altitude: Altitude; enemy?: boolean }
+  | { kind: "reveil"; altitude: Altitude }
   | { kind: "graft"; handIndex: number; altitude: Altitude }
   | { kind: "rite"; handIndex: number; altitude?: Altitude }
   | { kind: "stance"; altitude: Altitude }
+  | { kind: "wager"; altitude: Altitude }
+  | { kind: "press"; altitude: Altitude }
+  | { kind: "peal"; altitude: Altitude }
   | { kind: "pass" };

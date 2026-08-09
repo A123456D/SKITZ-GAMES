@@ -4,6 +4,7 @@ export type SfxId =
   | "ui-tap"
   | "select"
   | "play"
+  | "site"
   | "witness"
   | "gaze"
   | "graft"
@@ -15,14 +16,20 @@ export type SfxId =
   | "eclipse"
   | "win"
   | "lose"
-  | "enemy";
+  | "enemy"
+  | "stain"
+  | "strain"
+  | "blind"
+  | "fall"
+  | "draw";
 
-export type MusicBed = "menu" | "match";
+export type MusicBed = "menu" | "match" | "victory" | "defeat";
 
 const SFX_FILES: Record<SfxId, string> = {
   "ui-tap": "ui-tap.mp3",
   select: "select.mp3",
   play: "play.mp3",
+  site: "site.mp3",
   witness: "witness.mp3",
   gaze: "gaze.mp3",
   graft: "graft.mp3",
@@ -35,34 +42,49 @@ const SFX_FILES: Record<SfxId, string> = {
   win: "win.mp3",
   lose: "lose.mp3",
   enemy: "enemy.mp3",
+  fall: "fall.mp3",
+  // Semantic aliases until dedicated stems ship
+  stain: "gaze.mp3",
+  strain: "resolve.mp3",
+  blind: "pass.mp3",
+  draw: "select.mp3",
 };
 
 const MUSIC_FILES: Record<MusicBed, string> = {
   menu: "music-menu.mp3",
   match: "music-match.mp3",
+  victory: "music-victory.mp3",
+  defeat: "music-defeat.mp3",
 };
 
 const MUTE_KEY = "oculum.muted";
 const MUSIC_MUTE_KEY = "oculum.musicMuted";
-const SFX_VERSION = 2;
+const SFX_VERSION = 5;
 const MUSIC_VOLUME = 0.32;
+const END_MUSIC_VOLUME = 0.4;
 
 const DEFAULT_VOL: Partial<Record<SfxId, number>> = {
   "ui-tap": 0.45,
   select: 0.55,
   play: 0.7,
+  site: 0.82,
   witness: 0.85,
   gaze: 0.88,
   graft: 0.7,
   stance: 0.65,
-  rite: 0.72,
+  rite: 0.88,
   pass: 0.5,
   resolve: 0.9,
   law: 0.85,
   eclipse: 0.9,
   win: 0.95,
-  lose: 0.85,
+  lose: 0.92,
   enemy: 0.55,
+  stain: 0.78,
+  strain: 0.72,
+  blind: 0.62,
+  fall: 0.88,
+  draw: 0.48,
 };
 
 let ctx: AudioContext | null = null;
@@ -241,6 +263,8 @@ function playBed(bed: MusicBed): void {
     musicEl.src = `./sfx/${MUSIC_FILES[bed]}?v=${SFX_VERSION}`;
     currentBed = bed;
   }
+  musicEl.loop = true;
+  musicEl.volume = bed === "victory" || bed === "defeat" ? END_MUSIC_VOLUME : MUSIC_VOLUME;
   void musicEl.play().catch(() => {
     /* wait for gesture */
   });

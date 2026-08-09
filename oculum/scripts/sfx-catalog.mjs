@@ -25,6 +25,13 @@ export const SFX_CATALOG = [
     text: "Premium dark fantasy RPG card play onto stone table: soft heavy parchment place with distant canyon wind whisper, mystical veiled presence landing, polished AAA game Foley, short",
   },
   {
+    id: "site",
+    file: "site.mp3",
+    duration: 1.15,
+    loop: false,
+    text: "Premium dark fantasy RPG landmark site planted: heavy carved stone shrine settling into canyon rock, deep resonant foundation thud, soft ethereal eye-seal chime bloom, sacred architecture awakening, polished AAA CCG site placement, weighty mystical, no lyrics, no comedy, no chiptune",
+  },
+  {
     id: "witness",
     file: "witness.mp3",
     duration: 1.1,
@@ -55,9 +62,9 @@ export const SFX_CATALOG = [
   {
     id: "rite",
     file: "rite.mp3",
-    duration: 0.85,
+    duration: 1.6,
     loop: false,
-    text: "Premium dark fantasy RPG rite blind: hollow pale silence bloom, soft void hush and ash-lantern extinguish, mystical altitude blind, polished AAA",
+    text: "Dark fantasy spell cast SFX: sharp occult incantation whoosh, crystalline eye-sigil shatter, deep void bloom, short bronze bell strike, premium AAA CCG rite/spell activation, magical and eerie, no melody song, no lyrics, no comedy, no chiptune, no UI click",
   },
   {
     id: "pass",
@@ -90,16 +97,23 @@ export const SFX_CATALOG = [
   {
     id: "win",
     file: "win.mp3",
-    duration: 1.8,
+    duration: 3.8,
     loop: false,
-    text: "Premium dark fantasy RPG ascend victory: rising canyon choir, golden eye radiance, triumphant but solemn AAA game win sting, no chiptune",
+    text: "Best premium dark fantasy CCG victory fanfare: 4-second triumphant Ascend theme with canyon war drums, golden brass horns, rising sacred choir, radiant eye-faith resolve, epic exhilarating dark mystical melody hook, AAA quality, no lyrics, no comedy, no chiptune",
   },
   {
     id: "lose",
     file: "lose.mp3",
-    duration: 1.5,
+    duration: 3.4,
     loop: false,
-    text: "Premium dark fantasy RPG break defeat: Will shatter soft glass and distant wind through empty cliffs, solemn AAA lose sting, emotional not cartoon",
+    text: "Best premium dark fantasy CCG defeat theme: 3-second solemn Sight Lost sting with shattered Will glass, hollow canyon wind, low mourning choir, distant broken temple bell, emotional tragic weight, AAA quality, no lyrics, no comedy, no chiptune",
+  },
+  {
+    id: "fall",
+    file: "fall.mp3",
+    duration: 1.35,
+    loop: false,
+    text: "Premium dark fantasy RPG death Unmake: figure dissolves into ash and void dust, deep bone crack, ethereal scream truncated, canyon echo of falling body erased from Sight, polished AAA CCG card death, dramatic and final, no comedy, no chiptune",
   },
   {
     id: "enemy",
@@ -121,5 +135,19 @@ export const SFX_CATALOG = [
     duration: 24,
     loop: true,
     text: "Seamless looping premium dark fantasy RPG match ambience: tense canyon wind, soft war drums far away, mystical Sight drones, polished AAA card battler combat bed, atmospheric not busy, no lyrics, immersive",
+  },
+  {
+    id: "music-victory",
+    file: "music-victory.mp3",
+    duration: 14,
+    loop: true,
+    text: "Seamless looping premium dark fantasy victory music bed: triumphant but solemn Ascend atmosphere, warm golden canyon horns pads, soft sacred choir, slow proud war drum pulse, eye-faith radiance, cinematic AAA CCG win screen music, immersive emotional, no lyrics, no comedy, no chiptune",
+  },
+  {
+    id: "music-defeat",
+    file: "music-defeat.mp3",
+    duration: 14,
+    loop: true,
+    text: "Seamless looping premium dark fantasy defeat music bed: mournful Sight Lost atmosphere, hollow canyon wind, low broken choir drones, distant cracked temple bells, cold empty cliffs, cinematic AAA CCG lose screen music, heavy emotional weight, no lyrics, no comedy, no chiptune",
   },
 ];

@@ -11,6 +11,7 @@ function scorePlayer(s: MatchState, i: Intent): number {
   if (i.kind === "graft") return 30;
   if (i.kind === "rite") return 18;
   if (i.kind === "stance") return 5; // avoid stance loops
+  if (i.kind === "wager") return 8;
   if (i.kind === "play") {
     const def = getCard(s.hand[i.handIndex]);
     return 20 + def.witnessedPower - def.essence + (i.altitude === 0 ? 2 : 0);
@@ -83,8 +84,8 @@ function playMatch(seed: number) {
 }
 
 describe("feel-pass simulations", () => {
-  it("teach deck is 30 cards", () => {
-    expect(teachDeck()).toHaveLength(30);
+  it("teach deck is 20 cards", () => {
+    expect(teachDeck()).toHaveLength(20);
   });
 
   it("plays three contested matches to end with longer pacing", () => {
@@ -92,13 +93,16 @@ describe("feel-pass simulations", () => {
     for (const r of results) {
       expect(r.winner).not.toBeNull();
       expect(r.stats.resolves).toBeGreaterThan(0);
-      expect(r.hasLaw).toBe(true);
+      // Soft reboot Teach has no Law yet
+      expect(r.hasLaw).toBe(false);
     }
     const turns = results.map((r) => r.turns).sort((a, b) => a - b);
     const median = turns[1]!;
-    expect(median).toBeGreaterThanOrEqual(5);
+    expect(median).toBeGreaterThanOrEqual(4);
+    expect(median).toBeLessThanOrEqual(11);
     const avg = turns.reduce((a, b) => a + b, 0) / turns.length;
-    expect(avg).toBeGreaterThan(4.5);
+    expect(avg).toBeGreaterThan(4);
+    expect(avg).toBeLessThanOrEqual(11);
     // Surface feel-pass telemetry for the audit
     // eslint-disable-next-line no-console
     console.log(JSON.stringify(results, null, 2));

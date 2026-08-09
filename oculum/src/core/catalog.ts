@@ -1,18 +1,7 @@
 import { CARDS, getCard } from "./cards";
-import type { CardDef, CardType, School } from "./types";
+import type { CardDef, CardType, Heresy } from "./types";
 
-const SCHOOL_ORDER: School[] = [
-  "cube",
-  "deal",
-  "many",
-  "graft",
-  "hollow",
-  "coral",
-  "shell",
-  "deep",
-  "ring",
-  "neutral",
-];
+const HERESY_ORDER: Heresy[] = ["ink", "motley", "toll", "breach", "deal", "shell", "neutral"];
 
 const TYPE_ORDER: CardType[] = [
   "figure",
@@ -24,8 +13,8 @@ const TYPE_ORDER: CardType[] = [
   "prophecy",
 ];
 
-function schoolRank(s: School): number {
-  const i = SCHOOL_ORDER.indexOf(s);
+function heresyRank(s: Heresy): number {
+  const i = HERESY_ORDER.indexOf(s);
   return i < 0 ? 99 : i;
 }
 
@@ -34,11 +23,11 @@ function typeRank(t: CardType): number {
   return i < 0 ? 99 : i;
 }
 
-/** Codex / deck-index order: School → premium → Type → Essence → name. */
+/** Codex / deck-index order: Heresy → Sovereign → Type → Essence → name. */
 export function compareCardCatalog(a: CardDef, b: CardDef): number {
-  const s = schoolRank(a.school) - schoolRank(b.school);
+  const s = heresyRank(a.heresy) - heresyRank(b.heresy);
   if (s !== 0) return s;
-  const p = Number(!!b.premium) - Number(!!a.premium);
+  const p = Number(!!b.sovereign) - Number(!!a.sovereign);
   if (p !== 0) return p;
   const t = typeRank(a.type) - typeRank(b.type);
   if (t !== 0) return t;

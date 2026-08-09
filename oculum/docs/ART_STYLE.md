@@ -19,16 +19,19 @@ Mood refs (style only): `docs/ref/` — four-eye pilgrim, windmill keywalker, ta
 - Recurring **Eye** iconography as religion (banners, seals, masks, cloak apertures) — stylized, not horror spam
 - **Scale contrast** is on-brand: tiny pilgrim beside titan; mouse pilot inside giant body; High-altitude walkers
 - **Beauty + wrongness:** elegant cloth / calm pose next to maw, void, ink, or graft (premiums especially)
+- **Female glamour:** most female-presenting Figures carry intentional sexiness / allure (pose, silhouette, cloth) — beauty+wrongness, premium CCG, not softcore; skip for horrors, comic underlings, elders when character demands it
 - **Lived-in pilgrimage kit:** charms, belts, banners, ofuda-like tags, companion beasts, weathered flags
-- Faction feeling via **repeated seal on banners + cloth** (school glyph), not rarity text on the face
+- Faction feeling via **repeated seal on banners + cloth** (Heresy glyph), not rarity text on the face
+- **Frames:** unique architecture per card within craft family — Ink = cream/bone/pale stone; Motley = purple/teal/gold **ornate unique frames** (rich Motley court — not simplified); Bellward = crimson–bone–charcoal ornate filigree with **bells / eye-seals only** (never Motley masks or dice); Scar Breach = **open-wound / strap** frames (scarred bone-ash straps, torn cloth, eye-brands in wound-seams, thin ember slits) — not riveted plate borders (never Motley masks, Ink drip, Toll bells/parasols); Dusk = copper/charcoal canyon; Bonewick = matte bone-white cracked coastal shrine + royal blue banners (not Delft china)
+- **Do not** pass Motley/Ink finished card JPGs as GenerateImage `reference_image_paths` — motif bleed copies wrong craft chrome. Layout language is verbal (gold Essence pip, teal Witness pip, nameplate, parchment rules, **Veiled N / Witnessed M** power line). Palette/mood refs only from that craft’s `docs/ref/` pack.
 
 ## Motif kit (from wave-2 refs — remix, don’t copy)
 
 | Motif | Use in original designs |
 |-------|-------------------------|
-| Four-hole ceramic / wood masks | School seal, Veiled face, Many / Hollow |
+| Four-hole ceramic / wood masks | Heresy seal, Veiled face, Many / Hollow |
 | Red branch-runes & hanging ribbons | Essence / ritual cost language |
-| Cloak / cloth with perfect circular cutouts | Hollow school, Gaze / Sight yield |
+| Cloak / cloth with perfect circular cutouts | Hollow Heresy, Gaze / Sight yield |
 | Parasols, ofuda, bells, waypoint stones | Ring / coastal cliff pilgrims |
 | Windmill sails, oversized keys, patchwork bodies | Graft / Deal oddity figures |
 | Button / coin eyes, straw stuffing, charm belts | Rural folk-horror Sites & Figures |
@@ -48,12 +51,16 @@ Mood refs (style only): `docs/ref/` — four-eye pilgrim, windmill keywalker, ta
 | Desert / stone / ochre field | `#c4a574` – `#8b5a3c` · pale sky `#e8d9a8` |
 | Cloth purple | `#4a2a6e` – `#7b4aaa` |
 | Ritual red (ribbons / runes / parasol) | `#b42318` – `#e85a3c` |
+| Scar Breach strap / charcoal | `#1a1a1e` – `#3a3a42` leather binding · thin metal straps only |
+| Scar Breach rust-blood | `#6b1c14` – `#a83228` wound / brand |
+| Scar Breach bone-ash | `#d4cfc4` – `#a8a093` scarred frame |
+| Scar Breach ember | `#c45c12` – `#e8a030` thin slits in wounds only |
 | Teal / sigil | `#1f8a7a` – `#3ecfc0` |
 | Gold metal | `#c9a227` – `#f0d56a` |
 | Bone / mask | `#e8dfd0` – `#cfc4b0` |
 | Ink line | `#0c0a0f` |
 
-Avoid: flat purple-on-white UI gradients, cute chibi, photoreal 3D, soft watercolor wash, generic medieval knights.
+Avoid: flat purple-on-white UI gradients, cute chibi, photoreal 3D, soft watercolor wash, generic medieval knights / full-plate Warhammer sludge (Scar Breach is weird-faith canyon warband — open-wound straps, brands, eye-seals — not stock fantasy plate).
 
 ## Composition for cards
 
@@ -63,6 +70,8 @@ Avoid: flat purple-on-white UI gradients, cute chibi, photoreal 3D, soft waterco
 - Clear silhouette / subject readable at 108px hand size
 - Gold Essence pip top-left, teal Witness/Sight pip top-right when relevant
 - Dark nameplate + short rules box, high-contrast type
+- **Figures must print power:** first rules line `Veiled N / Witnessed M.` matching `veiledPower` / `witnessedPower` (Motley style) OR clear bottom VEILED / WITNESSED pips — never omit
+- **Anatomy QA before install:** Read each generated face; regenerate on extra/wrong-way arms, melted fingers, impossible grips, floating limbs (see card-design rule §0b). Prefer sleeves / mitt grips over bare complex hands.
 - Background sells world: banners, cliff cities, windmills, shrine paths, barren stakes
 - Original subjects only — never copy reference sheet characters
 - No watermarks, no other-game logos, no readable IP text from refs (e.g. don’t print “TiNG”)
@@ -76,19 +85,30 @@ palette: desert ochre, ritual red ribbons, deep purple or slate cloth, teal sigi
 strong silhouette, scale contrast welcome, premium collectible card illustration, no text, no watermark, original character design
 ```
 
-## Per-school flavor (subjects stay original)
+## Per-Craft flavor (subjects stay original)
 
-| School | Visual cues |
+### Live soft-reboot crafts
+
+| Craft | Visual cues |
+|-------|-------------|
+| **Ink Abyss** | Cream/black drip swamp; **cream/bone/pale stone unique frames** per card; ink-maw folk; glamorous widows/matrons |
+| **Motley Masquerade** | Purple/teal/gold/ritual red, bright cliffs; **ornate unique Masquerade frames** (purple/teal/gold filigree); smile/spiral/dice jesters; glamorous court women |
+| **Bellward Toll** | Palette/mood from `docs/ref/bellward` only (crimson / white / charcoal, kasa, red parasol bells, cliff banners) — **never copy sheet layouts**. Card chrome = Ink/Motley philosophy: **unique ornate frames per card of cloth + hanging bells + eye-seals** (crimson fabric wraps, white veil cloth, bronze bells) — **not bone**, not Motley masks/dice, not Ink cream-drip. Gold Essence + teal Witness pips; rules must open with `Veiled N / Witnessed M.` Cast: 2♂ human · 1♀ human modest · 2♀ creature; no exaggerated busts. Never use Motley/Ink JPGs as GenerateImage refs (motif bleed). |
+| **Scar Breach** | Canyon war camps / cliffs; **unique open-wound frames per card within one DNA family** (same as Ink cream family): shared kit = scarred **bone-ash / torn parchment straps + buckles** + **eye-brands** in border + **ember under the tears** — **each card MUST have distinct strap weave, wound placement, and corner architecture; NEVER duplicate or clone one frame across cards**; **never** riveted iron plate; **never** Motley/Ink/Toll chrome. Bodies: ritual strap harness, brands, exposed skin — not full plate. **Pose:** Ink-style unique characterful portraits. Natural hands (no boxing mitts). Palette charcoal strap · rust-blood · bone-ash · ember. Tone: cool · badass · sexy · aggressive (**not** Motley court glam). Gold Essence + teal Witness pips; `Veiled N / Witnessed M.` Never Motley/Ink/Toll JPGs as GenerateImage refs. Never print meta words (DNA/UNIQUE/architecture) on the face. |
+| **Dusk Ledger** (shelved) | Canyon sunsets, copper/charcoal ledger frames, eclipsed sun, debt coins, wind-keys; glamorous widows + holecloak perforated clergy + comic couriers |
+
+### Archive / future
+
+| Heresy | Visual cues |
 |--------|-------------|
-| Cube | Geometric masks, desert cliff cities, scavenger layers |
-| Deal | Cards-as-relics, gambler mystics, canyon sunsets, wind-key oddities |
-| Many | Multi-face/stance spirits, four-hole masks, horn chains, tree perches |
-| Graft | Wood-through-machine, windmill bodies, forest reclamation, cyan optics |
-| Hollow | Hole-glyph clergy, perforated cloaks, void yellow/purple, barren arches |
-| Coral | Organic crowns, rune tablets, arid pillars |
-| Shell | Cracked ceramic divinity, interior architecture, wing-eyes |
-| Deep | Immense scale (titan behind pilgrim), multi-limb seers, jungle ruins, gems |
-| Ring | Rotating mechanical eyes, parasol cliff paths, temple sentinels, coastal cliffs |
+| Ashlar Veil | Geometric masks, desert cliff cities, scavenger layers |
+| Facet Host | Multi-face/stance spirits, four-hole masks, horn chains, tree perches |
+| Keywright Join | Wood-through-machine, windmill bodies, forest reclamation, cyan optics |
+| Cutwork Pale | Hole-glyph clergy, perforated cloaks, void yellow/purple, barren arches |
+| Branch-Rune | Organic crowns, rune tablets, arid pillars |
+| Bonewick | Cracked ceramic divinity, interior architecture, wing-eyes |
+| Cataract Verdure | Immense scale (titan behind pilgrim), multi-limb seers, jungle ruins, gems |
+| Iris Circle | Rotating mechanical eyes, parasol cliff paths, temple sentinels, coastal cliffs |
 
 ## Forbidden
 
@@ -100,10 +120,13 @@ strong silhouette, scale contrast welcome, premium collectible card illustration
 
 ## Pipeline
 
-1. Generate raw into `scripts/art-raw/{cardId}.png` (or Cursor assets)
-2. **Premium / rare layered 3D:** also generate `{id}-bg`, `{id}-subject`, `{id}-fx` then run `node scripts/process-card-layers.mjs`
-3. Ship under `public/assets/cards/{cardId}.png` (+ `layers/{id}/` for rares)
-4. Until art exists, GPU procedural faces use school colors + glyph (runtime fallback)
+1. **Defs + engine + tests** — card ids live in `CARDS`; playtest with **procedural placeholder faces** (heresy colors + glyph in `cardBake.ts`)
+2. **User greenlights art** — then GenerateImage finished faces into `scripts/art-raw/` / Cursor assets
+3. **Premium / rare layered 3D (optional):** also generate `{id}-bg`, `{id}-subject`, `{id}-fx` then run `node scripts/process-card-layers.mjs`
+4. Ship under `public/assets/cards/{cardId}.jpg` (+ `layers/{id}/` for rares); bump cache bust in `cardBake.ts`
+5. Do **not** GenerateImage in the same pass as Wave defs unless asked — placeholders first
+
+Until a JPG/PNG exists for an id, GPU procedural faces are the intentional interim — not a permanent substitute after art is greenlit.
 
 ### Premium layered art (future skins — currently off)
 
@@ -119,4 +142,4 @@ Process with `node scripts/process-card-layers.mjs`. Until skins ship, rares use
 
 ## Mobile readability test
 
-Before accepting art: shrink to **96×128**. If you cannot tell school/mood and silhouette in 0.5s, reject and regenerate.
+Before accepting art: shrink to **96×128**. If you cannot tell Heresy/mood and silhouette in 0.5s, reject and regenerate.
