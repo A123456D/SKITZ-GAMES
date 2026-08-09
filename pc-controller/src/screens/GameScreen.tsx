@@ -21,11 +21,32 @@ const EMPTY: GamepadState = {
 export function GameScreen({ transport }: Props) {
   const state = useRef<GamepadState>({ ...EMPTY, buttons: {} })
   const stickPtr = useRef<{ l: number | null; r: number | null }>({ l: null, r: null })
+  const btnPtr = useRef<Record<string, number | null>>({})
+  const downRef = useRef<Record<string, boolean>>({})
   const sensRef = useRef(loadInputSettings())
 
   const [knobs, setKnobs] = useState({ lx: 0, ly: 0, rx: 0, ry: 0 })
   const [down, setDown] = useState<Record<string, boolean>>({})
   const [sens, setSens] = useState<InputSettings>(() => sensRef.current)
+
+  const publish = () => {
+    state.current.lookGain = LOOK_BASE * sensRef.current.look
+    transport.gamepad({
+      ...state.current,
+      buttons: { ...state.current.buttons },
+    })
+  }
+
+  const releaseAllInputs = () => {
+    stickPtr.current = { l: null, r: null }
+    btnPtr.current = {}
+    downRef.current = {}
+    state.current = { ...EMPTY, buttons: {}, lookGain: LOOK_BASE * sensRef.current.look }
+    setKnobs({ lx: 0, ly: 0, rx: 0, ry: 0 })
+    setDown({})
+    publish()
+    window.setTimeout(() => publish(), 32)
+  }
 
   const updateSens = (patch: Partial<InputSettings>) => {
     const next = { ...sensRef.current, ...patch }
@@ -35,13 +56,7 @@ export function GameScreen({ transport }: Props) {
     state.current.lookGain = LOOK_BASE * next.look
   }
 
-  const publish = () => {
-    state.current.lookGain = LOOK_BASE * sensRef.current.look
-    transport.gamepad(state.current)
-  }
-
-  // Continuous right-stick look only. Left stick is edge WASD — do not
-  // republish every frame or late packets can leave A/D stuck repeating.
+  // Continuous right-stick look only — never re-drive WASD/face keys every frame.
   useEffect(() => {
     let frame = 0
     const tick = () => {
@@ -50,16 +65,25 @@ export function GameScreen({ transport }: Props) {
       frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
+
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') releaseAllInputs()
+    }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', releaseAllInputs)
+    window.addEventListener('blur', releaseAllInputs)
+
     return () => {
       cancelAnimationFrame(frame)
-      state.current = { ...EMPTY, buttons: {} }
-      transport.gamepad(state.current)
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', releaseAllInputs)
+      window.removeEventListener('blur', releaseAllInputs)
+      releaseAllInputs()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transport])
 
   const setAxis = (side: 'l' | 'r', x: number, y: number) => {
-    // Snap near-center to zero so WASD always releases cleanly.
     const nx = Math.abs(x) < 0.12 ? 0 : x
     const ny = Math.abs(y) < 0.12 ? 0 : y
     if (side === 'l') {
@@ -72,7 +96,6 @@ export function GameScreen({ transport }: Props) {
       setKnobs((k) => ({ ...k, rx: nx, ry: ny }))
     }
     publish()
-    // Extra zero after left release — clears any in-flight held frame.
     if (side === 'l' && nx === 0 && ny === 0) {
       window.setTimeout(() => {
         if (state.current.lx === 0 && state.current.ly === 0) publish()
@@ -117,10 +140,16 @@ export function GameScreen({ transport }: Props) {
         stickPtr.current[side] = null
         setAxis(side, 0, 0)
       },
+      onLostPointerCapture: (e: PointerEvent<HTMLDivElement>) => {
+        if (stickPtr.current[side] !== e.pointerId) return
+        stickPtr.current[side] = null
+        setAxis(side, 0, 0)
+      },
     }
   }
 
   const press = (btn: string) => {
+    downRef.current[btn] = true
     state.current.buttons[btn] = true
     setDown((d) => ({ ...d, [btn]: true }))
     haptic(['A', 'B', 'X', 'Y'].includes(btn) ? 'medium' : 'light')
@@ -128,19 +157,40 @@ export function GameScreen({ transport }: Props) {
   }
 
   const release = (btn: string) => {
+    if (!downRef.current[btn] && !state.current.buttons[btn]) return
+    downRef.current[btn] = false
     state.current.buttons[btn] = false
+    btnPtr.current[btn] = null
     setDown((d) => ({ ...d, [btn]: false }))
     publish()
+    // Second flush so a coalesced "down" packet can't win after release.
+    window.setTimeout(() => {
+      if (!downRef.current[btn]) {
+        state.current.buttons[btn] = false
+        publish()
+      }
+    }, 32)
   }
 
   const bindBtn = (btn: string) => ({
-    onPointerDown: (e: PointerEvent) => {
+    onPointerDown: (e: PointerEvent<HTMLButtonElement>) => {
       e.preventDefault()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      btnPtr.current[btn] = e.pointerId
       press(btn)
     },
-    onPointerUp: () => release(btn),
-    onPointerLeave: () => down[btn] && release(btn),
-    onPointerCancel: () => down[btn] && release(btn),
+    onPointerUp: (e: PointerEvent<HTMLButtonElement>) => {
+      if (btnPtr.current[btn] != null && btnPtr.current[btn] !== e.pointerId) return
+      release(btn)
+    },
+    onPointerCancel: (e: PointerEvent<HTMLButtonElement>) => {
+      if (btnPtr.current[btn] != null && btnPtr.current[btn] !== e.pointerId) return
+      release(btn)
+    },
+    onLostPointerCapture: (e: PointerEvent<HTMLButtonElement>) => {
+      if (btnPtr.current[btn] != null && btnPtr.current[btn] !== e.pointerId) return
+      release(btn)
+    },
   })
 
   const knobStyle = (x: number, y: number) => ({
