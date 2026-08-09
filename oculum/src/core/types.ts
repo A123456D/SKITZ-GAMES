@@ -209,6 +209,8 @@ export type MatchState = {
   wagerUsed: { player: boolean; enemy: boolean };
   /** Ink Press used this action window */
   pressUsed: { player: boolean; enemy: boolean };
+  /** Figure/vessel plays per altitude this action window — stops lane spam */
+  figurePlaysThisWindow: { player: [number, number, number]; enemy: [number, number, number] };
   /** Bellward Peal used this action window */
   pealUsed: { player: boolean; enemy: boolean };
   /** Sound the Toll — Peal pays even without Resolve spend */

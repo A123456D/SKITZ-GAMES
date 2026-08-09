@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { chooseAiMove } from "./ai";
 import { teachDeck } from "./cards";
-import { createMatch, legalIntents } from "./match";
+import { applyIntent, createMatch, legalIntents } from "./match";
 import { pickAiOpponentDeck } from "./decks";
 import { validateConstructedDeck } from "./construct";
 
@@ -115,5 +115,87 @@ describe("AI", () => {
       if (move.kind === "rite") rites += 1;
     }
     expect(rites).toBe(0);
+  });
+
+  it("spreads figures across lanes instead of stacking one altitude per window", () => {
+    const s = createMatch({ seed: 77, aiDifficulty: "hard" });
+    s.active = "enemy";
+    s.enemyEssence = 9;
+    s.enemySight = 0;
+    s.enemyHand = ["bell_debt_walker", "path_bellman", "clapper_cantor"];
+    s.altitudes[0].enemy = null;
+    s.altitudes[1].enemy = null;
+    s.altitudes[2].enemy = null;
+
+    const playedAlts: number[] = [];
+    for (let step = 0; step < 3 && s.active === "enemy"; step++) {
+      const move = chooseAiMove(s);
+      if (move.kind !== "play") break;
+      playedAlts.push(move.altitude);
+      applyIntent(s, move);
+    }
+
+    expect(playedAlts.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(playedAlts).size).toBe(playedAlts.length);
+  });
+
+  it("hard prefers Sound the Toll before dumping Toll figures with no Tolls down", () => {
+    const s = createMatch({ seed: 55, aiDifficulty: "hard" });
+    s.active = "enemy";
+    s.enemyEssence = 4;
+    s.enemyHand = ["sound_the_toll", "bell_debt_walker", "path_bellman"];
+    s.tollOwner = [null, null, null];
+
+    let soundFirst = 0;
+    for (let i = 0; i < 30; i++) {
+      const trial = createMatch({ seed: 55 + i, aiDifficulty: "hard" });
+      trial.active = "enemy";
+      trial.enemyEssence = 4;
+      trial.enemyHand = ["sound_the_toll", "bell_debt_walker", "path_bellman"];
+      trial.tollOwner = [null, null, null];
+      const move = chooseAiMove(trial);
+      if (move.kind === "rite" && trial.enemyHand[move.handIndex] === "sound_the_toll") soundFirst += 1;
+    }
+    expect(soundFirst).toBeGreaterThanOrEqual(24);
+    void s;
+  });
+
+  it("hard Motley Wagers when Stance B and Favor are armed", () => {
+    let wagers = 0;
+    for (let i = 0; i < 25; i++) {
+      const s = createMatch({ seed: 300 + i, aiDifficulty: "hard" });
+      s.active = "enemy";
+      s.enemyEssence = 0;
+      s.enemySight = 2;
+      s.enemyHand = [];
+      s.enemyFavor = 2;
+      s.enemyEclipse = 4;
+      s.wagerUsed.enemy = false;
+      s.stanceUsed.enemy = true;
+      s.altitudes[1].enemy = {
+        instanceId: "m1",
+        cardId: "whitecard_mummer",
+        veiled: true,
+        hybridSite: false,
+        stanceB: true,
+        grafts: [],
+        inhabitant: null,
+        hasThirdFace: false,
+        strained: false,
+        stained: false,
+        revelationFired: false,
+        scrutiny: 0,
+        wagered: false,
+        wagerAntePaid: false,
+        wagerAnteFavor: false,
+        openedSinceResolve: false,
+        lastBreachOpened: false,
+        pressed: false,
+        pressedBy: null,
+      };
+      const move = chooseAiMove(s);
+      if (move.kind === "wager" && move.altitude === 1) wagers += 1;
+    }
+    expect(wagers).toBeGreaterThanOrEqual(20);
   });
 });

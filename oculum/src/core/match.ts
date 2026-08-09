@@ -2206,6 +2206,9 @@ export function sightIncome(state: MatchState, side: Side): number {
  * @param roundStart — true at match start / after resolve (clears blinds + both pass flags)
  */
 export function beginTurn(state: MatchState, side: Side, roundStart = false): void {
+  if (!state.figurePlaysThisWindow) {
+    state.figurePlaysThisWindow = { player: [0, 0, 0], enemy: [0, 0, 0] };
+  }
   state.active = side;
   state.passed[side] = false;
   state.stanceUsed[side] = false;
@@ -2216,6 +2219,7 @@ export function beginTurn(state: MatchState, side: Side, roundStart = false): vo
   state.soundTollPealBonus[side] = false;
   state.debtorBustDrawUsed[side] = false;
   state.favorGainedThisTurn[side] = false;
+  state.figurePlaysThisWindow[side] = [0, 0, 0];
   // False Hold / Smile That Holds last until your next turn begins
   state.falseHoldArmed[side] = false;
   state.falseFaceArmed[side] = false;
@@ -2236,6 +2240,8 @@ export function beginTurn(state: MatchState, side: Side, roundStart = false): vo
     state.debtorBustDrawUsed.enemy = false;
     state.favorGainedThisTurn.player = false;
     state.favorGainedThisTurn.enemy = false;
+    state.figurePlaysThisWindow.player = [0, 0, 0];
+    state.figurePlaysThisWindow.enemy = [0, 0, 0];
     for (const slot of state.altitudes) slot.blinded = false;
   }
   state.witnessedHeresiesThisTurn = [];
@@ -4474,6 +4480,7 @@ export function createMatch(opts?: {
     reveilUsed: { player: false, enemy: false },
     wagerUsed: { player: false, enemy: false },
     pressUsed: { player: false, enemy: false },
+    figurePlaysThisWindow: { player: [0, 0, 0], enemy: [0, 0, 0] },
     pealUsed: { player: false, enemy: false },
     soundTollPealBonus: { player: false, enemy: false },
     debtorBustDrawUsed: { player: false, enemy: false },
@@ -5193,6 +5200,9 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
     u.inhabitant = inhabitant;
     if (siteOf(slot, side) === "third_face") u.hasThirdFace = true;
     setUnit(slot, side, u);
+    if (def.type === "figure" || def.type === "vessel") {
+      state.figurePlaysThisWindow[side][intent.altitude] += 1;
+    }
     // Enemy Stainwell on this lane stains a newly played Veiled figure
     applyStainwell(state, other(side), intent.altitude);
     push(state, { type: "play", side, altitude: intent.altitude, cardId, veiled: true });

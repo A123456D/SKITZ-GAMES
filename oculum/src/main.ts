@@ -1479,12 +1479,11 @@ function startSpectateBots(
   const gen = spectateGen;
   spectateBusy = false;
   lastConstructedDeck = null;
-  const settings = loadSettings();
   state = createMatch({
     seed,
     deck: fullCraftDeck(bottom),
     enemyDeck: fullCraftDeck(top),
-    aiDifficulty: settings.aiDifficulty === "easy" ? "normal" : settings.aiDifficulty,
+    aiDifficulty: "hard",
   });
   selectedHand = null;
   mode = "play";
@@ -1507,7 +1506,7 @@ function startSpectateBots(
   setEnemyTurn(false);
   document.body.classList.add("spectating");
   spectateChip.hidden = false;
-  spectateChip.textContent = `BOT SIM · ${SPECTATE_LABEL[bottom]} vs ${SPECTATE_LABEL[top]}`;
+  spectateChip.textContent = `BOT SIM · HARD · ${SPECTATE_LABEL[bottom]} vs ${SPECTATE_LABEL[top]}`;
   setMusicBed("match");
   void unlockAudio();
   takeEvents(state);
@@ -5555,6 +5554,7 @@ function frame(now: number): void {
         reveilUsed: { player: false, enemy: false },
         wagerUsed: { player: false, enemy: false },
         pressUsed: { player: false, enemy: false },
+        figurePlaysThisWindow: { player: [0, 0, 0], enemy: [0, 0, 0] },
         pealUsed: { player: false, enemy: false },
         soundTollPealBonus: { player: false, enemy: false },
         debtorBustDrawUsed: { player: false, enemy: false },
