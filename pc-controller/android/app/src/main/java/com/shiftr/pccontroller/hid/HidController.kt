@@ -71,6 +71,9 @@ class HidController(private val context: Context) {
     private val pressedKeys = LinkedHashSet<Byte>()
     private var mouseButtons = 0
     private var consumerBits = 0
+    /** WASD codes currently held from left stick — edge-triggered to avoid stuck/spam. */
+    private val stickKeysHeld = HashSet<String>()
+    private val faceKeysHeld = HashSet<String>()
 
     private val qosOut =
         BluetoothHidDeviceAppQosSettings(
@@ -259,6 +262,7 @@ class HidController(private val context: Context) {
         recoverAttempts = 0
         clearTimeout()
         clearRecover()
+        clearGamepadKeys()
         try {
             hostDevice?.let { hidDevice?.disconnect(it) }
             if (registered) hidDevice?.unregisterApp()
@@ -569,13 +573,12 @@ class HidController(private val context: Context) {
         buttons: Map<String, Boolean>,
         lookGain: Float = 34f,
     ) {
-        // Stick → mouse look / WASD-style keys for PC games over keyboard+mouse HID
+        // Right stick → mouse look (continuous while held)
         fun axis(v: Float): Float {
             val dead = 0.06f
             val a = kotlin.math.abs(v)
             if (a < dead) return 0f
             val t = ((a - dead) / (1f - dead)).coerceIn(0f, 1f)
-            // Mild ease-in keeps fine aim, still strong near edge
             val shaped = t * (0.35f + 0.65f * t)
             return if (v < 0f) -shaped else shaped
         }
@@ -585,14 +588,34 @@ class HidController(private val context: Context) {
         val mdy = (axis(ry) * gain).toInt()
         if (mdx != 0 || mdy != 0) sendMouse(mdx, mdy)
 
-        fun stickKey(code: String, active: Boolean) {
-            keyEvent(code, active)
+        // Left stick → WASD with hysteresis. Only press/release on edges so
+        // late async frames can't leave a key stuck repeating forever.
+        val wantStick = HashSet<String>()
+        val pressAt = 0.32f
+        val releaseAt = 0.18f
+        fun dir(code: String, value: Float, negative: Boolean) {
+            val held = stickKeysHeld.contains(code)
+            val active =
+                if (held) {
+                    if (negative) value < -releaseAt else value > releaseAt
+                } else {
+                    if (negative) value < -pressAt else value > pressAt
+                }
+            if (active) wantStick.add(code)
         }
-        // Lower deadzone so left stick feels snappier
-        stickKey("KeyA", lx < -0.22f)
-        stickKey("KeyD", lx > 0.22f)
-        stickKey("KeyW", ly < -0.22f)
-        stickKey("KeyS", ly > 0.22f)
+        dir("KeyA", lx, negative = true)
+        dir("KeyD", lx, negative = false)
+        dir("KeyW", ly, negative = true)
+        dir("KeyS", ly, negative = false)
+
+        for (code in stickKeysHeld.toList()) {
+            if (code !in wantStick) keyEvent(code, false)
+        }
+        for (code in wantStick) {
+            if (code !in stickKeysHeld) keyEvent(code, true)
+        }
+        stickKeysHeld.clear()
+        stickKeysHeld.addAll(wantStick)
 
         val map =
             mapOf(
@@ -607,9 +630,26 @@ class HidController(private val context: Context) {
                 "Start" to "Enter",
                 "Select" to "Tab",
             )
+        val wantFace = HashSet<String>()
         for ((btn, code) in map) {
-            keyEvent(code, buttons[btn] == true)
+            if (buttons[btn] == true) wantFace.add(code)
         }
+        for (code in faceKeysHeld.toList()) {
+            if (code !in wantFace) keyEvent(code, false)
+        }
+        for (code in wantFace) {
+            if (code !in faceKeysHeld) keyEvent(code, true)
+        }
+        faceKeysHeld.clear()
+        faceKeysHeld.addAll(wantFace)
+    }
+
+    /** Force-clear stick/face keys (mode switch, disconnect, lost pointer). */
+    fun clearGamepadKeys() {
+        for (code in stickKeysHeld.toList()) keyEvent(code, false)
+        for (code in faceKeysHeld.toList()) keyEvent(code, false)
+        stickKeysHeld.clear()
+        faceKeysHeld.clear()
     }
 
     private fun flushKeyboard(): Boolean {

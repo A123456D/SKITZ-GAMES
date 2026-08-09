@@ -8,7 +8,9 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import androidx.core.content.ContextCompat
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
@@ -44,6 +46,8 @@ class BluetoothHidPlugin : Plugin() {
     private var service: HidService? = null
     private var controller: HidController? = null
     private var bound = false
+    private val handler = Handler(Looper.getMainLooper())
+    private var pendingGamepad: Runnable? = null
 
     private val connection =
         object : ServiceConnection {
@@ -278,7 +282,20 @@ class BluetoothHidPlugin : Plugin() {
             val k = keys.next()
             buttons[k] = buttonsObj.getBool(k) == true
         }
-        controller?.gamepad(lx, ly, rx, ry, buttons, lookGain)
+        val c = controller
+        if (c == null) {
+            call.resolve()
+            return
+        }
+        // Apply on main thread, latest call wins via posted runnable replacing pending.
+        pendingGamepad?.let { handler.removeCallbacks(it) }
+        val task =
+            Runnable {
+                pendingGamepad = null
+                c.gamepad(lx, ly, rx, ry, buttons, lookGain)
+            }
+        pendingGamepad = task
+        handler.post(task)
         call.resolve()
     }
 

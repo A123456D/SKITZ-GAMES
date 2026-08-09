@@ -55,6 +55,8 @@ export function createBluetoothTransport(): Transport & {
   let moveAccY = 0
   let scrollAccX = 0
   let scrollAccY = 0
+  let gamepadLatest: GamepadState | null = null
+  let gamepadFlushScheduled = false
   const listeners = new Set<Listener>()
 
   const notify = () => listeners.forEach((fn) => fn())
@@ -328,13 +330,30 @@ export function createBluetoothTransport(): Transport & {
     },
     gamepad(next: GamepadState) {
       if (link !== 'bluetooth') return
-      void BluetoothHid.gamepad({
+      // Latest-wins coalesce — prevents an older "stick held" packet from
+      // arriving after release and leaving WASD stuck auto-repeating.
+      gamepadLatest = {
         lx: next.lx,
         ly: next.ly,
         rx: next.rx,
         ry: next.ry,
         lookGain: next.lookGain ?? 34,
-        buttons: next.buttons,
+        buttons: { ...next.buttons },
+      }
+      if (gamepadFlushScheduled) return
+      gamepadFlushScheduled = true
+      queueMicrotask(() => {
+        gamepadFlushScheduled = false
+        const g = gamepadLatest
+        if (!g || link !== 'bluetooth') return
+        void BluetoothHid.gamepad({
+          lx: g.lx,
+          ly: g.ly,
+          rx: g.rx,
+          ry: g.ry,
+          lookGain: g.lookGain ?? 34,
+          buttons: g.buttons,
+        })
       })
     },
   }

@@ -40,30 +40,44 @@ export function GameScreen({ transport }: Props) {
     transport.gamepad(state.current)
   }
 
-  // Continuous stick sampling while held — keeps look/WASD flowing without new pointer events.
+  // Continuous right-stick look only. Left stick is edge WASD — do not
+  // republish every frame or late packets can leave A/D stuck repeating.
   useEffect(() => {
     let frame = 0
     const tick = () => {
       const s = state.current
-      if (s.lx || s.ly || s.rx || s.ry) publish()
+      if (s.rx || s.ry) publish()
       frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
+    return () => {
+      cancelAnimationFrame(frame)
+      state.current = { ...EMPTY, buttons: {} }
+      transport.gamepad(state.current)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transport])
 
   const setAxis = (side: 'l' | 'r', x: number, y: number) => {
+    // Snap near-center to zero so WASD always releases cleanly.
+    const nx = Math.abs(x) < 0.12 ? 0 : x
+    const ny = Math.abs(y) < 0.12 ? 0 : y
     if (side === 'l') {
-      state.current.lx = x
-      state.current.ly = y
-      setKnobs((k) => ({ ...k, lx: x, ly: y }))
+      state.current.lx = nx
+      state.current.ly = ny
+      setKnobs((k) => ({ ...k, lx: nx, ly: ny }))
     } else {
-      state.current.rx = x
-      state.current.ry = y
-      setKnobs((k) => ({ ...k, rx: x, ry: y }))
+      state.current.rx = nx
+      state.current.ry = ny
+      setKnobs((k) => ({ ...k, rx: nx, ry: ny }))
     }
     publish()
+    // Extra zero after left release — clears any in-flight held frame.
+    if (side === 'l' && nx === 0 && ny === 0) {
+      window.setTimeout(() => {
+        if (state.current.lx === 0 && state.current.ly === 0) publish()
+      }, 32)
+    }
   }
 
   const bindStick = (side: 'l' | 'r') => {
