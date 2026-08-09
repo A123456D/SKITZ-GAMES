@@ -1632,6 +1632,91 @@ body.tutorial-soft #toast-text {
   border-color: rgba(212, 175, 55, 0.8);
 }
 
+.lane-cue--hero {
+  top: 38%;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  border-width: 2px;
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.55),
+    0 0 24px rgba(212, 175, 55, 0.25);
+  animation: lane-cue-hero 2.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.lane-cue--stain.lane-cue--hero {
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.55),
+    0 0 28px rgba(80, 200, 140, 0.35);
+}
+.lane-cue--press.lane-cue--hero,
+.lane-cue--strain.lane-cue--hero,
+.lane-cue--fall.lane-cue--hero {
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.55),
+    0 0 28px rgba(220, 80, 100, 0.4);
+}
+.lane-cue--wager.lane-cue--hero,
+.lane-cue--stance.lane-cue--hero {
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.55),
+    0 0 28px rgba(160, 120, 220, 0.4);
+}
+
+@keyframes lane-cue-hero {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -10%) scale(0.7);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -45%) scale(1.12);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -48%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -70%) scale(0.96);
+  }
+}
+
+.ecl-pip.trick-primed {
+  box-shadow:
+    0 0 0 1px rgba(180, 140, 220, 0.7),
+    0 0 18px rgba(160, 100, 220, 0.45);
+  animation: trick-primed-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes trick-primed-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.25);
+  }
+}
+
+.alt-pow.pow-tick {
+  animation: pow-tick 0.55s ease-out;
+}
+
+@keyframes pow-tick {
+  0% {
+    transform: scale(1);
+    color: inherit;
+  }
+  40% {
+    transform: scale(1.35);
+    color: #e8d8ff;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @keyframes lane-cue-pop {
   0% {
     opacity: 0;
@@ -4559,6 +4644,61 @@ button.ghost:active:not(:disabled),
   text-shadow: 0 1px 4px #000;
 }
 
+.opponent-pick {
+  margin: 0 0 16px;
+  text-align: left;
+}
+
+.opponent-pick-label {
+  margin: 0 0 8px;
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(230, 201, 138, 0.88);
+  text-shadow: 0 1px 3px #000;
+}
+
+.opponent-pick-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.opponent-opt {
+  appearance: none;
+  border: 1px solid rgba(230, 201, 138, 0.28);
+  border-radius: 999px;
+  background: rgba(12, 8, 14, 0.72);
+  color: rgba(237, 228, 212, 0.9);
+  font: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  padding: 8px 12px;
+  min-height: 36px;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 236, 200, 0.06);
+}
+
+.opponent-opt:hover,
+.opponent-opt:focus-visible {
+  border-color: rgba(230, 201, 138, 0.55);
+  color: #f6edd8;
+  outline: none;
+}
+
+.opponent-opt.is-on {
+  border-color: rgba(230, 201, 138, 0.78);
+  background: linear-gradient(180deg, rgba(90, 62, 36, 0.9), rgba(42, 28, 18, 0.95));
+  color: #f8efd8;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 200, 0.18),
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.builder-opponent-row {
+  margin: 0 0 10px;
+}
+
 .heresy-list {
   display: flex;
   flex-direction: column;
@@ -4774,6 +4914,16 @@ button.ghost:active:not(:disabled),
   padding: 10px 8px;
   font-size: 0.9rem;
   letter-spacing: 0.1em;
+}
+
+.heresy-card-actions .cta .btn-vs {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.82;
+  font-weight: 500;
 }
 
 .heresy-card-actions .ghost .btn-label {

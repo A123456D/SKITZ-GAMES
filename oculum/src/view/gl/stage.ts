@@ -756,14 +756,17 @@ export class OculusStage {
         fxColor,
       });
 
-      // Grafted relics as charm seals on the figure
+      // Grafted relics as charm seals — bottom centre of the figure card
       if (u.grafts.length > 0) {
         const ts = Math.min(cardW * 0.34, lane.w * 0.22);
         const maxShow = Math.min(u.grafts.length, 3);
+        const step = ts * 0.48;
+        const clusterW = ts + (maxShow - 1) * step;
+        const baseX = cx + (cardW - clusterW) / 2;
+        const gy = cy + cardH - ts * 0.78;
         for (let i = 0; i < maxShow; i++) {
           const g = u.grafts[i];
-          const gx = cx + cardW - ts - 1 - i * (ts * 0.42);
-          const gy = top ? cy + cardH - ts * 0.85 : cy - ts * 0.15;
+          const gx = baseX + i * step;
           this.drawToken(g.cardId, gx, gy, ts, {
             pulse: pulse * 0.55,
             alpha: 1,

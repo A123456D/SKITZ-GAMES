@@ -111,6 +111,7 @@ describe("AI", () => {
     };
     let rites = 0;
     for (let i = 0; i < 25; i++) {
+      // Heuristic + 2-ply both must refuse dead Tithe
       const move = chooseAiMove(s);
       if (move.kind === "rite") rites += 1;
     }
@@ -197,5 +198,101 @@ describe("AI", () => {
       if (move.kind === "wager" && move.altitude === 1) wagers += 1;
     }
     expect(wagers).toBeGreaterThanOrEqual(20);
+  });
+
+  it("hard Ink Presses a stained Motley Stance-B lane when winning", () => {
+    let presses = 0;
+    for (let i = 0; i < 25; i++) {
+      const s = createMatch({ seed: 400 + i, aiDifficulty: "hard" });
+      s.active = "enemy";
+      s.enemyEssence = 0;
+      s.enemySight = 2;
+      s.enemyHand = [];
+      s.pressUsed.enemy = false;
+      s.craftKits.enemy = ["ink"];
+      s.altitudes[1].enemy = {
+        instanceId: "ink1",
+        cardId: "blot_herald",
+        veiled: false,
+        hybridSite: false,
+        stanceB: false,
+        grafts: [],
+        inhabitant: null,
+        hasThirdFace: false,
+        strained: false,
+        stained: false,
+        revelationFired: false,
+        scrutiny: 0,
+        wagered: false,
+        wagerAntePaid: false,
+        wagerAnteFavor: false,
+        openedSinceResolve: false,
+        lastBreachOpened: false,
+        pressed: false,
+        pressedBy: null,
+      };
+      s.altitudes[1].player = {
+        instanceId: "mot1",
+        cardId: "whitecard_mummer",
+        veiled: true,
+        hybridSite: false,
+        stanceB: true,
+        grafts: [],
+        inhabitant: null,
+        hasThirdFace: false,
+        strained: false,
+        stained: true,
+        revelationFired: false,
+        scrutiny: 0,
+        wagered: true,
+        wagerAntePaid: true,
+        wagerAnteFavor: false,
+        openedSinceResolve: false,
+        lastBreachOpened: false,
+        pressed: false,
+        pressedBy: null,
+      };
+      const legal = legalIntents(s);
+      expect(legal.some((x) => x.kind === "press" && x.altitude === 1)).toBe(true);
+      const move = chooseAiMove(s);
+      if (move.kind === "press" && move.altitude === 1) presses += 1;
+    }
+    expect(presses).toBeGreaterThanOrEqual(20);
+  });
+
+  it("hard Breach Opens a veiled Breach figure instead of Pass", () => {
+    let opens = 0;
+    for (let i = 0; i < 25; i++) {
+      const s = createMatch({ seed: 500 + i, aiDifficulty: "hard" });
+      s.active = "enemy";
+      s.enemyEssence = 0;
+      s.enemySight = 3;
+      s.enemyHand = [];
+      s.craftKits.enemy = ["breach"];
+      s.altitudes[0].enemy = {
+        instanceId: "br1",
+        cardId: "highscar_lancer",
+        veiled: true,
+        hybridSite: false,
+        stanceB: false,
+        grafts: [],
+        inhabitant: null,
+        hasThirdFace: false,
+        strained: false,
+        stained: false,
+        revelationFired: false,
+        scrutiny: 0,
+        wagered: false,
+        wagerAntePaid: false,
+        wagerAnteFavor: false,
+        openedSinceResolve: false,
+        lastBreachOpened: false,
+        pressed: false,
+        pressedBy: null,
+      };
+      const move = chooseAiMove(s);
+      if (move.kind === "witness" && !move.enemy && move.altitude === 0) opens += 1;
+    }
+    expect(opens).toBeGreaterThanOrEqual(20);
   });
 });

@@ -166,15 +166,29 @@ function clearWager(u: BoardUnit): void {
 }
 
 export function sidePlaysHeresy(state: MatchState, side: Side, heresy: string): boolean {
+  // Sticky: kit identity from starting deck — buttons don't vanish mid-match
+  if (state.craftKits?.[side]?.includes(heresy)) return true;
   for (let a = 0; a < ALTITUDE_COUNT; a++) {
-    const u = unitOf(state.altitudes[a as Altitude], side);
+    const slot = state.altitudes[a as Altitude];
+    const u = unitOf(slot, side);
     if (u && getCard(u.cardId).heresy === heresy) return true;
-    const site = siteOf(state.altitudes[a as Altitude], side);
+    if (u?.inhabitant && getCard(u.inhabitant).heresy === heresy) return true;
+    const site = siteOf(slot, side);
     if (site && getCard(site).heresy === heresy) return true;
   }
   if (handOf(state, side).some((id) => getCard(id).heresy === heresy)) return true;
+  if (propheciesOf(state, side).some((id) => getCard(id).heresy === heresy)) return true;
   // Craft identity stays even when the last copy is buried in the deck
   return deckOf(state, side).some((id) => getCard(id).heresy === heresy);
+}
+
+function craftKitsFromDeck(ids: readonly string[]): string[] {
+  const kits = new Set<string>();
+  for (const id of ids) {
+    const h = getCard(id).heresy;
+    if (h === "ink" || h === "motley" || h === "toll" || h === "breach") kits.add(h);
+  }
+  return [...kits];
 }
 
 function clearPress(u: BoardUnit): void {
@@ -347,7 +361,7 @@ function freeWagerUnit(
   return true;
 }
 
-/** Intentional Wager: ante 1 Sight, or 1 Favor for Favor-ante Figures. */
+/** Intentional Wager: ante 1 Sight, or 1 Favor for Favor-ante Motley Figures/Vessels. */
 function tryWager(
   state: MatchState,
   side: Side,
@@ -358,7 +372,8 @@ function tryWager(
   if (slot.blinded) return false;
   const u = unitOf(slot, side);
   if (!u?.veiled || u.wagered) return false;
-  if (getCard(u.cardId).type !== "figure") return false;
+  const t = getCard(u.cardId).type;
+  if (t !== "figure" && t !== "vessel") return false;
   if (getCard(u.cardId).heresy !== "motley") return false;
   const favorAnte = FAVOR_ANTE_FIGURES.has(u.cardId);
   if (favorAnte) {
@@ -1608,7 +1623,16 @@ function handleVeiledLoser(
 ): void {
   const armed = state.falseHoldArmed[winnerSide];
   const pressPierce = loser.pressed && loser.pressedBy === winnerSide;
-  if (!loser.stained && !armed && !pressPierce) return;
+  if (!loser.stained && !armed && !pressPierce) {
+    push(state, {
+      type: "hold",
+      side: loserSide,
+      altitude,
+      cardId: loser.cardId,
+      reason: "veil",
+    });
+    return;
+  }
   if (state.falseFaceArmed[loserSide]) {
     state.falseFaceArmed[loserSide] = false;
     setSight(state, loserSide, Math.min(SIGHT_CARRY_CAP, sightOf(state, loserSide) + 1));
@@ -1618,6 +1642,13 @@ function handleVeiledLoser(
     if (pressPierce && loser.pressedBy) {
       applyPressBacklash(state, loser.pressedBy, altitude, loser);
     }
+    push(state, {
+      type: "hold",
+      side: loserSide,
+      altitude,
+      cardId: loser.cardId,
+      reason: "smile",
+    });
     return;
   }
   // Stance B Motley: Hold through Stain / False Hold (Trick answers Erase) — Press pierces once
@@ -1625,9 +1656,20 @@ function handleVeiledLoser(
     if (loser.grafts.some((g) => g.cardId === "falseface_locket")) {
       setSight(state, loserSide, Math.min(SIGHT_CARRY_CAP, sightOf(state, loserSide) + 1));
     }
-    // Hold itself is the answer — Favor income is Cash / rites only (slows seal snowball)
+    push(state, {
+      type: "hold",
+      side: loserSide,
+      altitude,
+      cardId: loser.cardId,
+      reason: "motley_b",
+    });
     return;
   }
+  const via: "stain" | "press" | "false_hold" = pressPierce
+    ? "press"
+    : !loser.stained && armed
+      ? "false_hold"
+      : "stain";
   if (!loser.stained && armed) {
     state.falseHoldArmed[winnerSide] = false;
     stainUnit(state, loser);
@@ -1635,6 +1677,13 @@ function handleVeiledLoser(
   const wasPress = pressPierce;
   clearPress(loser);
   forceExpose(loser);
+  push(state, {
+    type: "erase",
+    side: loserSide,
+    altitude,
+    cardId: loser.cardId,
+    via,
+  });
   onForcedExposed(state, loser, loserSide, altitude, winnerSide);
   onEnemyFigureBecameWitnessed(state, loserSide, altitude, loser);
   if (!loser.strained) {
@@ -2563,6 +2612,7 @@ function resolveRound(state: MatchState): void {
     const enemyU = unitOf(slot, "enemy");
 
     if (pp > ep) {
+      const chipBefore = dmgEnemy;
       let dmg = resolveDamage(pp, highBonus);
       // Cube Hold: Veiled Cube loser caps chip at 1
       if (enemyU?.veiled && getCard(enemyU.cardId).heresy === "cube") dmg = Math.min(1, dmg);
@@ -2594,6 +2644,13 @@ function resolveRound(state: MatchState): void {
         if (breach > 0) {
           dmgEnemy += breach;
           noteBreachWillDealt(state, "player", breach);
+          push(state, {
+            type: "breach",
+            side: "player",
+            altitude: alt,
+            cardId: playerU.cardId,
+            amount: breach,
+          });
         }
         if (siteOf(slot, "player") === "scarforge") {
           setSight(state, "player", Math.min(SIGHT_CARRY_CAP, sightOf(state, "player") + 1));
@@ -2650,7 +2707,14 @@ function resolveRound(state: MatchState): void {
       if (playerU?.cardId === "shard_blade" && hasInhabitantInVessel(state, "player")) {
         drawOne(state, "player");
       }
+      push(state, {
+        type: "lane_result",
+        altitude: alt,
+        winner: "player",
+        softChip: dmgEnemy - chipBefore,
+      });
     } else if (ep > pp) {
+      const chipBefore = dmgPlayer;
       let dmg = resolveDamage(ep, highBonus);
       if (playerU?.veiled && getCard(playerU.cardId).heresy === "cube") dmg = Math.min(1, dmg);
       if (
@@ -2678,6 +2742,13 @@ function resolveRound(state: MatchState): void {
         if (breach > 0) {
           dmgPlayer += breach;
           noteBreachWillDealt(state, "enemy", breach);
+          push(state, {
+            type: "breach",
+            side: "enemy",
+            altitude: alt,
+            cardId: enemyU.cardId,
+            amount: breach,
+          });
         }
         if (siteOf(slot, "enemy") === "scarforge") {
           setSight(state, "enemy", Math.min(SIGHT_CARRY_CAP, sightOf(state, "enemy") + 1));
@@ -2734,6 +2805,12 @@ function resolveRound(state: MatchState): void {
       if (enemyU?.cardId === "shard_blade" && hasInhabitantInVessel(state, "enemy")) {
         drawOne(state, "enemy");
       }
+      push(state, {
+        type: "lane_result",
+        altitude: alt,
+        winner: "enemy",
+        softChip: dmgPlayer - chipBefore,
+      });
     }
   }
   if (motleyTrickEclipsePlayer > 0 && trickFavorReady.player) {
@@ -4535,6 +4612,10 @@ export function createMatch(opts?: {
     tutorialId: opts?.tutorial ? (opts.tutorialId ?? "first_gaze") : null,
     tutorialStep: opts?.tutorial ? "intro" : "done",
     aiDifficulty: opts?.aiDifficulty ?? "normal",
+    craftKits: {
+      player: craftKitsFromDeck(playerSource),
+      enemy: craftKitsFromDeck(enemySource),
+    },
   };
   beginTurn(state, "player", true);
   if (opts?.tutorial) setupTutorial(state, opts.tutorialId ?? "first_gaze");
@@ -4650,8 +4731,8 @@ export function legalIntents(state: MatchState): Intent[] {
     if (
       u?.veiled &&
       !u.wagered &&
-      getCard(u.cardId).type === "figure" &&
       getCard(u.cardId).heresy === "motley" &&
+      (getCard(u.cardId).type === "figure" || getCard(u.cardId).type === "vessel") &&
       !state.wagerUsed[side] &&
       !slot.blinded
     ) {
@@ -4965,10 +5046,10 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
       const u = unitOf(state.altitudes[intent.altitude], side);
       if (u?.veiled) {
         const t = getCard(u.cardId).type;
-        if (t === "figure" || t === "vessel") {
+        if ((t === "figure" || t === "vessel") && getCard(u.cardId).heresy === "motley") {
           if (u.wagered) {
             blindAltitude(state, side, intent.altitude);
-          } else if (sightOf(state, side) >= 1 && t === "figure") {
+          } else if (sightOf(state, side) >= 1) {
             setSight(state, side, sightOf(state, side) - 1);
             u.wagered = true;
             u.wagerAntePaid = true;
@@ -4987,7 +5068,7 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
       const u = unitOf(state.altitudes[intent.altitude], side);
       if (u) {
         const t = getCard(u.cardId).type;
-        if (t === "figure" || t === "vessel") {
+        if ((t === "figure" || t === "vessel") && getCard(u.cardId).heresy === "motley") {
           if (u.wagered) {
             if (favorOf(state, side) >= 1) {
               setFavor(state, side, favorOf(state, side) - 1);
@@ -4995,7 +5076,7 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
             } else {
               drawOne(state, side);
             }
-          } else if (sightOf(state, side) >= 1 && u.veiled && getCard(u.cardId).type === "figure") {
+          } else if (sightOf(state, side) >= 1 && u.veiled) {
             // Paid ante Wager (not Free) — Final Raise as ante push
             setSight(state, side, sightOf(state, side) - 1);
             u.wagered = true;
@@ -5005,6 +5086,8 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
           } else {
             drawOne(state, side);
           }
+        } else {
+          drawOne(state, side);
         }
       }
     } else if (def.id === "ashen_tithe") {

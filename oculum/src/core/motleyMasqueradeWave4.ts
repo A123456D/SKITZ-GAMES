@@ -51,7 +51,7 @@ export const MOTLEY_MASQUERADE_WAVE4: CardDef[] = [
     artSubject:
       "motley masquerade carnival urn vessel purple teal gold ribbon mask chamber ornate cliffs original",
     revelation: "Switch Stance. Free Wager another friendly Veiled Figure if able.",
-    text: "Vessel. On play, tuck a Figure from hand as Inhabitant if able. Revelation: Switch Stance. Free Wager another friendly Veiled Figure if able. Fall: Free Wager another friendly Veiled Figure if able; if you have Favor, gain 1 Sight.",
+    text: "Vessel. On play, tuck a Figure from hand as Inhabitant if able — or tuck your Figure on this lane when you play the Urn over them. You may Wager this (ante 1 Sight). Revelation: Switch Stance. Free Wager another friendly Veiled Figure if able. Fall: Free Wager another friendly Veiled Figure if able; if you have Favor, gain 1 Sight.",
   },
   {
     id: "antewell",

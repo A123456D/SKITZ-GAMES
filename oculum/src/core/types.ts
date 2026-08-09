@@ -137,6 +137,27 @@ export type OculusEvent =
   | { type: "resonance"; side: Side; altitude: Altitude }
   | { type: "overexpose"; side: Side; altitude: Altitude; cardId: string }
   | { type: "stain"; side: Side; altitude: Altitude; cardId: string }
+  | {
+      type: "hold";
+      side: Side;
+      altitude: Altitude;
+      cardId: string;
+      reason: "veil" | "motley_b" | "smile";
+    }
+  | {
+      type: "erase";
+      side: Side;
+      altitude: Altitude;
+      cardId: string;
+      via: "stain" | "press" | "false_hold";
+    }
+  | { type: "breach"; side: Side; altitude: Altitude; cardId: string; amount: number }
+  | {
+      type: "lane_result";
+      altitude: Altitude;
+      winner: Side | null;
+      softChip: number;
+    }
   | { type: "blind"; altitude: Altitude }
   | { type: "scrutiny"; side: Side; altitude: Altitude; cardId: string; stacks: number }
   | { type: "overwrite"; side: Side; altitude: Altitude; bouncedId: string }
@@ -294,6 +315,12 @@ export type MatchState = {
   tutorialId: import("./tutorial/types").TutorialId | null;
   tutorialStep: TutorialStep;
   aiDifficulty: AiDifficulty;
+  /**
+   * Crafts present in the starting deck (incl. prophecies).
+   * Kit buttons (Stance/Wager/Press/Peal) stay for the whole match even if
+   * every Motley/Ink/Toll body has Fallen or been tucked.
+   */
+  craftKits: { player: string[]; enemy: string[] };
 };
 
 export type Intent =

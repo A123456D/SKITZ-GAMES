@@ -14,7 +14,7 @@ function noiseFor(d: AiDifficulty): number {
     case "hard":
       return 0;
     default:
-      return 2;
+      return 0; // Normal: deterministic — was 2 and felt coin-flippable
   }
 }
 
@@ -77,13 +77,7 @@ function anyAltitudeTolled(state: MatchState): boolean {
 }
 
 function sidePlaysBreach(state: MatchState, side: Side): boolean {
-  for (let a = 0; a < 3; a++) {
-    const u = myUnit(state, side, a as Altitude);
-    if (u && getCard(u.cardId).heresy === "breach") return true;
-    const site = mySite(state, side, a as Altitude);
-    if (site && getCard(site).heresy === "breach") return true;
-  }
-  return handOf(state, side).some((id) => getCard(id).heresy === "breach");
+  return sidePlaysHeresy(state, side, "breach");
 }
 
 function countFriendlyWitnessedBreachFigures(state: MatchState, side: Side): number {
@@ -388,39 +382,49 @@ function scoreMotleyMindgame(state: MatchState, side: Side, i: Intent): number {
   const foe = other(side);
 
   if (i.kind === "pass") {
+    // Only bank for Cash when already Wagered — never cancel Stance/Wager refuse-Pass
     for (let a = 0; a < 3; a++) {
       const u = myUnit(state, side, a as Altitude);
-      if (!u?.veiled || !u.stanceB || getCard(u.cardId).heresy !== "motley") continue;
+      if (!u?.veiled || !u.stanceB || !u.wagered || getCard(u.cardId).heresy !== "motley") continue;
       const mine = unitPower(state, a as Altitude, side);
       const theirs = unitPower(state, a as Altitude, foe);
-      if (mine >= theirs) s += 14;
+      if (mine >= theirs) s += 28;
       const foeU = foeUnit(state, side, a as Altitude);
-      if (foeU?.stained && sidePlaysHeresy(state, foe, "ink")) s += 22;
-      if (!u.wagered && favorOf(state, side) > 0) s += 10;
+      if (foeU?.stained && sidePlaysHeresy(state, foe, "ink")) s += 34;
     }
-    if (eclipseOf(state, side) >= 3 && favorOf(state, side) > 0) s += 12;
+    if (eclipseOf(state, side) >= 3 && favorOf(state, side) > 0) {
+      for (let a = 0; a < 3; a++) {
+        const u = myUnit(state, side, a as Altitude);
+        if (u?.wagered && u.stanceB && getCard(u.cardId).heresy === "motley") {
+          s += 22;
+          break;
+        }
+      }
+    }
   }
 
   if (i.kind === "stance") {
     const u = myUnit(state, side, i.altitude);
     const foeU = foeUnit(state, side, i.altitude);
-    if (u?.veiled && !u.stanceB && foeU?.stained) s += 18;
+    if (u?.veiled && !u.stanceB && foeU?.stained) s += 26;
     if (u?.veiled && !u.stanceB && sidePlaysHeresy(state, foe, "ink")) {
-      if (countEnemyStained(state, side) > 0) s += 8;
+      if (countEnemyStained(state, side) > 0) s += 14;
     }
+    if (u?.veiled && !u.stanceB && getCard(u.cardId).heresy === "motley") s += 12;
   }
 
   if (i.kind === "wager") {
     const u = myUnit(state, side, i.altitude);
-    if (u?.stanceB && favorOf(state, side) > 0 && eclipseOf(state, side) >= 3) s += 20;
-    if (u?.stanceB && u.veiled && motleySealPressure(state, foe) >= 2) s += 14;
+    if (u?.stanceB && favorOf(state, side) > 0 && eclipseOf(state, side) >= 3) s += 28;
+    if (u?.stanceB && u.veiled && motleySealPressure(state, foe) >= 2) s += 20;
+    if (u?.stanceB && u.veiled) s += 10;
   }
 
   if (i.kind === "witness" && !i.enemy) {
     const u = myUnit(state, side, i.altitude);
     if (u?.veiled && u.stanceB && getCard(u.cardId).heresy === "motley") {
       const theirs = unitPower(state, i.altitude, foe);
-      if (faceWitnessedPower(getCard(u.cardId), true, graftWitnessBonus(u)) >= theirs) s -= 24;
+      if (faceWitnessedPower(getCard(u.cardId), true, graftWitnessBonus(u)) >= theirs) s -= 32;
     }
   }
 
@@ -434,11 +438,19 @@ function scoreInkMindgame(state: MatchState, side: Side, i: Intent): number {
   const stained = countEnemyStained(state, side);
 
   if (i.kind === "pass" && stained > 0 && !state.pressUsed[side]) {
-    s += 20 + stained * 6;
+    // Punish banking while Press is live — old +Pass bonuses cancelled refuse-Pass
     for (let a = 0; a < 3; a++) {
       const foe = foeUnit(state, side, a as Altitude);
       if (!foe?.stained || !foe.veiled) continue;
-      if (foe.stanceB && getCard(foe.cardId).heresy === "motley") s += 16;
+      const mine = unitPower(state, a as Altitude, side);
+      const theirs = unitPower(state, a as Altitude, other(side));
+      if (foe.stanceB && getCard(foe.cardId).heresy === "motley") {
+        s += mine > theirs ? -42 : 8; // wait only if we'd lose the Press
+      } else if (!foe.stanceB && getCard(foe.cardId).heresy === "motley") {
+        s += 12; // bait Stance B before Press
+      } else {
+        s -= 30; // Press stained now
+      }
     }
   }
 
@@ -447,18 +459,85 @@ function scoreInkMindgame(state: MatchState, side: Side, i: Intent): number {
     if (foe?.stained && foe.stanceB && getCard(foe.cardId).heresy === "motley") {
       const mine = unitPower(state, i.altitude, side);
       const theirs = unitPower(state, i.altitude, other(side));
-      if (mine > theirs) s += 24;
+      if (mine > theirs) s += 40;
       else s -= 12;
     }
     if (foe?.stained && !foe.stanceB && sidePlaysHeresy(state, other(side), "motley")) {
       s -= 10; // wait for them to enter B
+    }
+    if (foe?.stained && foe.veiled) s += 18;
+  }
+
+  if (i.kind === "witness" && !i.enemy) {
+    const u = myUnit(state, side, i.altitude);
+    const foe = foeUnit(state, side, i.altitude);
+    if (u && getCard(u.cardId).heresy === "ink" && foe?.veiled && !foe.stained) s += 14;
+  }
+
+  return s;
+}
+
+/** Bellward Toll / Peal sequencing. */
+function scoreTollMindgame(state: MatchState, side: Side, i: Intent): number {
+  if (!sidePlaysHeresy(state, side, "toll")) return 0;
+  let s = 0;
+  const hand = handOf(state, side);
+
+  if (i.kind === "pass") {
+    // Never reward Pass while Toll setup / Peal is still open
+    if (!anyAltitudeTolled(state) && hand.includes("sound_the_toll")) s -= 36;
+    if (legalIntents(state).some((x) => x.kind === "peal")) s -= 28;
+  }
+
+  if (i.kind === "peal") {
+    if (state.tollOwner[i.altitude] === side) s += 28;
+    else s -= 8;
+  }
+
+  if (i.kind === "witness" && !i.enemy) {
+    const u = myUnit(state, side, i.altitude);
+    if (u?.veiled && getCard(u.cardId).heresy === "toll") {
+      // Prefer Opening onto an untolled lane when Sound is in hand
+      if (!anyAltitudeTolled(state) && hand.includes("sound_the_toll")) s += 12;
+      if (state.tollOwner[i.altitude] === side) s += 10;
+    }
+  }
+
+  if (i.kind === "rite") {
+    const id = hand[i.handIndex];
+    if ((id === "sound_the_toll" || id === "ring_out") && !anyAltitudeTolled(state)) s += 22;
+  }
+
+  return s;
+}
+
+/** Scar Breach Open / Overexpose pressure. */
+function scoreBreachMindgame(state: MatchState, side: Side, i: Intent): number {
+  if (!sidePlaysBreach(state, side)) return 0;
+  let s = 0;
+
+  if (i.kind === "pass" && sightOf(state, side) >= 1) {
+    for (let a = 0; a < 3; a++) {
+      const u = myUnit(state, side, a as Altitude);
+      if (u?.veiled && getCard(u.cardId).heresy === "breach") s -= 32;
     }
   }
 
   if (i.kind === "witness" && !i.enemy) {
     const u = myUnit(state, side, i.altitude);
     const foe = foeUnit(state, side, i.altitude);
-    if (u && getCard(u.cardId).heresy === "ink" && foe?.veiled && !foe.stained) s += 10;
+    if (u?.veiled && getCard(u.cardId).heresy === "breach") {
+      const mine = faceWitnessedPower(getCard(u.cardId), u.stanceB, graftWitnessBonus(u));
+      const theirs = unitPower(state, i.altitude, other(side));
+      if (foe && mine > theirs) s += 24; // Open into a win → Breach Will
+      else if (foe && mine <= theirs) s -= 18; // Overexpose bait
+      else s += 10; // empty lane Open
+    }
+  }
+
+  if (i.kind === "witness" && i.enemy) {
+    const foe = foeUnit(state, side, i.altitude);
+    if (foe?.veiled && getCard(foe.cardId).heresy === "breach") s += 12;
   }
 
   return s;
@@ -506,7 +585,7 @@ function evalAfterMove(
 
   let ev = evalPosition(sim, side) + evalMindgames(sim, side);
 
-  if (sim.active === side) return ev + moveScore * 0.1;
+  if (sim.active === side) return ev + moveScore * 0.35;
 
   if (sim.active !== other(side)) return ev;
 
@@ -1203,7 +1282,8 @@ function scoreStance(state: MatchState, side: Side, alt: Altitude, d: AiDifficul
   const theirs = unitPower(state, alt, other(side));
   const mine = unitPower(state, alt, side);
   let s = 10;
-  if (d === "hard") s += 8;
+  if (d === "hard") s += 14;
+  else if (d === "normal") s += 5;
 
   if (!u.stanceB) {
     if (mySite(state, side, alt) === "hall_of_borrowed_faces") s += 14; // switch → Sight
@@ -1303,7 +1383,7 @@ function scoreRite(
         s += 28;
         if (foe.veiled) s += 16; // Blind + free Press line
       } else {
-        s += 1; // dead cast
+        s -= 80; // never dump Tithe with no Stain (beats Pass even under 2-ply)
       }
     }
   }
@@ -1318,7 +1398,7 @@ function scoreRite(
         if (foe?.stained && mine) s += 8;
       }
     } else {
-      s += 1;
+      s -= 60;
     }
   }
   if (id === "slip_the_mark") {
@@ -1400,7 +1480,17 @@ function scoreRite(
  * Difficulty scales aggression; Hard uses 2-ply search + school mindgames.
  */
 export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }): Intent {
-  const intents = legalIntents(state);
+  let intents = legalIntents(state);
+  // Hard prune: never cast Stain-payoff rites with zero Stain on board
+  intents = intents.filter((i) => {
+    if (i.kind !== "rite") return true;
+    const id = handOf(state, state.active)[i.handIndex];
+    if (id !== "ashen_tithe" && id !== "mire_surge") return true;
+    if (id === "ashen_tithe" && i.altitude != null) {
+      return !!foeUnit(state, state.active, i.altitude)?.stained;
+    }
+    return countEnemyStained(state, state.active) > 0;
+  });
   if (intents.length === 0) return { kind: "pass" };
 
   if (state.tutorial && state.tutorialStep !== "done" && state.active === "enemy") {
@@ -1409,7 +1499,15 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
 
   const side = state.active;
   const d: AiDifficulty = state.aiDifficulty ?? "normal";
-  const searchDepth = opts?.searchDepth ?? (d === "hard" ? 1 : 0);
+  const wantsSearch =
+    d === "hard" ||
+    (d === "normal" &&
+      (sidePlaysHeresy(state, side, "motley") ||
+        sidePlaysHeresy(state, side, "ink") ||
+        sidePlaysHeresy(state, side, "toll") ||
+        sidePlaysHeresy(state, side, "breach")));
+  const searchDepth = opts?.searchDepth ?? (wantsSearch ? 1 : 0);
+  const mindgameScale = d === "hard" ? 1.5 : d === "normal" ? 0.7 : 0;
 
   const rawScore = (i: Intent): number => {
     if (i.kind === "pass") {
@@ -1424,41 +1522,84 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
             x.kind === "witness" ||
             x.kind === "wager" ||
             x.kind === "press" ||
-            x.kind === "peal",
+            x.kind === "peal" ||
+            x.kind === "stance" ||
+            x.kind === "graft",
         );
-        if (canDevelop) return -36;
+        if (canDevelop) return d === "hard" ? -48 : -36;
       }
-      if (d === "hard") return -8;
-      // Normal: still prefer developing over banking when lanes are empty
+      // Shared refuse-Pass heuristics (Hard used to early-return here and bank too much)
       const emptyLanes = [0, 1, 2].filter((a) => !myUnit(state, side, a as Altitude)).length;
       const figuresInHand = handOf(state, side).filter((id) => {
         const t = getCard(id).type;
         return t === "figure" || t === "vessel";
       }).length;
-      if (emptyLanes >= 2 && figuresInHand > 0 && essenceOf(state, side) >= 1) return -6;
-      if (handHasGraftRelic(state, side) && veiledFigureAlts(state, side).length > 0) return -2;
+      if (emptyLanes >= 2 && figuresInHand > 0 && essenceOf(state, side) >= 1) {
+        return d === "hard" ? -22 : -10;
+      }
+      if (handHasGraftRelic(state, side) && veiledFigureAlts(state, side).length > 0) {
+        return d === "hard" ? -16 : -4;
+      }
       // Breach: don't Pass with Sight while Veiled Breach Figures can still Open
       if (sidePlaysBreach(state, side) && sightOf(state, side) >= 1) {
         for (let a = 0; a < 3; a++) {
           const u = myUnit(state, side, a as Altitude);
-          if (u?.veiled && getCard(u.cardId).heresy === "breach") return -18;
+          if (!u?.veiled || getCard(u.cardId).heresy !== "breach") continue;
+          const foe = foeUnit(state, side, a as Altitude);
+          const wit = faceWitnessedPower(getCard(u.cardId), u.stanceB, graftWitnessBonus(u));
+          const theirs = unitPower(state, a as Altitude, other(side));
+          // Profitable Open → hard refuse; otherwise still soft-refuse empty / contested Opens
+          if (!foe || wit > theirs) return d === "hard" ? -72 : -40;
+          return d === "hard" ? -36 : -18;
+        }
+      }
+      // Never bank when a winning Press is on the table
+      if (!state.pressUsed[side]) {
+        for (const x of legalIntents(state)) {
+          if (x.kind !== "press") continue;
+          const mine = unitPower(state, x.altitude, side);
+          const theirs = unitPower(state, x.altitude, other(side));
+          if (mine > theirs) return d === "hard" ? -80 : -45;
+        }
+      }
+      // Motley: don't Pass while Stance / Wager still open — unless Cash hold is armed
+      if (sidePlaysHeresy(state, side, "motley")) {
+        let cashHold = false;
+        for (let a = 0; a < 3; a++) {
+          const u = myUnit(state, side, a as Altitude);
+          if (!u?.veiled || !u.stanceB || !u.wagered || getCard(u.cardId).heresy !== "motley") {
+            continue;
+          }
+          if (unitPower(state, a as Altitude, side) >= unitPower(state, a as Altitude, other(side))) {
+            cashHold = true;
+            break;
+          }
+        }
+        const canStance = legalIntents(state).some((x) => x.kind === "stance");
+        const canWager = legalIntents(state).some((x) => x.kind === "wager");
+        if (!cashHold) {
+          if (canStance) return d === "hard" ? -28 : -12;
+          if (canWager) return d === "hard" ? -26 : -10;
         }
       }
       // Toll: don't Pass while Veiled Bellward can still Open (Toll / Lure payoffs)
       if (sidePlaysHeresy(state, side, "toll") && sightOf(state, side) >= 1) {
         for (let a = 0; a < 3; a++) {
           const u = myUnit(state, side, a as Altitude);
-          if (u?.veiled && getCard(u.cardId).heresy === "toll") return -20;
+          if (u?.veiled && getCard(u.cardId).heresy === "toll") return d === "hard" ? -34 : -20;
         }
-        // Banked Sight + no Tolls down — keep looking for Sound / Revelation setups
         if (!anyAltitudeTolled(state) && handOf(state, side).some((id) => id === "sound_the_toll")) {
-          return -14;
+          return d === "hard" ? -30 : -14;
         }
+        if (legalIntents(state).some((x) => x.kind === "peal")) return d === "hard" ? -24 : -10;
       }
       // Don't Pass while any foe Veiled figure is Gaze-able and we have Sight
       if (sightOf(state, side) >= 1 && countEnemyVeiledFigures(state, side) > 0) {
         const canGaze = legalIntents(state).some((x) => x.kind === "witness" && x.enemy);
-        if (canGaze) return -10 - Math.min(3, countEnemyVeiledFigures(state, side)) * 4;
+        if (canGaze) {
+          const n = Math.min(3, countEnemyVeiledFigures(state, side));
+          return d === "hard" ? -22 - n * 6 : -10 - n * 4;
+        }
       }
       // Ink: don't Pass while a Press is live
       if (sidePlaysHeresy(state, side, "ink") && !state.pressUsed[side]) {
@@ -1466,7 +1607,7 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
           const foe = foeUnit(state, side, a as Altitude);
           if (!foe?.veiled) continue;
           const vsTrick = foe.stanceB && getCard(foe.cardId).heresy === "motley";
-          if (vsTrick || foe.stained) return -22;
+          if (vsTrick || foe.stained) return d === "hard" ? -36 : -22;
         }
       }
       // Don't Pass while Motley seal pieces are Gaze-able
@@ -1474,10 +1615,26 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
       if (motleyPressure > 0 && sightOf(state, side) >= 1) {
         for (let a = 0; a < 3; a++) {
           const piece = foeMotleyEclipsePiece(state, side, a as Altitude);
-          if (piece?.veiled) return -12 - motleyPressure * 6;
+          if (piece?.veiled) return d === "hard" ? -20 - motleyPressure * 8 : -12 - motleyPressure * 6;
         }
       }
-      return 0;
+      // Hard: if anything productive is legal, bank is almost never right
+      if (d === "hard") {
+        const productive = legalIntents(state).some(
+          (x) =>
+            x.kind === "play" ||
+            x.kind === "witness" ||
+            x.kind === "graft" ||
+            x.kind === "rite" ||
+            x.kind === "stance" ||
+            x.kind === "wager" ||
+            x.kind === "press" ||
+            x.kind === "peal",
+        );
+        if (productive) return -28;
+        return -18;
+      }
+      return -5;
     }
     if (i.kind === "witness" && !i.enemy) {
       let s = scoreWitnessOwn(state, side, i.altitude, d);
@@ -1491,7 +1648,8 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
     }
     if (i.kind === "witness" && i.enemy) {
       let s = 40;
-      if (d === "hard") s += 18;
+      if (d === "hard") s += 28;
+      else if (d === "normal") s += 12;
       if (d === "easy") s -= 22;
       s += 6;
       if (i.altitude === 0) s += 16;
@@ -1538,8 +1696,8 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
       if (!u) return -5;
       const def = getCard(u.cardId);
       let s = 6;
-      if (u.stanceB) s += d === "hard" ? 20 : 14;
-      else if (def.heresy === "motley" && u.veiled) s -= d === "hard" ? 28 : 18; // Stance B before Wager
+      if (u.stanceB) s += d === "hard" ? 20 : d === "normal" ? 18 : 14;
+      else if (def.heresy === "motley" && u.veiled) s -= d === "hard" ? 28 : d === "normal" ? 24 : 18; // Stance B before Wager
       const mine = unitPower(state, i.altitude, side);
       const theirs = unitPower(state, i.altitude, other(side));
       // Motley Stance B: Wager flips Veiled power to Witnessed — score the post-ante body
@@ -1570,11 +1728,12 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
         if (mine > theirs) s += 42;
         else s -= 24;
       }
-      if (d === "hard") s += 10;
+      if (d === "hard") s += 18;
       return s;
     }
     if (i.kind === "peal") {
       let s = 16;
+      if (d === "hard") s += 10;
       if (state.tollOwner[i.altitude] === side) s += 10;
       const mine = unitPower(state, i.altitude, side);
       const theirs = unitPower(state, i.altitude, other(side));
@@ -1617,14 +1776,19 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
 
   const score = (i: Intent): number =>
     rawScore(i) +
-    (d === "hard" ? scoreMotleyMindgame(state, side, i) + scoreInkMindgame(state, side, i) : 0);
+    mindgameScale *
+      (scoreMotleyMindgame(state, side, i) +
+        scoreInkMindgame(state, side, i) +
+        scoreTollMindgame(state, side, i) +
+        scoreBreachMindgame(state, side, i));
 
   const scored = intents
     .map((i) => ({ i, s: score(i) }))
     .sort((a, b) => b.s - a.s);
 
-  if (searchDepth >= 1 && d === "hard" && scored.length > 1) {
-    const pool = scored.slice(0, Math.min(12, scored.length));
+  if (searchDepth >= 1 && wantsSearch && scored.length > 1) {
+    const poolSize = d === "hard" ? 18 : 8;
+    const pool = scored.slice(0, Math.min(poolSize, scored.length));
     let best = pool[0]!.i;
     let bestEval = -Infinity;
     for (const { i, s } of pool) {

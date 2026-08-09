@@ -3,7 +3,7 @@
   <head>
     <script>
 (function () {
-  var KEY = "oculum-bust-v15";
+  var KEY = "oculum-bust-v16";
   try {
     if (sessionStorage.getItem(KEY) === "1") return;
     sessionStorage.setItem(KEY, "1");
@@ -11,8 +11,8 @@
   var done = function () {
     try {
       var u = new URL(location.href);
-      if (u.searchParams.get("v") !== "15") {
-        u.searchParams.set("v", "15");
+      if (u.searchParams.get("v") !== "16") {
+        u.searchParams.set("v", "16");
         location.replace(u.toString());
       }
     } catch (e2) {}
@@ -57,8 +57,8 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-H5ThZ4iH.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-N6PMbXrS.css">
+    <script type="module" crossorigin src="./assets/index-BW6N6PBe.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-FZUKHeQA.css">
   </head>
   <body class="on-menu">
     <div id="app">
@@ -501,7 +501,17 @@
               <span class="btn-label">Back</span>
             </button>
             <p class="tag">CHOOSE YOUR HERESY</p>
-            <p class="heresy-pick-blurb">Each craft is a private keyword kit under shared Gaze law. Pick one to Enter.</p>
+            <p class="heresy-pick-blurb">Each craft is a private keyword kit under shared Gaze law. Pick yours, then who you face.</p>
+            <div class="opponent-pick" role="group" aria-label="Opponent craft">
+              <p class="opponent-pick-label">Opponent</p>
+              <div id="opponent-pick" class="opponent-pick-options">
+                <button type="button" class="opponent-opt" data-opponent="random">Random</button>
+                <button type="button" class="opponent-opt" data-opponent="ink">Ink</button>
+                <button type="button" class="opponent-opt" data-opponent="motley">Motley</button>
+                <button type="button" class="opponent-opt" data-opponent="toll">Toll</button>
+                <button type="button" class="opponent-opt" data-opponent="breach">Breach</button>
+              </div>
+            </div>
             <div id="heresy-list" class="heresy-list" role="list"></div>
           </div>
         </div>
@@ -665,6 +675,16 @@
               </select>
             </div>
             <div id="builder-pool" class="builder-pool"></div>
+            <label class="settings-row builder-opponent-row">
+              <span>Opponent</span>
+              <select id="builder-opponent" class="settings-select">
+                <option value="random">Random</option>
+                <option value="ink">Ink Abyss</option>
+                <option value="motley">Motley Masquerade</option>
+                <option value="toll">Bellward Toll</option>
+                <option value="breach">Scar Breach</option>
+              </select>
+            </label>
             <div class="builder-actions">
               <button type="button" id="builder-play" class="cta" disabled>
                 <span class="btn-label">Play Constructed</span>

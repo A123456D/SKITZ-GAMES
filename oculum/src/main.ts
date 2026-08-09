@@ -212,7 +212,7 @@ const deckBuilder = initDeckBuilder({
     menu.hidden = false;
     setMenuMode(true);
   },
-  onPlay: (deck) => startMatch(false, deck),
+  onPlay: (deck) => startMatch(false, deck, undefined, resolveEnemyDeck(readOpponentPick())),
 });
 
 let stage: OculusStage;
@@ -284,6 +284,45 @@ const unbindCodexFoil = bindFoilStage(codexFoil);
 void unbindCodexFoil;
 
 type AppSettings = { reduceMotion: boolean; aiDifficulty: AiDifficulty };
+type OpponentPick = "random" | "ink" | "motley" | "toll" | "breach";
+const OPPONENT_KEY = "oculum.opponentPick";
+const OPPONENT_PICKS: OpponentPick[] = ["random", "ink", "motley", "toll", "breach"];
+
+function isOpponentPick(v: unknown): v is OpponentPick {
+  return typeof v === "string" && (OPPONENT_PICKS as string[]).includes(v);
+}
+
+function loadOpponentPick(): OpponentPick {
+  try {
+    const raw = localStorage.getItem(OPPONENT_KEY);
+    if (isOpponentPick(raw)) return raw;
+  } catch {
+    /* private mode */
+  }
+  return "random";
+}
+
+function saveOpponentPick(pick: OpponentPick): void {
+  try {
+    localStorage.setItem(OPPONENT_KEY, pick);
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+/** Omit enemyDeck for Random — createMatch picks a live craft. */
+function resolveEnemyDeck(pick: OpponentPick): string[] | undefined {
+  if (pick === "random") return undefined;
+  return fullCraftDeck(pick);
+}
+
+function opponentLabel(pick: OpponentPick): string {
+  if (pick === "random") return "Random";
+  return heresyShort(pick);
+}
+
+/** Last opponent craft pick (Random or a live heresy) — rematch / builder share this. */
+let lastOpponentPick: OpponentPick = loadOpponentPick();
 
 function loadSettings(): AppSettings {
   try {
@@ -622,17 +661,17 @@ function flashToast(msg: string, ms = 3400, kind: string | null = null): void {
 }
 
 /** Big on-lane label so status changes aren't silent icons. */
-function floatLaneCue(alt: Altitude, text: string, kind: string): void {
+function floatLaneCue(alt: Altitude, text: string, kind: string, hero = false): void {
   const hit = altHits.find((h) => Number(h.dataset.alt) === alt);
   if (!hit) return;
   hit.querySelectorAll(".lane-cue").forEach((n) => n.remove());
   const el = document.createElement("div");
-  el.className = `lane-cue lane-cue--${kind}`;
+  el.className = `lane-cue lane-cue--${kind}${hero ? " lane-cue--hero" : ""}`;
   el.textContent = text;
   el.setAttribute("aria-hidden", "true");
   hit.appendChild(el);
   const reduce = document.body.classList.contains("reduce-motion");
-  window.setTimeout(() => el.remove(), reduce ? 1200 : 2400);
+  window.setTimeout(() => el.remove(), reduce ? (hero ? 1600 : 1200) : hero ? 3200 : 2400);
 }
 
 const BADGE_TITLES: Record<string, string> = {
@@ -643,7 +682,7 @@ const BADGE_TITLES: Record<string, string> = {
   ANTE: "ANTE — Sight already paid into this Wager.",
   FAVOR: "FAVOR ante — Motley currency staked on this Wager.",
   STR: "STRAINED — lost once while Witnessed. One more Witnessed loss = Fall (dies).",
-  STAIN: "STAIN — Ink Mark. Lets Ink Press / Erase toward Forced Expose.",
+  STAIN: "STAIN — Ink Mark. If this Figure loses Resolve while still Veiled, Erase Forced Exposes them (unless Motley Stance B Holds). Press pierces Hold.",
   PRESS: "PRESS — marked by Ink. If Ink wins Resolve here → Forced Expose. If Ink loses → backlash.",
   SCR: "SCRUTINY — stacks toward Forced Expose (at 2 the Veil breaks).",
   INH: "INHABITANT — a Figure tucked inside this Vessel / Urn.",
@@ -673,7 +712,7 @@ const METER_HELP: Record<string, { kind: string; text: string }> = {
   },
   eclipse: {
     kind: "eclipse",
-    text: "ECLIPSE — second win track (Motley loves it). Reach 10 Eclipse to Ascend — you win without Breaking Will. You · foe.",
+    text: "ECLIPSE — second win track. Reach 10 to Ascend (win without Breaking Will). Motley Trick banks it; card effects too. You · foe shown as n/10.",
   },
   law: {
     kind: "law",
@@ -846,6 +885,31 @@ function punchEclipsePip(surging: boolean): void {
   window.setTimeout(() => {
     eclPip.classList.remove("ecl-surge", "ecl-critical");
   }, 1200);
+}
+
+/** Motley Trick Eclipse is armed — Veiled + Stance B + paid ante + Favor. */
+function syncTrickPrimed(s: MatchState): void {
+  if (!eclPip) return;
+  let primed = false;
+  if (s.favor > 0) {
+    for (let a = 0; a < 3; a++) {
+      const u = s.altitudes[a as Altitude].player;
+      if (
+        u?.veiled &&
+        u.stanceB &&
+        u.wagered &&
+        u.wagerAntePaid &&
+        getCard(u.cardId).heresy === "motley"
+      ) {
+        primed = true;
+        break;
+      }
+    }
+  }
+  eclPip.classList.toggle("trick-primed", primed);
+  eclPip.title = primed
+    ? "Trick primed — Pass to Resolve for +1 Eclipse (spends 1 Favor)"
+    : "";
 }
 
 function indicateWillLoss(side: "you" | "foe", amount: number): void {
@@ -1097,6 +1161,7 @@ function closeCodex(): void {
 function openBuilder(heresy?: Heresy): void {
   hideAllSheets();
   setMenuMode(true);
+  syncOpponentPickUi();
   deckBuilder.open(heresy ? { heresy } : undefined);
 }
 
@@ -1133,10 +1198,39 @@ function buildTutorialList(): void {
   }
 }
 
+function syncOpponentPickUi(pick: OpponentPick = lastOpponentPick): void {
+  const root = document.getElementById("opponent-pick");
+  if (root) {
+    for (const btn of root.querySelectorAll<HTMLButtonElement>("[data-opponent]")) {
+      const id = btn.getAttribute("data-opponent");
+      btn.classList.toggle("is-on", id === pick);
+      btn.setAttribute("aria-pressed", id === pick ? "true" : "false");
+    }
+  }
+  const builderOpp = document.getElementById("builder-opponent") as HTMLSelectElement | null;
+  if (builderOpp && [...builderOpp.options].some((o) => o.value === pick)) {
+    builderOpp.value = pick;
+  }
+  for (const btn of document.querySelectorAll<HTMLElement>(".heresy-enter .btn-vs")) {
+    btn.textContent = `vs ${opponentLabel(pick)}`;
+  }
+}
+
+function setOpponentPick(pick: OpponentPick): void {
+  lastOpponentPick = pick;
+  saveOpponentPick(pick);
+  syncOpponentPickUi(pick);
+}
+
+function readOpponentPick(): OpponentPick {
+  return lastOpponentPick;
+}
+
 function openHeresyPick(): void {
   hideAllSheets();
   setMenuMode(true);
   buildHeresyList();
+  syncOpponentPickUi();
   heresyPickPanel.hidden = false;
 }
 
@@ -1167,7 +1261,7 @@ function buildHeresyList(): void {
       <p class="heresy-card-arch"><span class="heresy-arch-label">Archetype</span> ${pitch.archetype}</p>
       <div class="heresy-card-actions">
         <button type="button" class="cta heresy-enter" data-enter="${id}">
-          <span class="btn-label"><span class="btn-kicker">Play</span>Enter Gaze</span>
+          <span class="btn-label"><span class="btn-kicker">Play</span>Enter Gaze <span class="btn-vs">vs ${opponentLabel(lastOpponentPick)}</span></span>
         </button>
         <button type="button" class="ghost heresy-learn" data-learn="${id}">
           <span class="btn-label">Learn · Full Teach</span>
@@ -1244,7 +1338,12 @@ async function finishMulligan(keepAll: boolean): Promise<void> {
   persistProgress();
 }
 
-function startMatch(tutorial: boolean, constructedDeck?: string[], tutorialId?: TutorialId): void {
+function startMatch(
+  tutorial: boolean,
+  constructedDeck?: string[],
+  tutorialId?: TutorialId,
+  enemyDeck?: string[],
+): void {
   spectatorMode = false;
   spectateGen += 1;
   spectateBusy = false;
@@ -1268,6 +1367,7 @@ function startMatch(tutorial: boolean, constructedDeck?: string[], tutorialId?: 
     tutorial,
     tutorialId: tutorial ? (tutorialId ?? "first_gaze") : undefined,
     deck: !tutorial && constructedDeck ? constructedDeck : undefined,
+    enemyDeck: !tutorial ? enemyDeck : undefined,
     aiDifficulty: settings.aiDifficulty,
   });
   selectedHand = null;
@@ -1311,14 +1411,19 @@ function startMatch(tutorial: boolean, constructedDeck?: string[], tutorialId?: 
   hidePhaseBanner();
   persistProgress();
   if (!tutorial) {
+    const foeKit = state.craftKits.enemy[0];
+    const foeName =
+      foeKit === "ink" || foeKit === "motley" || foeKit === "toll" || foeKit === "breach"
+        ? heresyShort(foeKit)
+        : "Rival";
     flashPhase("Round 1", {
       kicker: "Match begin",
-      sub: "Play Veiled · Witness with Sight · Pass to Resolve",
+      sub: `vs ${foeName} · Play Veiled · Witness with Sight · Pass to Resolve`,
       kind: "round",
       ms: paceMs(3400),
     });
     explain(
-      "Round 1 — Play cards Veiled (half-real). Spend Sight to Witness them. Pass when done. When both Pass, lanes Resolve and Will chips. Watch the toast — it explains every beat.",
+      `Round 1 — facing ${foeName}. Play cards Veiled (half-real). Spend Sight to Witness them. Pass when done. When both Pass, lanes Resolve and Will chips. Watch the toast — it explains every beat.`,
       paceMs(4200),
       "round",
     );
@@ -1733,6 +1838,67 @@ function syncCoach(s: MatchState | null): void {
   window.requestAnimationFrame(() => syncTutorGuide(s));
 }
 
+function explainNoWager(s: MatchState): string {
+  if (s.wagerUsed.player) return "Wager already used this window — once per action window.";
+  if (s.sight < 1) return "Wager needs 1 Sight to ante — Pass or gain Sight first.";
+  let veiledMotley = 0;
+  let alreadyWagered = 0;
+  let blindedLane = 0;
+  let tuckedOnly = 0;
+  for (let a = 0; a < 3; a++) {
+    const slot = s.altitudes[a as Altitude];
+    const u = slot.player;
+    if (!u) continue;
+    const def = getCard(u.cardId);
+    if (def.heresy !== "motley") continue;
+    if (def.type !== "figure" && def.type !== "vessel") continue;
+    if (u.wagered) {
+      alreadyWagered += 1;
+      continue;
+    }
+    if (!u.veiled) continue;
+    if (slot.blinded) {
+      blindedLane += 1;
+      continue;
+    }
+    veiledMotley += 1;
+  }
+  // Inhabitant Motley figures are tucked — not on the board to ante
+  for (let a = 0; a < 3; a++) {
+    const u = s.altitudes[a as Altitude].player;
+    if (u?.inhabitant && getCard(u.inhabitant).heresy === "motley") tuckedOnly += 1;
+  }
+  if (tuckedOnly > 0 && veiledMotley === 0) {
+    return "Tucked Motley (Inhabitant) can't Wager — release them or ante the Vessel itself.";
+  }
+  if (blindedLane > 0 && veiledMotley === 0) {
+    return "That lane is Blind — can't Wager there this round.";
+  }
+  if (alreadyWagered > 0 && veiledMotley === 0) {
+    return "Your Motley pieces are already Wagered (or Opened).";
+  }
+  return "Wager needs a Veiled Motley Figure or Vessel — stay Veiled (don't Open first).";
+}
+
+function explainWagerLaneBlocked(s: MatchState, alt: Altitude): string {
+  const slot = s.altitudes[alt];
+  const u = slot.player;
+  if (!u) return "No Motley piece of yours on this lane to Wager.";
+  const def = getCard(u.cardId);
+  if (def.heresy !== "motley" || (def.type !== "figure" && def.type !== "vessel")) {
+    if (u.inhabitant && getCard(u.inhabitant).heresy === "motley") {
+      return `${getCard(u.inhabitant).name} is tucked as Inhabitant — Wager the Vessel, or release them first.`;
+    }
+    return "Wager is Motley-only — this lane isn't a Motley Figure/Vessel.";
+  }
+  if (!u.veiled) return `${def.name} is Open — Wager only works while Veiled (Fold clears an ante).`;
+  if (u.wagered) return `${def.name} is already Wagered.`;
+  if (slot.blinded) return "This altitude is Blind — can't Wager here this round.";
+  if (s.wagerUsed.player) return "Wager already used this window.";
+  if (s.sight < 1) return "Need 1 Sight to ante this Wager.";
+  return `Can't Wager ${def.name} on this lane right now.`;
+}
+
 function hint(s: MatchState): string {
   if (spectatorMode) {
     return s.active === "player"
@@ -1755,7 +1921,7 @@ function hint(s: MatchState): string {
     return "Tap a Witnessed figure to Re-Veil ? spend Sight; Revelation stays spent.";
   }
   if (mode === "stance") return "Tap a Motley figure to flip Stance A/B.";
-  if (mode === "wager") return "Tap a Veiled figure to ante 1 Sight (Wager).";
+  if (mode === "wager") return "Tap a Veiled Motley Figure or Vessel to ante 1 Sight (Wager).";
   if (mode === "press") return "Tap Motley Stance B (free) or a Stained Veiled enemy to Press.";
   if (mode === "peal") return "Tap your Tolled altitude to Peal-arm (1 Sight).";
   if (selectedHand !== null) {
@@ -1861,8 +2027,8 @@ function syncHud(): void {
     willFoeN.textContent = String(state.enemyWill);
     willYou.style.transform = `scaleX(${Math.max(0, state.will / START_WILL)})`;
     willFoe.style.transform = `scaleX(${Math.max(0, state.enemyWill / START_WILL)})`;
-    eclYou.textContent = String(state.eclipse);
-    eclFoe.textContent = String(state.enemyEclipse);
+    eclYou.textContent = `${state.eclipse}/${ECLIPSE_WIN}`;
+    eclFoe.textContent = `${state.enemyEclipse}/${ECLIPSE_WIN}`;
     if (flashTimer <= 0 && !toastBusy && toastQueue.length === 0) showToast("Paused");
     return;
   }
@@ -1878,8 +2044,9 @@ function syncHud(): void {
   willFoeN.textContent = String(state.enemyWill);
   willYou.style.transform = `scaleX(${Math.max(0, state.will / START_WILL)})`;
   willFoe.style.transform = `scaleX(${Math.max(0, state.enemyWill / START_WILL)})`;
-  eclYou.textContent = String(state.eclipse);
-  eclFoe.textContent = String(state.enemyEclipse);
+  eclYou.textContent = `${state.eclipse}/${ECLIPSE_WIN}`;
+  eclFoe.textContent = `${state.enemyEclipse}/${ECLIPSE_WIN}`;
+  syncTrickPrimed(state);
 
   {
     const youLabel = document.querySelector(".will-side.you .will-label");
@@ -2053,7 +2220,11 @@ function syncHud(): void {
   btnWitness.disabled = spectatorMode || state.active !== "player";
   btnReveil.disabled = spectatorMode || state.active !== "player" || !canReveil;
   btnStance.disabled = spectatorMode || state.active !== "player" || !canStance;
-  btnWager.disabled = spectatorMode || state.active !== "player" || !canWager;
+  // Keep Wager clickable for Motley so we can explain Sight / Blind / once-per-window gates
+  btnWager.disabled =
+    spectatorMode ||
+    state.active !== "player" ||
+    (!canWager && !sidePlaysHeresy(state, "player", "motley"));
   btnPress.disabled =
     spectatorMode ||
     state.active !== "player" ||
@@ -2063,6 +2234,8 @@ function syncHud(): void {
   btnPass.disabled = spectatorMode || state.active !== "player" || !canPass;
   // Dim when no legal Witness/Gaze — keep clickable so we can explain why
   btnWitness.classList.toggle("unavailable", !canWitness && mode !== "witness");
+  btnWager.classList.toggle("unavailable", !canWager && mode !== "wager");
+  btnStance.classList.toggle("unavailable", !canStance && mode !== "stance");
   if (spectatorMode) {
     actionsEl.hidden = true;
   }
@@ -2481,7 +2654,7 @@ async function playBoardVerbFx(intent: Intent, caster: Side = "player"): Promise
     const to = laneLanding(alt, gaze ? foe : caster);
     await showCombatArrow(from, to, gaze ? "gaze" : "witness", paceMs(780));
     punchAltitude(alt, gaze ? "gaze" : "witness");
-    floatLaneCue(alt, gaze ? "Gaze" : "Witness", gaze ? "gaze" : "witness");
+    floatLaneCue(alt, gaze ? "GAZE" : "WITNESS", gaze ? "gaze" : "witness", true);
   } else if (intent.kind === "press") {
     const from = unitBadgeOrigin(alt, caster);
     const to = laneLanding(alt, foe);
@@ -3599,7 +3772,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       const lane = ALT_NAMES[ev.altitude];
       playSfx(ev.enemyTarget ? "gaze" : "witness");
       punchAltitude(ev.altitude, ev.enemyTarget ? "gaze" : "witness");
-      floatLaneCue(ev.altitude, ev.enemyTarget ? "Gaze" : "Witnessed", ev.enemyTarget ? "gaze" : "witness");
+      floatLaneCue(ev.altitude, ev.enemyTarget ? "GAZE" : "WITNESS", ev.enemyTarget ? "gaze" : "witness", true);
       if (ev.enemyTarget) {
         explain(
           `Gaze on ${lane}: ${whoVerb(ev.side, "spend", "spends")} Sight to Witness enemy ${def.name} — steals their one-time Revelation.`,
@@ -3617,6 +3790,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       const def = getCard(ev.cardId);
       playSfx("witness");
       punchAltitude(ev.altitude, "stance");
+      floatLaneCue(ev.altitude, "Re-Veil", "stance", true);
       explain(
         `Re-Veil: ${whoVerb(ev.side, "pay", "pays")} Sight to hide ${def.name} again — back to Veiled power. Revelation does not re-fire.`,
         holdMs,
@@ -3625,18 +3799,95 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "scrutiny") {
       punchAltitude(ev.altitude, "blind");
       if (ev.stacks >= 2) {
+        floatLaneCue(ev.altitude, "Forced Expose", "strain", true);
+        flashPhase("Forced Expose", {
+          kicker: getCard(ev.cardId).name,
+          sub: "Scrutiny 2/2 — Veil ripped",
+          kind: "fall",
+          ms: paceMs(2800),
+        });
         explain(
           `Scrutiny 2/2 — ${getCard(ev.cardId).name} is Forced Exposed (Witnessed against its will).`,
           holdMs + 200,
           "blind",
         );
       } else {
+        floatLaneCue(ev.altitude, `Scrutiny ${ev.stacks}/2`, "blind", true);
         explain(
           `Scrutiny ${ev.stacks}/2 on ${getCard(ev.cardId).name} — at 2 stacks it Forced Exposes.`,
           holdMs,
           "blind",
         );
       }
+    } else if (ev.type === "hold") {
+      playSfx("stance");
+      punchAltitude(ev.altitude, "stance");
+      const label =
+        ev.reason === "motley_b" ? "HOLD · Stance B" : ev.reason === "smile" ? "HOLD · Smile" : "HOLD";
+      floatLaneCue(ev.altitude, label, "stance", true);
+      flashPhase("Hold", {
+        kicker: getCard(ev.cardId).name,
+        sub:
+          ev.reason === "motley_b"
+            ? "Veiled Stance B — Erase fails (Press still pierces)"
+            : ev.reason === "smile"
+              ? "Smile That Holds cancelled Forced Expose"
+              : "Still Veiled — cannot Fall",
+        kind: "pass",
+        ms: paceMs(2600),
+      });
+      explain(
+        ev.reason === "motley_b"
+          ? `HOLD — ${getCard(ev.cardId).name} stays Veiled through Erase (Stance B). Ink needs Press to pierce.`
+          : `HOLD — ${getCard(ev.cardId).name} lost ${ALT_NAMES[ev.altitude]} but stays Veiled (cannot Fall).`,
+        holdMs + 400,
+        "stance",
+      );
+    } else if (ev.type === "erase") {
+      playSfx("stain");
+      punchAltitude(ev.altitude, "stain");
+      floatLaneCue(
+        ev.altitude,
+        ev.via === "press" ? "ERASE · Press" : "ERASE",
+        "stain",
+        true,
+      );
+      flashPhase("Erase", {
+        kicker: getCard(ev.cardId).name,
+        sub:
+          ev.via === "press"
+            ? "Press pierced Hold — Forced Exposed + Strain"
+            : "Stained Veiled loss — Forced Exposed + Strain",
+        kind: "rite",
+        ms: paceMs(3000),
+      });
+      explain(
+        `ERASE — ${getCard(ev.cardId).name} lost while Veiled${ev.via === "press" ? " under Press" : " + Stained"} → Forced Exposed (no Revelation) + Strain.`,
+        holdMs + 600,
+        "stain",
+      );
+    } else if (ev.type === "breach") {
+      playSfx("resolve");
+      punchAltitude(ev.altitude, "resolve");
+      floatLaneCue(ev.altitude, `BREACH −${ev.amount} Will`, "resolve", true);
+      flashPhase("Breach", {
+        kicker: getCard(ev.cardId).name,
+        sub: `${whoLabel(ev.side)} Open hit · foe −${ev.amount} Will`,
+        kind: "break",
+        ms: paceMs(2600),
+      });
+      explain(
+        `BREACH — Witnessed ${getCard(ev.cardId).name} wins into a Witnessed foe → +${ev.amount} Will (Scar Breach).`,
+        holdMs + 400,
+        "resolve",
+      );
+    } else if (ev.type === "lane_result") {
+      playSfx("resolve");
+      punchAltitude(ev.altitude, "resolve");
+      const winLabel = ev.winner == null ? "TIE" : ev.winner === "player" ? "YOU WIN" : "FOE WINS";
+      const chip =
+        ev.softChip > 0 ? ` · −${ev.softChip} Will` : "";
+      floatLaneCue(ev.altitude, `${winLabel}${chip}`, "resolve", true);
     } else if (ev.type === "overwrite") {
       explain(
         `Overwrite on ${ALT_NAMES[ev.altitude]}: ${getCard(ev.bouncedId).name} returns to hand (no Fall) so a new figure can enter.`,
@@ -3685,7 +3936,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "toll") {
       playSfx("toll");
       punchAltitude(ev.altitude, "rite");
-      floatLaneCue(ev.altitude, "Toll placed", "toll");
+      floatLaneCue(ev.altitude, "TOLL", "toll", true);
       flashPhase("Toll", {
         kicker: whoLabel(ev.side),
         sub: `${ALT_NAMES[ev.altitude]} — tax on looking`,
@@ -3700,7 +3951,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "toll_pay") {
       playSfx("toll");
       punchAltitude(ev.altitude, "rite");
-      floatLaneCue(ev.altitude, ev.paid ? "Toll tax paid" : "Toll — no Sight", "toll");
+      floatLaneCue(ev.altitude, ev.paid ? "TOLL TAX" : "TOLL — no Sight", "toll", true);
       explain(
         ev.paid
           ? `Toll tax on ${ALT_NAMES[ev.altitude]} — Sight paid to the Toll owner; Resonance may fire. Mark stays.`
@@ -3711,7 +3962,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "lure") {
       playSfx("witness");
       punchAltitude(ev.altitude, "witness");
-      floatLaneCue(ev.altitude, "Lure", "witness");
+      floatLaneCue(ev.altitude, "LURE", "witness", true);
       explain(
         `Lure on ${ALT_NAMES[ev.altitude]}: forces a true Witness on ${getCard(ev.cardId).name} and clears the Toll.`,
         holdMs + 200,
@@ -3729,7 +3980,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "peal") {
       playSfx("peal");
       punchAltitude(ev.altitude, "rite");
-      floatLaneCue(ev.altitude, "Peal armed", "peal");
+      floatLaneCue(ev.altitude, "PEAL ARMED", "peal", true);
       flashPhase("Peal", {
         kicker: ALT_NAMES[ev.altitude],
         sub: "Toll will pay Sight + draw when spent",
@@ -3744,7 +3995,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "peal_pay") {
       playSfx("peal");
       punchAltitude(ev.altitude, "eclipse");
-      floatLaneCue(ev.altitude, "Peal pays", "peal");
+      floatLaneCue(ev.altitude, "PEAL PAYS", "peal", true);
       explain(
         `Peal pays on ${ALT_NAMES[ev.altitude]} — ${whoVerb(ev.side, "gain", "gains")} Sight and draw 1.`,
         holdMs,
@@ -3753,7 +4004,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "stance") {
       playSfx("stance");
       punchAltitude(ev.altitude, "stance");
-      floatLaneCue(ev.altitude, ev.stanceB ? "Stance B" : "Stance A", "stance");
+      floatLaneCue(ev.altitude, ev.stanceB ? "A → B" : "B → A", "stance", true);
       const stanceEl = altHits
         .find((h) => Number(h.dataset.alt) === ev.altitude)
         ?.querySelector(".alt-stance");
@@ -3762,9 +4013,26 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
         void (stanceEl as HTMLElement).offsetWidth;
         stanceEl.classList.add("flip");
       }
+      // Live power tick so Stance isn't silent
+      const hit = altHits.find((h) => Number(h.dataset.alt) === ev.altitude);
+      const pow = hit?.querySelector(".alt-pow-n");
+      if (pow && state) {
+        pow.textContent = `${unitPower(state, ev.altitude, "player")}–${unitPower(state, ev.altitude, "enemy")}`;
+        pow.classList.remove("pow-tick");
+        void (pow as HTMLElement).offsetWidth;
+        pow.classList.add("pow-tick");
+      }
+      flashPhase(ev.stanceB ? "Stance B" : "Stance A", {
+        kicker: ALT_NAMES[ev.altitude],
+        sub: ev.stanceB
+          ? "Power face flips when Wagered · Holds vs Erase while Veiled"
+          : "Back to printed Veiled / Witnessed powers",
+        kind: "pass",
+        ms: paceMs(2400),
+      });
       explain(
         ev.stanceB
-          ? `Stance B on ${ALT_NAMES[ev.altitude]} — Veiled/Witnessed powers swap. Motley Holds vs Erase while Veiled B.`
+          ? `Stance B on ${ALT_NAMES[ev.altitude]} — Motley power swap when Wagered; Veiled B Holds vs Erase.`
           : `Stance A on ${ALT_NAMES[ev.altitude]} — back to printed Veiled/Witnessed powers.`,
         holdMs,
         "stance",
@@ -3772,12 +4040,12 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "wager") {
       playSfx("wager");
       punchAltitude(ev.altitude, "stance");
-      floatLaneCue(ev.altitude, "Wager", "wager");
+      floatLaneCue(ev.altitude, ev.free ? "FREE WAGER" : "WAGER −1 Sight", "wager", true);
       flashPhase("Wager", {
         kicker: getCard(ev.cardId).name,
-        sub: ev.free ? "Free ante" : "Ante 1 Sight",
+        sub: ev.free ? "Free ante — Cash if you win Veiled" : "Ante 1 Sight — Cash if you win Veiled",
         kind: "pass",
-        ms: paceMs(2200),
+        ms: paceMs(2400),
       });
       const who = getCard(ev.cardId).name;
       explain(
@@ -3790,8 +4058,14 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "cash") {
       playSfx("cash");
       punchAltitude(ev.altitude, "resolve");
-      floatLaneCue(ev.altitude, "Cash!", "wager");
+      floatLaneCue(ev.altitude, "CASH", "wager", true);
       playWagerFlip(ev.altitude, "cash");
+      flashPhase("Cash", {
+        kicker: getCard(ev.cardId).name,
+        sub: "Won Veiled + Wagered — ante refunded + reward",
+        kind: "eclipse",
+        ms: paceMs(2800),
+      });
       explain(
         `Cash — ${getCard(ev.cardId).name} won ${ALT_NAMES[ev.altitude]} while Veiled + Wagered. Ante refunded + Cash reward. (Trick seals need Favor.)`,
         holdMs + 400,
@@ -3800,8 +4074,14 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "bust") {
       playSfx("bust");
       punchAltitude(ev.altitude, "strain");
-      floatLaneCue(ev.altitude, "Bust", "strain");
+      floatLaneCue(ev.altitude, "BUST", "strain", true);
       playWagerFlip(ev.altitude, "bust");
+      flashPhase("Bust", {
+        kicker: getCard(ev.cardId).name,
+        sub: "Lost / Exposed while Wagered — ante gone",
+        kind: "fall",
+        ms: paceMs(2600),
+      });
       explain(
         `Bust — ${getCard(ev.cardId).name} lost or was Forced Exposed while Wagered. Ante is gone; no Cash.`,
         holdMs + 200,
@@ -3809,7 +4089,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       );
     } else if (ev.type === "fold") {
       punchAltitude(ev.altitude, "stance");
-      floatLaneCue(ev.altitude, "Fold", "stance");
+      floatLaneCue(ev.altitude, "FOLD", "stance", true);
       explain(
         `Fold — ${whoVerb(ev.side, "Witness", "Witnesses")} their own Wagered ${getCard(ev.cardId).name}. Wager clears; ante not refunded. (Bad for Eclipse.)`,
         holdMs,
@@ -3818,7 +4098,13 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "overexpose") {
       playSfx("strain");
       punchAltitude(ev.altitude, "strain");
-      floatLaneCue(ev.altitude, "Overexpose", "strain");
+      floatLaneCue(ev.altitude, "OVEREXPOSE", "strain", true);
+      flashPhase("Overexpose", {
+        kicker: getCard(ev.cardId).name,
+        sub: "Opened then lost — Sight + Will tax",
+        kind: "fall",
+        ms: paceMs(2600),
+      });
       explain(
         `Overexpose — ${getCard(ev.cardId).name} lost Resolve while freshly Witnessed (Scar Breach). Controller loses 1 Sight if able and 1 Will.`,
         holdMs + 200,
@@ -3827,7 +4113,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "press") {
       playSfx("press");
       punchAltitude(ev.altitude, "stain");
-      floatLaneCue(ev.altitude, "Pressed", "press");
+      floatLaneCue(ev.altitude, "PRESS", "press", true);
       flashPhase("Press", {
         kicker: whoLabel(ev.side),
         sub: "Win this lane to Forced Expose",
@@ -3846,7 +4132,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "press_backlash") {
       playSfx("bust");
       punchAltitude(ev.altitude, "strain");
-      floatLaneCue(ev.altitude, "Press backlash", "strain");
+      floatLaneCue(ev.altitude, "BACKLASH", "strain", true);
       explain(
         `Press backlash — the Press failed on ${ALT_NAMES[ev.altitude]} (${getCard(ev.cardId).name}). Smother cost hits the Presser.`,
         holdMs + 200,
@@ -3870,30 +4156,20 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
     } else if (ev.type === "resolve") {
       const { player, enemy } = ev.damages;
       playSfx("resolve");
-      void enqueueFx(async () => {
-        for (let a = 0; a < 3; a++) {
-          const hit = altHits.find((h) => Number(h.dataset.alt) === a);
-          hit?.classList.add("fx-resolve");
-          punchAltitude(a as Altitude, "resolve");
-          floatLaneCue(a as Altitude, ALT_NAMES[a], "resolve");
-          await waitMs(paceMs(320));
-        }
-        window.setTimeout(() => {
-          for (const hit of altHits) hit.classList.remove("fx-resolve");
-        }, 520);
-      });
       const bits: string[] = [];
       if (enemy > 0) bits.push(`${whoLabel("enemy")} −${enemy} Will`);
       if (player > 0) bits.push(`${whoLabel("player")} −${player} Will`);
       const sub = bits.length ? bits.join(" · ") : "No Will damage this Resolve";
       flashPhase("Resolve", {
-        kicker: "Both passed",
+        kicker: "Lanes compared",
         sub,
         kind: "resolve",
-        ms: paceMs(4200),
+        ms: paceMs(3600),
       });
+      if (enemy > 0) indicateWillLoss("foe", enemy);
+      if (player > 0) indicateWillLoss("you", player);
       explain(
-        `Resolve — each lane compares power. Winner chips Will. Veiled losers Hold; Witnessed losers Fall. ${sub}.`,
+        `Resolve — watch HOLD / ERASE / CASH / BREACH on lanes. ${sub}.`,
         holdMs + 1200,
         "resolve",
       );
@@ -3901,7 +4177,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       const def = getCard(ev.cardId);
       playSfx("strain");
       punchAltitude(ev.altitude, "strain");
-      floatLaneCue(ev.altitude, "Strained", "strain");
+      floatLaneCue(ev.altitude, "STRAIN", "strain", true);
       explain(
         `Strain — ${whose(ev.side)} Witnessed ${def.name} lost a lane. Next loss while Witnessed = Fall (destroyed).`,
         holdMs + 200,
@@ -3911,16 +4187,22 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       const def = getCard(ev.cardId);
       playSfx("stain");
       punchAltitude(ev.altitude, "stain");
-      floatLaneCue(ev.altitude, "Stained", "stain");
+      floatLaneCue(ev.altitude, "STAIN", "stain", true);
+      flashPhase("Stain", {
+        kicker: def.name,
+        sub: "Lose Veiled Resolve → Erase (Forced Expose)",
+        kind: "rite",
+        ms: paceMs(2400),
+      });
       explain(
-        `Stain — ${def.name} marked (${ALT_NAMES[ev.altitude]}). Ink can Press / Erase from here toward Forced Exposed.`,
-        holdMs,
+        `Stain — ${def.name} marked (${ALT_NAMES[ev.altitude]}). If they lose Resolve while still Veiled → Erase. Motley Stance B Holds; Press pierces.`,
+        holdMs + 400,
         "stain",
       );
     } else if (ev.type === "blind") {
       playSfx("blind");
       punchAltitude(ev.altitude, "blind");
-      floatLaneCue(ev.altitude, "Blinded", "blind");
+      floatLaneCue(ev.altitude, "BLIND", "blind", true);
       explain(
         `Blind — ${ALT_NAMES[ev.altitude]} yields no Sight this turn (Cash / Witness income shut on that lane).`,
         holdMs,
@@ -3965,7 +4247,7 @@ function narrateEvents(events: ReturnType<typeof applyIntent>): void {
       const def = getCard(ev.cardId);
       playSfx("fall");
       punchAltitude(ev.altitude, "fall");
-      floatLaneCue(ev.altitude, "Fall", "fall");
+      floatLaneCue(ev.altitude, "FALL", "fall", true);
       flashPhase("Fall", {
         kicker: "Unmake",
         sub: `${whose(ev.side)} ${def.name}`,
@@ -4863,6 +5145,20 @@ bindTap(document.getElementById("btn-builder"), unlockAnd(() => openBuilder()));
 bindTap(document.getElementById("btn-howto"), unlockAnd(() => openHowto("menu")));
 bindTap(document.getElementById("btn-settings"), unlockAnd(() => openSettings("menu")));
 document.getElementById("heresy-back")!.addEventListener("click", () => closeHeresyPick());
+document.getElementById("opponent-pick")?.addEventListener("click", (ev) => {
+  const t = ev.target as HTMLElement | null;
+  const btn = t?.closest?.("[data-opponent]") as HTMLElement | null;
+  const id = btn?.getAttribute("data-opponent");
+  if (!isOpponentPick(id)) return;
+  playSfx("ui-tap");
+  setOpponentPick(id);
+});
+document.getElementById("builder-opponent")?.addEventListener("change", (ev) => {
+  const v = (ev.target as HTMLSelectElement).value;
+  if (!isOpponentPick(v)) return;
+  setOpponentPick(v);
+});
+syncOpponentPickUi();
 heresyListEl.addEventListener("click", (ev) => {
   const t = ev.target as HTMLElement | null;
   const enter = t?.closest?.("[data-enter]") as HTMLElement | null;
@@ -4873,7 +5169,7 @@ heresyListEl.addEventListener("click", (ev) => {
     if (!id) return;
     void unlockAudio();
     playSfx("ui-tap");
-    startMatch(false, fullCraftDeck(id));
+    startMatch(false, fullCraftDeck(id), undefined, resolveEnemyDeck(readOpponentPick()));
     return;
   }
   if (learn) {
@@ -4914,8 +5210,9 @@ document.getElementById("btn-again")!.addEventListener("click", () => {
     return;
   }
   if (state?.tutorial) startMatch(true, undefined, state.tutorialId ?? "first_gaze");
-  else if (lastConstructedDeck) startMatch(false, lastConstructedDeck);
-  else openHeresyPick();
+  else if (lastConstructedDeck) {
+    startMatch(false, lastConstructedDeck, undefined, resolveEnemyDeck(readOpponentPick()));
+  } else openHeresyPick();
 });
 document.getElementById("btn-menu")!.addEventListener("click", () => goToMenu());
 
@@ -5136,6 +5433,10 @@ for (const hit of altHits) {
         showToast("Nothing to Witness / Gaze on this lane.");
       } else if (mode === "peal") {
         showToast("Peal needs your Toll on this lane.");
+      } else if (mode === "wager") {
+        showToast(state ? explainWagerLaneBlocked(state, alt) : "Can't Wager here.");
+      } else if (mode === "stance") {
+        showToast("Stance needs your Motley figure on this lane (once per window).");
       }
       return;
     }
@@ -5307,9 +5608,19 @@ btnStance.addEventListener("click", () => {
 });
 
 btnWager.addEventListener("click", () => {
-  if (uiPaused) return;
-  mode = mode === "wager" ? "play" : "wager";
+  if (uiPaused || !state) return;
+  if (state.active !== "player") return;
   selectedHand = null;
+  if (mode === "wager") {
+    mode = "play";
+    syncHud();
+    return;
+  }
+  mode = "wager";
+  const can = legalIntents(state).some((i) => i.kind === "wager");
+  if (!can) {
+    showToast(explainNoWager(state));
+  }
   syncHud();
 });
 
@@ -5618,6 +5929,7 @@ function frame(now: number): void {
         tutorialId: null,
         tutorialStep: "done",
         aiDifficulty: "normal",
+        craftKits: { player: [], enemy: [] },
       },
       dt,
     );

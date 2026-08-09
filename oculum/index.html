@@ -468,7 +468,17 @@
               <span class="btn-label">Back</span>
             </button>
             <p class="tag">CHOOSE YOUR HERESY</p>
-            <p class="heresy-pick-blurb">Each craft is a private keyword kit under shared Gaze law. Pick one to Enter.</p>
+            <p class="heresy-pick-blurb">Each craft is a private keyword kit under shared Gaze law. Pick yours, then who you face.</p>
+            <div class="opponent-pick" role="group" aria-label="Opponent craft">
+              <p class="opponent-pick-label">Opponent</p>
+              <div id="opponent-pick" class="opponent-pick-options">
+                <button type="button" class="opponent-opt" data-opponent="random">Random</button>
+                <button type="button" class="opponent-opt" data-opponent="ink">Ink</button>
+                <button type="button" class="opponent-opt" data-opponent="motley">Motley</button>
+                <button type="button" class="opponent-opt" data-opponent="toll">Toll</button>
+                <button type="button" class="opponent-opt" data-opponent="breach">Breach</button>
+              </div>
+            </div>
             <div id="heresy-list" class="heresy-list" role="list"></div>
           </div>
         </div>
@@ -632,6 +642,16 @@
               </select>
             </div>
             <div id="builder-pool" class="builder-pool"></div>
+            <label class="settings-row builder-opponent-row">
+              <span>Opponent</span>
+              <select id="builder-opponent" class="settings-select">
+                <option value="random">Random</option>
+                <option value="ink">Ink Abyss</option>
+                <option value="motley">Motley Masquerade</option>
+                <option value="toll">Bellward Toll</option>
+                <option value="breach">Scar Breach</option>
+              </select>
+            </label>
             <div class="builder-actions">
               <button type="button" id="builder-play" class="cta" disabled>
                 <span class="btn-label">Play Constructed</span>

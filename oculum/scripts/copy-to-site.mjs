@@ -11,8 +11,8 @@ const destFresh = join(root, "..", "website", "public", "games", "oculum", "b9")
 const siteImg = join(root, "..", "website", "public", "images", "oculum-seal.png");
 const seal = join(root, "public", "assets", "ui", "seal-eye.png");
 /** Bump whenever shipping a critical client fix so phones drop stale SW caches. */
-const SW_CACHE = "oculum-beta-v15";
-const BUST = "15";
+const SW_CACHE = "oculum-beta-v16";
+const BUST = "16";
 
 if (!existsSync(dist)) {
   console.error("Missing dist/ — run npm run build first");

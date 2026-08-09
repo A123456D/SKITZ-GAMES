@@ -63,6 +63,11 @@ function deckFor(kind: DeckKind, seed: number): string[] {
   return buildAutoDeck({ seed, heresy: "all" });
 }
 
+/** Exposed for audit / tooling — same lists the bot sim seats use. */
+export function botSimDeck(kind: DeckKind, seed = 0): string[] {
+  return deckFor(kind, seed);
+}
+
 /** Both seats use the same heuristic AI (`chooseAiMove` for active side). */
 export function playBotMatch(opts: {
   seed: number;

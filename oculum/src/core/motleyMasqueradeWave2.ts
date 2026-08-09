@@ -50,7 +50,8 @@ export const MOTLEY_MASQUERADE_WAVE2: CardDef[] = [
     artSubject:
       "motley masquerade masque urn vessel purple teal gold twin mask chamber ornate cliffs original",
     revelation: "Free Wager this if able.",
-    text: "Vessel. On play, tuck a Figure from hand as Inhabitant if able. Revelation: Free Wager this if able. When this Falls or is Forced Exposed: Free Wager another friendly Veiled Figure if able.",
+    text: "Vessel. On play, tuck a Figure from hand as Inhabitant if able. You may Wager this (ante 1 Sight). Revelation: Free Wager this if able. When this Falls or is Forced Exposed: Free Wager another friendly Veiled Figure if able.",
+    veiledAbility: "You may Wager this (ante 1 Sight).",
   },
   {
     id: "coinface_charm",
