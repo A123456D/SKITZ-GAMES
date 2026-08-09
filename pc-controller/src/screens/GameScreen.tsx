@@ -8,7 +8,7 @@ type Props = {
   transport: Transport
 }
 
-const LOOK_BASE = 36
+const LOOK_BASE = 1.35
 
 const EMPTY: GamepadState = {
   lx: 0,
@@ -18,34 +18,64 @@ const EMPTY: GamepadState = {
   buttons: {},
 }
 
+/** Middle keys — no WASD / arrows (left stick covers movement). */
+const MID_KEYS: { label: string; code: string }[] = [
+  { label: 'G', code: 'KeyG' },
+  { label: 'T', code: 'KeyT' },
+  { label: 'F', code: 'KeyF' },
+  { label: 'X', code: 'KeyX' },
+  { label: 'Z', code: 'KeyZ' },
+  { label: 'C', code: 'KeyC' },
+  { label: 'V', code: 'KeyV' },
+  { label: 'R', code: 'KeyR' },
+  { label: 'Q', code: 'KeyQ' },
+  { label: 'Y', code: 'KeyY' },
+  { label: '1', code: 'Digit1' },
+  { label: '2', code: 'Digit2' },
+  { label: '3', code: 'Digit3' },
+  { label: '4', code: 'Digit4' },
+  { label: '5', code: 'Digit5' },
+]
+
 export function GameScreen({ transport }: Props) {
   const state = useRef<GamepadState>({ ...EMPTY, buttons: {} })
-  const stickPtr = useRef<{ l: number | null; r: number | null }>({ l: null, r: null })
+  const stickPtr = useRef<number | null>(null)
+  const padPtr = useRef<number | null>(null)
+  const padLast = useRef<{ x: number; y: number } | null>(null)
   const btnPtr = useRef<Record<string, number | null>>({})
   const downRef = useRef<Record<string, boolean>>({})
   const sensRef = useRef(loadInputSettings())
 
-  const [knobs, setKnobs] = useState({ lx: 0, ly: 0, rx: 0, ry: 0 })
+  const [knobs, setKnobs] = useState({ lx: 0, ly: 0 })
   const [down, setDown] = useState<Record<string, boolean>>({})
+  const [padActive, setPadActive] = useState(false)
   const [sens, setSens] = useState<InputSettings>(() => sensRef.current)
 
-  const publish = () => {
-    state.current.lookGain = LOOK_BASE * sensRef.current.look
+  const publishStick = () => {
     transport.gamepad({
       ...state.current,
-      buttons: { ...state.current.buttons },
+      rx: 0,
+      ry: 0,
+      buttons: {},
+      lookGain: 0,
     })
   }
 
   const releaseAllInputs = () => {
-    stickPtr.current = { l: null, r: null }
+    stickPtr.current = null
+    padPtr.current = null
+    padLast.current = null
     btnPtr.current = {}
+    for (const code of Object.keys(downRef.current)) {
+      if (downRef.current[code]) transport.key(code, false)
+    }
     downRef.current = {}
-    state.current = { ...EMPTY, buttons: {}, lookGain: LOOK_BASE * sensRef.current.look }
-    setKnobs({ lx: 0, ly: 0, rx: 0, ry: 0 })
+    state.current = { ...EMPTY, buttons: {} }
+    setKnobs({ lx: 0, ly: 0 })
     setDown({})
-    publish()
-    window.setTimeout(() => publish(), 32)
+    setPadActive(false)
+    publishStick()
+    window.setTimeout(() => publishStick(), 32)
   }
 
   const updateSens = (patch: Partial<InputSettings>) => {
@@ -53,28 +83,16 @@ export function GameScreen({ transport }: Props) {
     sensRef.current = next
     setSens(next)
     saveInputSettings(next)
-    state.current.lookGain = LOOK_BASE * next.look
   }
 
-  // Continuous right-stick look only — never re-drive WASD/face keys every frame.
   useEffect(() => {
-    let frame = 0
-    const tick = () => {
-      const s = state.current
-      if (s.rx || s.ry) publish()
-      frame = requestAnimationFrame(tick)
-    }
-    frame = requestAnimationFrame(tick)
-
     const onHide = () => {
       if (document.visibilityState === 'hidden') releaseAllInputs()
     }
     document.addEventListener('visibilitychange', onHide)
     window.addEventListener('pagehide', releaseAllInputs)
     window.addEventListener('blur', releaseAllInputs)
-
     return () => {
-      cancelAnimationFrame(frame)
       document.removeEventListener('visibilitychange', onHide)
       window.removeEventListener('pagehide', releaseAllInputs)
       window.removeEventListener('blur', releaseAllInputs)
@@ -83,27 +101,21 @@ export function GameScreen({ transport }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transport])
 
-  const setAxis = (side: 'l' | 'r', x: number, y: number) => {
+  const setLeftStick = (x: number, y: number) => {
     const nx = Math.abs(x) < 0.12 ? 0 : x
     const ny = Math.abs(y) < 0.12 ? 0 : y
-    if (side === 'l') {
-      state.current.lx = nx
-      state.current.ly = ny
-      setKnobs((k) => ({ ...k, lx: nx, ly: ny }))
-    } else {
-      state.current.rx = nx
-      state.current.ry = ny
-      setKnobs((k) => ({ ...k, rx: nx, ry: ny }))
-    }
-    publish()
-    if (side === 'l' && nx === 0 && ny === 0) {
+    state.current.lx = nx
+    state.current.ly = ny
+    setKnobs({ lx: nx, ly: ny })
+    publishStick()
+    if (nx === 0 && ny === 0) {
       window.setTimeout(() => {
-        if (state.current.lx === 0 && state.current.ly === 0) publish()
+        if (state.current.lx === 0 && state.current.ly === 0) publishStick()
       }, 32)
     }
   }
 
-  const bindStick = (side: 'l' | 'r') => {
+  const bindLeftStick = () => {
     const move = (e: PointerEvent<HTMLDivElement>) => {
       const rect = e.currentTarget.getBoundingClientRect()
       const cx = rect.left + rect.width / 2
@@ -116,80 +128,114 @@ export function GameScreen({ transport }: Props) {
         dx = (dx / dist) * max
         dy = (dy / dist) * max
       }
-      setAxis(side, dx / max, dy / max)
+      setLeftStick(dx / max, dy / max)
     }
 
     return {
       onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
         e.currentTarget.setPointerCapture(e.pointerId)
-        stickPtr.current[side] = e.pointerId
+        stickPtr.current = e.pointerId
         haptic('selection')
         move(e)
       },
       onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
-        if (stickPtr.current[side] !== e.pointerId) return
+        if (stickPtr.current !== e.pointerId) return
         move(e)
       },
       onPointerUp: (e: PointerEvent<HTMLDivElement>) => {
-        if (stickPtr.current[side] !== e.pointerId) return
-        stickPtr.current[side] = null
-        setAxis(side, 0, 0)
+        if (stickPtr.current !== e.pointerId) return
+        stickPtr.current = null
+        setLeftStick(0, 0)
       },
       onPointerCancel: (e: PointerEvent<HTMLDivElement>) => {
-        if (stickPtr.current[side] !== e.pointerId) return
-        stickPtr.current[side] = null
-        setAxis(side, 0, 0)
+        if (stickPtr.current !== e.pointerId) return
+        stickPtr.current = null
+        setLeftStick(0, 0)
       },
       onLostPointerCapture: (e: PointerEvent<HTMLDivElement>) => {
-        if (stickPtr.current[side] !== e.pointerId) return
-        stickPtr.current[side] = null
-        setAxis(side, 0, 0)
+        if (stickPtr.current !== e.pointerId) return
+        stickPtr.current = null
+        setLeftStick(0, 0)
       },
     }
   }
 
-  const press = (btn: string) => {
-    downRef.current[btn] = true
-    state.current.buttons[btn] = true
-    setDown((d) => ({ ...d, [btn]: true }))
-    haptic(['A', 'B', 'X', 'Y'].includes(btn) ? 'medium' : 'light')
-    publish()
+  const bindLookPad = () => {
+    const gain = () => LOOK_BASE * sensRef.current.look
+
+    return {
+      onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
+        e.currentTarget.setPointerCapture(e.pointerId)
+        padPtr.current = e.pointerId
+        padLast.current = { x: e.clientX, y: e.clientY }
+        setPadActive(true)
+        haptic('selection')
+      },
+      onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
+        if (padPtr.current !== e.pointerId || !padLast.current) return
+        const dx = e.clientX - padLast.current.x
+        const dy = e.clientY - padLast.current.y
+        padLast.current = { x: e.clientX, y: e.clientY }
+        const g = gain()
+        if (dx || dy) transport.mouseMove(dx * g, dy * g)
+      },
+      onPointerUp: (e: PointerEvent<HTMLDivElement>) => {
+        if (padPtr.current !== e.pointerId) return
+        padPtr.current = null
+        padLast.current = null
+        setPadActive(false)
+      },
+      onPointerCancel: (e: PointerEvent<HTMLDivElement>) => {
+        if (padPtr.current !== e.pointerId) return
+        padPtr.current = null
+        padLast.current = null
+        setPadActive(false)
+      },
+      onLostPointerCapture: (e: PointerEvent<HTMLDivElement>) => {
+        if (padPtr.current !== e.pointerId) return
+        padPtr.current = null
+        padLast.current = null
+        setPadActive(false)
+      },
+    }
   }
 
-  const release = (btn: string) => {
-    if (!downRef.current[btn] && !state.current.buttons[btn]) return
-    downRef.current[btn] = false
-    state.current.buttons[btn] = false
-    btnPtr.current[btn] = null
-    setDown((d) => ({ ...d, [btn]: false }))
-    publish()
-    // Second flush so a coalesced "down" packet can't win after release.
+  const press = (code: string) => {
+    downRef.current[code] = true
+    setDown((d) => ({ ...d, [code]: true }))
+    haptic('light')
+    transport.key(code, true)
+  }
+
+  const release = (code: string) => {
+    if (!downRef.current[code]) return
+    downRef.current[code] = false
+    btnPtr.current[code] = null
+    setDown((d) => ({ ...d, [code]: false }))
+    transport.key(code, false)
     window.setTimeout(() => {
-      if (!downRef.current[btn]) {
-        state.current.buttons[btn] = false
-        publish()
-      }
+      if (!downRef.current[code]) transport.key(code, false)
     }, 32)
   }
 
-  const bindBtn = (btn: string) => ({
+  const bindKey = (code: string) => ({
     onPointerDown: (e: PointerEvent<HTMLButtonElement>) => {
       e.preventDefault()
       e.currentTarget.setPointerCapture(e.pointerId)
-      btnPtr.current[btn] = e.pointerId
-      press(btn)
+      btnPtr.current[code] = e.pointerId
+      press(code)
     },
     onPointerUp: (e: PointerEvent<HTMLButtonElement>) => {
-      if (btnPtr.current[btn] != null && btnPtr.current[btn] !== e.pointerId) return
-      release(btn)
+      if (btnPtr.current[code] != null && btnPtr.current[code] !== e.pointerId) return
+      release(code)
     },
     onPointerCancel: (e: PointerEvent<HTMLButtonElement>) => {
-      if (btnPtr.current[btn] != null && btnPtr.current[btn] !== e.pointerId) return
-      release(btn)
+      if (btnPtr.current[code] != null && btnPtr.current[code] !== e.pointerId) return
+      release(code)
     },
     onLostPointerCapture: (e: PointerEvent<HTMLButtonElement>) => {
-      if (btnPtr.current[btn] != null && btnPtr.current[btn] !== e.pointerId) return
-      release(btn)
+      if (btnPtr.current[code] != null && btnPtr.current[code] !== e.pointerId) return
+      release(code)
     },
   })
 
@@ -201,7 +247,7 @@ export function GameScreen({ transport }: Props) {
     <section className="screen game-screen">
       <div className="game-intro">
         <h1 className="headline">Gamepad</h1>
-        <p className="sub">Left stick WASD · Right stick look. Rotate for full layout.</p>
+        <p className="sub">Left stick move · Keys · Right pad look. Rotate for full layout.</p>
         <div className="sens-panel compact">
           <SensSlider
             label="Look"
@@ -213,64 +259,35 @@ export function GameScreen({ transport }: Props) {
       </div>
 
       <div className="game-layout">
-        <div className="game-shoulders game-shoulders-l">
-          <button type="button" className={`action-key${down.LT ? ' down' : ''}`} {...bindBtn('LT')}>
-            LT
-          </button>
-          <button type="button" className={`action-key${down.LB ? ' down' : ''}`} {...bindBtn('LB')}>
-            LB
-          </button>
-        </div>
-
-        <div className="game-shoulders game-shoulders-r">
-          <button type="button" className={`action-key${down.RB ? ' down' : ''}`} {...bindBtn('RB')}>
-            RB
-          </button>
-          <button type="button" className={`action-key${down.RT ? ' down' : ''}`} {...bindBtn('RT')}>
-            RT
-          </button>
-        </div>
-
-        <div className="game-meta">
-          <button type="button" className={`action-key compact${down.Select ? ' down' : ''}`} {...bindBtn('Select')}>
-            Select
-          </button>
-          <button type="button" className={`action-key compact${down.Start ? ' down' : ''}`} {...bindBtn('Start')}>
-            Start
-          </button>
-        </div>
-
         <div className="game-cluster game-cluster-l">
-          <div className="stick" {...bindStick('l')}>
+          <div className="stick" {...bindLeftStick()}>
             <div className="stick-knob" style={knobStyle(knobs.lx, knobs.ly)} />
           </div>
         </div>
 
-        <div className="game-cluster game-cluster-r">
-          <div className="face-buttons">
-            <div className="face-btn empty" />
-            <button type="button" className={`face-btn${down.Y ? ' down' : ''}`} {...bindBtn('Y')}>
-              Y
-            </button>
-            <div className="face-btn empty" />
-            <button type="button" className={`face-btn${down.X ? ' down' : ''}`} {...bindBtn('X')}>
-              X
-            </button>
-            <div className="face-btn empty" />
-            <button type="button" className={`face-btn${down.B ? ' down' : ''}`} {...bindBtn('B')}>
-              B
-            </button>
-            <div className="face-btn empty" />
-            <button type="button" className={`face-btn${down.A ? ' down' : ''}`} {...bindBtn('A')}>
-              A
-            </button>
-            <div className="face-btn empty" />
+        <div className="game-cluster game-cluster-keys">
+          <div className="game-key-grid" role="group" aria-label="Game keys">
+            {MID_KEYS.map(({ label, code }) => (
+              <button
+                key={code}
+                type="button"
+                className={`game-key${down[code] ? ' down' : ''}`}
+                {...bindKey(code)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="game-cluster game-cluster-rs">
-          <div className="stick" {...bindStick('r')}>
-            <div className="stick-knob" style={knobStyle(knobs.rx, knobs.ry)} />
+        <div className="game-cluster game-cluster-pad">
+          <div
+            className={`look-pad${padActive ? ' active' : ''}`}
+            role="application"
+            aria-label="Look touchpad"
+            {...bindLookPad()}
+          >
+            <span className="look-pad__label">LOOK</span>
           </div>
         </div>
       </div>

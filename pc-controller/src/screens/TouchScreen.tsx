@@ -14,14 +14,43 @@ const SCROLL_BASE = 0.28
 const SWIPE_OPEN = 56
 const SWIPE_CLOSE = 48
 
+/** Finger travel under this = tap (phone jitter is often high). */
+const TAP_SLOP_PX = 52
+/** Max press duration still counted as a tap. */
+const TAP_MAX_MS = 420
+/** Second tap window for double-click / double-tap-hold drag. */
+const DOUBLE_TAP_MS = 420
+/** After this hold/move on an armed second tap, start left-button drag. */
+const DRAG_ARM_MS = 120
+const DRAG_ARM_MOVE = 12
+
+type PadGesture = {
+  pointerId: number
+  startX: number
+  startY: number
+  startTime: number
+  lastX: number
+  lastY: number
+  totalMove: number
+  isDoubleHold: boolean
+  dragArmed: boolean
+  dragging: boolean
+}
+
 export function TouchScreen({ transport }: Props) {
-  const last = useRef<{ x: number; y: number } | null>(null)
   const scrollLastY = useRef<number | null>(null)
   const edgeSwipe = useRef<{ y: number; active: boolean } | null>(null)
   const sheetDrag = useRef<{ y: number; moved: boolean } | null>(null)
   const sheetOffsetRef = useRef(0)
   const scrollTick = useRef(0)
   const sensRef = useRef(loadInputSettings())
+  const gesture = useRef<PadGesture | null>(null)
+  const secondaryPtr = useRef<number | null>(null)
+  const secondaryLastY = useRef(0)
+  const multiScrollY = useRef(0)
+  const multiMoved = useRef(false)
+  const awaitSecondTap = useRef(false)
+  const lastTapUp = useRef(0)
 
   const [active, setActive] = useState(false)
   const [glint, setGlint] = useState({ x: 50, y: 50 })
@@ -42,9 +71,43 @@ export function TouchScreen({ transport }: Props) {
     setSheetOffset(value)
   }
 
+  const clickLeft = () => {
+    transport.mouseButton('left', true)
+    transport.mouseButton('left', false)
+    haptic('medium')
+  }
+
+  const clickRight = () => {
+    transport.mouseButton('right', true)
+    transport.mouseButton('right', false)
+    haptic('medium')
+  }
+
+  const endDrag = () => {
+    const g = gesture.current
+    if (g?.dragging) {
+      transport.mouseButton('left', false)
+    }
+  }
+
   const onPadDown = (e: PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const fromBottom = rect.bottom - e.clientY
+
+    // Second finger on pad → two-finger scroll / right-click path
+    if (gesture.current && secondaryPtr.current == null && e.pointerId !== gesture.current.pointerId) {
+      secondaryPtr.current = e.pointerId
+      secondaryLastY.current = e.clientY
+      multiScrollY.current = 0
+      multiMoved.current = false
+      gesture.current.dragArmed = false
+      if (gesture.current.dragging) {
+        transport.mouseButton('left', false)
+        gesture.current.dragging = false
+      }
+      e.currentTarget.setPointerCapture(e.pointerId)
+      return
+    }
 
     if (!keysOpen && fromBottom < 56) {
       edgeSwipe.current = { y: e.clientY, active: true }
@@ -53,8 +116,26 @@ export function TouchScreen({ transport }: Props) {
       return
     }
 
+    const now = performance.now()
+    const isDoubleHold = awaitSecondTap.current && now - lastTapUp.current < DOUBLE_TAP_MS
+    if (isDoubleHold) awaitSecondTap.current = false
+
     e.currentTarget.setPointerCapture(e.pointerId)
-    last.current = { x: e.clientX, y: e.clientY }
+    gesture.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startTime: now,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      totalMove: 0,
+      isDoubleHold,
+      dragArmed: isDoubleHold,
+      dragging: false,
+    }
+    secondaryPtr.current = null
+    multiScrollY.current = 0
+    multiMoved.current = false
     setActive(true)
     haptic('light')
     updateGlint(e)
@@ -67,16 +148,57 @@ export function TouchScreen({ transport }: Props) {
       return
     }
 
-    if (!last.current) return
-    const dx = e.clientX - last.current.x
-    const dy = e.clientY - last.current.y
-    last.current = { x: e.clientX, y: e.clientY }
-    const g = sensRef.current.pointer
-    if (dx || dy) transport.mouseMove(dx * g, dy * g)
+    const g = gesture.current
+    if (!g) return
+
+    // Two-finger scroll while secondary is down
+    if (secondaryPtr.current != null) {
+      if (e.pointerId !== g.pointerId && e.pointerId !== secondaryPtr.current) return
+      let moveY = 0
+      if (e.pointerId === g.pointerId) {
+        moveY = e.clientY - g.lastY
+        g.lastX = e.clientX
+        g.lastY = e.clientY
+      } else {
+        moveY = e.clientY - secondaryLastY.current
+        secondaryLastY.current = e.clientY
+      }
+      multiScrollY.current += moveY
+      if (Math.abs(moveY) > 2) multiMoved.current = true
+      const gain = SCROLL_BASE * sensRef.current.scroll
+      const step = 20
+      while (Math.abs(multiScrollY.current) >= step) {
+        const dir = multiScrollY.current > 0 ? 1 : -1
+        transport.mouseScroll(0, dir * step * gain)
+        multiScrollY.current -= dir * step
+      }
+      return
+    }
+
+    if (e.pointerId !== g.pointerId) return
+
+    const dx = e.clientX - g.lastX
+    const dy = e.clientY - g.lastY
+    g.lastX = e.clientX
+    g.lastY = e.clientY
+    g.totalMove += Math.abs(dx) + Math.abs(dy)
+
+    // Double-tap + hold → left-button drag
+    if (g.dragArmed && !g.dragging) {
+      const heldMs = performance.now() - g.startTime
+      if (heldMs >= DRAG_ARM_MS || g.totalMove > DRAG_ARM_MOVE) {
+        g.dragging = true
+        transport.mouseButton('left', true)
+        haptic('medium')
+      }
+    }
+
+    const sens = sensRef.current.pointer
+    if (dx || dy) transport.mouseMove(dx * sens, dy * sens)
     updateGlint(e)
   }
 
-  const onPadUp = () => {
+  const onPadUp = (e: PointerEvent<HTMLDivElement>) => {
     if (edgeSwipe.current?.active) {
       const opened = sheetOffsetRef.current >= SWIPE_OPEN
       setKeysOpen(opened)
@@ -85,7 +207,79 @@ export function TouchScreen({ transport }: Props) {
       edgeSwipe.current = null
       return
     }
-    last.current = null
+
+    const g = gesture.current
+    if (!g) return
+
+    // Secondary finger up — maybe two-finger right-click
+    if (secondaryPtr.current != null && e.pointerId === secondaryPtr.current) {
+      secondaryPtr.current = null
+      if (!multiMoved.current && Math.abs(multiScrollY.current) < 24) {
+        clickRight()
+        awaitSecondTap.current = false
+      }
+      multiScrollY.current = 0
+      return
+    }
+
+    if (e.pointerId !== g.pointerId) return
+
+    // Primary up while secondary still down — end multi gesture
+    if (secondaryPtr.current != null) {
+      secondaryPtr.current = null
+      multiScrollY.current = 0
+      gesture.current = null
+      setActive(false)
+      return
+    }
+
+    const upTime = performance.now()
+    const heldMs = upTime - g.startTime
+    const wasTap = g.totalMove < TAP_SLOP_PX && heldMs < TAP_MAX_MS
+
+    if (g.dragging) {
+      transport.mouseButton('left', false)
+      awaitSecondTap.current = false
+      gesture.current = null
+      setActive(false)
+      return
+    }
+
+    if (g.isDoubleHold && wasTap) {
+      // Quick second tap → double-click (first tap already clicked)
+      clickLeft()
+      awaitSecondTap.current = false
+      gesture.current = null
+      setActive(false)
+      return
+    }
+
+    if (wasTap) {
+      clickLeft()
+      awaitSecondTap.current = true
+      lastTapUp.current = upTime
+    } else {
+      awaitSecondTap.current = false
+    }
+
+    gesture.current = null
+    setActive(false)
+  }
+
+  const onPadCancel = (e: PointerEvent<HTMLDivElement>) => {
+    if (edgeSwipe.current?.active) {
+      setOffset(0)
+      edgeSwipe.current = null
+      return
+    }
+    if (secondaryPtr.current === e.pointerId) {
+      secondaryPtr.current = null
+      multiScrollY.current = 0
+      return
+    }
+    endDrag()
+    awaitSecondTap.current = false
+    gesture.current = null
     setActive(false)
   }
 
@@ -208,11 +402,11 @@ export function TouchScreen({ transport }: Props) {
             onPointerDown={onPadDown}
             onPointerMove={onPadMove}
             onPointerUp={onPadUp}
-            onPointerCancel={onPadUp}
+            onPointerCancel={onPadCancel}
           >
             <div className="cursor-glint" style={{ left: `${glint.x}%`, top: `${glint.y}%` }} />
             <div className="pad-edge-hint" aria-hidden>
-              swipe up for keys
+              tap · dbl-tap drag · swipe up for keys
             </div>
           </div>
 
