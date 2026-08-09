@@ -1,0 +1,285 @@
+import { useState, type PointerEvent } from 'react'
+import { haptic } from '../haptics'
+import type { Transport } from '../transport'
+
+type Props = {
+  transport: Transport
+}
+
+type Panel = 'remote' | 'num' | 'abc'
+
+const APPS = [
+  { id: 'netflix', label: 'Netflix', tone: 'netflix' },
+  { id: 'prime', label: 'Prime', tone: 'prime' },
+  { id: 'appletv', label: 'Apple TV', tone: 'apple' },
+  { id: 'disney', label: 'Disney+', tone: 'disney' },
+] as const
+
+const SYSTEM = [
+  { label: '⌂', action: 'home' },
+  { label: '⌫', action: 'back' },
+  { label: '☰', action: 'menu' },
+  { label: '⏻', action: 'power' },
+]
+
+const MEDIA = [
+  { label: '⏮', action: 'prev' },
+  { label: '⏯', action: 'play' },
+  { label: '⏭', action: 'next' },
+  { label: '🔇', action: 'mute' },
+]
+
+const NUMBERS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '0', '⌫'] as const
+
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+
+export function TvScreen({ transport }: Props) {
+  const [down, setDown] = useState<Record<string, boolean>>({})
+  const [panel, setPanel] = useState<Panel>('remote')
+
+  const pressConsumer = (action: string) => {
+    setDown((d) => ({ ...d, [action]: true }))
+    const strong = ['netflix', 'prime', 'appletv', 'disney', 'ok', 'power'].includes(action)
+    haptic(strong ? 'medium' : 'light')
+    transport.consumer(action, true)
+  }
+
+  const releaseConsumer = (action: string) => {
+    setDown((d) => ({ ...d, [action]: false }))
+    transport.consumer(action, false)
+  }
+
+  const pressKey = (code: string) => {
+    setDown((d) => ({ ...d, [code]: true }))
+    haptic('light')
+    transport.key(code, true)
+  }
+
+  const releaseKey = (code: string) => {
+    setDown((d) => ({ ...d, [code]: false }))
+    transport.key(code, false)
+  }
+
+  const bindConsumer = (action: string) => ({
+    onPointerDown: (e: PointerEvent) => {
+      e.preventDefault()
+      pressConsumer(action)
+    },
+    onPointerUp: () => releaseConsumer(action),
+    onPointerLeave: () => down[action] && releaseConsumer(action),
+    onPointerCancel: () => down[action] && releaseConsumer(action),
+  })
+
+  const bindKey = (code: string) => ({
+    onPointerDown: (e: PointerEvent) => {
+      e.preventDefault()
+      pressKey(code)
+    },
+    onPointerUp: () => releaseKey(code),
+    onPointerLeave: () => down[code] && releaseKey(code),
+    onPointerCancel: () => down[code] && releaseKey(code),
+  })
+
+  const numberCode = (n: string) => {
+    if (n === '⌫') return 'Backspace'
+    if (n === '-') return 'Minus'
+    return `Digit${n}`
+  }
+
+  return (
+    <section className="screen tv-screen">
+      <div className="tv-apps">
+        {APPS.map((app) => (
+          <button
+            key={app.id}
+            type="button"
+            className={`tv-app ${app.tone}${down[app.id] ? ' down' : ''}`}
+            {...bindConsumer(app.id)}
+          >
+            {app.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="tv-panel-tabs">
+        {(
+          [
+            { id: 'remote', label: 'Remote' },
+            { id: 'num', label: '123' },
+            { id: 'abc', label: 'ABC' },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`tv-panel-tab${panel === tab.id ? ' active' : ''}`}
+            onClick={() => {
+              haptic('selection')
+              setPanel(tab.id)
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {panel === 'remote' && (
+        <div className="tv-layout">
+          <div className="media-row">
+            {SYSTEM.map((item) => (
+              <button
+                key={item.action}
+                type="button"
+                className={`action-key${down[item.action] ? ' down' : ''}`}
+                {...bindConsumer(item.action)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="dpad">
+            <div className="dpad-btn empty" />
+            <button type="button" className={`dpad-btn${down.up ? ' down' : ''}`} {...bindConsumer('up')}>
+              ▲
+            </button>
+            <div className="dpad-btn empty" />
+            <button type="button" className={`dpad-btn${down.left ? ' down' : ''}`} {...bindConsumer('left')}>
+              ◀
+            </button>
+            <button type="button" className={`dpad-btn ok${down.ok ? ' down' : ''}`} {...bindConsumer('ok')}>
+              OK
+            </button>
+            <button type="button" className={`dpad-btn${down.right ? ' down' : ''}`} {...bindConsumer('right')}>
+              ▶
+            </button>
+            <div className="dpad-btn empty" />
+            <button type="button" className={`dpad-btn${down.down ? ' down' : ''}`} {...bindConsumer('down')}>
+              ▼
+            </button>
+            <div className="dpad-btn empty" />
+          </div>
+
+          <div className="media-row">
+            <button
+              type="button"
+              className={`action-key${down.volDown ? ' down' : ''}`}
+              {...bindConsumer('volDown')}
+            >
+              Vol −
+            </button>
+            {MEDIA.slice(0, 2).map((item) => (
+              <button
+                key={item.action}
+                type="button"
+                className={`action-key${down[item.action] ? ' down' : ''}`}
+                {...bindConsumer(item.action)}
+              >
+                {item.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              className={`action-key${down.volUp ? ' down' : ''}`}
+              {...bindConsumer('volUp')}
+            >
+              Vol +
+            </button>
+          </div>
+
+          <div className="media-row">
+            {MEDIA.slice(2).map((item) => (
+              <button
+                key={item.action}
+                type="button"
+                className={`action-key${down[item.action] ? ' down' : ''}`}
+                {...bindConsumer(item.action)}
+              >
+                {item.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              className={`action-key${down.info ? ' down' : ''}`}
+              {...bindConsumer('info')}
+            >
+              Info
+            </button>
+            <button
+              type="button"
+              className={`action-key${down.input ? ' down' : ''}`}
+              {...bindConsumer('input')}
+            >
+              Input
+            </button>
+          </div>
+        </div>
+      )}
+
+      {panel === 'num' && (
+        <div className="tv-pad">
+          <p className="hint">Channel / PIN / search digits</p>
+          <div className="tv-num-grid">
+            {NUMBERS.map((n) => {
+              const code = numberCode(n)
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  className={`tv-pad-key${down[code] ? ' down' : ''}`}
+                  {...bindKey(code)}
+                >
+                  {n}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {panel === 'abc' && (
+        <div className="tv-pad">
+          <p className="hint">On-screen search letters</p>
+          <div className="tv-abc-grid">
+            {LETTERS.map((letter) => {
+              const code = `Key${letter}`
+              return (
+                <button
+                  key={letter}
+                  type="button"
+                  className={`tv-pad-key${down[code] ? ' down' : ''}`}
+                  {...bindKey(code)}
+                >
+                  {letter}
+                </button>
+              )
+            })}
+          </div>
+          <div className="tv-abc-extras">
+            <button
+              type="button"
+              className={`tv-pad-key wide${down.Space ? ' down' : ''}`}
+              {...bindKey('Space')}
+            >
+              Space
+            </button>
+            <button
+              type="button"
+              className={`tv-pad-key${down.Backspace ? ' down' : ''}`}
+              {...bindKey('Backspace')}
+            >
+              ⌫
+            </button>
+            <button
+              type="button"
+              className={`tv-pad-key${down.Enter ? ' down' : ''}`}
+              {...bindKey('Enter')}
+            >
+              ⏎
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
