@@ -472,22 +472,15 @@ class HidController(private val context: Context) {
     }
 
     fun sendMouse(dx: Int, dy: Int, buttons: Int = 0, wheel: Int = 0): Boolean {
-        val host = hostDevice
-        val hid = hidDevice
-        if (host == null || hid == null || !registered) {
-            onReportFailed("No HID host — Connect screen → Connect HID")
-            return false
-        }
-        if (!isConnectedTo(host)) {
-            onReportFailed("HID link dropped — Connect screen → Connect HID")
-            return false
-        }
-        // Kontroller mouse report: buttons(1) + X16 + Y16 + wheel8 + pan8
+        val host = hostDevice ?: return false
+        val hid = hidDevice ?: return false
+        if (!registered) return false
+        // Hot path: don't call getConnectionState every move — that adds lag.
         val x = dx.coerceIn(-2047, 2047)
         val y = dy.coerceIn(-2047, 2047)
         val report =
             byteArrayOf(
-                (buttons and 0x03).toByte(),
+                (buttons and 0x07).toByte(),
                 (x and 0xff).toByte(),
                 ((x shr 8) and 0xff).toByte(),
                 (y and 0xff).toByte(),
@@ -496,11 +489,10 @@ class HidController(private val context: Context) {
                 0,
             )
         return try {
-            val ok = hid.sendReport(host, HidDescriptors.MOUSE_REPORT_ID, report)
-            if (!ok) onReportFailed("Mouse report blocked — keep app open, tap Connect HID")
-            ok
-        } catch (e: SecurityException) {
-            onReportFailed("Bluetooth permission denied")
+            hid.sendReport(host, HidDescriptors.MOUSE_REPORT_ID, report)
+        } catch (_: SecurityException) {
+            false
+        } catch (_: Exception) {
             false
         }
     }

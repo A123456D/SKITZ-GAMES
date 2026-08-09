@@ -23,7 +23,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,11 +41,21 @@ import games.skitz.clickclack.ui.theme.TechAccent
 import games.skitz.clickclack.ui.theme.TechHairline
 import games.skitz.clickclack.ui.theme.TechPadField
 import games.skitz.clickclack.ui.theme.TechSurfaceRaised
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.sign
+
+/** Finger travel under this = tap (phone jitter is often >18px). */
+private const val TAP_SLOP_PX = 52f
+
+/** Max press duration still counted as a tap. */
+private const val TAP_MAX_MS = 420L
+
+/** Second tap window for double-tap-hold drag. */
+private const val DOUBLE_TAP_MS = 420L
+
+/** Cursor gain — higher = snappier. */
+private const val MOVE_GAIN = 2.55f
 
 @Composable
 fun TouchpadScreen(
@@ -58,22 +67,28 @@ fun TouchpadScreen(
     var heldButtons by remember { mutableIntStateOf(0) }
     var awaitSecondTap by remember { mutableStateOf(false) }
     var lastTapUp by remember { mutableLongStateOf(0L) }
-    var singleClickJob by remember { mutableStateOf<Job?>(null) }
-    val scope = rememberCoroutineScope()
     val buzz = rememberBuzz()
     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val wellShape = RoundedCornerShape(24.dp)
 
     fun clickLeft() {
-        onMouse(0, 0, 0x01, 0)
+        onMouse(0, 0, heldButtons or 0x01, 0)
         onMouse(0, 0, heldButtons, 0)
         buzz.thump()
     }
 
     fun clickRight() {
-        onMouse(0, 0, 0x02, 0)
+        onMouse(0, 0, heldButtons or 0x02, 0)
         onMouse(0, 0, heldButtons, 0)
         buzz.thump()
+    }
+
+    fun scaleDelta(raw: Float): Int {
+        // Mild acceleration so flicks cover distance without losing fine control.
+        val mag = abs(raw)
+        val boosted = if (mag < 4f) raw * MOVE_GAIN else raw * (MOVE_GAIN + (mag / 80f).coerceAtMost(1.4f))
+        val v = boosted.roundToInt()
+        return if (v == 0 && mag >= 0.6f) sign(raw).toInt() else v
     }
 
     @Composable
@@ -90,14 +105,12 @@ fun TouchpadScreen(
                             val down = awaitFirstDown(requireUnconsumed = false)
                             val downTime = System.currentTimeMillis()
                             finger = down.position
-                            buzz.resetMove()
                             var totalMove = 0f
                             var lastScrollY = 0f
                             var multi = false
-                            val isDoubleHold = awaitSecondTap && (downTime - lastTapUp) < 450L
+                            val isDoubleHold = awaitSecondTap && (downTime - lastTapUp) < DOUBLE_TAP_MS
                             if (isDoubleHold) {
                                 awaitSecondTap = false
-                                singleClickJob?.cancel()
                             }
                             var dragArmed = isDoubleHold
                             var dragging = false
@@ -118,11 +131,10 @@ fun TouchpadScreen(
                                     dragging = false
                                     val dy = pressed.map { it.positionChange().y }.average().toFloat()
                                     lastScrollY += dy
-                                    while (abs(lastScrollY) >= 24f) {
+                                    while (abs(lastScrollY) >= 20f) {
                                         val wheel = if (lastScrollY > 0) -1 else 1
                                         onMouse(0, 0, heldButtons, wheel)
-                                        lastScrollY -= 24f * -wheel
-                                        buzz.tick()
+                                        lastScrollY -= 20f * -wheel
                                     }
                                     pressed.forEach { it.consume() }
                                     continue
@@ -130,14 +142,14 @@ fun TouchpadScreen(
 
                                 val p = pressed.first()
                                 val delta = p.positionChange()
-                                val travel = abs(delta.x) + abs(delta.y)
-                                totalMove += travel
-                                val dx = (delta.x * 1.45f).roundToInt()
-                                val dy = (delta.y * 1.45f).roundToInt()
+                                totalMove += abs(delta.x) + abs(delta.y)
+                                val dx = scaleDelta(delta.x)
+                                val dy = scaleDelta(delta.y)
 
+                                // Double-tap + hold → left-button drag
                                 if (dragArmed && !dragging) {
                                     val heldMs = System.currentTimeMillis() - holdStart
-                                    if (heldMs >= 140L || totalMove > 10f) {
+                                    if (heldMs >= 120L || totalMove > 12f) {
                                         dragging = true
                                         onMouse(0, 0, heldButtons or 0x01, 0)
                                         buzz.thump()
@@ -147,41 +159,41 @@ fun TouchpadScreen(
                                 val buttons = if (dragging) heldButtons or 0x01 else heldButtons
                                 if (dx != 0 || dy != 0) {
                                     onMouse(dx, dy, buttons, 0)
-                                    buzz.moveTick(travel)
                                 }
                                 p.consume()
                             }
 
+                            val upTime = System.currentTimeMillis()
+                            val heldMs = upTime - downTime
+                            val wasTap = !multi && totalMove < TAP_SLOP_PX && heldMs < TAP_MAX_MS
+
                             if (dragging) {
                                 onMouse(0, 0, heldButtons, 0)
+                                awaitSecondTap = false
                                 return@awaitEachGesture
                             }
-                            if (multi && totalMove < 28f && abs(lastScrollY) < 20f) {
+                            if (multi && totalMove < 36f && abs(lastScrollY) < 24f) {
                                 clickRight()
+                                awaitSecondTap = false
                                 return@awaitEachGesture
                             }
-                            if (isDoubleHold && totalMove < 18f) {
+                            if (isDoubleHold && wasTap) {
+                                // Quick second tap → double-click (first tap already clicked)
                                 clickLeft()
-                                clickLeft()
+                                awaitSecondTap = false
                                 return@awaitEachGesture
                             }
-                            if (!multi && totalMove < 18f) {
+                            if (wasTap) {
+                                // Immediate click — no 320ms wait (that made taps feel broken)
+                                clickLeft()
                                 awaitSecondTap = true
-                                lastTapUp = System.currentTimeMillis()
-                                singleClickJob?.cancel()
-                                singleClickJob =
-                                    scope.launch {
-                                        delay(320)
-                                        if (awaitSecondTap) {
-                                            awaitSecondTap = false
-                                            clickLeft()
-                                        }
-                                    }
+                                lastTapUp = upTime
+                            } else {
+                                awaitSecondTap = false
                             }
                         }
                     },
         ) {
-            // Subtle mouse glyph when idle — like the reference remotes.
             if (finger == null) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val cx = size.width * 0.5f
@@ -233,11 +245,10 @@ fun TouchpadScreen(
                                 if (pressed.isEmpty()) break
                                 val dy = pressed.first().positionChange().y
                                 scrollAcc += dy
-                                while (abs(scrollAcc) >= 22f) {
+                                while (abs(scrollAcc) >= 18f) {
                                     val wheel = if (scrollAcc > 0) -1 else 1
                                     onMouse(0, 0, heldButtons, wheel)
-                                    scrollAcc -= 22f * -wheel
-                                    buzz.tick()
+                                    scrollAcc -= 18f * -wheel
                                 }
                                 pressed.forEach { it.consume() }
                             }
@@ -261,7 +272,6 @@ fun TouchpadScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             modifier = modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
         ) {
-            // Wide L / narrow M / wide R — matches remote-app pad chrome.
             listOf(
                 Triple("L", 0x01, 1.35f),
                 Triple("M", 0x04, 0.55f),
@@ -280,6 +290,7 @@ fun TouchpadScreen(
                     onPress = {
                         heldButtons = heldButtons or bit
                         onMouse(0, 0, heldButtons, 0)
+                        buzz.tick()
                     },
                     onRelease = {
                         heldButtons = heldButtons and bit.inv()
@@ -322,6 +333,7 @@ fun TouchpadScreen(
                             onPress = {
                                 heldButtons = heldButtons or bit
                                 onMouse(0, 0, heldButtons, 0)
+                                buzz.tick()
                             },
                             onRelease = {
                                 heldButtons = heldButtons and bit.inv()
