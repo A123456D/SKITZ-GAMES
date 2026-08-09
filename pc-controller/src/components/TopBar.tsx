@@ -4,10 +4,10 @@ import type { ConnectionState, DeviceInfo } from '../transport'
 type Props = {
   state: ConnectionState
   device: DeviceInfo | null
-  onDisconnect?: () => void
+  onStatusTap?: () => void
 }
 
-export function TopBar({ state, device, onDisconnect }: Props) {
+export function TopBar({ state, device, onStatusTap }: Props) {
   const label =
     state === 'connected' && device
       ? device.name
@@ -17,12 +17,12 @@ export function TopBar({ state, device, onDisconnect }: Props) {
           ? 'Connecting'
           : state === 'error'
             ? 'Error'
-            : 'Offline'
+            : 'Tap to connect'
 
   const tone =
     state === 'connected' ? 'ok' : state === 'scanning' || state === 'connecting' ? 'warn' : state === 'error' ? 'err' : ''
 
-  const canDrop = state === 'connected' && onDisconnect
+  const connected = state === 'connected'
 
   return (
     <header className="topbar">
@@ -32,13 +32,12 @@ export function TopBar({ state, device, onDisconnect }: Props) {
       <button
         type="button"
         className="status-pill"
-        disabled={!canDrop}
         onClick={() => {
-          if (!canDrop) return
-          haptic('warning')
-          onDisconnect()
+          if (!onStatusTap) return
+          haptic(connected ? 'warning' : 'selection')
+          onStatusTap()
         }}
-        title={canDrop ? 'Tap to disconnect' : undefined}
+        title={connected ? 'Tap to disconnect' : 'Tap to connect'}
       >
         <span className={`status-dot ${tone}`} />
         {label}

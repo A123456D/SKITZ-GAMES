@@ -8,6 +8,7 @@ type Props = {
   devices: DeviceInfo[]
   onScan: () => Promise<void>
   onConnect: (id: string) => Promise<void>
+  onClose?: () => void
 }
 
 function protocolLabel(device: DeviceInfo) {
@@ -23,7 +24,7 @@ function protocolLabel(device: DeviceInfo) {
   return 'PC · Bluetooth'
 }
 
-export function ConnectScreen({ transport, devices, onScan, onConnect }: Props) {
+export function ConnectScreen({ transport, devices, onScan, onConnect, onClose }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [manualHost, setManualHost] = useState('')
   const [manualProto, setManualProto] = useState('roku')
@@ -35,14 +36,28 @@ export function ConnectScreen({ transport, devices, onScan, onConnect }: Props) 
   const pcs = devices.filter((d) => d.kind !== 'tv')
 
   return (
-    <section className="screen">
-      <div>
-        <h1 className="headline">{native ? 'Connect' : 'Pair a screen.'}</h1>
-        <p className="sub">
-          {native
-            ? 'PC via Bluetooth HID. Smart TVs via Wi‑Fi (Roku, Samsung, LG, Bravia, Android/Google TV) or Bluetooth when the TV accepts a keyboard.'
-            : 'Demo mode lists sample targets. On phone, Bluetooth + Wi‑Fi TV protocols are live.'}
-        </p>
+    <section className="screen connect-panel">
+      <div className="connect-head">
+        <div>
+          <h1 className="headline">{native ? 'Connect' : 'Pair a screen.'}</h1>
+          <p className="sub">
+            {native
+              ? 'Optional. Use the pad offline — link a PC (Bluetooth) or TV (Wi‑Fi) when you want.'
+              : 'Demo mode lists sample targets. On phone, Bluetooth + Wi‑Fi TV protocols are live.'}
+          </p>
+        </div>
+        {onClose && (
+          <button
+            type="button"
+            className="btn ghost connect-close"
+            onClick={() => {
+              haptic('selection')
+              onClose()
+            }}
+          >
+            Done
+          </button>
+        )}
       </div>
 
       {native && (

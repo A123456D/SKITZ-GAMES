@@ -9,11 +9,10 @@ const TABS: { id: ControllerMode; label: string }[] = [
 
 type Props = {
   mode: ControllerMode
-  enabled: boolean
   onChange: (mode: ControllerMode) => void
 }
 
-export function ModeTabs({ mode, enabled, onChange }: Props) {
+export function ModeTabs({ mode, onChange }: Props) {
   return (
     <nav className="tabs" aria-label="Controller modes">
       {TABS.map((tab) => (
@@ -21,7 +20,6 @@ export function ModeTabs({ mode, enabled, onChange }: Props) {
           key={tab.id}
           type="button"
           className={`tab${mode === tab.id ? ' active' : ''}`}
-          disabled={!enabled}
           onClick={() => {
             if (tab.id === mode) return
             haptic('selection')

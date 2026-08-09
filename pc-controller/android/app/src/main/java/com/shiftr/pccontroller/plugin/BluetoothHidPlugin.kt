@@ -102,27 +102,35 @@ class BluetoothHidPlugin : Plugin() {
                 return
             }
         }
-        if (Build.VERSION.SDK_INT >= 33) {
-            if (getPermissionState("notifications") != com.getcapacitor.PermissionState.GRANTED) {
-                requestPermissionForAlias("notifications", call, "notifPermsCallback")
-                return
-            }
+        // Notifications are optional — never block HID startup on them.
+        if (Build.VERSION.SDK_INT >= 33 &&
+            getPermissionState("notifications") != com.getcapacitor.PermissionState.GRANTED
+        ) {
+            requestPermissionForAlias("notifications", call, "notifPermsCallback")
+            return
         }
         call.resolve(JSObject().put("granted", true))
     }
 
     @PermissionCallback
     private fun bluetoothPermsCallback(call: PluginCall) {
-        if (getPermissionState("bluetooth") == com.getcapacitor.PermissionState.GRANTED) {
-            ensurePermissions(call)
-        } else {
-            call.reject("Bluetooth permission denied")
+        val granted = getPermissionState("bluetooth") == com.getcapacitor.PermissionState.GRANTED
+        // Always resolve so the WebView is never stuck on the splash/boot path.
+        if (granted && Build.VERSION.SDK_INT >= 33 &&
+            getPermissionState("notifications") != com.getcapacitor.PermissionState.GRANTED
+        ) {
+            requestPermissionForAlias("notifications", call, "notifPermsCallback")
+            return
         }
+        call.resolve(JSObject().put("granted", granted))
     }
 
     @PermissionCallback
     private fun notifPermsCallback(call: PluginCall) {
-        call.resolve(JSObject().put("granted", getPermissionState("notifications") == com.getcapacitor.PermissionState.GRANTED))
+        val btOk =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                getPermissionState("bluetooth") == com.getcapacitor.PermissionState.GRANTED
+        call.resolve(JSObject().put("granted", btOk))
     }
 
     @PluginMethod

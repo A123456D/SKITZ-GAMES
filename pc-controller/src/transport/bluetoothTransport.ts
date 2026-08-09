@@ -21,6 +21,21 @@ function mapConnection(state: HidNativeState): Transport['state'] {
   }
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => resolve(fallback), ms)
+    promise
+      .then((value) => {
+        window.clearTimeout(timer)
+        resolve(value)
+      })
+      .catch(() => {
+        window.clearTimeout(timer)
+        resolve(fallback)
+      })
+  })
+}
+
 export function createBluetoothTransport(): Transport & {
   subscribe: (fn: Listener) => () => void
   nativeMessage: string
@@ -33,7 +48,7 @@ export function createBluetoothTransport(): Transport & {
   let state: Transport['state'] = 'idle'
   let device: DeviceInfo | null = null
   let error: string | null = null
-  let nativeMessage = 'Start HID for PC, or scan Wi‑Fi for Smart TVs'
+  let nativeMessage = 'Tap Scan to find PCs (Bluetooth) and Smart TVs (Wi‑Fi)'
   let nativeDetail = ''
   let link: LinkMode = 'none'
   const listeners = new Set<Listener>()
@@ -118,17 +133,38 @@ export function createBluetoothTransport(): Transport & {
       return () => listeners.delete(fn)
     },
     async restartHid() {
-      const s = await BluetoothHid.restart()
+      const s = await withTimeout(BluetoothHid.restart(), 8000, {
+        connection: 'Error' as const,
+        hostName: null,
+        hostAddress: null,
+        message: 'Bluetooth restart timed out',
+        detail: '',
+        profileAvailable: true,
+      })
       applyNative(s)
     },
     async makeDiscoverable() {
-      const res = await BluetoothHid.makeDiscoverable()
+      const res = await withTimeout(
+        BluetoothHid.makeDiscoverable(),
+        5000,
+        {
+          ok: false,
+          state: {
+            connection: 'WaitingForHost' as const,
+            hostName: null,
+            hostAddress: null,
+            message: 'Discoverable request timed out',
+            detail: '',
+            profileAvailable: true,
+          },
+        },
+      )
       applyNative(res.state)
     },
     async scanWifiTvs() {
-      await TvRemote.ensurePermissions().catch(() => undefined)
-      const { devices } = await TvRemote.scan()
-      return devices.map((d) => ({
+      await withTimeout(TvRemote.ensurePermissions(), 5000, { granted: false })
+      const scanned = await withTimeout(TvRemote.scan(), 6000, { devices: [] })
+      return scanned.devices.map((d) => ({
         id: d.id,
         name: d.name,
         kind: 'tv' as const,
@@ -139,16 +175,28 @@ export function createBluetoothTransport(): Transport & {
     async startScan() {
       state = 'scanning'
       error = null
+      nativeMessage = 'Scanning…'
       notify()
       try {
-        await BluetoothHid.ensurePermissions()
-        const started = await BluetoothHid.start()
+        // Never hang forever on the permission sheet
+        await withTimeout(BluetoothHid.ensurePermissions(), 20000, { granted: false })
+
+        const started = await withTimeout(BluetoothHid.start(), 6000, {
+          connection: 'Idle' as const,
+          hostName: null,
+          hostAddress: null,
+          message: 'Bluetooth HID starting… use Restart HID if needed',
+          detail: '',
+          profileAvailable: true,
+        })
         applyNative(started)
-        const bonded = await BluetoothHid.listBonded()
+
+        const bonded = await withTimeout(BluetoothHid.listBonded(), 4000, { devices: [] })
+
         let wifi: DeviceInfo[] = []
         try {
-          await TvRemote.ensurePermissions().catch(() => undefined)
-          const scanned = await TvRemote.scan()
+          await withTimeout(TvRemote.ensurePermissions(), 5000, { granted: false })
+          const scanned = await withTimeout(TvRemote.scan(), 6000, { devices: [] })
           wifi = scanned.devices.map((d) => ({
             id: d.id,
             name: d.name,
@@ -159,18 +207,28 @@ export function createBluetoothTransport(): Transport & {
         } catch {
           wifi = []
         }
+
         const bt = bonded.devices.map((d) => ({
           id: d.id,
           name: d.name,
           kind: (d.kind ?? 'pc') as DeviceInfo['kind'],
           protocol: 'bluetooth',
         }))
-        state = mapConnection(started)
+
+        // Keep scanning state from mapping Connected; otherwise idle for connect UI
+        if (link !== 'bluetooth' && link !== 'wifi-tv') {
+          state = 'idle'
+        }
+        nativeMessage =
+          wifi.length || bt.length
+            ? `Found ${wifi.length} TV(s), ${bt.length} Bluetooth host(s)`
+            : 'No devices yet — try Make discoverable or enter a TV IP'
         notify()
         return [...wifi, ...bt]
       } catch (e) {
-        state = 'error'
+        state = 'idle'
         error = e instanceof Error ? e.message : 'Scan failed'
+        nativeMessage = error
         notify()
         return []
       }

@@ -6,13 +6,11 @@ import android.net.nsd.NsdServiceInfo
 import android.util.Log
 import com.shiftr.pccontroller.tv.DiscoveredTv
 import com.shiftr.pccontroller.tv.TvProtocol
-import com.shiftr.pccontroller.tv.roku.RokuClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
@@ -24,7 +22,6 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.resume
 
 class TvDiscovery(private val context: Context) {
     private val tag = "TvDiscovery"
@@ -34,7 +31,7 @@ class TvDiscovery(private val context: Context) {
             .readTimeout(800, TimeUnit.MILLISECONDS)
             .build()
 
-    suspend fun scan(timeoutMs: Long = 3500): List<DiscoveredTv> =
+    suspend fun scan(timeoutMs: Long = 2800): List<DiscoveredTv> =
         withContext(Dispatchers.IO) {
             val found = ConcurrentHashMap<String, DiscoveredTv>()
 
@@ -43,7 +40,7 @@ class TvDiscovery(private val context: Context) {
                     listOf(
                         async { ssdpSearch(found) },
                         async { nsdSearch(found, timeoutMs) },
-                        async { probeSubnet(found) },
+                        // Full /24 port sweep is too slow on phones — SSDP/NSD + manual IP cover real use.
                     )
                 withTimeoutOrNull(timeoutMs) { jobs.awaitAll() }
             }
@@ -106,27 +103,23 @@ class TvDiscovery(private val context: Context) {
             listOf(
                 "_androidtvremote2._tcp.",
                 "_androidtvremote._tcp.",
-                "_googlecast._tcp.",
             )
-        for (type in types) {
-            try {
-                suspendCancellableCoroutine { cont ->
-                    val listener =
-                        object : NsdManager.DiscoveryListener {
-                            override fun onStartDiscoveryFailed(serviceType: String?, errorCode: Int) {
-                                if (cont.isActive) cont.resume(Unit)
-                            }
+        val listeners = mutableListOf<NsdManager.DiscoveryListener>()
+        try {
+            for (type in types) {
+                val listener =
+                    object : NsdManager.DiscoveryListener {
+                        override fun onStartDiscoveryFailed(serviceType: String?, errorCode: Int) = Unit
 
-                            override fun onStopDiscoveryFailed(serviceType: String?, errorCode: Int) = Unit
+                        override fun onStopDiscoveryFailed(serviceType: String?, errorCode: Int) = Unit
 
-                            override fun onDiscoveryStarted(serviceType: String?) = Unit
+                        override fun onDiscoveryStarted(serviceType: String?) = Unit
 
-                            override fun onDiscoveryStopped(serviceType: String?) {
-                                if (cont.isActive) cont.resume(Unit)
-                            }
+                        override fun onDiscoveryStopped(serviceType: String?) = Unit
 
-                            override fun onServiceFound(serviceInfo: NsdServiceInfo?) {
-                                serviceInfo ?: return
+                        override fun onServiceFound(serviceInfo: NsdServiceInfo?) {
+                            serviceInfo ?: return
+                            try {
                                 nsd.resolveService(
                                     serviceInfo,
                                     object : NsdManager.ResolveListener {
@@ -151,23 +144,27 @@ class TvDiscovery(private val context: Context) {
                                         }
                                     },
                                 )
+                            } catch (_: Exception) {
                             }
+                        }
 
-                            override fun onServiceLost(serviceInfo: NsdServiceInfo?) = Unit
-                        }
-                    nsd.discoverServices(type, NsdManager.PROTOCOL_DNS_SD, listener)
-                    // stop later
-                    cont.invokeOnCancellation {
-                        try {
-                            nsd.stopServiceDiscovery(listener)
-                        } catch (_: Exception) {
-                        }
+                        override fun onServiceLost(serviceInfo: NsdServiceInfo?) = Unit
                     }
+                listeners += listener
+                try {
+                    nsd.discoverServices(type, NsdManager.PROTOCOL_DNS_SD, listener)
+                } catch (_: Exception) {
                 }
-            } catch (_: Exception) {
+            }
+            delay(timeoutMs.coerceAtMost(2500))
+        } finally {
+            for (listener in listeners) {
+                try {
+                    nsd.stopServiceDiscovery(listener)
+                } catch (_: Exception) {
+                }
             }
         }
-        delay(timeoutMs.coerceAtMost(2500))
     }
 
     private suspend fun probeSubnet(out: ConcurrentHashMap<String, DiscoveredTv>) {

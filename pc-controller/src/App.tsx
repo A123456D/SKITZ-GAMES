@@ -13,30 +13,23 @@ export default function App() {
   const [, tick] = useState(0)
   const [devices, setDevices] = useState<DeviceInfo[]>([])
   const [mode, setMode] = useState<ControllerMode>('touch')
-  const [booting, setBooting] = useState(true)
+  const [showConnect, setShowConnect] = useState(false)
 
   useEffect(() => transport.subscribe(() => tick((n) => n + 1)), [transport])
 
+  // Demo web: soft auto-pair in the background — never blocks the pad UI.
   useEffect(() => {
+    if (transport.isNative) return
     let cancelled = false
     ;(async () => {
       try {
-        if (transport.isNative) {
-          // Request perms + start HID registration; do not fake-connect.
-          const list = await transport.startScan()
-          if (!cancelled) setDevices(list)
-        } else {
-          const list = await transport.startScan()
-          if (cancelled) return
-          setDevices(list)
-          const preferred = list.find((d) => d.kind === 'pc') ?? list[0]
-          if (preferred) {
-            await transport.connect(preferred.id)
-            if (!cancelled) setMode('touch')
-          }
-        }
-      } finally {
-        if (!cancelled) setBooting(false)
+        const list = await transport.startScan()
+        if (cancelled) return
+        setDevices(list)
+        const preferred = list.find((d) => d.kind === 'pc') ?? list[0]
+        if (preferred) await transport.connect(preferred.id)
+      } catch {
+        /* ignore — pad still usable offline */
       }
     })()
     return () => {
@@ -52,8 +45,12 @@ export default function App() {
   }
 
   const onConnect = async (id: string) => {
-    await transport.connect(id)
-    setMode('touch')
+    try {
+      await transport.connect(id)
+      if (transport.state === 'connected') setShowConnect(false)
+    } catch {
+      /* keep sheet open; error shows in ConnectScreen */
+    }
   }
 
   const onDisconnect = async () => {
@@ -66,27 +63,38 @@ export default function App() {
         <TopBar
           state={transport.state}
           device={transport.device}
-          onDisconnect={() => void onDisconnect()}
+          onStatusTap={() => {
+            if (connected) {
+              void onDisconnect()
+            } else {
+              setShowConnect(true)
+            }
+          }}
         />
 
-        {booting ? (
-          <section className="screen" style={{ justifyContent: 'center', alignItems: 'center' }}>
-            <p className="hint">{transport.isNative ? 'Starting Bluetooth…' : 'Linking demo pad…'}</p>
-          </section>
-        ) : connected ? (
-          <>
-            {mode === 'touch' && <TouchScreen transport={transport} />}
-            {mode === 'tv' && <TvScreen transport={transport} />}
-            {mode === 'game' && <GameScreen transport={transport} />}
-            <ModeTabs mode={mode} enabled={connected} onChange={setMode} />
-          </>
-        ) : (
-          <ConnectScreen
-            transport={transport}
-            devices={devices}
-            onScan={onScan}
-            onConnect={onConnect}
-          />
+        {mode === 'touch' && <TouchScreen transport={transport} />}
+        {mode === 'tv' && <TvScreen transport={transport} />}
+        {mode === 'game' && <GameScreen transport={transport} />}
+        <ModeTabs mode={mode} onChange={setMode} />
+
+        {showConnect && (
+          <div className="connect-overlay" role="dialog" aria-label="Connect">
+            <button
+              type="button"
+              className="connect-backdrop"
+              aria-label="Close connect"
+              onClick={() => setShowConnect(false)}
+            />
+            <div className="connect-sheet">
+              <ConnectScreen
+                transport={transport}
+                devices={devices}
+                onScan={onScan}
+                onConnect={onConnect}
+                onClose={() => setShowConnect(false)}
+              />
+            </div>
+          </div>
         )}
       </div>
     </PhoneShell>
