@@ -5750,15 +5750,19 @@ body.on-menu {
 }
 
 body.on-menu #hud {
-  pointer-events: auto;
+  pointer-events: auto !important;
 }
 
 body.on-menu #menu,
 body.on-menu #menu button,
 body.on-menu .panel.sheet,
 body.on-menu .panel.sheet button {
-  pointer-events: auto;
+  pointer-events: auto !important;
   touch-action: manipulation;
+}
+
+body.on-menu #stage {
+  pointer-events: none !important;
 }
 
 @keyframes seal-breath {

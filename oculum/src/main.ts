@@ -5493,6 +5493,18 @@ setMusicBed("menu");
 armUnlockOnGesture();
 syncContinueButton();
 syncHud();
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker
+      .register("./sw.js", { updateViaCache: "none" })
+      .then((reg) => {
+        void reg.update();
+      })
+      .catch(() => {
+        /* ignore — private mode / blocked */
+      });
+  });
+}
 const onViewportChange = (): void => {
   if (state?.tutorial && state.tutorialStep !== "done") syncTutorGuide(state);
   // Safari chrome show/hide changes layout without a window resize alone

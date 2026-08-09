@@ -1,2 +1,15 @@
 # PulseFold is a Vite/canvas game and does not need SharedArrayBuffer.
 # Restrictive COOP/COEP headers break the play-page iframe embed.
+
+# OCULUM — never pin the HTML shell / SW (Android Chrome was stuck on old builds)
+/games/oculum/web/
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/games/oculum/web/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/games/oculum/web/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/games/oculum/web/assets/*
+  Cache-Control: public, max-age=31536000, immutable
