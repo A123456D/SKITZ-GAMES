@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, rmSync, existsSync, writeFileSync, readFileSync } from "node:fs";
+import { cpSync, mkdirSync, rmSync, existsSync, writeFileSync, readFileSync, readdirSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,7 +11,8 @@ const destFresh = join(root, "..", "website", "public", "games", "oculum", "b9")
 const siteImg = join(root, "..", "website", "public", "images", "oculum-seal.png");
 const seal = join(root, "public", "assets", "ui", "seal-eye.png");
 /** Bump whenever shipping a critical client fix so phones drop stale SW caches. */
-const SW_CACHE = "oculum-beta-v14";
+const SW_CACHE = "oculum-beta-v15";
+const BUST = "15";
 
 if (!existsSync(dist)) {
   console.error("Missing dist/ — run npm run build first");
@@ -25,8 +26,24 @@ function mirrorDist(target) {
   cpSync(dist, target, { recursive: true });
 }
 
+/** Drop redundant full-face PNGs when JPG exists — halves OCULUM deploy weight. */
+function stripRedundantCardPngs(target) {
+  const cards = join(target, "assets", "cards");
+  if (!existsSync(cards)) return 0;
+  let n = 0;
+  for (const name of readdirSync(cards)) {
+    if (!name.endsWith(".png")) continue;
+    const base = name.slice(0, -4);
+    if (!existsSync(join(cards, `${base}.jpg`))) continue;
+    unlinkSync(join(cards, name));
+    n += 1;
+  }
+  return n;
+}
+
 mirrorDist(dest);
 mirrorDist(destFresh);
+const stripped = stripRedundantCardPngs(dest) + stripRedundantCardPngs(destFresh);
 
 if (existsSync(seal)) {
   mkdirSync(dirname(siteImg), { recursive: true });
@@ -35,7 +52,7 @@ if (existsSync(seal)) {
 
 const bustScript = `<script>
 (function () {
-  var KEY = "oculum-bust-v14";
+  var KEY = "oculum-bust-v${BUST}";
   try {
     if (sessionStorage.getItem(KEY) === "1") return;
     sessionStorage.setItem(KEY, "1");
@@ -43,8 +60,8 @@ const bustScript = `<script>
   var done = function () {
     try {
       var u = new URL(location.href);
-      if (u.searchParams.get("v") !== "14") {
-        u.searchParams.set("v", "14");
+      if (u.searchParams.get("v") !== "${BUST}") {
+        u.searchParams.set("v", "${BUST}");
         location.replace(u.toString());
       }
     } catch (e2) {}
@@ -79,7 +96,7 @@ self.addEventListener("activate", (e) => {
     for (const c of clients) {
       try {
         const u = new URL(c.url);
-        u.searchParams.set("v", "14");
+        u.searchParams.set("v", "${BUST}");
         await c.navigate(u.toString());
       } catch (_) {
         /* ignore */
@@ -95,7 +112,7 @@ self.addEventListener("fetch", (e) => {
 function patchShell(target) {
   const indexPath = join(target, "index.html");
   const indexHtml = readFileSync(indexPath, "utf8");
-  if (!indexHtml.includes("oculum-bust-v14")) {
+  if (!indexHtml.includes(`oculum-bust-v${BUST}`)) {
     writeFileSync(
       indexPath,
       indexHtml.replace(/<head[^>]*>/i, (m) => `${m}\n    ${bustScript}`),
@@ -123,11 +140,11 @@ writeFileSync(
       await Promise.all(keys.map((k) => caches.delete(k)));
     }
   } catch (e) {}
-  location.replace("../b9/?v=14");
+  location.replace("../b9/?v=${BUST}");
 })();
 </script>
-<p style="font-family:system-ui;color:#eee;background:#111;padding:2rem">Opening OCULUM build 14…</p>
+<p style="font-family:system-ui;color:#eee;background:#111;padding:2rem">Opening OCULUM build ${BUST}…</p>
 `,
 );
 
-console.log(`Copied ${dist} → ${dest} + ${destFresh} (${SW_CACHE})`);
+console.log(`Copied ${dist} → ${dest} + ${destFresh} (${SW_CACHE}, stripped ${stripped} pngs)`);

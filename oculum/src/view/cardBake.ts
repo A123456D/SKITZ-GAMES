@@ -57,8 +57,8 @@ export function preloadCardChrome(): Promise<void> {
       await Promise.all(
         FULL_CARD_IDS.map(async (id) => {
           const img =
-            (await tryLoad(`./assets/cards/${id}.jpg?v=14`)) ??
-            (await tryLoad(`./assets/cards/${id}.png?v=14`));
+            (await tryLoad(`./assets/cards/${id}.jpg?v=15`)) ??
+            (await tryLoad(`./assets/cards/${id}.png?v=15`));
           if (img) fullCardImgs.set(id, img);
         }),
       );
@@ -80,7 +80,7 @@ export function cardBackSrc(): string {
 export function handCardSrc(cardId: string): string {
   // Stable filenames need a bust when faces regenerate or a bad HTML 200 was
   // cached under /assets/* immutable headers (SPA fallback on missing files).
-  return `./assets/cards/${cardId}.jpg?v=14`;
+  return `./assets/cards/${cardId}.jpg?v=15`;
 }
 
 function hashStr(s: string): number {

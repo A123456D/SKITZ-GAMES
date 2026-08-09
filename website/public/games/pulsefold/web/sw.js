@@ -1,5 +1,33 @@
-/* PulseFold — Android install / offline cache. */
-const CACHE = "pulsefold-v23";
+/* PulseFold — Android install / offline cache.
+ * Never cache text/html as an image/audio asset (SPA 200 poison). */
+const CACHE = "pulsefold-v24";
+
+const ASSET_EXT =
+  /\.(png|jpe?g|gif|webp|avif|svg|ico|mp3|ogg|wav|webm|mp4|m4a|woff2?|ttf|otf)$/i;
+
+function isBinaryAsset(url) {
+  return (
+    ASSET_EXT.test(url.pathname) ||
+    url.pathname.includes("/audio/") ||
+    url.pathname.includes("/playlist/")
+  );
+}
+
+function safeToCache(req, res) {
+  if (!res || !res.ok) return false;
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  if (ct.includes("text/html")) return false;
+  if (
+    isBinaryAsset(new URL(req.url)) &&
+    !ct.includes("image") &&
+    !ct.includes("audio") &&
+    !ct.includes("font") &&
+    !ct.includes("octet-stream")
+  ) {
+    return false;
+  }
+  return true;
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -28,8 +56,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Never intercept music — HTMLAudioElement uses Range requests; SW
-  // respondWith breaks decoding on Android and goes completely silent.
+  // Never intercept music — Range requests break under respondWith.
   if (url.pathname.includes("/audio/") || url.pathname.includes("/playlist/")) return;
 
   const isShell =
@@ -45,7 +72,7 @@ self.addEventListener("fetch", (event) => {
       (async () => {
         try {
           const fresh = await fetch(req);
-          if (fresh.ok) {
+          if (safeToCache(req, fresh)) {
             const cache = await caches.open(CACHE);
             cache.put(req, fresh.clone());
           }
@@ -63,18 +90,25 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     (async () => {
-      const cached = await caches.match(req);
-      if (cached) return cached;
       try {
         const fresh = await fetch(req);
-        if (fresh.ok) {
+        if (safeToCache(req, fresh)) {
           const cache = await caches.open(CACHE);
           cache.put(req, fresh.clone());
         }
-        return fresh;
+        if (fresh.ok) return fresh;
       } catch {
-        return cached || Response.error();
+        /* fall through */
       }
+      const cached = await caches.match(req);
+      if (cached) {
+        const ct = (cached.headers.get("content-type") || "").toLowerCase();
+        if (isBinaryAsset(url) && ct.includes("text/html")) {
+          return Response.error();
+        }
+        return cached;
+      }
+      return Response.error();
     })(),
   );
 });

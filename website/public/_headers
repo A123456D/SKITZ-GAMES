@@ -1,5 +1,24 @@
-# PulseFold is a Vite/canvas game and does not need SharedArrayBuffer.
-# Restrictive COOP/COEP headers break the play-page iframe embed.
+# SKITZ Pages — keep shells fresh; never pin SW scripts.
+# Binary assets under /games/*/assets may be hashed (immutable OK).
+# Stable-name art (cards, themes) must NOT be immutable — SPA HTML 200s were sticky.
+
+/games/*/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/games/*/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/games/*/web/
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/games/*/web/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/games/*/web/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/games/*/web/manifest.webmanifest
+  Cache-Control: no-cache, no-store, must-revalidate
 
 # OCULUM — never pin the HTML shell / SW (Android Chrome was stuck on old builds)
 /games/oculum/web/
@@ -14,7 +33,6 @@
 /games/oculum/web/assets/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Card faces keep stable filenames — never immutable (SPA HTML 200s were sticky)
 /games/oculum/web/assets/cards/*
   Cache-Control: public, max-age=3600, must-revalidate
 
