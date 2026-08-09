@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, rmSync, existsSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, rmSync, existsSync, writeFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -6,84 +6,128 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const dist = join(root, "dist");
 const dest = join(root, "..", "website", "public", "games", "oculum", "web");
+/** Fresh path with no prior SW scope — escape hatch when Android pins /web/. */
+const destFresh = join(root, "..", "website", "public", "games", "oculum", "b9");
 const siteImg = join(root, "..", "website", "public", "images", "oculum-seal.png");
 const seal = join(root, "public", "assets", "ui", "seal-eye.png");
 /** Bump whenever shipping a critical client fix so phones drop stale SW caches. */
-const SW_CACHE = "oculum-beta-v8";
+const SW_CACHE = "oculum-beta-v9-kill";
 
 if (!existsSync(dist)) {
   console.error("Missing dist/ — run npm run build first");
   process.exit(1);
 }
 
-mkdirSync(dirname(dest), { recursive: true });
-rmSync(dest, { recursive: true, force: true });
-mkdirSync(dest, { recursive: true });
-cpSync(dist, dest, { recursive: true });
+function mirrorDist(target) {
+  mkdirSync(dirname(target), { recursive: true });
+  rmSync(target, { recursive: true, force: true });
+  mkdirSync(target, { recursive: true });
+  cpSync(dist, target, { recursive: true });
+}
+
+mirrorDist(dest);
+mirrorDist(destFresh);
 
 if (existsSync(seal)) {
   mkdirSync(dirname(siteImg), { recursive: true });
   cpSync(seal, siteImg);
 }
 
-// Network-first for HTML/JS/CSS so Android Chrome cannot pin an old shell forever.
-writeFileSync(
-  join(dest, "sw.js"),
-  `const CACHE = "${SW_CACHE}";
-const PRECACHE = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
+const bustScript = `<script>
+(function () {
+  var KEY = "oculum-bust-v9";
+  try {
+    if (sessionStorage.getItem(KEY) === "1") return;
+    sessionStorage.setItem(KEY, "1");
+  } catch (e) {}
+  var done = function () {
+    try {
+      var u = new URL(location.href);
+      if (u.searchParams.get("v") !== "9") {
+        u.searchParams.set("v", "9");
+        location.replace(u.toString());
+      }
+    } catch (e2) {}
+  };
+  var run = async function () {
+    try {
+      if ("serviceWorker" in navigator) {
+        var regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(function (r) { return r.unregister(); }));
+      }
+      if (window.caches && caches.keys) {
+        var keys = await caches.keys();
+        await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      }
+    } catch (e3) {}
+    done();
+  };
+  void run();
+})();
+</script>`;
+
+const killSw = `const CACHE = "${SW_CACHE}";
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
+  e.waitUntil(self.skipWaiting());
 });
 self.addEventListener("activate", (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
-    ).then(() => self.clients.claim()),
-  );
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+    await self.registration.unregister();
+    const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const c of clients) {
+      try {
+        const u = new URL(c.url);
+        u.searchParams.set("v", "9");
+        await c.navigate(u.toString());
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  })());
 });
 self.addEventListener("fetch", (e) => {
-  const req = e.request;
-  if (req.method !== "GET") return;
-  const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;
-  const isShell =
-    req.mode === "navigate" ||
-    url.pathname.endsWith(".html") ||
-    url.pathname.endsWith("/") ||
-    url.pathname.endsWith("/sw.js");
-  const isScript =
-    url.pathname.endsWith(".js") ||
-    url.pathname.endsWith(".css") ||
-    url.pathname.endsWith(".webmanifest");
-  if (isShell || isScript) {
-    e.respondWith(
-      fetch(req)
-        .then((res) => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-          }
-          return res;
-        })
-        .catch(() => caches.match(req).then((hit) => hit || caches.match("./index.html"))),
-    );
-    return;
-  }
-  e.respondWith(
-    caches.match(req).then(
-      (hit) =>
-        hit ||
-        fetch(req).then((res) => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-          }
-          return res;
-        }),
-    ),
-  );
+  e.respondWith(fetch(e.request));
 });
+`;
+
+function patchShell(target) {
+  const indexPath = join(target, "index.html");
+  const indexHtml = readFileSync(indexPath, "utf8");
+  if (!indexHtml.includes("oculum-bust-v9")) {
+    writeFileSync(
+      indexPath,
+      indexHtml.replace(/<head[^>]*>/i, (m) => `${m}\n    ${bustScript}`),
+    );
+  }
+  writeFileSync(join(target, "sw.js"), killSw);
+}
+
+patchShell(dest);
+patchShell(destFresh);
+
+// Escape hatch under old /web/ scope if a stale SW ever lets network through.
+writeFileSync(
+  join(dest, "fresh.html"),
+  `<!doctype html><meta charset="utf-8"><title>OCULUM</title>
+<script>
+(async function () {
+  try {
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch (e) {}
+  location.replace("../b9/?v=9");
+})();
+</script>
+<p style="font-family:system-ui;color:#eee;background:#111;padding:2rem">Opening OCULUM build 9…</p>
 `,
 );
 
-console.log(`Copied ${dist} → ${dest} (${SW_CACHE})`);
+console.log(`Copied ${dist} → ${dest} + ${destFresh} (${SW_CACHE})`);

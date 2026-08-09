@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>OCULUM</title>
+<script>
+(async function () {
+  try {
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch (e) {}
+  location.replace("../b9/?v=9");
+})();
+</script>
+<p style="font-family:system-ui;color:#eee;background:#111;padding:2rem">Opening OCULUM build 9…</p>

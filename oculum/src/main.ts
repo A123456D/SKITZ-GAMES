@@ -5493,16 +5493,23 @@ setMusicBed("menu");
 armUnlockOnGesture();
 syncContinueButton();
 syncHud();
+// Service worker disabled for beta ship v9: older cache-first workers pinned a
+// dead shell on Android Chrome. copy-to-site ships a one-shot kill-switch sw.js
+// that unregisters itself; do not re-register here until that pin is gone.
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker
-      .register("./sw.js", { updateViaCache: "none" })
-      .then((reg) => {
-        void reg.update();
-      })
-      .catch(() => {
+    void (async () => {
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+      } catch {
         /* ignore — private mode / blocked */
-      });
+      }
+    })();
   });
 }
 const onViewportChange = (): void => {

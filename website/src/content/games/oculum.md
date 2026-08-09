@@ -15,7 +15,7 @@ platforms:
   macos: false
   linux: false
   ios: true
-webPlayPath: web/index.html
+webPlayPath: b9/
 downloads: {}
 ---
 

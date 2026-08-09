@@ -4896,6 +4896,23 @@ body.reduce-motion .heresy-card {
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
 }
 
+/* Hard-to-miss ship stamp — own line so mobile letter-spacing cannot clip it */
+.menu-build {
+  margin: 10px 0 0;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #1a120c;
+  background: rgba(230, 201, 138, 0.92);
+  border: 1px solid rgba(255, 230, 180, 0.55);
+  border-radius: 999px;
+  padding: 0.28em 0.85em;
+  display: inline-block;
+  text-shadow: none;
+}
+
 .menu-blurb {
   margin: 12px 0 0;
   max-width: 19rem;
