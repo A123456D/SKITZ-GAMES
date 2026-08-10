@@ -1,0 +1,14 @@
+{
+  "name": "Paper Craft",
+  "short_name": "Paper Craft",
+  "description": "Fold. Stack. Rip. A colour-pen paper lane battler.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#e8dfc8",
+  "theme_color": "#e8dfc8",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

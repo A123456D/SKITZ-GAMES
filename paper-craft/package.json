@@ -1,0 +1,20 @@
+{
+  "name": "paper-craft",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "art:cut": "node scripts/remove-bg.mjs",
+    "ship": "npm run build && node scripts/copy-to-site.mjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.3",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.8"
+  }
+}
