@@ -1,4 +1,4 @@
-const CACHE = "oculum-beta-v30";
+const CACHE = "oculum-beta-v31";
 self.addEventListener("install", (e) => {
   e.waitUntil(self.skipWaiting());
 });
@@ -11,7 +11,7 @@ self.addEventListener("activate", (e) => {
     for (const c of clients) {
       try {
         const u = new URL(c.url);
-        u.searchParams.set("v", "30");
+        u.searchParams.set("v", "31");
         await c.navigate(u.toString());
       } catch (_) {
         /* ignore */

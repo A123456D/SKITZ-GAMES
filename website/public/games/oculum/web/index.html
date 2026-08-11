@@ -3,7 +3,7 @@
   <head>
     <script>
 (function () {
-  var KEY = "oculum-bust-v30";
+  var KEY = "oculum-bust-v31";
   try {
     if (sessionStorage.getItem(KEY) === "1") return;
     sessionStorage.setItem(KEY, "1");
@@ -11,8 +11,8 @@
   var done = function () {
     try {
       var u = new URL(location.href);
-      if (u.searchParams.get("v") !== "30") {
-        u.searchParams.set("v", "30");
+      if (u.searchParams.get("v") !== "31") {
+        u.searchParams.set("v", "31");
         location.replace(u.toString());
       }
     } catch (e2) {}
@@ -57,7 +57,7 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-WHiA4e32.js"></script>
+    <script type="module" crossorigin src="./assets/index-pjDh7Zli.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-D5CaTsAr.css">
   </head>
   <body class="on-menu">

@@ -1,7 +1,7 @@
 export const ALTITUDE_COUNT = 3;
 export const MAX_TURNS = 10;
 export const HAND_MAX = 5;
-export const START_WILL = 30;
+export const START_WILL = 20;
 export const SIGHT_CARRY_CAP = 6;
 export const ESSENCE_CAP = 8;
 export const ECLIPSE_WIN = 10;

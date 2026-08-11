@@ -789,45 +789,43 @@ export class OculusStage {
     let cx = lane.x + (lane.w - cardW) / 2;
     let cy = top ? lane.y + lane.h * 0.08 : lane.y + lane.h - cardH - lane.h * 0.08;
 
-    // Witnessed presence: clear idle float + lift (Veiled stay planted)
+    // Witnessed presence: gentle idle float + slight lift (Veiled stay planted)
     const witnessed = !!u && !u.veiled;
     const hovered =
       witnessed &&
       this.hoverSlot?.alt === alt &&
       this.hoverSlot?.side === side;
     if (witnessed) {
-      // Baseline lift — fully Named cards sit above the stone
-      const baseLift = this.reduceMotion ? 3 : 7;
+      const baseLift = this.reduceMotion ? 1.5 : 3;
       cy += top ? baseLift : -baseLift;
       if (!this.reduceMotion) {
-        const phase = this.time * 1.85 + alt * 1.7 + (top ? 0.4 : 0);
-        const idle = Math.sin(phase) * (hovered ? 9 : 5.5);
+        const phase = this.time * 1.55 + alt * 1.7 + (top ? 0.4 : 0);
+        const idle = Math.sin(phase) * (hovered ? 3.2 : 2);
         cy += top ? idle : -idle;
-        const grow = hovered ? 1.07 : 1.035;
+        const grow = hovered ? 1.03 : 1.012;
         const nw = cardW * grow;
         const nh = cardH * grow;
         cx -= (nw - cardW) / 2;
         cy -= (nh - cardH) / 2;
         cardW = nw;
         cardH = nh;
-        const breath = 0.14 + 0.1 * (0.5 + 0.5 * Math.sin(phase * 0.85));
-        pulse = Math.min(1.55, pulse + breath + (hovered ? 0.28 : 0));
+        const breath = 0.06 + 0.04 * (0.5 + 0.5 * Math.sin(phase * 0.85));
+        pulse = Math.min(1.35, pulse + breath + (hovered ? 0.12 : 0));
         if (!fx) {
-          fxColor = hovered ? [0.82, 0.62, 0.32] : [0.62, 0.48, 0.26];
+          fxColor = hovered ? [0.7, 0.52, 0.28] : [0.55, 0.42, 0.22];
         } else if (hovered) {
-          fxColor = [0.82, 0.62, 0.32];
+          fxColor = [0.7, 0.52, 0.28];
         }
       } else {
-        pulse = Math.min(1.35, pulse + 0.12);
-        if (!fx) fxColor = [0.58, 0.44, 0.24];
+        pulse = Math.min(1.25, pulse + 0.06);
+        if (!fx) fxColor = [0.52, 0.4, 0.22];
       }
     }
 
     if (u) {
       const tex = this.texFor(u.cardId, u.veiled);
-      // Soft contact shadow — Witnessed casts a deeper float shadow
-      const shadowSpread = witnessed ? 7 : 3;
-      const shadowAlpha = witnessed ? 0.5 : 0.38;
+      const shadowSpread = witnessed ? 4 : 3;
+      const shadowAlpha = witnessed ? 0.42 : 0.38;
       this.drawCardQuad(cx + shadowSpread * 0.35, cy + shadowSpread, cardW, cardH, tex, {
         veil: 0,
         pulse: 0,
