@@ -3,7 +3,7 @@
   <head>
     <script>
 (function () {
-  var KEY = "oculum-bust-v29";
+  var KEY = "oculum-bust-v30";
   try {
     if (sessionStorage.getItem(KEY) === "1") return;
     sessionStorage.setItem(KEY, "1");
@@ -11,8 +11,8 @@
   var done = function () {
     try {
       var u = new URL(location.href);
-      if (u.searchParams.get("v") !== "29") {
-        u.searchParams.set("v", "29");
+      if (u.searchParams.get("v") !== "30") {
+        u.searchParams.set("v", "30");
         location.replace(u.toString());
       }
     } catch (e2) {}
@@ -57,8 +57,8 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-B74wjFX5.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-ClcyeppR.css">
+    <script type="module" crossorigin src="./assets/index-WHiA4e32.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-D5CaTsAr.css">
   </head>
   <body class="on-menu">
     <div id="app">
@@ -185,6 +185,27 @@
           <span id="phase-sub" class="phase-sub"></span>
         </div>
         <div id="vfx-wash" hidden aria-hidden="true"></div>
+
+        <div id="match-intro" hidden aria-hidden="true">
+          <div class="match-intro-veil" aria-hidden="true"></div>
+          <div class="match-intro-rays" aria-hidden="true"></div>
+          <img class="match-intro-seal" src="./assets/ui/seal-eye.png" alt="" draggable="false" />
+          <p class="match-intro-tag">VEIL · WITNESS · ASCEND</p>
+          <div class="match-intro-vs" aria-hidden="true">
+            <div class="match-intro-side match-intro-you">
+              <img id="match-intro-you-face" class="match-intro-face" alt="" draggable="false" />
+              <p id="match-intro-you-name" class="match-intro-craft"></p>
+              <p class="match-intro-role">YOU</p>
+            </div>
+            <p class="match-intro-vs-mark">VS</p>
+            <div class="match-intro-side match-intro-foe">
+              <img id="match-intro-foe-face" class="match-intro-face" alt="" draggable="false" />
+              <p id="match-intro-foe-name" class="match-intro-craft"></p>
+              <p class="match-intro-role">FOE</p>
+            </div>
+          </div>
+          <p class="match-intro-round">ROUND 1</p>
+        </div>
 
         <div id="coach" hidden>
           <p id="coach-title" class="coach-title"></p>

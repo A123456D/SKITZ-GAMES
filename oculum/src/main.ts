@@ -4,6 +4,7 @@ import { fullCraftDeck } from "./core/decks";
 import { catalogOrder } from "./core/catalog";
 import { collectiblePool } from "./core/construct";
 import { HERESY_IDS, heresyName, heresyPickFace, heresyPitch, heresyShort, heresyVerb } from "./core/heresies";
+import type { LiveHeresy } from "./core/heresies";
 import { applyIntent, applyMulligan, createMatch, lawHeresyProgress, legalIntents, printedFacePower, sidePlaysHeresy, takeEvents, unitPower, witnessCostAt } from "./core/match";
 import {
   CARD_ANCHORS,
@@ -107,6 +108,12 @@ const phaseKicker = document.getElementById("phase-kicker")!;
 const phaseTitle = document.getElementById("phase-title")!;
 const phaseSub = document.getElementById("phase-sub")!;
 const vfxWash = document.getElementById("vfx-wash")!;
+const matchIntro = document.getElementById("match-intro")!;
+const matchIntroYouFace = document.getElementById("match-intro-you-face") as HTMLImageElement;
+const matchIntroFoeFace = document.getElementById("match-intro-foe-face") as HTMLImageElement;
+const matchIntroYouName = document.getElementById("match-intro-you-name")!;
+const matchIntroFoeName = document.getElementById("match-intro-foe-name")!;
+const matchIntroRound = matchIntro.querySelector(".match-intro-round") as HTMLElement;
 const coachEl = document.getElementById("coach")!;
 const coachTitle = document.getElementById("coach-title")!;
 const coachBody = document.getElementById("coach-body")!;
@@ -393,6 +400,7 @@ function hideAllSheets(): void {
   document.body.classList.remove("mulligan-open");
   hideRiteReveal();
   hideVictoryReveal();
+  hideMatchIntro();
   closeEventLog();
   cardInspect.close();
 }
@@ -781,6 +789,51 @@ function eclipseReasonLabel(reason: string): string {
     default:
       return reason;
   }
+}
+
+function craftLabel(h: string | undefined | null): string {
+  if (h && (HERESY_IDS as readonly string[]).includes(h)) return heresyShort(h as LiveHeresy);
+  return "Rival";
+}
+
+function hideMatchIntro(): void {
+  matchIntro.hidden = true;
+  matchIntro.classList.remove("is-on");
+  matchIntro.setAttribute("aria-hidden", "true");
+}
+
+/** Cinematic craft-vs-craft curtain before Round 1 / hand deal. */
+async function playMatchIntro(youHeresy: string | null, foeHeresy: string | null): Promise<void> {
+  const reduce = document.body.classList.contains("reduce-motion");
+  const youFace = youHeresy ? heresyPickFace(youHeresy as Heresy) : null;
+  const foeFace = foeHeresy ? heresyPickFace(foeHeresy as Heresy) : null;
+  matchIntroYouName.textContent = craftLabel(youHeresy);
+  matchIntroFoeName.textContent = craftLabel(foeHeresy);
+  matchIntroRound.textContent = "ROUND 1";
+  if (youFace) {
+    matchIntroYouFace.src = handCardSrc(youFace);
+    matchIntroYouFace.hidden = false;
+  } else {
+    matchIntroYouFace.removeAttribute("src");
+    matchIntroYouFace.hidden = true;
+  }
+  if (foeFace) {
+    matchIntroFoeFace.src = handCardSrc(foeFace);
+    matchIntroFoeFace.hidden = false;
+  } else {
+    matchIntroFoeFace.removeAttribute("src");
+    matchIntroFoeFace.hidden = true;
+  }
+  matchIntro.hidden = false;
+  matchIntro.setAttribute("aria-hidden", "false");
+  matchIntro.classList.remove("is-on");
+  void matchIntro.offsetWidth;
+  matchIntro.classList.add("is-on");
+  playSfx("witness");
+  window.setTimeout(() => playSfx("select"), reduce ? 280 : 900);
+  window.setTimeout(() => playSfx("ui-tap"), reduce ? 520 : 1800);
+  await waitMs(paceMs(reduce ? 1100 : 3800));
+  hideMatchIntro();
 }
 
 function hidePhaseBanner(): void {
@@ -1469,36 +1522,40 @@ function startMatch(
   hidePhaseBanner();
   persistProgress();
   if (!tutorial) {
-    const foeKit = state.craftKits.enemy[0];
-    const foeName =
-      foeKit === "ink" || foeKit === "motley" || foeKit === "toll" || foeKit === "breach"
-        ? heresyShort(foeKit)
-        : "Rival";
-    flashPhase("Round 1", {
-      kicker: "Match begin",
-      sub: `vs ${foeName} · Play Veiled · Witness with Sight · Pass to Resolve`,
-      kind: "round",
-      ms: paceMs(3400),
+    const youKit = state.craftKits.player[0] ?? null;
+    const foeKit = state.craftKits.enemy[0] ?? null;
+    const foeName = craftLabel(foeKit);
+    void enqueueFx(async () => {
+      await playMatchIntro(youKit, foeKit);
+      flashPhase("Round 1", {
+        kicker: "Match begin",
+        sub: `vs ${foeName} · Play Veiled · Witness with Sight · Pass to Resolve`,
+        kind: "round",
+        ms: paceMs(2800),
+      });
+      explain(
+        `Round 1 — facing ${foeName}. Play cards Veiled (half-real). Spend Sight to Witness them. Pass when done. When both Pass, lanes Resolve and Will chips.`,
+        paceMs(3600),
+        "round",
+      );
+      if (state?.hand.length) {
+        await animateHandDeals([...state.hand]);
+        beginMulligan();
+      } else {
+        beginMulligan();
+      }
     });
-    explain(
-      `Round 1 — facing ${foeName}. Play cards Veiled (half-real). Spend Sight to Witness them. Pass when done. When both Pass, lanes Resolve and Will chips. Watch the toast — it explains every beat.`,
-      paceMs(4200),
-      "round",
-    );
   } else {
     explain(
       "First Gaze — follow the coach. When a Site or Relic appears, the big card pops up — read it, then tap Continue.",
       paceMs(3800),
       "round",
     );
-  }
-  if (state.hand.length) {
-    void enqueueFx(async () => {
-      await animateHandDeals([...state!.hand]);
-      if (!tutorial) beginMulligan();
-    });
-  } else if (!tutorial) {
-    beginMulligan();
+    if (state.hand.length) {
+      void enqueueFx(async () => {
+        await animateHandDeals([...state!.hand]);
+      });
+    }
   }
 }
 
