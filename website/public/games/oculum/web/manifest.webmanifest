@@ -3,7 +3,7 @@
   "short_name": "OCULUM β",
   "description": "Veil. Witness. Ascend. — OCULUM beta",
   "start_url": "./",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "portrait",
   "background_color": "#120e18",
   "theme_color": "#1a1420",

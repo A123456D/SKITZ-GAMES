@@ -69,6 +69,7 @@ import {
   saveLastConstructedDeck,
   saveMatchProgress,
 } from "./view/progress";
+import { armImmersiveReenter, enterImmersivePlay, exitImmersivePlay } from "./view/immersive";
 
 const CODEX_ALL = catalogOrder(collectiblePool());
 const canvas = document.getElementById("stage") as HTMLCanvasElement;
@@ -364,6 +365,9 @@ function setMenuMode(on: boolean): void {
     hidePhaseBanner();
     hideMeterTip();
     clearTutorGuide();
+    void exitImmersivePlay();
+  } else {
+    void enterImmersivePlay();
   }
 }
 
@@ -6365,6 +6369,7 @@ function frame(now: number): void {
 setMenuMode(true);
 setMusicBed("menu");
 armUnlockOnGesture();
+armImmersiveReenter();
 syncContinueButton();
 syncHud();
 // Service worker disabled for beta ship v9: older cache-first workers pinned a
