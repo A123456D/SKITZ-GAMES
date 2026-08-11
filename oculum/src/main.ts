@@ -6317,6 +6317,10 @@ function frame(now: number): void {
         lumenShrineSustainFree: { player: false, enemy: false },
         lumenUsherSustainSight: { player: false, enemy: false },
         lumenFullRadianceArmed: { player: false, enemy: false },
+        temptUsed: { player: false, enemy: false },
+        desireAltarTemptFree: { player: true, enemy: true },
+        ruinBrandlaceTemptSight: { player: true, enemy: true },
+        ruinFullDevourArmed: { player: false, enemy: false },
         altitudes: [
           { player: null, enemy: null, playerSite: null, enemySite: null, blinded: false },
           { player: null, enemy: null, playerSite: null, enemySite: null, blinded: false },
