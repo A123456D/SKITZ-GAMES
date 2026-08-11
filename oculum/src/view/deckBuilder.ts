@@ -1,4 +1,4 @@
-import { getCard, teachDeck, teachDeckMotley, teachDeckToll, teachDeckDusk, teachDeckBonewick } from "../core/cards";
+import { getCard, teachDeck, teachDeckMotley, teachDeckToll, teachDeckBreach, teachDeckLumen } from "../core/cards";
 import { catalogOrder } from "../core/catalog";
 import {
   CONSTRUCTED_DECK_SIZE,
@@ -233,10 +233,10 @@ export function initDeckBuilder(opts: {
         ? teachDeckMotley()
         : filterEl.value === "toll"
           ? teachDeckToll()
-          : filterEl.value === "deal"
-            ? teachDeckDusk()
-            : filterEl.value === "shell"
-              ? teachDeckBonewick()
+          : filterEl.value === "breach"
+            ? teachDeckBreach()
+            : filterEl.value === "lumen"
+              ? teachDeckLumen()
               : teachDeck()),
     ];
     renderDeck();
@@ -282,10 +282,10 @@ export function initDeckBuilder(opts: {
             ? teachDeckMotley()
             : opts.heresy === "toll"
               ? teachDeckToll()
-              : opts.heresy === "deal"
-                ? teachDeckDusk()
-                : opts.heresy === "shell"
-                  ? teachDeckBonewick()
+              : opts.heresy === "breach"
+                ? teachDeckBreach()
+                : opts.heresy === "lumen"
+                  ? teachDeckLumen()
                   : teachDeck()),
         ];
       }

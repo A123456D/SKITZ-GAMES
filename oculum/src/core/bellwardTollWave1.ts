@@ -82,9 +82,9 @@ export const BELLWARD_TOLL_WAVE1: CardDef[] = [
     sightYield: 0,
     artSubject:
       "same Bellward Toll set style as Veil Ringer — human female pilgrim debtor modest proportions conical kasa white face-veil red eye-seal crimson white robes bright red parasol hanging bronze bells cliff path ocean banners, unique crimson parasol-rib cloth arch inner frame, high-contrast crimson-white-charcoal bell shrine",
-    veiledAbility: "When this Holds on a Tolled altitude, draw 1.",
-    revelation: "If any altitude is Tolled, draw 1.",
-    text: "Veiled: When this Holds on a Tolled altitude, draw 1. Revelation: If any altitude is Tolled, draw 1.",
+    veiledAbility: "When this Holds on a Tolled altitude, gain 1 Sight.",
+    revelation: "If any altitude is Tolled, gain 1 Sight.",
+    text: "Veiled: When this Holds on a Tolled altitude, gain 1 Sight. Revelation: If any altitude is Tolled, gain 1 Sight.",
   },
 ];
 

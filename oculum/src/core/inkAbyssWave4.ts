@@ -21,8 +21,8 @@ export const INK_ABYSS_WAVE4: CardDef[] = [
     veiledAbility:
       "Whenever an enemy Figure becomes Forced Exposed, gain 1 Sight.",
     revelation:
-      "Stain each enemy Figure. If you Stained 2 or more, draw 1 and Blind Mid this turn.",
-    text: "SOVEREIGN. Veiled: Whenever an enemy Figure becomes Forced Exposed, gain 1 Sight. Revelation: Stain each enemy Figure. If you Stained 2 or more, draw 1 and Blind Mid this turn. While Witnessed: Whenever you Forced Expose an enemy Figure, Blind that altitude this turn. Press: when you Press, if this is Witnessed, deal 1 Will. Fall: Draw 1.",
+      "Stain each enemy Figure. If you Stained 2 or more, gain 1 Sight and Blind Mid this turn.",
+    text: "SOVEREIGN. Veiled: Whenever an enemy Figure becomes Forced Exposed, gain 1 Sight. Revelation: Stain each enemy Figure. If you Stained 2 or more, gain 1 Sight and Blind Mid this turn. While Witnessed: Whenever you Forced Expose an enemy Figure, Blind that altitude this turn. Press: when you Press, if this is Witnessed, deal 1 Will. Fall: Gain 1 Sight.",
   },
   {
     id: "echo_blot",
@@ -36,7 +36,7 @@ export const INK_ABYSS_WAVE4: CardDef[] = [
     sightYield: 0,
     artSubject:
       "same Ink Abyss set style as Mire Duelist — echo blot rite pale hand double ink stain swamp seals, unique cream double-blot inner frame, high-contrast cream-black ink-wash",
-    text: "Stain an enemy Figure in the chosen altitude if able. If Mid, draw 1. If it was already Stained, Blind that altitude this turn.",
+    text: "Stain an enemy Figure in the chosen altitude if able. If Mid, gain 1 Sight. If it was already Stained, Blind that altitude this turn.",
   },
   {
     id: "blot_lens",
@@ -50,7 +50,7 @@ export const INK_ABYSS_WAVE4: CardDef[] = [
     sightYield: 0,
     artSubject:
       "same Ink Abyss set style as Mire Duelist — black blot lens charm cream cord eye ink glass floating swamp, unique cream lens-rim inner frame, high-contrast cream-black ink-wash",
-    text: "Graft: +1 power while host Witnessed. When you Blind an altitude that has a Stained enemy, gain 1 Sight. If that altitude is Low, also draw 1.",
+    text: "Graft: +1 power while host Witnessed. When you Blind an altitude that has a Stained enemy, gain 1 Sight.",
   },
   {
     id: "stainwell",

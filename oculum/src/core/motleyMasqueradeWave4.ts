@@ -1,8 +1,7 @@
 import type { CardDef } from "./types";
 
 /**
- * Motley Masquerade — Wave 4 closing pack (Motley 20 complete).
- * Roles: Sovereign · Blind payoff · Vessel continuity · Bust bank site · Closing rite.
+ * Motley Masquerade — Wave 4 (Cash/Bust closer).
  */
 export const MOTLEY_MASQUERADE_WAVE4: CardDef[] = [
   {
@@ -18,11 +17,9 @@ export const MOTLEY_MASQUERADE_WAVE4: CardDef[] = [
     sovereign: true,
     artSubject:
       "glamorous sexy motley masquerade sovereign lady masque throne purple teal gold crown twin masks ornate court cliffs original SOVEREIGN legend presence",
-    veiledAbility:
-      "Whenever a friendly Figure Cashes, gain 1 Sight.",
-    revelation:
-      "Free Wager this. If you control 2 or more Wagered Figures, gain 1 Eclipse and draw 1.",
-    text: "SOVEREIGN. Veiled: Whenever a friendly Figure Cashes, gain 1 Sight. Revelation: Free Wager this. If you control 2 or more Wagered Figures, gain 1 Eclipse and draw 1. While Witnessed: Whenever a friendly Figure Cashes, gain 1 Favor. If you Cash 2 or more times in a Resolve while this is Witnessed, gain 1 Eclipse. Fall: Draw 1.",
+    veiledAbility: "Whenever a friendly Motley Figure Cashes, gain 1 Sight.",
+    revelation: "Free Wager this. If you control 2 or more Wagered Motley Figures, gain 1 Eclipse and gain 1 Favor.",
+    text: "SOVEREIGN. Veiled: Whenever a friendly Motley Figure Cashes, gain 1 Sight. Revelation: Free Wager this. If you control 2 or more Wagered Motley Figures, gain 1 Eclipse and gain 1 Favor. While Witnessed: Cash 2+ this Resolve → Eclipse. Fall: Gain 1 Sight.",
   },
   {
     id: "blindfold_charm",
@@ -36,7 +33,7 @@ export const MOTLEY_MASQUERADE_WAVE4: CardDef[] = [
     sightYield: 0,
     artSubject:
       "motley masquerade blindfold charm graft purple teal gold silk eye seal floating ornate cliffs original",
-    text: "Graft: +1 power while host Witnessed. When you Blind an altitude while host is Wagered, gain 1 Sight. If that altitude is Mid, also draw 1.",
+    text: "Graft: +1 power while host Witnessed. When you Blind an altitude while host is Wagered, gain 1 Sight. If that altitude is Mid, also gain 1 Favor.",
   },
   {
     id: "carnival_urn",
@@ -50,8 +47,9 @@ export const MOTLEY_MASQUERADE_WAVE4: CardDef[] = [
     sightYield: 0,
     artSubject:
       "motley masquerade carnival urn vessel purple teal gold ribbon mask chamber ornate cliffs original",
-    revelation: "Switch Stance. Free Wager another friendly Veiled Figure if able.",
-    text: "Vessel. On play, tuck a Figure from hand as Inhabitant if able — or tuck your Figure on this lane when you play the Urn over them. You may Wager this (ante 1 Sight). Revelation: Switch Stance. Free Wager another friendly Veiled Figure if able. Fall: Free Wager another friendly Veiled Figure if able; if you have Favor, gain 1 Sight.",
+    revelation: "Switch Stance; Free Wager another Motley.",
+    veiledAbility: "You may Wager this (ante 1 Sight).",
+    text: "Vessel. On play, tuck the Figure on this lane if able, else tuck from hand. You may Wager this (ante 1 Sight). Revelation: Switch Stance; Free Wager another Motley. Fall: If you have Favor, gain 1 Sight.",
   },
   {
     id: "antewell",
@@ -65,7 +63,7 @@ export const MOTLEY_MASQUERADE_WAVE4: CardDef[] = [
     sightYield: 0,
     artSubject:
       "motley masquerade antewell shrine purple teal gold coin well landmark ornate cliffs original",
-    text: "Site. When a friendly Figure here Busts, draw 1. Your Wagered Figures here have +1 power.",
+    text: "Site. When a friendly Figure here Busts, gain 1 Favor. Your Wagered Figures here have +1 power.",
   },
   {
     id: "final_raise",
@@ -79,7 +77,7 @@ export const MOTLEY_MASQUERADE_WAVE4: CardDef[] = [
     sightYield: 0,
     artSubject:
       "motley masquerade final raise rite purple teal gold chips stack parchment ornate cliffs original",
-    text: "Choose an altitude. If your Figure there is Wagered: spend 1 Favor to gain 1 Eclipse; if you cannot, draw 1. Otherwise ante 1 Sight to Wager it if able; if you cannot, draw 1.",
+    text: "Choose an altitude. If your Motley there is Wagered: spend 1 Favor to gain 1 Eclipse; if you cannot, gain 1 Sight. Otherwise Wager it (ante 1 Sight) if able; if you cannot, gain 1 Sight.",
   },
 ];
 

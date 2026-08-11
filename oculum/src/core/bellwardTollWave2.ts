@@ -62,7 +62,7 @@ export const BELLWARD_TOLL_WAVE2: CardDef[] = [
     sightYield: 0,
     artSubject:
       "same Bellward Toll set style as Veil Ringer — bellcord charm graft crimson cloth cord bronze bell eye-seal floating cliff ocean, unique crimson cord-knot charm inner frame, high-contrast crimson-white-charcoal bell shrine",
-    text: "Graft: +1 power while host Witnessed. When you Toll the host's altitude, gain 1 Sight. When Resonance happens for you while host is Witnessed, draw 1.",
+    text: "Graft: +1 power while host Witnessed. When you Toll the host's altitude, gain 1 Sight. When Resonance happens for you while host is Witnessed, gain 1 Sight.",
   },
   {
     id: "sound_the_toll",

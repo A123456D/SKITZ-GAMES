@@ -18,10 +18,10 @@ export const INK_ABYSS_WAVE3: CardDef[] = [
     artSubject:
       "same Ink Abyss set style as Mire Duelist — ink-abyss creature cliff maw pilgrim cream cloth black drip high ledge void face, unique cream cliff-ledge inner frame, high-contrast cream-black ink-wash",
     veiledAbility:
-      "When this wins Resolve while Veiled on High, draw 1.",
+      "When this wins Resolve while Veiled on High, gain 1 Sight.",
     revelation:
       "Stain the enemy Figure here if able. If this is on High, Blind High this turn and gain 1 Sight.",
-    text: "Veiled: When this wins Resolve while Veiled on High, draw 1. Revelation: Stain the enemy Figure here if able. If this is on High, Blind High this turn and gain 1 Sight.",
+    text: "Veiled: When this wins Resolve while Veiled on High, gain 1 Sight. Revelation: Stain the enemy Figure here if able. If this is on High, Blind High this turn and gain 1 Sight.",
   },
   {
     id: "silt_warden",
@@ -38,8 +38,8 @@ export const INK_ABYSS_WAVE3: CardDef[] = [
     veiledAbility:
       "When this Holds on Low against a Stained enemy, Blind Low this turn.",
     revelation:
-      "If any enemy Figure is Stained, Blind Low this turn. If a Stained enemy Figure is on Low, also draw 1.",
-    text: "Veiled: When this Holds on Low against a Stained enemy, Blind Low this turn. Revelation: If any enemy Figure is Stained, Blind Low this turn. If a Stained enemy Figure is on Low, also draw 1.",
+      "If any enemy Figure is Stained, Blind Low this turn. If a Stained enemy Figure is on Low, also gain 1 Sight.",
+    text: "Veiled: When this Holds on Low against a Stained enemy, Blind Low this turn. Revelation: If any enemy Figure is Stained, Blind Low this turn. If a Stained enemy Figure is on Low, also gain 1 Sight.",
   },
   {
     id: "ink_matron",
@@ -56,8 +56,8 @@ export const INK_ABYSS_WAVE3: CardDef[] = [
     veiledAbility:
       "While Veiled on Mid: +1 power if any enemy Figure is Stained.",
     revelation:
-      "If any enemy Figure is Stained, draw 1. If 2 or more are Stained, also gain 1 Sight.",
-    text: "Veiled: While Veiled on Mid: +1 power if any enemy Figure is Stained. Revelation: If any enemy Figure is Stained, draw 1. If 2 or more are Stained, also gain 1 Sight. While Witnessed on Mid: your Ink Abyss Figures have +1 power against Stained enemies.",
+      "If any enemy Figure is Stained, Blind Mid this turn. If 2 or more are Stained, also gain 1 Sight.",
+    text: "Veiled: While Veiled on Mid: +1 power if any enemy Figure is Stained. Revelation: If any enemy Figure is Stained, Blind Mid this turn. If 2 or more are Stained, also gain 1 Sight. While Witnessed on Mid: your Ink Abyss Figures have +1 power against Stained enemies.",
   },
   {
     id: "gulf_cairn",

@@ -10,15 +10,31 @@
 | Breach | **Overexpose shipped** |
 | Ink | **Press shipped** |
 | Toll | **Peal shipped** |
+| Lumen | **Halo / Blaze / Sustain shipped** |
+| Velvet Ruin | **Tempt / Brand / Devour shipped** (Waves 1–4 · **20/20**) |
 
 ## Shared pattern (spine only)
 
-| Layer | Motley | Breach | Ink | Toll |
-|-------|--------|--------|-----|------|
-| Mode | Stance A/B | Veiled vs Open | Mark police | Sticky Toll vs armed Peal |
-| Commit | Ante Sight | Open | **Press** (1 Sight) | **Peal** arm (1 Sight) |
-| Outcome | Cash / Bust | Breach / Overexpose | Erase pierce / Smother backlash | Peal pay / fizzle |
-| Closer | Eclipse | Break | Break | Break |
+| Layer | Motley | Breach | Ink | Toll | Lumen | Ruin |
+|-------|--------|--------|-----|------|-------|------|
+| Mode | Stance A/B | Veiled vs Open | Mark police | Sticky Toll vs armed Peal | Halo'd torch | Tempted bait |
+| Commit | Ante Sight | Open | **Press** (1 Sight) | **Peal** arm (1 Sight) | Witness / Sustain | **Tempt** (once/window) |
+| Outcome | Cash / Bust | Breach / Overexpose | Erase pierce / Smother backlash | Peal pay / fizzle | Blaze / Re-Veil | Brand → Devour Will/Sight |
+| Closer | Eclipse | Break | Break | Break | Break | Break |
+
+---
+
+## Velvet Ruin — Tempt / Brand / Devour (design lock)
+
+See `docs/RUIN_WAVE1.md`. Spine only:
+
+1. **Tempt** enemy Veiled (−1 Witness/Gaze cost; never force — ≠ Lure).
+2. Foe **Witnesses** Tempted → **Brand** + you gain 1 Sight (≠ Stain/Erase).
+3. On **your Pass**, Branded enemies **Devour** (1 Will if Witnessed, else +1 Sight) then Brands clear.
+
+Mis-timing: Tempt when they will refuse = wasted action; Brand then they Re-Veil/Fall before Pass = weak Devour.
+
+**Wave 1–4 shipped** to engine (Tempt / Brand / Devour · **20/20**; Teach 2× Waves 1–2, no Veloth).
 
 ---
 
@@ -98,3 +114,7 @@ No Stain/Stance/Breach. Peal ≠ choir win path.
 | 2026-08-08 | Overexpose shipped |
 | 2026-08-08 | Press + Peal locked as free actions (Wager-shaped); selective prints; ship for tests |
 | 2026-08-08 | **Press + Peal shipped** (engine, CardDefs, UI, AI, tests) |
+| 2026-08-11 | **Velvet Ruin** Wave 1 design lock — Tempt → Brand → Devour (`docs/RUIN_WAVE1.md`); engine deferred |
+| 2026-08-11 | **Velvet Ruin** Waves 1–2 shipped (`docs/RUIN_WAVE2.md`) |
+| 2026-08-11 | **Velvet Ruin** Wave 3 shipped (`docs/RUIN_WAVE3.md`) |
+| 2026-08-11 | **Velvet Ruin** Wave 4 shipped — craft **20/20** (`docs/RUIN_WAVE4.md`) |

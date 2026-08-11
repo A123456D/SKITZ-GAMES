@@ -19,7 +19,7 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     sightYield: 0,
     artSubject:
       "ochre stake warden geometric four-hole mask teal sash barren cliff mast companion hound pale desert banners",
-    text: "Revelation: If on Low and you control another Veiled Figure, draw 1.",
+    text: "Revelation: If on Low and you control another Veiled Figure, gain 1 Sight.",
   },
   {
     id: "stake_mast",
@@ -47,7 +47,7 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     sightYield: 0,
     artSubject:
       "miniature veil-banner charm teal cloth eye-in-circle seal hanging ofuda desert wind",
-    text: "Graft: +1 power while host Witnessed. When host Witnesses, if you control Veil Banner, draw 1.",
+    text: "Graft: +1 power while host Witnessed. When host Witnesses, if you control Veil Banner, gain 1 Sight.",
   },
   {
     id: "hold_tithe",
@@ -61,7 +61,7 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     sightYield: 0,
     artSubject:
       "ashlar hold tithe rite geometric mask staff barren stakes teal sash pale sky eye seals",
-    text: "If you control Veil Banner, draw 1. Otherwise Blind Low this turn.",
+    text: "If you control Veil Banner, gain 1 Sight. Otherwise Blind Low this turn.",
   },
   {
     id: "mesa_urn",
@@ -76,78 +76,6 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     artSubject:
       "ochre mesa urn-vessel geometric lid eye-glyph interior cliff terrace pale banners",
     text: "Vessel. Tucks a Figure from hand if able. Fall: release Inhabitant here. Revelation: release Inhabitant here if empty, else to hand. If you control an Ashlar Site or a Veiled Figure, gain 1 Sight.",
-  },
-
-  // ——— Wave 18 · Dusk Ledger (Debt) ———
-  {
-    id: "dusk_walker",
-    name: "Dusk Walker",
-    heresy: "deal",
-    type: "figure",
-    essence: 3,
-    witnessCost: 2,
-    veiledPower: 2,
-    witnessedPower: 4,
-    sightYield: 0,
-    artSubject:
-      "canyon dusk walker jackal-mask purple coat ledger scroll companion coyote sunset coin-eye seals",
-    text: "Revelation: If you have Eclipse, gain 1 Sight. If on Mid and no enemy unit here, gain 1 Eclipse.",
-  },
-  {
-    id: "coin_gallery",
-    name: "Coin Gallery",
-    heresy: "deal",
-    type: "site",
-    essence: 2,
-    witnessCost: 0,
-    veiledPower: 0,
-    witnessedPower: 0,
-    sightYield: 1,
-    artSubject:
-      "canyon coin gallery purple dusk shelves floating debt-coins eye seals hanging ofuda",
-    text: "Site. +1 Sight/turn. When you Witness a Ledger Figure here, if you have Eclipse, draw 1.",
-  },
-  {
-    id: "dusk_seal",
-    name: "Dusk Seal",
-    heresy: "deal",
-    type: "relic",
-    essence: 2,
-    witnessCost: 0,
-    veiledPower: 0,
-    witnessedPower: 1,
-    sightYield: 0,
-    artSubject:
-      "purple dusk eclipse-seal relic coin-eye brass rim canyon sunset hanging charm",
-    text: "Graft: +1 power while host Witnessed. When host Witnesses, if you have Eclipse, draw 1.",
-  },
-  {
-    id: "creditor_tithe",
-    name: "Creditor Tithe",
-    heresy: "deal",
-    type: "rite",
-    essence: 2,
-    witnessCost: 0,
-    veiledPower: 0,
-    witnessedPower: 0,
-    sightYield: 0,
-    artSubject:
-      "dusk creditor tithe rite purple coat canyon ledger staff coin-eye seal sunset",
-    text: "If you have Eclipse, gain 1 Sight. Otherwise Blind Mid this turn.",
-  },
-  {
-    id: "jackal_urn",
-    name: "Jackal Urn",
-    heresy: "deal",
-    type: "vessel",
-    essence: 3,
-    witnessCost: 2,
-    veiledPower: 1,
-    witnessedPower: 2,
-    sightYield: 1,
-    artSubject:
-      "jackal-mask ledger urn vessel purple gold coin-eye interior canyon dusk debt seals",
-    text: "Vessel. Tucks a Figure from hand if able. Fall: release Inhabitant here. Revelation: release Inhabitant here if empty, else to hand. If you have Eclipse, gain 1 Sight.",
   },
 
   // ——— Wave 19 · Facet Host (Stance) ———
@@ -177,7 +105,7 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     sightYield: 0,
     artSubject:
       "facet shrine split-mask plaques tree perch teal red cloth hanging charms twin horns",
-    text: "Site. When you switch Stance on a Figure here, draw 1.",
+    text: "Site. When you switch Stance on a Figure here, gain 1 Sight.",
   },
   {
     id: "stance_charm",
@@ -205,7 +133,7 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     sightYield: 0,
     artSubject:
       "facet tithe rite twin-mask staff tree canopy teal cloth hanging charms stance seals",
-    text: "If you have a Stance B Figure, draw 1. Otherwise Blind an altitude this turn.",
+    text: "If you have a Stance B Figure, gain 1 Sight. Otherwise Blind an altitude this turn.",
   },
   {
     id: "horn_urn",
@@ -235,7 +163,7 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     sightYield: 0,
     artSubject:
       "brass-optics hound patchwork sails cyan lenses windmill hills key-collar companion",
-    text: "Revelation: If on Mid and this has a Graft, draw 1.",
+    text: "Revelation: If on Mid and this has a Graft, gain 1 Sight.",
   },
   {
     id: "sail_cache",
@@ -263,7 +191,7 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     sightYield: 0,
     artSubject:
       "miniature windmill charm brass key cyan lens green hill suture thread floating",
-    text: "Graft: +1 power while host Witnessed. When host Witnesses, if you control a Keywright Site, draw 1.",
+    text: "Graft: +1 power while host Witnessed. When host Witnesses, if you control a Keywright Site, gain 1 Sight.",
   },
   {
     id: "key_tithe",
@@ -349,7 +277,7 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     sightYield: 0,
     artSubject:
       "aperture tithe rite orange cutwork cloak barren arches void eye seal pale staff",
-    text: "Blind High this turn. If you control Pale Arch, draw 1.",
+    text: "Blind High this turn. If you control Pale Arch, gain 1 Sight.",
   },
   {
     id: "void_urn",
@@ -421,7 +349,7 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     sightYield: 0,
     artSubject:
       "colony tithe rite red branch-rune staff arid pillars hanging ribbons teal sash",
-    text: "If you control a Branch-Rune Site, draw 1. Otherwise Blind an altitude this turn.",
+    text: "If you control a Branch-Rune Site, gain 1 Sight. Otherwise Blind an altitude this turn.",
   },
   {
     id: "tablet_urn",
@@ -438,78 +366,6 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     text: "Vessel. Tucks a Figure from hand if able. Fall: release Inhabitant here. Revelation: release Inhabitant here if empty, else to hand. If you control a Branch-Rune Site, gain 1 Sight.",
   },
 
-  // ——— Wave 23 · Bonewick (Vessel) ———
-  {
-    id: "wick_walker",
-    name: "Wick Walker",
-    heresy: "shell",
-    type: "figure",
-    essence: 2,
-    witnessCost: 1,
-    veiledPower: 2,
-    witnessedPower: 3,
-    sightYield: 0,
-    artSubject:
-      "wick walker cracked ceramic mask ember veil bone pillars coastal low-tide shrine path",
-    text: "Revelation: If on Low and you control a Vessel, draw 1.",
-  },
-  {
-    id: "shard_cache",
-    name: "Shard Cache",
-    heresy: "shell",
-    type: "site",
-    essence: 2,
-    witnessCost: 0,
-    veiledPower: 0,
-    witnessedPower: 0,
-    sightYield: 1,
-    artSubject:
-      "shard cache coastal bone shelves cracked ceramic relics ember charms low-tide pillars",
-    text: "Site. +1 Sight/turn. When you Witness a Vessel here, gain 1 Sight.",
-  },
-  {
-    id: "inhabit_charm",
-    name: "Inhabit Charm",
-    heresy: "shell",
-    type: "relic",
-    essence: 2,
-    witnessCost: 0,
-    veiledPower: 0,
-    witnessedPower: 1,
-    sightYield: 0,
-    artSubject:
-      "inhabit charm cracked ceramic wick-flame miniature city-eye seal coastal floating",
-    text: "Graft: +1 power while host Witnessed. When host Witnesses, if a Vessel holds an Inhabitant, gain 1 Sight.",
-  },
-  {
-    id: "wick_tithe",
-    name: "Wick Tithe",
-    heresy: "shell",
-    type: "rite",
-    essence: 2,
-    witnessCost: 0,
-    veiledPower: 0,
-    witnessedPower: 0,
-    sightYield: 0,
-    artSubject:
-      "wick tithe rite cracked ceramic staff ember flame bone pillars coastal shrine seals",
-    text: "If a Vessel holds an Inhabitant, draw 1. Otherwise Blind an altitude this turn.",
-  },
-  {
-    id: "bone_urn",
-    name: "Bone Urn",
-    heresy: "shell",
-    type: "vessel",
-    essence: 3,
-    witnessCost: 2,
-    veiledPower: 1,
-    witnessedPower: 2,
-    sightYield: 1,
-    artSubject:
-      "bone gallery urn vessel cracked porcelain lid ember interior coastal shrine seals",
-    text: "Vessel. Tucks a Figure from hand if able. Fall: release Inhabitant here. Revelation: release Inhabitant here if empty, else to hand. If you control Bone Gallery or another Vessel, gain 1 Sight.",
-  },
-
   // ——— Wave 24 · Cataract Verdure (Chain) ———
   {
     id: "moss_walker",
@@ -523,7 +379,7 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     sightYield: 0,
     artSubject:
       "moss walker multi-eye charms jungle bridge waterfall teal cloth gem glow companion shade",
-    text: "Revelation: If on Mid, gain 1 Sight. If you control a Veiled Figure, draw 1.",
+    text: "Revelation: If on Mid, gain 1 Sight. If you control a Veiled Figure, gain 1 additional Sight.",
   },
   {
     id: "cataract_cache",
@@ -551,7 +407,7 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     sightYield: 0,
     artSubject:
       "chain charm moss cords multi-eye seal waterfall gem floating jungle teal ribbon",
-    text: "Graft: +1 power while host Witnessed. When host Witnesses, if you control a Cataract Site and a Veiled Figure, draw 1.",
+    text: "Graft: +1 power while host Witnessed. When host Witnesses, if you control a Cataract Site and a Veiled Figure, gain 1 Sight.",
   },
   {
     id: "verdant_tithe",
@@ -637,7 +493,7 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
     sightYield: 0,
     artSubject:
       "iris tithe rite red parasol coastal cliffs rotating eye seal white banners bells",
-    text: "If you control a Gaze altitude, draw 1. Otherwise Blind High this turn.",
+    text: "If you control a Gaze altitude, gain 1 Sight. Otherwise Blind High this turn.",
   },
   {
     id: "parasol_urn",
@@ -657,24 +513,20 @@ export const WAVE_HERESY_SEALS: CardDef[] = [
 
 export const HERESY_SEALS_RITE_IDS = new Set([
   "hold_tithe",
-  "creditor_tithe",
   "facet_tithe",
   "key_tithe",
   "aperture_tithe",
   "colony_tithe",
-  "wick_tithe",
   "verdant_tithe",
   "iris_tithe",
 ]);
 
 export const HERESY_SEALS_VESSEL_IDS = [
   "mesa_urn",
-  "jackal_urn",
   "horn_urn",
   "windmill_urn",
   "void_urn",
   "tablet_urn",
-  "bone_urn",
   "abyss_urn",
   "parasol_urn",
 ] as const;

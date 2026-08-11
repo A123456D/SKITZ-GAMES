@@ -18,21 +18,21 @@ export type Altitude = 0 | 1 | 2; // High, Mid, Low
 
 /**
  * Craft / heresy id on CardDef.
- * Live soft-reboot: ink · motley · toll · breach.
- * Shelved / seal leftovers stay typed for leftover hooks and HERESY_LORE.
+ * Live soft-reboot: ink · motley · toll · breach · lumen · ruin.
+ * Other ids stay typed for leftover hooks and HERESY_LORE.
  */
 export type Heresy =
   | "ink"
   | "motley"
   | "toll"
   | "breach"
+  | "lumen"
+  | "ruin"
   | "cube"
-  | "deal"
   | "many"
   | "graft"
   | "hollow"
   | "coral"
-  | "shell"
   | "deep"
   | "ring"
   | "neutral";
@@ -88,12 +88,16 @@ export type BoardUnit = {
   revelationFired: boolean;
   /** Veiled Hold stacks toward SCRUTINY_FORCE */
   scrutiny: number;
-  /** Motley: ante committed — Cash on Veiled win / Bust on lose or Forced Expose */
+  /** Motley: ante committed — Cash on Veiled win / Bust on lose or Forced Expose (cashbust mode) */
   wagered: boolean;
   /** True if ante spent a resource (refund on Cash); false for Free Wager */
   wagerAntePaid: boolean;
   /** True if ante was Favor (not Sight); only when wagerAntePaid */
   wagerAnteFavor: boolean;
+  /** Motley coinflip: scored Heads this action window (Eclipse arm) */
+  wagerHeads: boolean;
+  /** Motley coinflip: temporary power from Heads steals this Resolve */
+  wagerPowerDelta: number;
   /** Iron Breach: became Witnessed via own Open since last Resolve (Overexpose eligible) */
   openedSinceResolve: boolean;
   /** Iron Breach Last Breach: Opened by that rite this round (Overexpose → draw) */
@@ -102,6 +106,18 @@ export type BoardUnit = {
   pressed: boolean;
   /** Side that Pressed this unit (for backlash / pierce) */
   pressedBy: Side | null;
+  /** Lumen Host: Halo'd after own Witness */
+  haloed: boolean;
+  /** Lumen Host: Sustained this window (keeps Halo after Blaze) */
+  haloSustained: boolean;
+  /** Velvet Ruin: Tempt bait mark (enemy Veiled) */
+  tempted: boolean;
+  /** Side that Tempted this unit */
+  temptedBy: Side | null;
+  /** Velvet Ruin: Brand after Witness on Tempt (or card Brand) */
+  branded: boolean;
+  /** Side that Brands this unit (Devour on their Pass) */
+  brandedBy: Side | null;
 };
 
 export type AltitudeSlot = {
@@ -123,6 +139,15 @@ export type OculusEvent =
   | { type: "rite"; side: Side; cardId: string; altitude?: Altitude }
   | { type: "stance"; side: Side; altitude: Altitude; stanceB: boolean }
   | { type: "wager"; side: Side; altitude: Altitude; cardId: string; free: boolean }
+  | {
+      type: "wager_flip";
+      side: Side;
+      altitude: Altitude;
+      cardId: string;
+      result: "heads" | "tails";
+      ante: boolean;
+    }
+  | { type: "up_ante"; side: Side; altitude: Altitude; cardId: string }
   | { type: "cash"; side: Side; altitude: Altitude; cardId: string }
   | { type: "bust"; side: Side; altitude: Altitude; cardId: string }
   | { type: "fold"; side: Side; altitude: Altitude; cardId: string }
@@ -136,6 +161,12 @@ export type OculusEvent =
   | { type: "lure"; side: Side; altitude: Altitude; cardId: string }
   | { type: "resonance"; side: Side; altitude: Altitude }
   | { type: "overexpose"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "halo"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "blaze"; side: Side; altitude: Altitude; cardId: string; will?: number; sight?: number }
+  | { type: "sustain"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "tempt"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "brand"; side: Side; altitude: Altitude; cardId: string }
+  | { type: "devour"; side: Side; altitude: Altitude; cardId: string; will?: number; sight?: number }
   | { type: "stain"; side: Side; altitude: Altitude; cardId: string }
   | {
       type: "hold";
@@ -228,12 +259,32 @@ export type MatchState = {
   reveilUsed: { player: boolean; enemy: boolean };
   /** Motley Wager used this action window */
   wagerUsed: { player: boolean; enemy: boolean };
+  /** Motley coinflip — Up the Ante armed after Heads */
+  pendingUpAnte: { side: Side; altitude: Altitude; free: boolean } | null;
+  /** Entropy for Motley coin flips */
+  wagerEntropy: number;
+  /** Whitecard Mummer — Up the Ante draw used this turn */
+  mummerAnteDrawUsed: { player: boolean; enemy: boolean };
+  /** Grinning Debtor Witnessed tails power — once per Resolve */
+  debtorTailsBuffUsed: { player: boolean; enemy: boolean };
+  /** Spire Caprice High steal Sight — once per turn */
+  capriceStealSightUsed: { player: boolean; enemy: boolean };
+  /** Trick Eclipse already scored this Resolve (coinflip) */
+  trickEclipseScored: { player: boolean; enemy: boolean };
   /** Ink Press used this action window */
   pressUsed: { player: boolean; enemy: boolean };
   /** Figure/vessel plays per altitude this action window — stops lane spam */
   figurePlaysThisWindow: { player: [number, number, number]; enemy: [number, number, number] };
   /** Bellward Peal used this action window */
   pealUsed: { player: boolean; enemy: boolean };
+  /** Velvet Ruin Tempt used this action window */
+  temptUsed: { player: boolean; enemy: boolean };
+  /** Velvet Ruin — Desire Altar free Tempt available this window */
+  desireAltarTemptFree: { player: boolean; enemy: boolean };
+  /** Velvet Ruin — Brandlace: first Tempt Sight available this window */
+  ruinBrandlaceTemptSight: { player: boolean; enemy: boolean };
+  /** Velvet Ruin — Full Devour: Devours deal +1 Will until Resolve */
+  ruinFullDevourArmed: { player: boolean; enemy: boolean };
   /** Sound the Toll — Peal pays even without Resolve spend */
   soundTollPealBonus: { player: boolean; enemy: boolean };
   /** Debtor of Caprice — Bust draw used this match */
@@ -282,6 +333,12 @@ export type MatchState = {
   rivetCharmDrawUsed: { player: boolean; enemy: boolean };
   /** Slag Reaper strain draw used */
   slagStrainDrawUsed: { player: boolean; enemy: boolean };
+  /** Lumen — free Sustain from Shrine available this window */
+  lumenShrineSustainFree: { player: boolean; enemy: boolean };
+  /** Lumen Host — Veilburn Usher: first Sustain Sight available this window */
+  lumenUsherSustainSight: { player: boolean; enemy: boolean };
+  /** Lumen Host — Full Radiance: Blazes deal +1 Will until Resolve */
+  lumenFullRadianceArmed: { player: boolean; enemy: boolean };
   altitudes: [AltitudeSlot, AltitudeSlot, AltitudeSlot];
   hand: string[];
   enemyHand: string[];
@@ -331,6 +388,10 @@ export type Intent =
   | { kind: "rite"; handIndex: number; altitude?: Altitude }
   | { kind: "stance"; altitude: Altitude }
   | { kind: "wager"; altitude: Altitude }
+  | { kind: "up_ante"; altitude: Altitude }
+  | { kind: "skip_ante" }
   | { kind: "press"; altitude: Altitude }
   | { kind: "peal"; altitude: Altitude }
+  | { kind: "sustain"; altitude: Altitude }
+  | { kind: "tempt"; altitude: Altitude }
   | { kind: "pass" };

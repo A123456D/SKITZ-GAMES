@@ -153,7 +153,7 @@ export function coreGazeLessons(
     {
       id: `${p}_lanes`,
       coach: {
-        body: "Three altitudes always matter. HIGH: Gaze costs 1 less Sight; Resolve winners chip +1 Will before soft rules. MID: Witness your own Figure here to draw 1. LOW: Veiled fighters hit harder; Witness/Gaze here refunds Sight. Crafts hang Tolls, Sites, and Marks on these lanes — never treat them as identical.",
+        body: "Three altitudes always matter. HIGH: Gaze costs 1 less Sight; Resolve winners chip +1 Will before soft rules. MID: Witness your own Figure here to gain 1 Sight. LOW: Veiled fighters hit harder; Witness/Gaze here refunds Sight. Crafts hang Tolls, Sites, and Marks on these lanes — never treat them as identical.",
         action: "Look at High / Mid / Low",
         cta: "Next",
       },

@@ -15,7 +15,13 @@ export type KeywordId =
   | "stance"
   | "favor"
   | "resonance"
-  | "erase";
+  | "erase"
+  | "halo"
+  | "blaze"
+  | "sustain"
+  | "tempt"
+  | "brand"
+  | "devour";
 
 type KeywordDef = {
   id: KeywordId;
@@ -72,7 +78,7 @@ export const KEYWORDS: KeywordDef[] = [
     match: /\bPeal(?:s)?\b/i,
     annotate: /\bPeal(?:s)?\b/gi,
     label: "Peal",
-    text: "Arm your Toll (1 Sight). When Resolve spends that Toll, you gain Sight and draw.",
+    text: "Arm your Toll (1 Sight). When Resolve spends that Toll, you gain Sight.",
   },
   {
     id: "breach",
@@ -87,6 +93,48 @@ export const KEYWORDS: KeywordDef[] = [
     annotate: /\bOpen\b/g,
     label: "Open",
     text: "Scar commit — pay Sight to Witness so Breach turns on. Veiled Scar wins do not Breach.",
+  },
+  {
+    id: "halo",
+    match: /\bHalo(?:'?d|ed)?\b/i,
+    annotate: /\bHalo(?:'?d|ed)?\b/gi,
+    label: "Halo",
+    text: "Lumen mark after you Witness your own Figure. Halo'd Figures +1 power and Blaze when you Pass.",
+  },
+  {
+    id: "blaze",
+    match: /\bBlaze(?:s|d)?\b/i,
+    annotate: /\bBlaze(?:s|d)?\b/gi,
+    label: "Blaze",
+    text: "End of your window: each Halo'd Figure deals 1 Will if the lane is contested (else +1 Sight), then Re-Veils unless Sustained.",
+  },
+  {
+    id: "sustain",
+    match: /\bSustain(?:s|ed)?\b/i,
+    annotate: /\bSustain(?:s|ed)?\b/gi,
+    label: "Sustain",
+    text: "Spend 1 Sight on a Halo'd Figure before Pass to keep Halo through Blaze (Shrine can make the first free).",
+  },
+  {
+    id: "tempt",
+    match: /\bTempt(?:ed|s)?\b/i,
+    annotate: /\bTempt(?:ed|s)?\b/gi,
+    label: "Tempt",
+    text: "Mark an enemy Veiled Figure. They Witness/Gaze it at −1 Sight (bait). Never forces Witness (≠ Lure).",
+  },
+  {
+    id: "brand",
+    match: /\bBrand(?:ed|s)?\b/i,
+    annotate: /\bBrand(?:ed|s)?\b/gi,
+    label: "Brand",
+    text: "When they Witness a Tempted Figure, Brand it and you gain 1 Sight. Not Stain/Erase.",
+  },
+  {
+    id: "devour",
+    match: /\bDevour(?:s|ed)?\b/i,
+    annotate: /\bDevour(?:s|ed)?\b/gi,
+    label: "Devour",
+    text: "On your Pass, each Branded enemy: 1 Will if Witnessed, else +1 Sight — then Brand clears.",
   },
   {
     id: "wager",

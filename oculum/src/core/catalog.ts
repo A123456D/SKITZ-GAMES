@@ -1,7 +1,7 @@
 import { CARDS, getCard } from "./cards";
 import type { CardDef, CardType, Heresy } from "./types";
 
-const HERESY_ORDER: Heresy[] = ["ink", "motley", "toll", "breach", "deal", "shell", "neutral"];
+const HERESY_ORDER: Heresy[] = ["ink", "motley", "toll", "breach", "neutral"];
 
 const TYPE_ORDER: CardType[] = [
   "figure",

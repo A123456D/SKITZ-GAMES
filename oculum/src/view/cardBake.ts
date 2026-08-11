@@ -57,8 +57,8 @@ export function preloadCardChrome(): Promise<void> {
       await Promise.all(
         FULL_CARD_IDS.map(async (id) => {
           const img =
-            (await tryLoad(`./assets/cards/${id}.jpg?v=15`)) ??
-            (await tryLoad(`./assets/cards/${id}.png?v=15`));
+            (await tryLoad(`./assets/cards/${id}.jpg?v=31`)) ??
+            (await tryLoad(`./assets/cards/${id}.png?v=31`));
           if (img) fullCardImgs.set(id, img);
         }),
       );
@@ -80,7 +80,7 @@ export function cardBackSrc(): string {
 export function handCardSrc(cardId: string): string {
   // Stable filenames need a bust when faces regenerate or a bad HTML 200 was
   // cached under /assets/* immutable headers (SPA fallback on missing files).
-  return `./assets/cards/${cardId}.jpg?v=15`;
+  return `./assets/cards/${cardId}.jpg?v=31`;
 }
 
 function hashStr(s: string): number {
@@ -142,7 +142,7 @@ function paintProceduralFace(
   } else if (sub.includes("jungle") || def.heresy === "deep") {
     sky.addColorStop(0, "#3a7a9a");
     sky.addColorStop(1, "#1a3a48");
-  } else if (sub.includes("canyon") || sub.includes("dusk") || def.heresy === "deal") {
+  } else if (sub.includes("canyon") || sub.includes("dusk")) {
     sky.addColorStop(0, "#c46a3a");
     sky.addColorStop(0.55, "#6a2a5a");
     sky.addColorStop(1, "#2a1838");
@@ -155,7 +155,7 @@ function paintProceduralFace(
     sky.addColorStop(0, "#7ec8e8");
     sky.addColorStop(0.45, "#c45a48");
     sky.addColorStop(1, "#2a1818");
-  } else if (sub.includes("coast") || def.heresy === "ring" || def.heresy === "shell") {
+  } else if (sub.includes("coast") || def.heresy === "ring") {
     sky.addColorStop(0, "#5ec8e8");
     sky.addColorStop(1, "#2f6fb5");
   } else if (def.heresy === "graft") {

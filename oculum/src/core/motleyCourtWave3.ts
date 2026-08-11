@@ -14,7 +14,7 @@ export const MOTLEY_COURT_WAVE3: CardDef[] = [
     sightYield: 0,
     artSubject:
       "motley ribbon duelist purple teal sash blade smile halfmask high cliff duel original",
-    text: "Revelation: Enter Stance B. If on High, gain 1 Sight. If the enemy Figure here is Witnessed, also draw 1.",
+    text: "Revelation: Enter Stance B. If on High, gain 1 Sight.",
   },
   {
     id: "tithe_widow",
@@ -42,7 +42,7 @@ export const MOTLEY_COURT_WAVE3: CardDef[] = [
     sightYield: 1,
     artSubject:
       "motley pairmask usher twin smile spiral masks purple teal court corridor original",
-    text: "Revelation: If you control another Stance B Figure, draw 1 and gain 1 Sight; else enter Stance B. Witnessed: +1 Sight/turn.",
+    text: "Revelation: If you control another Stance B Figure, gain 1 Favor and gain 1 Sight; else enter Stance B. Witnessed: +1 Sight/turn.",
   },
   {
     id: "gala_warden",
@@ -112,7 +112,7 @@ export const MOTLEY_COURT_WAVE3: CardDef[] = [
     sightYield: 0,
     artSubject:
       "motley jury grin many smile masks court rite purple teal original",
-    text: "If you have 2+ Stance B Figures, draw 1 and gain 1 Sight. Otherwise switch Stance on a friendly Figure at the chosen altitude.",
+    text: "If you have 2+ Stance B Figures, gain 1 Favor and gain 1 Sight. Otherwise switch Stance on a friendly Figure at the chosen altitude.",
   },
 ];
 

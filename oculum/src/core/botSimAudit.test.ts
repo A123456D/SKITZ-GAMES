@@ -158,10 +158,18 @@ function figUnit(cardId: string) {
     wagered: false,
     wagerAntePaid: false,
     wagerAnteFavor: false,
+    wagerHeads: false,
+    wagerPowerDelta: 0,
     openedSinceResolve: false,
     lastBreachOpened: false,
     pressed: false,
     pressedBy: null as null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
   };
 }
 

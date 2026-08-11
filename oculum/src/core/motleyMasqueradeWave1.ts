@@ -1,9 +1,8 @@
 import type { CardDef } from "./types";
 
 /**
- * Motley Masquerade — Wave 1 identity pass (Trick + Wager).
+ * Motley Masquerade — Wave 1 (Cash/Bust Wager kit).
  * Roles: Ante opener · High-roller · Table dealer · House edge · Bust specialist.
- * Live in CARDS; Motley Teach is 2× Waves 1–2 (craft under 16 → copy limit 4).
  */
 export const MOTLEY_MASQUERADE_WAVE1: CardDef[] = [
   {
@@ -19,9 +18,9 @@ export const MOTLEY_MASQUERADE_WAVE1: CardDef[] = [
     artSubject:
       "motley masquerade whitecard mummer smile mask top hat purple teal gold ornate court cliffs original",
     veiledAbility:
-      "When this Holds, enter Stance B if able. You may Wager this (ante 1 Sight).",
+      "When this Holds, enter Stance B if able. You may Wager this (ante 1 Sight). Cash: Gain 1 Favor.",
     revelation: "Enter Stance B. If this is Wagered, gain 1 Sight.",
-    text: "Veiled: When this Holds, enter Stance B if able. You may Wager this (ante 1 Sight). Revelation: Enter Stance B. If this is Wagered, gain 1 Sight. Cash (win Resolve Veiled while Wagered): draw 1.",
+    text: "Veiled: When this Holds, enter Stance B if able. You may Wager this (ante 1 Sight). Cash: Gain 1 Favor. Revelation: Enter Stance B. If this is Wagered, gain 1 Sight.",
   },
   {
     id: "diamond_widow",
@@ -36,9 +35,9 @@ export const MOTLEY_MASQUERADE_WAVE1: CardDef[] = [
     artSubject:
       "glamorous sexy motley masquerade diamond widow gem eye veil purple teal gold ornate court cliffs original",
     veiledAbility:
-      "When this wins Resolve while Veiled, Stance B, and Wagered: draw 2. You may Wager this (ante 1 Sight).",
+      "You may Wager this (ante 1 Sight). While Stance B and Wagered, this has +1 power. Cash (Stance B): Gain 2 Favor. Bust: Blind this altitude.",
     revelation: "Switch Stance.",
-    text: "Veiled: When this wins Resolve while Veiled, Stance B, and Wagered: draw 2. You may Wager this (ante 1 Sight). Revelation: Switch Stance. Bust: Blind this altitude this turn.",
+    text: "Veiled: You may Wager this (ante 1 Sight). While Stance B and Wagered, this has +1 power. Cash (Stance B): Gain 2 Favor. Bust: Blind this altitude. Revelation: Switch Stance.",
   },
   {
     id: "split_hymn_cantor",
@@ -53,8 +52,7 @@ export const MOTLEY_MASQUERADE_WAVE1: CardDef[] = [
     artSubject:
       "glamorous motley masquerade split-hymn twin face cantor purple teal gold choir cliffs original",
     veiledAbility: "When this Holds, Switch Stance on another friendly Figure if able.",
-    revelation:
-      "Switch Stance on another friendly Figure.",
+    revelation: "Switch Stance on another friendly Figure.",
     text: "Veiled: When this Holds, Switch Stance on another friendly Figure if able. Revelation: Switch Stance on another friendly Figure. While Witnessed: +1 Sight/turn.",
   },
   {
@@ -70,9 +68,9 @@ export const MOTLEY_MASQUERADE_WAVE1: CardDef[] = [
     artSubject:
       "motley masquerade masked usher glamorous cloak purple teal gold door staff court cliffs original",
     veiledAbility:
-      "Whenever an enemy Figure in another altitude becomes Forced Exposed, Free Wager this if able.",
+      "Whenever an enemy Figure in another altitude becomes Forced Exposed, Free Wager this if able. Cash: Gain 1 Favor.",
     revelation: "If you control a Wagered Figure, gain 1 Sight.",
-    text: "Veiled: Whenever an enemy Figure in another altitude becomes Forced Exposed, Free Wager this if able. Revelation: If you control a Wagered Figure, gain 1 Sight. Cash: draw 1.",
+    text: "Veiled: Whenever an enemy Figure in another altitude becomes Forced Exposed, Free Wager this if able. Cash: Gain 1 Favor. Revelation: If you control a Wagered Figure, gain 1 Sight.",
   },
   {
     id: "grinning_debtor",
@@ -86,9 +84,9 @@ export const MOTLEY_MASQUERADE_WAVE1: CardDef[] = [
     sightYield: 0,
     artSubject:
       "motley masquerade grinning debtor dice smile purple teal gold debt ledger court cliffs original",
-    veiledAbility: "The first time each turn a friendly Figure Busts, draw 1.",
-    revelation: "If this is Wagered, Blind Low this turn. Otherwise draw 1.",
-    text: "Veiled: The first time each turn a friendly Figure Busts, draw 1. Revelation: If this is Wagered, Blind Low this turn. Otherwise draw 1. Cash: gain 1 Sight.",
+    veiledAbility: "The first time each turn a friendly Motley Busts, gain 1 Favor.",
+    revelation: "If Wagered, Blind Low; otherwise gain 1 Sight.",
+    text: "Veiled: The first time each turn a friendly Motley Busts, gain 1 Favor. Cash: Gain 1 Sight. Revelation: If Wagered, Blind Low; otherwise gain 1 Sight.",
   },
 ];
 

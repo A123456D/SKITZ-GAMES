@@ -58,7 +58,7 @@ export const IRON_BREACH_WAVE2: CardDef[] = [
     witnessedPower: 1,
     sightYield: 0,
     artSubject: "Scar Breach open-wound — rivet charm graft strap-bound eye-brand scar seal",
-    text: "Graft: +1 power while host Witnessed. When host becomes Witnessed, gain 1 Sight. When host wins Resolve while Witnessed, draw 1 (once per Resolve).",
+    text: "Graft: +1 power while host Witnessed. When host becomes Witnessed, gain 1 Sight. When host wins Resolve while Witnessed, gain 1 Sight (once per Resolve).",
   },
   {
     id: "breach_order",

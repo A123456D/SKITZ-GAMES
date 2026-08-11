@@ -37,8 +37,8 @@ export const INK_ABYSS_WAVE1: CardDef[] = [
     veiledAbility:
       "When this wins Resolve while Veiled against a Stained enemy, Blind this altitude this turn.",
     revelation:
-      "Blind each altitude that has a Stained enemy Figure. If you Blinded 2 or more, draw 1. While Witnessed: The first time each turn an opponent spends Sight to Witness or Gaze, they lose 1 additional Sight if able.",
-    text: "Veiled: When this wins Resolve while Veiled against a Stained enemy, Blind this altitude this turn. Revelation: Blind each altitude that has a Stained enemy Figure. If you Blinded 2 or more, draw 1. While Witnessed: The first time each turn an opponent spends Sight to Witness or Gaze, they lose 1 additional Sight if able. Press: when your Press Forces Exposed, Blind that altitude this turn.",
+      "Blind each altitude that has a Stained enemy Figure. If you Blinded 2 or more, gain 1 Sight. While Witnessed: The first time each turn an opponent spends Sight to Witness or Gaze, they lose 1 additional Sight if able.",
+    text: "Veiled: When this wins Resolve while Veiled against a Stained enemy, Blind this altitude this turn. Revelation: Blind each altitude that has a Stained enemy Figure. If you Blinded 2 or more, gain 1 Sight. While Witnessed: The first time each turn an opponent spends Sight to Witness or Gaze, they lose 1 additional Sight if able. Press: when your Press Forces Exposed, Blind that altitude this turn.",
   },
   {
     id: "well_cantor",
@@ -87,10 +87,10 @@ export const INK_ABYSS_WAVE1: CardDef[] = [
     sightYield: 0,
     artSubject:
       "same Ink Abyss set style as Mire Duelist — ink-abyss creature lean swamp ink-beast stained blade maw-mask, unique cream ruin-column inner frame, high-contrast cream-black ink-wash",
-    veiledAbility: "When this wins Resolve while Veiled against a Stained enemy, draw 1.",
+    veiledAbility: "When this wins Resolve while Veiled against a Stained enemy, gain 1 Sight.",
     revelation:
       "Stain the enemy Figure here if able. While Witnessed: Stained enemies here have −1 power. If a Stained Witnessed enemy here loses Resolve, they Fall.",
-    text: "Veiled: When this wins Resolve while Veiled against a Stained enemy, draw 1. Revelation: Stain the enemy Figure here if able. While Witnessed: Stained enemies here have −1 power. If a Stained Witnessed enemy here loses Resolve, they Fall. Press: when your Press Forces Exposed a Figure here, gain 1 Sight.",
+    text: "Veiled: When this wins Resolve while Veiled against a Stained enemy, gain 1 Sight. Revelation: Stain the enemy Figure here if able. While Witnessed: Stained enemies here have −1 power. If a Stained Witnessed enemy here loses Resolve, they Fall. Press: when your Press Forces Exposed a Figure here, gain 1 Sight.",
   },
 ];
 

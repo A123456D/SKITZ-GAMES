@@ -2105,3 +2105,121 @@ Vessel. Tuck Inhabitant on play. **Revelation:** Witness a friendly Veiled Figur
 **Craft:** Scar Breach · **Type:** Rite · **Essence:** 2
 Choose an altitude with your Figure: if Veiled, Witness it paying 1 less Sight (min 0); if Witnessed, deal 2 Will.
 
+## Soft reboot — Velvet Ruin Wave 1 (5 cards)
+
+Tempt / Brand / Devour identity. See `docs/RUIN_WAVE1.md`. Placeholders first.
+
+### Thorn Liaison
+**Craft:** Velvet Ruin · **Type:** Figure · **Essence:** 2 · **Witness:** 2 · **Cast:** ♀ demon
+**Veiled 2 · Witnessed 3**
+**Veiled:** Enemy Witness into this altitude costs +1 Sight unless the target is Tempted.
+**Revelation:** Tempt the enemy Figure here if able.
+
+### Crimson Vow
+**Craft:** Velvet Ruin · **Type:** Figure · **Essence:** 3 · **Witness:** 2 · **Cast:** ♀ near-human succubus
+**Veiled 2 · Witnessed 4**
+**Veiled:** Whenever an enemy Figure becomes Branded anywhere, gain 1 Sight.
+**Revelation:** Tempt the enemy Figure on Mid if able; otherwise Brand a Witnessed enemy Figure here if able.
+
+### Spire Hunger
+**Craft:** Velvet Ruin · **Type:** Figure · **Essence:** 3 · **Witness:** 2 · **Cast:** ♀ inhuman demon
+**Veiled 2 · Witnessed 4**
+**Veiled:** While on High, Tempted enemy Figures elsewhere cost 0 Sight to Witness.
+**Revelation:** If on High, Brand a Tempted enemy Figure if able.
+**While a Branded enemy is on High:** your Devour against that Figure deals +1 Will (requires you control Spire Hunger).
+
+### Desire Altar
+**Craft:** Velvet Ruin · **Type:** Site · **Essence:** 2
+**Site.** +1 Sight/turn. The first Tempt you place on an enemy Figure here each window costs 0 and does not spend your once-per-window Tempt action.
+
+### Unwrite the Sin
+**Craft:** Velvet Ruin · **Type:** Rite · **Essence:** 2
+Choose an altitude. If an enemy there is Branded: clear Brand; gain 2 Sight. Else if an enemy there is Witnessed: Blind that altitude this turn.
+
+## Soft reboot — Velvet Ruin Wave 2 (5 cards)
+
+Tempt / Brand / Devour support. See `docs/RUIN_WAVE2.md`. Placeholders first.
+
+### Vespera
+**Craft:** Velvet Ruin · **Type:** Figure · **Essence:** 2 · **Witness:** 1 · **Cast:** ♀ Low demon
+**Veiled 2 · Witnessed 3**
+**Veiled:** When you Tempt an enemy Figure on Low, gain 1 Sight.
+**Revelation:** Tempt the enemy Figure here if able.
+**While Witnessed on Low:** your Devour against a Branded enemy on Low deals +1 Will.
+
+### Thorn Font
+**Craft:** Velvet Ruin · **Type:** Site · **Essence:** 2
+**Site.** When an enemy Figure here becomes Branded, gain 1 Sight. When you Tempt an enemy Figure here, gain 1 Sight.
+
+### Want Urn
+**Craft:** Velvet Ruin · **Type:** Vessel · **Essence:** 3 · **Witness:** 2
+**Veiled 1 · Witnessed 3**
+**Vessel.** On play, tuck a Figure from hand as Inhabitant if able.
+**Revelation:** Tempt the enemy Figure here if able; otherwise Brand a Witnessed enemy Figure here if able.
+**Fall:** Tempt an enemy Veiled Figure if able; otherwise gain 1 Sight.
+
+### Horn Charm
+**Craft:** Velvet Ruin · **Type:** Relic · **Essence:** 2 · Graft
+**Graft:** +1 power while host Witnessed. When an enemy Figure on the host's altitude becomes Branded, gain 1 Sight. When you Devour a Branded enemy on the host's altitude, gain 1 Sight.
+
+### Invite the Look
+**Craft:** Velvet Ruin · **Type:** Rite · **Essence:** 1
+Choose an altitude. If enemy Veiled and not Tempted: Tempt it. If Veiled and Tempted: Brand it. If Witnessed and Branded: gain 1 Sight. If Witnessed and unbranded: Brand it.
+
+## Soft reboot — Velvet Ruin Wave 3 (5 cards)
+
+Lanes + Devour pressure. See `docs/RUIN_WAVE3.md`. Placeholders first.
+
+### Thorncrown
+**Craft:** Velvet Ruin · **Type:** Figure · **Essence:** 3 · **Witness:** 2 · **Cast:** ♀ High demon
+**Veiled 2 · Witnessed 4**
+**Veiled:** While on High, whenever an enemy Figure becomes Branded elsewhere, gain 1 Sight.
+**Revelation:** If on High, Brand a Tempted enemy Figure if able; otherwise Tempt the enemy Figure here if able.
+**While Witnessed on High:** Enemy Witness and Gaze on High cost +1 Sight unless the target is Tempted.
+
+### Siltthorn
+**Craft:** Velvet Ruin · **Type:** Figure · **Essence:** 2 · **Witness:** 1 · **Cast:** ♂ incubus
+**Veiled 2 · Witnessed 3**
+**Veiled:** Hold on Low while you control a Branded enemy Figure → Blind Low this turn.
+**Revelation:** If on Low, Tempt the enemy Figure here if able; otherwise gain 1 Sight.
+**While Witnessed on Low:** Enemy Witness and Gaze on Low cost +1 Sight.
+
+### Brandlace
+**Craft:** Velvet Ruin · **Type:** Figure · **Essence:** 3 · **Witness:** 2 · **Cast:** ♀ Mid demon
+**Veiled 1 · Witnessed 3**
+**Veiled:** The first time each window you Tempt, gain 1 Sight.
+**Revelation:** Tempt the enemy Figure on Mid if able; otherwise Brand a Witnessed enemy Figure on Mid if able.
+
+### Lace Gallery
+**Craft:** Velvet Ruin · **Type:** Site · **Essence:** 2
+**Site.** While a Branded enemy Figure is here, your other Figures have +1 power. When an enemy Figure here becomes Branded, Tempt an enemy Veiled Figure in another altitude if able.
+
+### Full Devour
+**Craft:** Velvet Ruin · **Type:** Rite · **Essence:** 2
+Gain 1 Sight. Until Resolve: your Devours against Witnessed Branded enemies deal +1 Will.
+
+## Soft reboot — Velvet Ruin Wave 4 (5 cards)
+
+Closing pack. Devour **20/20**. See `docs/RUIN_WAVE4.md`. Placeholders first. Teach excludes Veloth.
+
+### Veloth — 5E / 3W · V3 / W7 · Sovereign
+**Craft:** Velvet Ruin · **Type:** Figure · **Cast:** fully inhuman demon
+**SOVEREIGN.** Veiled: Whenever you Tempt an enemy Figure, gain 1 Sight. Revelation: Tempt an enemy Veiled Figure if able. Then Brand a Tempted enemy Figure if able. If you control 2 or more Branded enemy Figures after this, deal 1 Will and gain 1 Sight. While Witnessed: your Devours against Witnessed Branded enemies deal +1 Will. Fall: Gain 1 Sight.
+
+### Lace Charm
+**Craft:** Velvet Ruin · **Type:** Relic · **Essence:** 2 · Graft
+Graft: +1 power while host Witnessed. When an enemy Figure on the host's altitude becomes Tempted, gain 1 Sight. When you Devour a Witnessed Branded enemy on the host's altitude, Blind that altitude this turn if an enemy is there.
+
+### Hunger Urn
+**Craft:** Velvet Ruin · **Type:** Vessel · **Essence:** 3 · **Witness:** 2
+**Veiled 1 · Witnessed 3**
+Vessel. Tuck Inhabitant on play. **Revelation:** Tempt an enemy Veiled Figure if able; otherwise gain 2 Sight. **Fall:** If you control a Branded enemy Figure, gain 1 Sight; otherwise Tempt an enemy Veiled Figure if able.
+
+### Wantwell
+**Craft:** Velvet Ruin · **Type:** Site · **Essence:** 2
+**Site.** While a Branded enemy Figure is here, your Figure here has +1 power. When an enemy Figure here becomes Branded, the opponent loses 1 Sight if able.
+
+### Last Devour
+**Craft:** Velvet Ruin · **Type:** Rite · **Essence:** 2
+Choose an altitude. If enemy Veiled and not Tempted: Tempt it. If Veiled and Tempted: Brand it. If Witnessed and Branded: deal 2 Will. If Witnessed and unbranded: Brand it.
+

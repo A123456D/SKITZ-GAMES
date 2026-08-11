@@ -1,4 +1,4 @@
-import { CARDS, teachDeck } from "./cards";
+import { CARDS } from "./cards";
 import { validateConstructedDeck } from "./construct";
 import type { Heresy } from "./types";
 
@@ -15,12 +15,25 @@ function mulberry32(seed: number): () => number {
 
 /**
  * Bot / sim decks: exactly one of every card in the craft (20 uniques, incl. Sovereign).
- * Not the curated Teach 2×10 list — sims must exercise the full set.
+ * Incomplete crafts (<20 uniques): pad to 20 within copy limits (Wave 1 playtest).
  */
 export function fullCraftDeck(heresy: Heresy): string[] {
-  const deck = CARDS.filter((c) => c.heresy === heresy).map((c) => c.id);
-  if (deck.length !== 20) {
-    throw new Error(`fullCraftDeck(${heresy}): expected 20 cards, got ${deck.length}`);
+  const ids = CARDS.filter((c) => c.heresy === heresy).map((c) => c.id);
+  if (ids.length === 0) {
+    throw new Error(`fullCraftDeck(${heresy}): no cards`);
+  }
+  let deck: string[];
+  if (ids.length === 20) {
+    deck = ids;
+  } else if (ids.length < 20) {
+    deck = [];
+    let i = 0;
+    while (deck.length < 20) {
+      deck.push(ids[i % ids.length]!);
+      i++;
+    }
+  } else {
+    throw new Error(`fullCraftDeck(${heresy}): expected ≤20 cards, got ${ids.length}`);
   }
   const v = validateConstructedDeck(deck);
   if (!v.ok) throw new Error(v.issues.map((i) => i.message).join(" "));
@@ -50,14 +63,14 @@ export function aiIronBreachDeck(): string[] {
   return fullCraftDeck("breach");
 }
 
-/** Shelved — Ink mirror until Dusk rebuild. */
-export function aiDuskLedgerDeck(): string[] {
-  return teachDeck();
+/** Lumen Host — Wave 1 padded craft (bot sim / AI opponent). */
+export function aiLumenHostDeck(): string[] {
+  return fullCraftDeck("lumen");
 }
 
-/** Shelved — Ink mirror until Bonewick rebuild. */
-export function aiBonewickDeck(): string[] {
-  return teachDeck();
+/** Velvet Ruin — full 20 craft (bot sim / AI opponent). */
+export function aiVelvetRuinDeck(): string[] {
+  return fullCraftDeck("ruin");
 }
 
 const AI_ARCHETYPES: { heresy: Heresy; build: () => string[] }[] = [
@@ -65,6 +78,8 @@ const AI_ARCHETYPES: { heresy: Heresy; build: () => string[] }[] = [
   { heresy: "motley", build: aiMotleyCourtDeck },
   { heresy: "toll", build: aiBellwardTollDeck },
   { heresy: "breach", build: aiIronBreachDeck },
+  { heresy: "lumen", build: aiLumenHostDeck },
+  { heresy: "ruin", build: aiVelvetRuinDeck },
 ];
 
 export function allAiArchetypeDecks(): string[][] {

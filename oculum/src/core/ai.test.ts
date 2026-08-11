@@ -46,10 +46,18 @@ describe("AI", () => {
       wagered: true,
       wagerAntePaid: true,
       wagerAnteFavor: false,
+      wagerHeads: false,
+      wagerPowerDelta: 0,
       openedSinceResolve: false,
       lastBreachOpened: false,
       pressed: false,
       pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
     };
     const legal = legalIntents(s);
     expect(legal.some((i) => i.kind === "witness" && i.enemy && i.altitude === 0)).toBe(true);
@@ -83,10 +91,18 @@ describe("AI", () => {
       wagered: false,
       wagerAntePaid: false,
       wagerAnteFavor: false,
+      wagerHeads: false,
+      wagerPowerDelta: 0,
       openedSinceResolve: false,
       lastBreachOpened: false,
       pressed: false,
       pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
     };
     s.altitudes[1].player = {
       instanceId: "p1",
@@ -104,10 +120,18 @@ describe("AI", () => {
       wagered: false,
       wagerAntePaid: false,
       wagerAnteFavor: false,
+      wagerHeads: false,
+      wagerPowerDelta: 0,
       openedSinceResolve: false,
       lastBreachOpened: false,
       pressed: false,
       pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
     };
     let rites = 0;
     for (let i = 0; i < 25; i++) {
@@ -189,10 +213,18 @@ describe("AI", () => {
         wagered: false,
         wagerAntePaid: false,
         wagerAnteFavor: false,
+        wagerHeads: false,
+        wagerPowerDelta: 0,
         openedSinceResolve: false,
         lastBreachOpened: false,
         pressed: false,
         pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
       };
       const move = chooseAiMove(s);
       if (move.kind === "wager" && move.altitude === 1) wagers += 1;
@@ -226,10 +258,18 @@ describe("AI", () => {
         wagered: false,
         wagerAntePaid: false,
         wagerAnteFavor: false,
+        wagerHeads: false,
+        wagerPowerDelta: 0,
         openedSinceResolve: false,
         lastBreachOpened: false,
         pressed: false,
         pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
       };
       s.altitudes[1].player = {
         instanceId: "mot1",
@@ -247,10 +287,18 @@ describe("AI", () => {
         wagered: true,
         wagerAntePaid: true,
         wagerAnteFavor: false,
+        wagerHeads: false,
+        wagerPowerDelta: 0,
         openedSinceResolve: false,
         lastBreachOpened: false,
         pressed: false,
         pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
       };
       const legal = legalIntents(s);
       expect(legal.some((x) => x.kind === "press" && x.altitude === 1)).toBe(true);
@@ -285,14 +333,100 @@ describe("AI", () => {
         wagered: false,
         wagerAntePaid: false,
         wagerAnteFavor: false,
+        wagerHeads: false,
+        wagerPowerDelta: 0,
         openedSinceResolve: false,
         lastBreachOpened: false,
         pressed: false,
         pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
       };
       const move = chooseAiMove(s);
       if (move.kind === "witness" && !move.enemy && move.altitude === 0) opens += 1;
     }
     expect(opens).toBeGreaterThanOrEqual(20);
+  });
+
+  it("hard Peals a Tolled contested win instead of banking", () => {
+    let peals = 0;
+    for (let i = 0; i < 25; i++) {
+      const s = createMatch({ seed: 600 + i, aiDifficulty: "hard" });
+      s.active = "enemy";
+      s.enemyEssence = 0;
+      s.enemySight = 2;
+      s.enemyHand = [];
+      s.craftKits.enemy = ["toll"];
+      s.tollOwner = ["enemy", null, null];
+      s.pealUsed.enemy = false;
+      s.passed.player = true;
+      s.altitudes[0].enemy = {
+        instanceId: "bell1",
+        cardId: "highcliff_ringer",
+        veiled: false,
+        hybridSite: false,
+        stanceB: false,
+        grafts: [],
+        inhabitant: null,
+        hasThirdFace: false,
+        strained: false,
+        stained: false,
+        revelationFired: true,
+        scrutiny: 0,
+        wagered: false,
+        wagerAntePaid: false,
+        wagerAnteFavor: false,
+        wagerHeads: false,
+        wagerPowerDelta: 0,
+        openedSinceResolve: true,
+        lastBreachOpened: false,
+        pressed: false,
+        pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
+      };
+      s.altitudes[0].player = {
+        instanceId: "foe1",
+        cardId: "blot_herald",
+        veiled: false,
+        hybridSite: false,
+        stanceB: false,
+        grafts: [],
+        inhabitant: null,
+        hasThirdFace: false,
+        strained: false,
+        stained: false,
+        revelationFired: true,
+        scrutiny: 0,
+        wagered: false,
+        wagerAntePaid: false,
+        wagerAnteFavor: false,
+        wagerHeads: false,
+        wagerPowerDelta: 0,
+        openedSinceResolve: true,
+        lastBreachOpened: false,
+        pressed: false,
+        pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
+      };
+      const legal = legalIntents(s);
+      expect(legal.some((x) => x.kind === "peal" && x.altitude === 0)).toBe(true);
+      const move = chooseAiMove(s);
+      if (move.kind === "peal" && move.altitude === 0) peals += 1;
+    }
+    expect(peals).toBeGreaterThanOrEqual(18);
   });
 });

@@ -209,6 +209,8 @@
             <button type="button" class="alt-badge alt-badge--peal" data-peal hidden title="What is Peal?" aria-label="Peal">PEAL</button>
             <span class="alt-stain" data-stain data-side="enemy" hidden title="Stained"></span>
             <span class="alt-stain" data-stain data-side="player" hidden title="Stained"></span>
+            <span class="alt-halo" data-halo data-side="enemy" hidden title="Halo'd"></span>
+            <span class="alt-halo" data-halo data-side="player" hidden title="Halo'd"></span>
             <div class="alt-status foe" data-side="enemy" aria-hidden="true">
               <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
@@ -238,14 +240,16 @@
               <button type="button" class="alt-badge alt-badge--site" data-site hidden title="Inspect Site">SITE</button>
             </div>
           </div>
-          <div role="button" tabindex="0" class="alt-hit" data-alt="1" aria-label="Mid — Witness your figure to draw">
+          <div role="button" tabindex="0" class="alt-hit" data-alt="1" aria-label="Mid — Witness your figure to gain Sight">
             <span class="alt-tag">MID</span>
-            <span class="alt-rule">Witness draw</span>
+            <span class="alt-rule">Witness Sight</span>
             <span class="alt-badge alt-badge--blind" data-blind hidden>BLIND</span>
             <button type="button" class="alt-badge alt-badge--toll" data-toll hidden title="What is Toll?" aria-label="Toll">TOLL</button>
             <button type="button" class="alt-badge alt-badge--peal" data-peal hidden title="What is Peal?" aria-label="Peal">PEAL</button>
             <span class="alt-stain" data-stain data-side="enemy" hidden title="Stained"></span>
             <span class="alt-stain" data-stain data-side="player" hidden title="Stained"></span>
+            <span class="alt-halo" data-halo data-side="enemy" hidden title="Halo'd"></span>
+            <span class="alt-halo" data-halo data-side="player" hidden title="Halo'd"></span>
             <div class="alt-status foe" data-side="enemy" aria-hidden="true">
               <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
@@ -283,6 +287,8 @@
             <button type="button" class="alt-badge alt-badge--peal" data-peal hidden title="What is Peal?" aria-label="Peal">PEAL</button>
             <span class="alt-stain" data-stain data-side="enemy" hidden title="Stained"></span>
             <span class="alt-stain" data-stain data-side="player" hidden title="Stained"></span>
+            <span class="alt-halo" data-halo data-side="enemy" hidden title="Halo'd"></span>
+            <span class="alt-halo" data-halo data-side="player" hidden title="Halo'd"></span>
             <div class="alt-status foe" data-side="enemy" aria-hidden="true">
               <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
@@ -365,11 +371,23 @@
           <button type="button" id="btn-wager" class="ghost" disabled>
             <span class="btn-label"><span class="btn-kicker">Ante</span>Wager</span>
           </button>
+          <button type="button" id="btn-up-ante" class="ghost" hidden disabled>
+            <span class="btn-label"><span class="btn-kicker">Double</span>Up Ante</span>
+          </button>
+          <button type="button" id="btn-skip-ante" class="ghost" hidden disabled>
+            <span class="btn-label"><span class="btn-kicker">Hold</span>Skip Ante</span>
+          </button>
           <button type="button" id="btn-press" class="ghost" disabled>
             <span class="btn-label"><span class="btn-kicker">Mark</span>Press</span>
           </button>
           <button type="button" id="btn-peal" class="ghost" disabled>
             <span class="btn-label"><span class="btn-kicker">Arm</span>Peal</span>
+          </button>
+          <button type="button" id="btn-sustain" class="ghost" disabled>
+            <span class="btn-label"><span class="btn-kicker">Keep</span>Sustain</span>
+          </button>
+          <button type="button" id="btn-tempt" class="ghost" disabled>
+            <span class="btn-label"><span class="btn-kicker">Bait</span>Tempt</span>
           </button>
         </div>
 
@@ -380,7 +398,7 @@
               <img class="menu-seal" src="./assets/ui/seal-eye.png" alt="" draggable="false" />
               <h1 class="menu-wordmark">OCULUM <span class="wordmark-beta">beta</span></h1>
               <p class="menu-tag">VEIL · WITNESS · ASCEND</p>
-              <p class="menu-build" id="menu-build">build 15</p>
+              <p class="menu-build" id="menu-build">build 25</p>
               <p class="menu-blurb">Things only fully exist when seen.</p>
             </header>
             <nav class="menu-actions" aria-label="Main">
@@ -432,6 +450,8 @@
                 <option value="ink">Ink Abyss</option>
                 <option value="motley">Motley Masquerade</option>
                 <option value="breach">Scar Breach</option>
+                <option value="lumen">Lumen Host</option>
+                <option value="ruin">Velvet Ruin</option>
               </select>
             </label>
             <label class="settings-row">
@@ -441,6 +461,8 @@
                 <option value="toll">Bellward Toll</option>
                 <option value="ink">Ink Abyss</option>
                 <option value="breach">Scar Breach</option>
+                <option value="lumen">Lumen Host</option>
+                <option value="ruin">Velvet Ruin</option>
               </select>
             </label>
             <button type="button" id="spectate-start" class="ghost">
@@ -477,6 +499,8 @@
                 <button type="button" class="opponent-opt" data-opponent="motley">Motley</button>
                 <button type="button" class="opponent-opt" data-opponent="toll">Toll</button>
                 <button type="button" class="opponent-opt" data-opponent="breach">Breach</button>
+                <button type="button" class="opponent-opt" data-opponent="lumen">Lumen</button>
+                <button type="button" class="opponent-opt" data-opponent="ruin">Ruin</button>
               </div>
             </div>
             <div id="heresy-list" class="heresy-list" role="list"></div>
@@ -523,7 +547,7 @@
                 <h3>Three lanes</h3>
                 <p>Each altitude has a standing Reveal rule — pick lanes on purpose.</p>
                 <p><strong>HIGH</strong> — Gaze Witness costs 1 less Sight. Winning here deals +1 before soft damage.</p>
-                <p><strong>MID</strong> — Witness your own figure here to draw 1.</p>
+                <p><strong>MID</strong> — Witness your own figure here to gain 1 Sight.</p>
                 <p><strong>LOW</strong> — Veiled figures get +1 power, but Witness and Gaze cost +1 Sight.</p>
               </section>
               <section class="howto-block">
@@ -637,8 +661,9 @@
                 <option value="all">All</option>
                 <option value="ink">Ink Abyss</option>
                 <option value="motley">Motley Masquerade</option>
-                <option value="deal">Dusk Ledger</option>
-                <option value="shell">Bonewick</option>
+                <option value="toll">Bellward Toll</option>
+                <option value="breach">Scar Breach</option>
+                <option value="lumen">Lumen Host</option>`n                <option value="ruin">Velvet Ruin</option>
               </select>
             </div>
             <div id="builder-pool" class="builder-pool"></div>
@@ -650,6 +675,7 @@
                 <option value="motley">Motley Masquerade</option>
                 <option value="toll">Bellward Toll</option>
                 <option value="breach">Scar Breach</option>
+                <option value="lumen">Lumen Host</option>`n                <option value="ruin">Velvet Ruin</option>
               </select>
             </label>
             <div class="builder-actions">
@@ -760,8 +786,9 @@
                   <option value="all">All</option>
                   <option value="ink">Ink Abyss</option>
                   <option value="motley">Motley Masquerade</option>
-                  <option value="deal">Dusk Ledger</option>
-                  <option value="shell">Bonewick</option>
+                  <option value="toll">Bellward Toll</option>
+                  <option value="breach">Scar Breach</option>
+                  <option value="lumen">Lumen Host</option>`n                <option value="ruin">Velvet Ruin</option>
                 </select>
               </div>
             </div>

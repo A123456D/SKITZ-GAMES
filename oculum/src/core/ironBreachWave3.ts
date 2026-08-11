@@ -15,8 +15,8 @@ export const IRON_BREACH_WAVE3: CardDef[] = [
     artSubject:
       "Scar Breach open-wound portrait — male human cliffbrand captain high planted stance strap harness scar brands canyon",
     veiledAbility: "While on High, whenever you Witness a friendly Figure elsewhere, gain 1 Sight.",
-    revelation: "If on High, Blind High this turn if an enemy is there; otherwise draw 1.",
-    text: "Veiled: While on High, whenever you Witness a friendly Figure elsewhere, gain 1 Sight. Revelation: If on High, Blind High this turn if an enemy is there; otherwise draw 1. While Witnessed on High: When this wins Resolve, draw 1. Overexpose: shared; on High, opponent draws 1.",
+    revelation: "If on High, Blind High this turn if an enemy is there; otherwise gain 1 Sight.",
+    text: "Veiled: While on High, whenever you Witness a friendly Figure elsewhere, gain 1 Sight. Revelation: If on High, Blind High this turn if an enemy is there; otherwise gain 1 Sight. While Witnessed on High: When this wins Resolve, gain 1 Sight. Overexpose: shared; on High, opponent gains 1 Sight.",
   },
   {
     id: "lowscar_warden",
@@ -32,8 +32,8 @@ export const IRON_BREACH_WAVE3: CardDef[] = [
       "Scar Breach open-wound portrait — male human lowscar warden low planted stance strap harness scar brands canyon",
     veiledAbility:
       "Hold on Low while you control another Witnessed friendly Figure → Blind Low this turn.",
-    revelation: "If on Low, draw 1; otherwise gain 1 Sight.",
-    text: "Veiled: Hold on Low while you control another Witnessed friendly Figure → Blind Low this turn. Revelation: If on Low, draw 1; otherwise gain 1 Sight. While Witnessed on Low: Enemy Witness and Gaze on Low cost +1 Sight.",
+    revelation: "If on Low, deal 1 Will; otherwise gain 1 Sight.",
+    text: "Veiled: Hold on Low while you control another Witnessed friendly Figure → Blind Low this turn. Revelation: If on Low, deal 1 Will; otherwise gain 1 Sight. While Witnessed on Low: Enemy Witness and Gaze on Low cost +1 Sight.",
   },
   {
     id: "ember_herald",

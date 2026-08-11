@@ -1,9 +1,7 @@
 import type { CardDef } from "./types";
 
 /**
- * Motley Masquerade — Wave 3 lanes + Favor.
- * Roles: High specialist · Low specialist · Favor ante · Gala site · Gala rite.
- * Unique names — no reuse of shelved Motley Court or Waves 1–2 ids.
+ * Motley Masquerade — Wave 3 (Cash/Bust lanes + Favor).
  */
 export const MOTLEY_MASQUERADE_WAVE3: CardDef[] = [
   {
@@ -19,9 +17,9 @@ export const MOTLEY_MASQUERADE_WAVE3: CardDef[] = [
     artSubject:
       "glamorous sexy motley masquerade spire caprice high cliff dancer purple teal gold ornate court cliffs original",
     veiledAbility:
-      "While on High and Wagered, this has +1 power. You may Wager this (ante 1 Sight).",
-    revelation: "If this is on High, Free Wager this and gain 1 Sight.",
-    text: "Veiled: While on High and Wagered, this has +1 power. You may Wager this (ante 1 Sight). Revelation: If this is on High, Free Wager this and gain 1 Sight. Cash: Blind Mid this turn.",
+      "While on High and Wagered, this has +1 power. You may Wager this (ante 1 Sight). Cash: Blind Mid.",
+    revelation: "If on High, Free Wager this and gain 1 Sight.",
+    text: "Veiled: While on High and Wagered, this has +1 power. You may Wager this (ante 1 Sight). Cash: Blind Mid. Revelation: If on High, Free Wager this and gain 1 Sight.",
   },
   {
     id: "pit_capper",
@@ -36,9 +34,9 @@ export const MOTLEY_MASQUERADE_WAVE3: CardDef[] = [
     artSubject:
       "motley masquerade pit capper low dice grin purple teal gold ornate court cliffs original",
     veiledAbility:
-      "When this Holds on Low, if you control a Wagered Figure, Blind Low this turn.",
-    revelation: "Free Wager this. If this is on Low, draw 1.",
-    text: "Veiled: When this Holds on Low, if you control a Wagered Figure, Blind Low this turn. Revelation: Free Wager this. If this is on Low, draw 1. Bust: gain 1 Favor (once/turn income).",
+      "When this Holds on Low, if any friendly is Wagered, Blind Low this turn. Bust: Gain 1 Favor.",
+    revelation: "Free Wager this. If on Low, gain 1 Favor.",
+    text: "Veiled: When this Holds on Low, if any friendly is Wagered, Blind Low this turn. Bust: Gain 1 Favor. Revelation: Free Wager this. If on Low, gain 1 Favor.",
   },
   {
     id: "favor_broker",
@@ -53,9 +51,9 @@ export const MOTLEY_MASQUERADE_WAVE3: CardDef[] = [
     artSubject:
       "glamorous sexy motley masquerade favor broker ledger chips purple teal gold ornate court cliffs original",
     veiledAbility:
-      "You may Wager this (ante 1 Sight). When this wins Resolve while Veiled, Stance B, and Wagered: gain 1 Sight.",
+      "You may Wager this (ante 1 Sight). When this wins Resolve while Veiled, Stance B, and Wagered: gain 1 Sight. Cash: Gain 1 Favor.",
     revelation: "Switch Stance. If this became Stance B, gain 1 Favor.",
-    text: "Veiled: You may Wager this (ante 1 Sight). When this wins Resolve while Veiled, Stance B, and Wagered: gain 1 Sight. Revelation: Switch Stance. If this became Stance B, gain 1 Favor. Cash: draw 1 (refund Sight ante).",
+    text: "Veiled: You may Wager this (ante 1 Sight). When this wins Resolve while Veiled, Stance B, and Wagered: gain 1 Sight. Cash: Gain 1 Favor. Revelation: Switch Stance. If this became Stance B, gain 1 Favor.",
   },
   {
     id: "gala_mirrorhall",
@@ -69,7 +67,7 @@ export const MOTLEY_MASQUERADE_WAVE3: CardDef[] = [
     sightYield: 0,
     artSubject:
       "motley masquerade gala mirrorhall purple teal gold mirrors ballroom landmark ornate cliffs original",
-    text: "Site. While you have Favor, your Stance B Figures have +1 power. When a friendly Figure here Cashes, gain 1 Sight.",
+    text: "Site. While you have Favor, your Stance B Figures have +1 power. Cash here: gain 1 Sight.",
   },
   {
     id: "gala_call",

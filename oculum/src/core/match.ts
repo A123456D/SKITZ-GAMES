@@ -2,10 +2,10 @@ import {
   getCard,
   INK_ABYSS_RITE_IDS,
   MOTLEY_COURT_RITE_IDS,
-  DUSK_LEDGER_RITE_IDS,
-  BONEWICK_RITE_IDS,
   BELLWARD_TOLL_RITE_IDS,
   IRON_BREACH_RITE_IDS,
+  LUMEN_HOST_RITE_IDS,
+  VELVET_RUIN_RITE_IDS,
   teachDeck,
 } from "./cards";
 import { validateConstructedDeck } from "./construct";
@@ -152,10 +152,18 @@ function mint(state: MatchState, cardId: string, veiled: boolean): BoardUnit {
     wagered: false,
     wagerAntePaid: false,
     wagerAnteFavor: false,
+    wagerHeads: false,
+    wagerPowerDelta: 0,
     openedSinceResolve: false,
     lastBreachOpened: false,
     pressed: false,
     pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
   };
 }
 
@@ -163,6 +171,8 @@ function clearWager(u: BoardUnit): void {
   u.wagered = false;
   u.wagerAntePaid = false;
   u.wagerAnteFavor = false;
+  u.wagerHeads = false;
+  u.wagerPowerDelta = 0;
 }
 
 export function sidePlaysHeresy(state: MatchState, side: Side, heresy: string): boolean {
@@ -186,7 +196,7 @@ function craftKitsFromDeck(ids: readonly string[]): string[] {
   const kits = new Set<string>();
   for (const id of ids) {
     const h = getCard(id).heresy;
-    if (h === "ink" || h === "motley" || h === "toll" || h === "breach") kits.add(h);
+    if (h === "ink" || h === "motley" || h === "toll" || h === "breach" || h === "lumen" || h === "ruin") kits.add(h);
   }
   return [...kits];
 }
@@ -228,7 +238,6 @@ function payPeal(state: MatchState, owner: Side, altitude: Altitude): void {
   if (!state.pealArmed[altitude]) return;
   state.pealArmed[altitude] = false;
   setSight(state, owner, Math.min(SIGHT_CARRY_CAP, sightOf(state, owner) + 1));
-  drawOne(state, owner);
   push(state, { type: "peal_pay", side: owner, altitude });
   for (let a = 0; a < ALTITUDE_COUNT; a++) {
     const u = unitOf(state.altitudes[a as Altitude], owner);
@@ -248,6 +257,208 @@ function payPeal(state: MatchState, owner: Side, altitude: Altitude): void {
 
 function fizzlePeal(state: MatchState, altitude: Altitude): void {
   state.pealArmed[altitude] = false;
+}
+
+function clearHalo(u: BoardUnit): void {
+  u.haloed = false;
+  u.haloSustained = false;
+}
+
+function grantHalo(state: MatchState, side: Side, altitude: Altitude, u: BoardUnit): void {
+  if (getCard(u.cardId).heresy !== "lumen") return;
+  if (getCard(u.cardId).type !== "figure") return;
+  if (u.veiled) return;
+  if (u.haloed) return;
+  u.haloed = true;
+  push(state, { type: "halo", side, altitude, cardId: u.cardId });
+  if (siteOf(state.altitudes[altitude], side) === "aureole_well") {
+    setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+  }
+  if (u.grafts.some((g) => g.cardId === "halo_charm")) {
+    setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+  }
+  // Highflare Cantor (Veiled on High): Sight when you Halo elsewhere
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    if (a === altitude) continue;
+    const cantor = unitOf(state.altitudes[a as Altitude], side);
+    if (cantor?.veiled && cantor.cardId === "highflare_cantor" && a === 0) {
+      setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+    }
+  }
+  // Solarch (Veiled): Sight when a friendly Figure becomes Halo'd
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    const sov = unitOf(state.altitudes[a as Altitude], side);
+    if (sov?.veiled && sov.cardId === "solarch") {
+      setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+    }
+  }
+}
+
+function controlsHaloedSolarch(state: MatchState, side: Side): boolean {
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    const u = unitOf(state.altitudes[a as Altitude], side);
+    if (u?.haloed && !u.veiled && u.cardId === "solarch") return true;
+  }
+  return false;
+}
+
+function countHaloedFigures(state: MatchState, side: Side): number {
+  let n = 0;
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    const u = unitOf(state.altitudes[a as Altitude], side);
+    if (u?.haloed && !u.veiled && getCard(u.cardId).type === "figure") n += 1;
+  }
+  return n;
+}
+
+function pickOtherFriendlyVeiledLumen(
+  state: MatchState,
+  side: Side,
+  exceptAlt?: Altitude,
+): Altitude | null {
+  for (const prefer of [1, 0, 2] as Altitude[]) {
+    if (exceptAlt !== undefined && prefer === exceptAlt) continue;
+    const u = unitOf(state.altitudes[prefer], side);
+    if (
+      u?.veiled &&
+      getCard(u.cardId).type === "figure" &&
+      getCard(u.cardId).heresy === "lumen"
+    ) {
+      return prefer;
+    }
+  }
+  return null;
+}
+
+function controlsOtherHaloed(
+  state: MatchState,
+  side: Side,
+  exceptAlt: Altitude,
+): boolean {
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    if (a === exceptAlt) continue;
+    const u = unitOf(state.altitudes[a as Altitude], side);
+    if (u?.haloed) return true;
+  }
+  return false;
+}
+
+function haloHeraldTax(state: MatchState, witnesser: Side, altitude: Altitude): number {
+  const foe = other(witnesser);
+  const u = unitOf(state.altitudes[altitude], foe);
+  if (u?.veiled && u.cardId === "halo_herald") return 1;
+  return 0;
+}
+
+function trySustain(
+  state: MatchState,
+  side: Side,
+  altitude: Altitude,
+  opts: { free?: boolean } = {},
+): boolean {
+  if (!sidePlaysHeresy(state, side, "lumen")) return false;
+  const slot = state.altitudes[altitude];
+  if (slot.blinded) return false;
+  const u = unitOf(slot, side);
+  if (!u?.haloed || u.veiled || u.haloSustained) return false;
+  if (getCard(u.cardId).heresy !== "lumen") return false;
+
+  let cost = opts.free ? 0 : 1;
+  if (
+    cost > 0 &&
+    state.lumenShrineSustainFree[side] &&
+    siteOf(slot, side) === "lumen_shrine"
+  ) {
+    cost = 0;
+    state.lumenShrineSustainFree[side] = false;
+  }
+  if (sightOf(state, side) < cost) return false;
+  if (cost > 0) setSight(state, side, sightOf(state, side) - cost);
+  u.haloSustained = true;
+  push(state, { type: "sustain", side, altitude, cardId: u.cardId });
+  if (siteOf(state.altitudes[altitude], side) === "sunwell") {
+    setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+  }
+  // Veilburn Usher (Veiled): first Sustain each window → Sight
+  if (state.lumenUsherSustainSight[side]) {
+    for (let a = 0; a < ALTITUDE_COUNT; a++) {
+      const usher = unitOf(state.altitudes[a as Altitude], side);
+      if (usher?.veiled && usher.cardId === "veilburn_usher") {
+        setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+        state.lumenUsherSustainSight[side] = false;
+        break;
+      }
+    }
+  }
+  return true;
+}
+
+/** End of window: Halo'd Figures Blaze, then Re-Veil unless Sustained. */
+function runLumenBlazeAndBurnout(state: MatchState, side: Side): void {
+  if (!sidePlaysHeresy(state, side, "lumen")) return;
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    const alt = a as Altitude;
+    const u = unitOf(state.altitudes[alt], side);
+    if (!u?.haloed || u.veiled) continue;
+    if (getCard(u.cardId).heresy !== "lumen") continue;
+
+    const foeHere = !!unitOf(state.altitudes[alt], other(side));
+    let willDmg = 0;
+    let sightGain = 0;
+    const alwaysWill = u.cardId === "candela_blade";
+    if (foeHere || alwaysWill) {
+      willDmg = 1;
+      if (u.cardId === "skyflare_seraph" && alt === 0) willDmg += 1;
+    } else {
+      sightGain = 1;
+    }
+    if (state.lumenFullRadianceArmed[side]) willDmg += 1;
+    if (u.cardId !== "solarch" && controlsHaloedSolarch(state, side)) willDmg += 1;
+    if (willDmg > 0) dealWillToOpponent(state, side, willDmg);
+    if (sightGain > 0) {
+      setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + sightGain));
+    }
+    push(state, {
+      type: "blaze",
+      side,
+      altitude: alt,
+      cardId: u.cardId,
+      will: willDmg || undefined,
+      sight: sightGain || undefined,
+    });
+
+    // Ash Chorister (Veiled): Sight when a friendly Figure Blazes
+    for (let b = 0; b < ALTITUDE_COUNT; b++) {
+      const chor = unitOf(state.altitudes[b as Altitude], side);
+      if (chor?.veiled && chor.cardId === "ash_chorister") {
+        setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+      }
+    }
+    if (u.grafts.some((g) => g.cardId === "halo_charm")) {
+      setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+    }
+    if (siteOf(state.altitudes[alt], side) === "halo_gallery") {
+      setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+    }
+    if (u.cardId === "ash_chorister" && alt === 2 && foeHere) {
+      blindAltitude(state, side, 2);
+    }
+    if (u.cardId === "highflare_cantor" && alt === 0 && foeHere) {
+      blindAltitude(state, side, 0);
+    }
+    if (u.grafts.some((g) => g.cardId === "aureole_charm") && foeHere) {
+      blindAltitude(state, side, alt);
+    }
+
+    if (u.haloSustained) {
+      u.haloSustained = false;
+      continue;
+    }
+    // Burnout: Re-Veil and clear Halo
+    u.veiled = true;
+    clearHalo(u);
+    push(state, { type: "reveil", side, altitude: alt, cardId: u.cardId });
+  }
 }
 
 function tryPress(
@@ -310,6 +521,265 @@ function tryPeal(
     state.soundTollPealBonus[side] = false;
   }
   return true;
+}
+
+function clearTempt(u: BoardUnit): void {
+  u.tempted = false;
+  u.temptedBy = null;
+}
+
+function clearBrand(u: BoardUnit): void {
+  u.branded = false;
+  u.brandedBy = null;
+}
+
+/** Place Brand on foe; Sight to brander; Crimson Vow / Thorn Font / Horn Charm pay. */
+function applyBrand(
+  state: MatchState,
+  brander: Side,
+  altitude: Altitude,
+  u: BoardUnit,
+): boolean {
+  if (u.branded && u.brandedBy === brander) return false;
+  clearTempt(u);
+  u.branded = true;
+  u.brandedBy = brander;
+  setSight(state, brander, Math.min(SIGHT_CARRY_CAP, sightOf(state, brander) + 1));
+  push(state, { type: "brand", side: brander, altitude, cardId: u.cardId });
+  // Crimson Vow (Veiled): Brand anywhere → Sight
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    const bride = unitOf(state.altitudes[a as Altitude], brander);
+    if (bride?.veiled && bride.cardId === "crimson_vow") {
+      setSight(state, brander, Math.min(SIGHT_CARRY_CAP, sightOf(state, brander) + 1));
+    }
+  }
+  // Thorncrown (Veiled on High): Brand elsewhere → Sight
+  if (altitude !== 0) {
+    const crown = unitOf(state.altitudes[0], brander);
+    if (crown?.veiled && crown.cardId === "thorncrown") {
+      setSight(state, brander, Math.min(SIGHT_CARRY_CAP, sightOf(state, brander) + 1));
+    }
+  }
+  // Thorn Font: Brand on this lane → Sight
+  if (siteOf(state.altitudes[altitude], brander) === "thorn_font") {
+    setSight(state, brander, Math.min(SIGHT_CARRY_CAP, sightOf(state, brander) + 1));
+  }
+  // Horn Charm: Brand on host's altitude → Sight
+  const host = unitOf(state.altitudes[altitude], brander);
+  if (host?.grafts.some((g) => g.cardId === "horn_charm")) {
+    setSight(state, brander, Math.min(SIGHT_CARRY_CAP, sightOf(state, brander) + 1));
+  }
+  // Lace Gallery: Brand here → Tempt elsewhere
+  if (siteOf(state.altitudes[altitude], brander) === "lace_gallery") {
+    for (const prefer of [0, 1, 2] as Altitude[]) {
+      if (prefer === altitude) continue;
+      if (tryTempt(state, brander, prefer, { skipUsed: true })) break;
+    }
+  }
+  // Wantwell: Brand here → opponent loses 1 Sight
+  if (siteOf(state.altitudes[altitude], brander) === "wantwell") {
+    const foeSide = other(brander);
+    if (sightOf(state, foeSide) > 0) {
+      setSight(state, foeSide, sightOf(state, foeSide) - 1);
+    }
+  }
+  return true;
+}
+
+/**
+ * Tempt enemy Veiled Figure.
+ * @param skipUsed — Revelation / card Tempt (does not spend once/window)
+ * Desire Altar: first Tempt on foe here each window skips temptUsed.
+ */
+function tryTempt(
+  state: MatchState,
+  side: Side,
+  altitude: Altitude,
+  opts: { skipUsed?: boolean } = {},
+): boolean {
+  if (!sidePlaysHeresy(state, side, "ruin")) return false;
+  const slot = state.altitudes[altitude];
+  if (slot.blinded) return false;
+  const foe = unitOf(slot, other(side));
+  if (!foe?.veiled || foe.tempted) return false;
+  if (getCard(foe.cardId).type !== "figure" && getCard(foe.cardId).type !== "vessel") return false;
+
+  const shrineFree =
+    !opts.skipUsed &&
+    state.desireAltarTemptFree[side] &&
+    siteOf(slot, side) === "desire_altar";
+  if (!opts.skipUsed && !shrineFree && state.temptUsed[side]) return false;
+
+  foe.tempted = true;
+  foe.temptedBy = side;
+  if (shrineFree) state.desireAltarTemptFree[side] = false;
+  else if (!opts.skipUsed) state.temptUsed[side] = true;
+  push(state, { type: "tempt", side, altitude, cardId: foe.cardId });
+
+  // Vespera (Veiled): Tempt on Low → Sight
+  if (altitude === 2) {
+    for (let a = 0; a < ALTITUDE_COUNT; a++) {
+      const lip = unitOf(state.altitudes[a as Altitude], side);
+      if (lip?.veiled && lip.cardId === "vespera") {
+        setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+        break;
+      }
+    }
+  }
+  // Brandlace (Veiled): first Tempt each window → Sight
+  if (state.ruinBrandlaceTemptSight[side]) {
+    for (let a = 0; a < ALTITUDE_COUNT; a++) {
+      const lace = unitOf(state.altitudes[a as Altitude], side);
+      if (lace?.veiled && lace.cardId === "brandlace") {
+        setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+        state.ruinBrandlaceTemptSight[side] = false;
+        break;
+      }
+    }
+  }
+  // Veloth (Veiled): Tempt → Sight
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    const sov = unitOf(state.altitudes[a as Altitude], side);
+    if (sov?.veiled && sov.cardId === "veloth") {
+      setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+      break;
+    }
+  }
+  // Lace Charm: Tempt on host's altitude → Sight
+  {
+    const host = unitOf(slot, side);
+    if (host?.grafts.some((g) => g.cardId === "lace_charm")) {
+      setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+    }
+  }
+  // Thorn Font: Tempt on this lane → Sight
+  if (siteOf(slot, side) === "thorn_font") {
+    setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+  }
+  return true;
+}
+
+function thornLiaisonTax(
+  state: MatchState,
+  witnesser: Side,
+  altitude: Altitude,
+  target: BoardUnit,
+): number {
+  const foe = unitOf(state.altitudes[altitude], other(witnesser));
+  if (foe?.veiled && foe.cardId === "thorn_liaison" && !target.tempted) return 1;
+  return 0;
+}
+
+/** Hornspire on High: Tempted foes elsewhere Witness for 0. */
+function spireHungerFreeTemptWitness(
+  state: MatchState,
+  witnesser: Side,
+  altitude: Altitude,
+  target: BoardUnit,
+): boolean {
+  if (!target.tempted || altitude === 0) return false;
+  const hung = unitOf(state.altitudes[0], other(witnesser));
+  return !!(hung?.veiled && hung.cardId === "spire_hunger");
+}
+
+function controlsSpireHunger(state: MatchState, side: Side): boolean {
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    const u = unitOf(state.altitudes[a as Altitude], side);
+    if (u?.cardId === "spire_hunger") return true;
+  }
+  return false;
+}
+
+function vesperaWitnessedOnLow(state: MatchState, side: Side): boolean {
+  const u = unitOf(state.altitudes[2], side);
+  return !!(u && !u.veiled && u.cardId === "vespera");
+}
+
+function controlsWitnessedVeloth(state: MatchState, side: Side): boolean {
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    const u = unitOf(state.altitudes[a as Altitude], side);
+    if (u && !u.veiled && u.cardId === "veloth") return true;
+  }
+  return false;
+}
+
+function countBrandedEnemyFigures(state: MatchState, side: Side): number {
+  let n = 0;
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    const foe = unitOf(state.altitudes[a as Altitude], other(side));
+    if (foe?.branded && foe.brandedBy === side && getCard(foe.cardId).type === "figure") n += 1;
+  }
+  return n;
+}
+
+function controlsBrandedEnemy(state: MatchState, side: Side): boolean {
+  return countBrandedEnemyFigures(state, side) > 0;
+}
+
+/** Own-Witness Sight cost including Ruin Tempt bait / Liaison tax. */
+function ownWitnessSightCost(
+  state: MatchState,
+  side: Side,
+  altitude: Altitude,
+  u: BoardUnit,
+): number {
+  const def = getCard(u.cardId);
+  let cost = witnessCostAt(altitude, def.witnessCost, false) + haloHeraldTax(state, side, altitude);
+  cost += thornLiaisonTax(state, side, altitude, u);
+  if (u.tempted) {
+    if (spireHungerFreeTemptWitness(state, side, altitude, u)) return 0;
+    cost = Math.max(0, cost - 1);
+  }
+  return cost;
+}
+
+/** Pass: Branded enemies Devour for the Ruin player, then Brands clear. */
+function runRuinDevour(state: MatchState, side: Side): void {
+  if (!sidePlaysHeresy(state, side, "ruin")) return;
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    const alt = a as Altitude;
+    const foe = unitOf(state.altitudes[alt], other(side));
+    if (!foe?.branded || foe.brandedBy !== side) continue;
+    let willDmg = 0;
+    let sightGain = 0;
+    if (!foe.veiled) {
+      willDmg = 1;
+      // Spire Hunger: Branded on High → +1 Will Devour
+      if (alt === 0 && controlsSpireHunger(state, side)) willDmg += 1;
+      // Vespera Witnessed on Low: Branded on Low → +1 Will Devour
+      if (alt === 2 && vesperaWitnessedOnLow(state, side)) willDmg += 1;
+      // Full Devour: +1 Will until Resolve
+      if (state.ruinFullDevourArmed[side]) willDmg += 1;
+      // Veloth Witnessed: +1 Will Devour aura
+      if (controlsWitnessedVeloth(state, side)) willDmg += 1;
+    } else {
+      sightGain = 1;
+    }
+    if (willDmg > 0) dealWillToOpponent(state, side, willDmg);
+    if (sightGain > 0) {
+      setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + sightGain));
+    }
+    // Horn Charm: Devour on host's altitude → Sight
+    const host = unitOf(state.altitudes[alt], side);
+    if (host?.grafts.some((g) => g.cardId === "horn_charm")) {
+      setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+    }
+    // Lace Charm: Devour Will on host's altitude → Blind
+    if (willDmg > 0 && host?.grafts.some((g) => g.cardId === "lace_charm")) {
+      if (unitOf(state.altitudes[alt], other(side))) {
+        blindAltitude(state, side, alt);
+      }
+    }
+    push(state, {
+      type: "devour",
+      side,
+      altitude: alt,
+      cardId: foe.cardId,
+      will: willDmg || undefined,
+      sight: sightGain || undefined,
+    });
+    clearBrand(foe);
+  }
 }
 
 /** Figures that ante Favor instead of Sight. */
@@ -397,7 +867,7 @@ function notifyDebtorOnBust(state: MatchState, side: Side): void {
   for (let a = 0; a < ALTITUDE_COUNT; a++) {
     const d = unitOf(state.altitudes[a as Altitude], side);
     if (d?.veiled && d.cardId === "grinning_debtor") {
-      drawOne(state, side);
+      gainFavor(state, side, 1);
       state.debtorBustDrawUsed[side] = true;
       return;
     }
@@ -427,7 +897,7 @@ function notifyBlindfoldCharm(state: MatchState, side: Side, altitude: Altitude)
     if (!u?.wagered) continue;
     if (!u.grafts.some((g) => g.cardId === "blindfold_charm")) continue;
     setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
-    if (altitude === 1) drawOne(state, side);
+    if (altitude === 1) gainFavor(state, side, 1);
     return;
   }
 }
@@ -467,9 +937,9 @@ function applyBust(
   } else if (cardId === "pit_capper") {
     tryGainFavor(state, side);
   }
-  // Antewell: friendly Figure Bust here → draw 1
+  // Antewell: friendly Figure Bust here → Favor
   if (getCard(cardId).type === "figure" && siteOf(state.altitudes[altitude], side) === "antewell") {
-    drawOne(state, side);
+    gainFavor(state, side, 1);
   }
   notifyDebtorOnBust(state, side);
 }
@@ -504,25 +974,22 @@ function applyCash(
       }
     }
   }
-  if (cardId === "whitecard_mummer") drawOne(state, side);
-  else if (cardId === "masked_usher") drawOne(state, side);
-  else if (cardId === "grinning_debtor") {
+  // Cash riders — Favor (tryGainFavor already did once/turn income for generic Cash)
+  if (cardId === "diamond_widow" && u.stanceB) {
+    gainFavor(state, side, 2);
+  } else if (cardId === "grinning_debtor") {
     setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
-  } else if (cardId === "scarlet_dealer") {
-    drawOne(state, side);
   } else if (cardId === "spire_caprice") {
     blindAltitude(state, side, 1);
-  } else if (cardId === "favor_broker") {
-    drawOne(state, side);
   }
   // Velvet Antehall / Gala Mirrorhall: Cash here → Sight
   const site = siteOf(state.altitudes[altitude], side);
   if (site === "velvet_antehall" || site === "gala_mirrorhall") {
     setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
   }
-  // Coinface Charm: Cash → draw
+  // Coinface Charm: Cash → Favor
   if (u.grafts.some((g) => g.cardId === "coinface_charm")) {
-    drawOne(state, side);
+    gainFavor(state, side, 1);
   }
 }
 
@@ -627,7 +1094,6 @@ function tryPayToll(
     const host = unitOf(state.altitudes[altitude], owner);
     if (host && !host.veiled && host.grafts.some((g) => g.cardId === "siren_cord")) {
       setSight(state, owner, Math.min(SIGHT_CARRY_CAP, sightOf(state, owner) + 1));
-      if (altitude === 1) drawOne(state, owner);
     }
   }
   fireResonance(state, owner, altitude);
@@ -666,7 +1132,7 @@ function fireResonance(state: MatchState, side: Side, altitude: Altitude): void 
       setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
     }
     if (!u.veiled && u.grafts.some((g) => g.cardId === "bellcord_charm")) {
-      drawOne(state, side);
+      abilitySight(state, side);
     }
   }
 }
@@ -789,7 +1255,7 @@ function applyOverexpose(
   }
 
   if (u.cardId === "cliffbrand_captain" && altitude === 0) {
-    drawOne(state, other(side));
+    abilitySight(state, other(side));
   }
 
   if (u.cardId === "skaroth") {
@@ -803,7 +1269,7 @@ function applyOverexpose(
   }
 
   if (u.lastBreachOpened) {
-    drawOne(state, side);
+    abilitySight(state, side);
   }
 
   push(state, { type: "overexpose", side, altitude, cardId: u.cardId });
@@ -866,9 +1332,10 @@ function openOwnFigure(
     applyRevelation(state, side, side, altitude, u, false);
     u.revelationFired = true;
   }
+  grantHalo(state, side, altitude, u);
   if (foldAfter && u.wagered) foldWager(state, side, altitude, u);
   onFriendlyFigureOpened(state, side, altitude, u);
-  if (altitude === 1 && def.type === "figure") drawOne(state, side);
+  if (altitude === 1 && def.type === "figure") abilitySight(state, side);
   push(state, { type: "witness", side, altitude, cardId: def.id });
   return true;
 }
@@ -931,13 +1398,57 @@ function applyLowscarWitnessTax(
   setSight(state, witnesser, sightOf(state, witnesser) - 1);
 }
 
+/** Cinder Warden (Halo'd on Low): enemy Witness/Gaze on Low +1 Sight. */
+function applyCinderWitnessTax(
+  state: MatchState,
+  witnesser: Side,
+  altitude: Altitude,
+): void {
+  if (altitude !== 2) return;
+  const owner = other(witnesser);
+  const warden = unitOf(state.altitudes[2], owner);
+  if (!warden?.haloed || warden.veiled || warden.cardId !== "cinder_warden") return;
+  if (sightOf(state, witnesser) < 1) return;
+  setSight(state, witnesser, sightOf(state, witnesser) - 1);
+}
+
+/** Siltthorn (Witnessed on Low): enemy Witness/Gaze on Low +1 Sight. */
+function applySiltthornWitnessTax(
+  state: MatchState,
+  witnesser: Side,
+  altitude: Altitude,
+): void {
+  if (altitude !== 2) return;
+  const owner = other(witnesser);
+  const warden = unitOf(state.altitudes[2], owner);
+  if (!warden || warden.veiled || warden.cardId !== "siltthorn") return;
+  if (sightOf(state, witnesser) < 1) return;
+  setSight(state, witnesser, sightOf(state, witnesser) - 1);
+}
+
+/** Thorncrown (Witnessed on High): enemy Witness/Gaze on High +1 Sight unless Tempted. */
+function applyThorncrownWitnessTax(
+  state: MatchState,
+  witnesser: Side,
+  altitude: Altitude,
+  target: BoardUnit,
+): void {
+  if (altitude !== 0) return;
+  if (target.tempted) return;
+  const owner = other(witnesser);
+  const crown = unitOf(state.altitudes[0], owner);
+  if (!crown || crown.veiled || crown.cardId !== "thorncrown") return;
+  if (sightOf(state, witnesser) < 1) return;
+  setSight(state, witnesser, sightOf(state, witnesser) - 1);
+}
+
 function notifySlagReaperOnStrain(state: MatchState, strainedSide: Side): void {
   const owner = other(strainedSide);
   if (state.slagStrainDrawUsed[owner]) return;
   for (let a = 0; a < ALTITUDE_COUNT; a++) {
     const u = unitOf(state.altitudes[a as Altitude], owner);
     if (u?.veiled && u.cardId === "slag_reaper") {
-      drawOne(state, owner);
+      abilitySight(state, owner);
       state.slagStrainDrawUsed[owner] = true;
       return;
     }
@@ -1006,6 +1517,13 @@ function lureWitness(state: MatchState, lureSide: Side, altitude: Altitude): boo
   setSight(state, lureSide, sightOf(state, lureSide) - cost);
   applySmotherSightTax(state, lureSide);
   applyRopeAuditorTax(state, lureSide, altitude);
+  applyLowscarWitnessTax(state, lureSide, altitude);
+  applyCinderWitnessTax(state, lureSide, altitude);
+  applySiltthornWitnessTax(state, lureSide, altitude);
+  {
+    const targ = unitOf(state.altitudes[altitude], other(lureSide));
+    if (targ) applyThorncrownWitnessTax(state, lureSide, altitude, targ);
+  }
 
   if (u.wagered) applyBust(state, targetSide, altitude, u);
 
@@ -1158,9 +1676,9 @@ function applyVeiledHoldAbility(
   if (u.cardId === "bell_debt_walker") {
     placeToll(state, side, altitude);
   }
-  // Litany Debtor: Hold on Tolled altitude → draw 1
+  // Litany Debtor: Hold on Tolled altitude → gain 1 Sight
   if (u.cardId === "parasol_debtor" && altitudeIsTolled(state, altitude)) {
-    drawOne(state, side);
+    abilitySight(state, side);
   }
   // Lowcloth Warden: Hold on Low while Low Tolled → Blind Low
   if (u.cardId === "lowcloth_warden" && altitude === 2 && altitudeIsTolled(state, 2)) {
@@ -1177,6 +1695,29 @@ function applyVeiledHoldAbility(
     controlsWitnessedFigure(state, side, 2)
   ) {
     blindAltitude(state, side, 2);
+  }
+  // Cinder Warden: Hold on Low while you control a Halo'd Figure → Blind Low
+  if (u.cardId === "cinder_warden" && altitude === 2) {
+    let hasHalo = false;
+    for (let a = 0; a < ALTITUDE_COUNT; a++) {
+      if (unitOf(state.altitudes[a as Altitude], side)?.haloed) {
+        hasHalo = true;
+        break;
+      }
+    }
+    if (hasHalo) blindAltitude(state, side, 2);
+  }
+  // Siltthorn: Hold on Low while you control a Branded enemy → Blind Low
+  if (u.cardId === "siltthorn" && altitude === 2) {
+    let hasBrand = false;
+    for (let a = 0; a < ALTITUDE_COUNT; a++) {
+      const foe = unitOf(state.altitudes[a as Altitude], other(side));
+      if (foe?.branded && foe.brandedBy === side) {
+        hasBrand = true;
+        break;
+      }
+    }
+    if (hasBrand) blindAltitude(state, side, 2);
   }
 }
 
@@ -1196,13 +1737,10 @@ function applyVeiledWinAbility(
   } else if (u.cardId === "mire_duelist") {
     const foe = unitOf(state.altitudes[altitude], other(side));
     if (foe?.stained && getCard(foe.cardId).type === "figure") {
-      drawOne(state, side);
+      abilitySight(state, side);
     }
   } else if (u.cardId === "cliff_maw" && altitude === 0) {
-    drawOne(state, side);
-  } else if (u.cardId === "diamond_widow" && u.stanceB && u.wagered) {
-    drawOne(state, side);
-    drawOne(state, side);
+    abilitySight(state, side);
   } else if (u.cardId === "favor_broker" && u.stanceB && u.wagered) {
     setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
   } else if (u.cardId === "rivet_vanguard") {
@@ -1487,7 +2025,7 @@ function blindAltitude(state: MatchState, side: Side, altitude: Altitude): void 
   const foe = unitOf(state.altitudes[altitude], other(side));
   if (foe?.stained && getCard(foe.cardId).type === "figure" && hasBlotLens(state, side)) {
     setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
-    if (altitude === 2) drawOne(state, side);
+    if (altitude === 2) abilitySight(state, side);
   }
   notifyBlindfoldCharm(state, side, altitude);
 }
@@ -1706,7 +2244,7 @@ function onPressErased(
     const u = unitOf(state.altitudes[a as Altitude], presser);
     if (!u) continue;
     if (u.veiled && u.cardId === "pale_bailiff") {
-      drawOne(state, presser);
+      abilitySight(state, presser);
       break;
     }
   }
@@ -1756,6 +2294,13 @@ function setSight(state: MatchState, side: Side, n: number): void {
   if (side === "player") state.sight = n;
   else state.enemySight = n;
 }
+
+/** Card-ability payoff — Sight, never dig the hand. */
+function abilitySight(state: MatchState, side: Side, n = 1): void {
+  if (n <= 0) return;
+  setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + n));
+}
+
 
 function other(side: Side): Side {
   return side === "player" ? "enemy" : "player";
@@ -1886,6 +2431,30 @@ export function unitPower(state: MatchState, altitude: Altitude, side: Side): nu
   if (def.type === "figure" && state.tollOwner[altitude] === side) {
     p += 1;
   }
+  // Lumen Halo: +1 while Halo'd and Witnessed
+  if (def.type === "figure" && u.haloed && !u.veiled) {
+    p += 1;
+  }
+  // Sunwell: Halo'd Figures here +1
+  if (def.type === "figure" && u.haloed && !u.veiled && siteOf(slot, side) === "sunwell") {
+    p += 1;
+  }
+  // Halo Gallery: other Halo'd Figures +1 while Halo'd Figure on Gallery
+  if (def.type === "figure" && u.haloed && !u.veiled) {
+    for (let a = 0; a < ALTITUDE_COUNT; a++) {
+      if (a === altitude) continue;
+      if (siteOf(state.altitudes[a as Altitude], side) !== "halo_gallery") continue;
+      const host = unitOf(state.altitudes[a as Altitude], side);
+      if (host?.haloed && !host.veiled && getCard(host.cardId).type === "figure") {
+        p += 1;
+        break;
+      }
+    }
+  }
+  // Candela Blade: Veiled +1 while another Halo'd
+  if (u.cardId === "candela_blade" && u.veiled && controlsOtherHaloed(state, side, altitude)) {
+    p += 1;
+  }
   // Highscar Lancer: Veiled +1 on High
   if (u.cardId === "highscar_lancer" && u.veiled && altitude === 0) {
     p += 1;
@@ -1902,6 +2471,11 @@ export function unitPower(state: MatchState, altitude: Altitude, side: Side): nu
   if (def.type === "figure" && !u.veiled && siteOf(slot, side) === "openwell") {
     p += 1;
   }
+  // Wantwell: Figure here +1 while Branded enemy here
+  if (def.type === "figure" && siteOf(slot, side) === "wantwell") {
+    const foe = unitOf(slot, other(side));
+    if (foe?.branded && foe.brandedBy === side) p += 1;
+  }
   // Banner Drill: other Witnessed Figures +1 while Witnessed Figure on Drill
   if (def.type === "figure" && !u.veiled) {
     for (let a = 0; a < ALTITUDE_COUNT; a++) {
@@ -1909,6 +2483,18 @@ export function unitPower(state: MatchState, altitude: Altitude, side: Side): nu
       if (siteOf(state.altitudes[a as Altitude], side) !== "banner_drill") continue;
       const host = unitOf(state.altitudes[a as Altitude], side);
       if (host && !host.veiled && getCard(host.cardId).type === "figure") {
+        p += 1;
+        break;
+      }
+    }
+  }
+  // Lace Gallery: other Figures +1 while Branded enemy on Gallery
+  if (def.type === "figure") {
+    for (let a = 0; a < ALTITUDE_COUNT; a++) {
+      if (a === altitude) continue;
+      if (siteOf(state.altitudes[a as Altitude], side) !== "lace_gallery") continue;
+      const foe = unitOf(state.altitudes[a as Altitude], other(side));
+      if (foe?.branded && foe.brandedBy === side) {
         p += 1;
         break;
       }
@@ -1965,16 +2551,6 @@ export function unitPower(state: MatchState, altitude: Altitude, side: Side): nu
   // Tithe Mast: Figures here +1 while Mid empty of enemy Figure
   if (def.type === "figure" && siteOf(slot, side) === "tithe_mast" && midHasNoEnemyFigure(state, side)) {
     p += 1;
-  }
-  // Eclipse Sovereign: Witnessed + Eclipse — Dusk Ledger Figures +1
-  if (def.type === "figure" && def.heresy === "deal" && eclipseOf(state, side) > 0) {
-    for (let a = 0; a < ALTITUDE_COUNT; a++) {
-      const sov = unitOf(state.altitudes[a as Altitude], side);
-      if (sov && !sov.veiled && sov.cardId === "eclipse_sovereign") {
-        p += 1;
-        break;
-      }
-    }
   }
   if (altitude === 2 && u.veiled && def.type === "figure") p += 1;
 
@@ -2265,10 +2841,20 @@ export function beginTurn(state: MatchState, side: Side, roundStart = false): vo
   state.wagerUsed[side] = false;
   state.pressUsed[side] = false;
   state.pealUsed[side] = false;
+  state.temptUsed[side] = false;
   state.soundTollPealBonus[side] = false;
   state.debtorBustDrawUsed[side] = false;
   state.favorGainedThisTurn[side] = false;
+  state.lumenShrineSustainFree[side] = true;
+  state.lumenUsherSustainSight[side] = true;
+  state.desireAltarTemptFree[side] = true;
+  state.ruinBrandlaceTemptSight[side] = true;
   state.figurePlaysThisWindow[side] = [0, 0, 0];
+  // Clear Sustain marks; Halo persists until Blaze burnout
+  for (let a = 0; a < ALTITUDE_COUNT; a++) {
+    const u = unitOf(state.altitudes[a as Altitude], side);
+    if (u) u.haloSustained = false;
+  }
   // False Hold / Smile That Holds last until your next turn begins
   state.falseHoldArmed[side] = false;
   state.falseFaceArmed[side] = false;
@@ -2285,6 +2871,8 @@ export function beginTurn(state: MatchState, side: Side, roundStart = false): vo
     state.pressUsed.enemy = false;
     state.pealUsed.player = false;
     state.pealUsed.enemy = false;
+    state.temptUsed.player = false;
+    state.temptUsed.enemy = false;
     state.debtorBustDrawUsed.player = false;
     state.debtorBustDrawUsed.enemy = false;
     state.favorGainedThisTurn.player = false;
@@ -2407,20 +2995,26 @@ function checkFallLaw(state: MatchState, side: Side, enemyFalls: number): void {
 function applyFallTriggers(state: MatchState, fallenSide: Side, altitude: Altitude, fallen: BoardUnit): void {
   const owner = fallenSide;
   if (fallen.cardId === "root_chassis") {
-    drawOne(state, owner);
+    abilitySight(state, owner);
     setSight(state, owner, Math.min(SIGHT_CARRY_CAP, sightOf(state, owner) + 1));
   }
   if (fallen.cardId === "dahaka") {
-    drawOne(state, owner);
+    abilitySight(state, owner);
   }
   if (fallen.cardId === "lady_masque") {
-    drawOne(state, owner);
+    abilitySight(state, owner);
   }
   if (fallen.cardId === "carillon") {
-    drawOne(state, owner);
+    abilitySight(state, owner);
   }
   if (fallen.cardId === "skaroth") {
-    drawOne(state, owner);
+    abilitySight(state, owner);
+  }
+  if (fallen.cardId === "solarch") {
+    abilitySight(state, owner);
+  }
+  if (fallen.cardId === "veloth") {
+    abilitySight(state, owner);
   }
   if (fallen.cardId === "iron_urn") {
     const openAlt = pickOtherFriendlyVeiledFigure(state, owner, altitude);
@@ -2437,28 +3031,28 @@ function applyFallTriggers(state: MatchState, fallenSide: Side, altitude: Altitu
     }
   }
   if (fallen.cardId === "abyss_sovereign") {
-    drawOne(state, owner);
+    abilitySight(state, owner);
   }
   if (fallen.cardId === "sovereign_of_grins") {
-    drawOne(state, owner);
+    abilitySight(state, owner);
   }
   if (fallen.cardId === "eclipse_sovereign") {
-    drawOne(state, owner);
+    abilitySight(state, owner);
   }
   if (fallen.cardId === "wick_throne") {
-    drawOne(state, owner);
+    abilitySight(state, owner);
   }
   if (fallen.cardId === "bone_lantern" && countVessels(state, owner) > 1) {
     setSight(state, owner, Math.min(SIGHT_CARRY_CAP, sightOf(state, owner) + 1));
   }
   if (fallen.cardId === "wick_urn" && countVessels(state, owner) > 1) {
-    drawOne(state, owner);
+    abilitySight(state, owner);
   }
   if (getCard(fallen.cardId).type === "vessel") {
     for (const siteSide of ["player", "enemy"] as Side[]) {
       if (siteOf(state.altitudes[altitude], siteSide) !== "shard_cache") continue;
       if (fallenSide !== siteSide) continue;
-      drawOne(state, siteSide);
+      abilitySight(state, siteSide);
     }
   }
   if (fallen.cardId === "tithe_urn" && eclipseOf(state, owner) > 0) {
@@ -2468,7 +3062,7 @@ function applyFallTriggers(state: MatchState, fallenSide: Side, altitude: Altitu
     gainEclipse(state, owner, 1);
   }
   if (fallen.cardId === "borrowed_face_urn" && fallen.stanceB) {
-    drawOne(state, owner);
+    abilitySight(state, owner);
   }
   if (fallen.cardId === "gulf_urn") {
     if (stainEnemyVeiled(state, owner)) {
@@ -2492,6 +3086,45 @@ function applyFallTriggers(state: MatchState, fallenSide: Side, altitude: Altitu
       if (lureAlt != null) lureWitness(state, owner, lureAlt);
     }
   }
+  if (fallen.cardId === "lumen_urn") {
+    setSight(state, owner, Math.min(SIGHT_CARRY_CAP, sightOf(state, owner) + 1));
+  }
+  if (fallen.cardId === "want_urn") {
+    let tempted = false;
+    for (const prefer of [0, 1, 2] as Altitude[]) {
+      if (tryTempt(state, owner, prefer, { skipUsed: true })) {
+        tempted = true;
+        break;
+      }
+    }
+    if (!tempted) {
+      setSight(state, owner, Math.min(SIGHT_CARRY_CAP, sightOf(state, owner) + 1));
+    }
+  }
+  if (fallen.cardId === "hunger_urn") {
+    if (controlsBrandedEnemy(state, owner)) {
+      setSight(state, owner, Math.min(SIGHT_CARRY_CAP, sightOf(state, owner) + 1));
+    } else {
+      for (const prefer of [0, 1, 2] as Altitude[]) {
+        if (tryTempt(state, owner, prefer, { skipUsed: true })) break;
+      }
+    }
+  }
+  if (fallen.cardId === "radiance_urn") {
+    let hasHalo = false;
+    for (let a = 0; a < ALTITUDE_COUNT; a++) {
+      if (unitOf(state.altitudes[a as Altitude], owner)?.haloed) {
+        hasHalo = true;
+        break;
+      }
+    }
+    if (hasHalo) {
+      setSight(state, owner, Math.min(SIGHT_CARRY_CAP, sightOf(state, owner) + 1));
+    } else {
+      const openAlt = pickOtherFriendlyVeiledLumen(state, owner, altitude);
+      if (openAlt != null) openOwnFigure(state, owner, openAlt, { free: true });
+    }
+  }
   if (fallen.cardId === "masque_urn") {
     freeWagerOtherFigure(state, owner, altitude);
   }
@@ -2509,11 +3142,11 @@ function applyFallTriggers(state: MatchState, fallenSide: Side, altitude: Altitu
     setSight(state, siteSide, Math.min(SIGHT_CARRY_CAP, sightOf(state, siteSide) + 1));
   }
   if (fallen.cardId === "millwright_colossus" && fallen.grafts.length > 0) {
-    drawOne(state, owner);
+    abilitySight(state, owner);
   }
   // Graft heresy: Fall recycles attachment value
   if (getCard(fallen.cardId).heresy === "graft" && fallen.grafts.length > 0) {
-    drawOne(state, owner);
+    abilitySight(state, owner);
   }
   if (fallen.cardId === "split_gaze_seraph" && fallen.stanceB) {
     gainEclipse(state, owner, 1);
@@ -2545,6 +3178,7 @@ function fallUnit(state: MatchState, side: Side, altitude: Altitude): void {
   const slot = state.altitudes[altitude];
   const u = unitOf(slot, side);
   if (!u) return;
+  clearHalo(u);
   const hand = handOf(state, side);
   const fallRelease = FALL_RELEASE_VESSELS.has(u.cardId) && !!u.inhabitant;
   const releaseId = fallRelease ? u.inhabitant : null;
@@ -2656,15 +3290,15 @@ function resolveRound(state: MatchState): void {
           setSight(state, "player", Math.min(SIGHT_CARRY_CAP, sightOf(state, "player") + 1));
         }
         if (playerU.grafts.some((g) => g.cardId === "rivet_charm") && !state.rivetCharmDrawUsed.player) {
-          drawOne(state, "player");
+          abilitySight(state, "player");
           state.rivetCharmDrawUsed.player = true;
         }
         if (playerU.grafts.some((g) => g.cardId === "eyebrand_charm")) {
           setSight(state, "player", Math.min(SIGHT_CARRY_CAP, sightOf(state, "player") + 1));
-          if (alt === 0) drawOne(state, "player");
+          if (alt === 0) abilitySight(state, "player");
         }
         if (playerU.cardId === "cliffbrand_captain" && alt === 0) {
-          drawOne(state, "player");
+          abilitySight(state, "player");
         }
       }
       if (playerU && !playerU.veiled) playerU.strained = false;
@@ -2705,7 +3339,7 @@ function resolveRound(state: MatchState): void {
         tryPayToll(state, "enemy", alt, { clear: true });
       }
       if (playerU?.cardId === "shard_blade" && hasInhabitantInVessel(state, "player")) {
-        drawOne(state, "player");
+        abilitySight(state, "player");
       }
       push(state, {
         type: "lane_result",
@@ -2754,15 +3388,15 @@ function resolveRound(state: MatchState): void {
           setSight(state, "enemy", Math.min(SIGHT_CARRY_CAP, sightOf(state, "enemy") + 1));
         }
         if (enemyU.grafts.some((g) => g.cardId === "rivet_charm") && !state.rivetCharmDrawUsed.enemy) {
-          drawOne(state, "enemy");
+          abilitySight(state, "enemy");
           state.rivetCharmDrawUsed.enemy = true;
         }
         if (enemyU.grafts.some((g) => g.cardId === "eyebrand_charm")) {
           setSight(state, "enemy", Math.min(SIGHT_CARRY_CAP, sightOf(state, "enemy") + 1));
-          if (alt === 0) drawOne(state, "enemy");
+          if (alt === 0) abilitySight(state, "enemy");
         }
         if (enemyU.cardId === "cliffbrand_captain" && alt === 0) {
-          drawOne(state, "enemy");
+          abilitySight(state, "enemy");
         }
       }
       if (enemyU && !enemyU.veiled) enemyU.strained = false;
@@ -2803,7 +3437,7 @@ function resolveRound(state: MatchState): void {
         tryPayToll(state, "player", alt, { clear: true });
       }
       if (enemyU?.cardId === "shard_blade" && hasInhabitantInVessel(state, "enemy")) {
-        drawOne(state, "enemy");
+        abilitySight(state, "enemy");
       }
       push(state, {
         type: "lane_result",
@@ -2850,6 +3484,10 @@ function resolveRound(state: MatchState): void {
   state.pathBellmanBuff.enemy = false;
   state.fullBreachArmed.player = false;
   state.fullBreachArmed.enemy = false;
+  state.lumenFullRadianceArmed.player = false;
+  state.lumenFullRadianceArmed.enemy = false;
+  state.ruinFullDevourArmed.player = false;
+  state.ruinFullDevourArmed.enemy = false;
   state.ashcoilBuff.player = 0;
   state.ashcoilBuff.enemy = 0;
   state.skarothPowerArmed.player = false;
@@ -2882,6 +3520,8 @@ function resolveRound(state: MatchState): void {
 }
 
 function onPass(state: MatchState, side: Side): void {
+  runLumenBlazeAndBurnout(state, side);
+  runRuinDevour(state, side);
   // Empty-Sight Pass no longer grants Eclipse — races were Motley/Ink Sight-economy skew.
   // Eclipse comes from cards, heresy payoffs, and Break pressure.
   checkProphecy(state, side);
@@ -3051,7 +3691,7 @@ function onStanceChanged(
     setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
   }
   if (site === "facet_shrine") {
-    drawOne(state, side);
+    abilitySight(state, side);
   }
   if (site === "grinning_colonnade") {
     setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
@@ -3082,7 +3722,7 @@ function noteStanceSwitch(state: MatchState, side: Side, altitude: Altitude): vo
     if (site === "twinspoke_banner" || site === "hall_of_borrowed_faces") {
       setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
     }
-    if (site === "facet_shrine") drawOne(state, side);
+    if (site === "facet_shrine") abilitySight(state, side);
   }
 }
 
@@ -3181,7 +3821,7 @@ function applyRevelation(
   const slot = state.altitudes[altitude];
 
   if (u.grafts.some((g) => g.cardId === "ace_of_hollows") && eclipseOf(state, hostSide) > 0) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (u.grafts.some((g) => g.cardId === "bone_wick_charm") && hasVesselInPlay(state, hostSide)) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
@@ -3190,7 +3830,7 @@ function applyRevelation(
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
   }
   if (u.grafts.some((g) => g.cardId === "splice_token") && hasGraftSite(state, hostSide)) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (u.grafts.some((g) => g.cardId === "void_charm")) {
     markBlind(state, altitude);
@@ -3218,20 +3858,20 @@ function applyRevelation(
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
   }
   if (u.grafts.some((g) => g.cardId === "wick_charm") && hasVesselInPlay(state, hostSide)) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (u.grafts.some((g) => g.cardId === "iris_charm") && controlsGazeAltitude(state, hostSide)) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
   }
   if (u.grafts.some((g) => g.cardId === "banner_charm") && controlsSiteId(state, hostSide, "veil_banner")) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (u.grafts.some((g) => g.cardId === "dusk_seal") && eclipseOf(state, hostSide) > 0) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (u.grafts.some((g) => g.cardId === "paystone_charm")) {
     if (spendEclipse(state, hostSide, 1)) {
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
       if (midHasNoEnemyFigure(state, hostSide)) {
         setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
       }
@@ -3250,7 +3890,7 @@ function applyRevelation(
     }
   }
   if (u.grafts.some((g) => g.cardId === "mill_charm") && hasGraftSite(state, hostSide)) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (u.grafts.some((g) => g.cardId === "pale_charm")) {
     markBlind(state, 2 as Altitude);
@@ -3277,7 +3917,7 @@ function applyRevelation(
     hasDeepSite(state, hostSide) &&
     countVeiledFigures(state, hostSide) > 0
   ) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (u.grafts.some((g) => g.cardId === "heliograph_charm") && controlsGazeAltitude(state, hostSide)) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
@@ -3310,7 +3950,7 @@ function applyRevelation(
         blinded += 1;
       }
     }
-    if (blinded >= 2) drawOne(state, hostSide);
+    if (blinded >= 2) abilitySight(state, hostSide);
   }
   if (def.id === "well_cantor") {
     state.inkChoirBuff[hostSide] = true;
@@ -3365,13 +4005,13 @@ function applyRevelation(
       blindAltitude(state, hostSide, 2);
       const lowFoe = unitOf(state.altitudes[2], other(hostSide));
       if (lowFoe?.stained && getCard(lowFoe.cardId).type === "figure") {
-        drawOne(state, hostSide);
+        abilitySight(state, hostSide);
       }
     }
   }
   if (def.id === "ink_matron") {
     const n = countEnemyStainedFigures(state, hostSide);
-    if (n >= 1) drawOne(state, hostSide);
+    if (n >= 1) blindAltitude(state, hostSide, 1);
     if (n >= 2) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
@@ -3406,8 +4046,167 @@ function applyRevelation(
       }
     }
     if (stained >= 2) {
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
       blindAltitude(state, hostSide, 1);
+    }
+  }
+  if (def.id === "halo_herald") {
+    const foe = unitOf(slot, other(hostSide));
+    if (foe?.veiled) {
+      setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
+    }
+  }
+  if (def.id === "thorn_liaison") {
+    tryTempt(state, hostSide, altitude, { skipUsed: true });
+  }
+  if (def.id === "crimson_vow") {
+    const midFoe = unitOf(state.altitudes[1], other(hostSide));
+    if (midFoe?.veiled && !midFoe.tempted) {
+      tryTempt(state, hostSide, 1, { skipUsed: true });
+    } else {
+      const here = unitOf(slot, other(hostSide));
+      if (here && !here.veiled) applyBrand(state, hostSide, altitude, here);
+    }
+  }
+  if (def.id === "spire_hunger" && altitude === 0) {
+    for (const prefer of [0, 1, 2] as Altitude[]) {
+      const foe = unitOf(state.altitudes[prefer], other(hostSide));
+      if (foe?.tempted) {
+        applyBrand(state, hostSide, prefer, foe);
+        break;
+      }
+    }
+  }
+  if (def.id === "vespera") {
+    tryTempt(state, hostSide, altitude, { skipUsed: true });
+  }
+  if (def.id === "want_urn") {
+    if (!tryTempt(state, hostSide, altitude, { skipUsed: true })) {
+      const here = unitOf(slot, other(hostSide));
+      if (here && !here.veiled) applyBrand(state, hostSide, altitude, here);
+    }
+  }
+  if (def.id === "thorncrown") {
+    if (altitude === 0) {
+      let branded = false;
+      for (const prefer of [0, 1, 2] as Altitude[]) {
+        const foe = unitOf(state.altitudes[prefer], other(hostSide));
+        if (foe?.tempted) {
+          applyBrand(state, hostSide, prefer, foe);
+          branded = true;
+          break;
+        }
+      }
+      if (!branded) tryTempt(state, hostSide, altitude, { skipUsed: true });
+    } else {
+      tryTempt(state, hostSide, altitude, { skipUsed: true });
+    }
+  }
+  if (def.id === "siltthorn") {
+    if (altitude === 2) {
+      if (!tryTempt(state, hostSide, altitude, { skipUsed: true })) {
+        setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
+      }
+    } else {
+      setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
+    }
+  }
+  if (def.id === "brandlace") {
+    const midFoe = unitOf(state.altitudes[1], other(hostSide));
+    if (midFoe?.veiled && !midFoe.tempted) {
+      tryTempt(state, hostSide, 1, { skipUsed: true });
+    } else if (midFoe && !midFoe.veiled) {
+      applyBrand(state, hostSide, 1, midFoe);
+    }
+  }
+  if (def.id === "veloth") {
+    for (const prefer of [altitude, 1, 0, 2] as Altitude[]) {
+      if (tryTempt(state, hostSide, prefer, { skipUsed: true })) break;
+    }
+    for (const prefer of [0, 1, 2] as Altitude[]) {
+      const foe = unitOf(state.altitudes[prefer], other(hostSide));
+      if (foe?.tempted) {
+        applyBrand(state, hostSide, prefer, foe);
+        break;
+      }
+    }
+    if (countBrandedEnemyFigures(state, hostSide) >= 2) {
+      dealWillToOpponent(state, hostSide, 1);
+      abilitySight(state, hostSide);
+    }
+  }
+  if (def.id === "hunger_urn") {
+    let tempted = false;
+    for (const prefer of [altitude, 1, 0, 2] as Altitude[]) {
+      if (tryTempt(state, hostSide, prefer, { skipUsed: true })) {
+        tempted = true;
+        break;
+      }
+    }
+    if (!tempted) {
+      setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 2));
+    }
+  }
+  if (def.id === "skyflare_seraph") {
+    if (altitude === 0 && unitOf(slot, other(hostSide))) {
+      blindAltitude(state, hostSide, 0);
+    } else {
+      setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
+    }
+  }
+  if (def.id === "highflare_cantor") {
+    if (altitude === 0 && unitOf(slot, other(hostSide))) {
+      blindAltitude(state, hostSide, 0);
+    } else {
+      setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
+    }
+  }
+  if (def.id === "veilburn_usher") {
+    let opened = false;
+    for (const prefer of [1, 0, 2] as Altitude[]) {
+      if (prefer === altitude) continue;
+      const ou = unitOf(state.altitudes[prefer], hostSide);
+      if (
+        ou?.veiled &&
+        getCard(ou.cardId).type === "figure" &&
+        getCard(ou.cardId).heresy === "lumen"
+      ) {
+        openOwnFigure(state, hostSide, prefer, { discount: 1 });
+        opened = true;
+        break;
+      }
+    }
+    if (!opened) {
+      setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
+    }
+  }
+  if (def.id === "solarch") {
+    grantHalo(state, hostSide, altitude, u);
+    const openAlt = pickOtherFriendlyVeiledLumen(state, hostSide, altitude);
+    if (openAlt != null) openOwnFigure(state, hostSide, openAlt, { discount: 1 });
+    if (countHaloedFigures(state, hostSide) >= 2) {
+      dealWillToOpponent(state, hostSide, 1);
+      abilitySight(state, hostSide);
+    }
+  }
+  if (def.id === "radiance_urn") {
+    const openAlt = pickOtherFriendlyVeiledLumen(state, hostSide, altitude);
+    if (openAlt == null || !openOwnFigure(state, hostSide, openAlt, { free: true })) {
+      setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 2));
+    }
+  }
+  if (def.id === "lumen_urn") {
+    for (const prefer of [1, 0, 2] as Altitude[]) {
+      if (prefer === altitude) continue;
+      const ou = unitOf(state.altitudes[prefer], hostSide);
+      if (
+        ou?.veiled &&
+        getCard(ou.cardId).type === "figure" &&
+        getCard(ou.cardId).heresy === "lumen"
+      ) {
+        openOwnFigure(state, hostSide, prefer, { discount: 1 });
+        break;
+      }
     }
   }
   if (def.id === "abyss_sovereign") {
@@ -3420,7 +4219,7 @@ function applyRevelation(
         stained += 1;
       }
     }
-    if (stained >= 2) drawOne(state, hostSide);
+    if (stained >= 2) abilitySight(state, hostSide);
   }
   if (u.grafts.some((g) => g.cardId === "drip_seal")) {
     if (!stainEnemyVeiled(state, hostSide, altitude)) {
@@ -3436,7 +4235,7 @@ function applyRevelation(
     if (n >= 1) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
-    if (n >= 2) drawOne(state, hostSide);
+    if (n >= 2) abilitySight(state, hostSide);
   }
   if (
     siteOf(slot, hostSide) === "hall_of_borrowed_faces" &&
@@ -3453,7 +4252,7 @@ function applyRevelation(
     u.stanceB
   ) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
-    if (countStanceBFigures(state, hostSide) >= 2) drawOne(state, hostSide);
+    if (countStanceBFigures(state, hostSide) >= 2) abilitySight(state, hostSide);
   }
   if (u.grafts.some((g) => g.cardId === "otherface_seal")) {
     if (u.stanceB) {
@@ -3483,7 +4282,7 @@ function applyRevelation(
   }
   if (def.id === "grinning_debtor") {
     if (u.wagered) blindAltitude(state, hostSide, 2);
-    else drawOne(state, hostSide);
+    else abilitySight(state, hostSide);
   }
   if (def.id === "scarlet_dealer") {
     enterStanceB(state, hostSide, altitude, u);
@@ -3498,7 +4297,7 @@ function applyRevelation(
           break;
         }
       }
-      if (otherW) drawOne(state, hostSide);
+      if (otherW) gainFavor(state, hostSide, 1);
     }
   }
   if (def.id === "masque_urn") {
@@ -3512,7 +4311,7 @@ function applyRevelation(
   }
   if (def.id === "pit_capper") {
     freeWagerUnit(state, hostSide, altitude, u);
-    if (altitude === 2) drawOne(state, hostSide);
+    if (altitude === 2) gainFavor(state, hostSide, 1);
   }
   if (def.id === "favor_broker") {
     const wasB = u.stanceB;
@@ -3523,7 +4322,7 @@ function applyRevelation(
     freeWagerUnit(state, hostSide, altitude, u);
     if (countWageredFigures(state, hostSide) >= 2) {
       gainEclipse(state, hostSide, 1, "masque");
-      drawOne(state, hostSide);
+      gainFavor(state, hostSide, 1);
     }
   }
   if (def.id === "carnival_urn") {
@@ -3539,7 +4338,7 @@ function applyRevelation(
         if (enterStanceB(state, hostSide, a as Altitude, ou)) entered += 1;
       }
     }
-    if (entered >= 2) drawOne(state, hostSide);
+    if (entered >= 2) abilitySight(state, hostSide);
   }
   if (def.id === "ashen_halfmask") {
     enterStanceB(state, hostSide, altitude, u);
@@ -3551,7 +4350,7 @@ function applyRevelation(
   if (def.id === "grinrunner") {
     if (u.stanceB) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
     } else {
       enterStanceB(state, hostSide, altitude, u);
     }
@@ -3562,7 +4361,7 @@ function applyRevelation(
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
     const foe = unitOf(slot, other(hostSide));
-    if (foe?.veiled && getCard(foe.cardId).type === "figure") drawOne(state, hostSide);
+    if (foe?.veiled && getCard(foe.cardId).type === "figure") gainFavor(state, hostSide, 1);
   }
   if (def.id === "chance_step_dancer") {
     enterStanceB(state, hostSide, altitude, u);
@@ -3589,7 +4388,7 @@ function applyRevelation(
     }
     const foe = unitOf(slot, other(hostSide));
     if (foe && !foe.veiled && getCard(foe.cardId).type === "figure") {
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
     }
   }
   if (def.id === "tithe_widow") {
@@ -3610,7 +4409,7 @@ function applyRevelation(
       if (ou?.stanceB && getCard(ou.cardId).type === "figure") otherB = true;
     }
     if (otherB) {
-      drawOne(state, hostSide);
+      gainFavor(state, hostSide, 1);
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     } else {
       enterStanceB(state, hostSide, altitude, u);
@@ -3633,22 +4432,22 @@ function applyRevelation(
   }
   if (def.id === "stake_field_pilgrim") {
     if (!unitOf(slot, other(hostSide))) {
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
       if (altitude === 2) {
         setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
       }
     }
   }
   if (def.id === "keywright_scarecrow") {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
     if (hasGraftSite(state, hostSide)) {
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
     }
   }
   // ochre_vanguard: Eclipse on enemy fall (see applyFallTriggers)
   if (def.id === "echo_mask") switchOtherStance(state, hostSide, altitude);
   if (def.id === "ledger_jackal") {
-    if (eclipseOf(state, hostSide) > 0) drawOne(state, hostSide);
+    if (eclipseOf(state, hostSide) > 0) abilitySight(state, hostSide);
     else if (altitude === 1) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
@@ -3664,14 +4463,14 @@ function applyRevelation(
     if (after > before) gainEclipse(state, hostSide, 1);
   }
   if (def.id === "saltglass_courier" && altitude === 0) {
-    if (countVeiledFigures(state, hostSide) > 0) drawOne(state, hostSide);
+    if (countVeiledFigures(state, hostSide) > 0) abilitySight(state, hostSide);
     else setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
   }
   if (def.id === "pillar_cantor" && altitude === 1 && countCoralSites(state, hostSide) > 0) {
     gainEclipse(state, hostSide, 1);
   }
   if (def.id === "canister_hound" && altitude === 1 && controlsOtherGraft(state, hostSide, altitude)) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (def.id === "inkdrip_acolyte") markBlind(state, altitude);
   if (def.id === "mire_debtor" && altitude === 1) {
@@ -3680,7 +4479,7 @@ function applyRevelation(
   }
   if (def.id === "bone_lantern") releaseInhabitant(state, hostSide, altitude, u);
   if (def.id === "bell_hollow") {
-    if (forceReleaseInhabitantToHand(state, hostSide)) drawOne(state, hostSide);
+    if (forceReleaseInhabitantToHand(state, hostSide)) abilitySight(state, hostSide);
   }
   if (def.id === "shard_walker" && hasEmptyVessel(state, hostSide)) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
@@ -3702,23 +4501,7 @@ function applyRevelation(
   ) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
   }
-  if (
-    siteOf(slot, hostSide) === "dust_cache" &&
-    witnesser === hostSide &&
-    def.heresy === "deal" &&
-    def.type === "figure"
-  ) {
-    setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
-  }
   // Heresy sites → Mid Witness engines (like caches)
-  if (
-    siteOf(slot, hostSide) === "dust_ledger" &&
-    witnesser === hostSide &&
-    def.heresy === "deal" &&
-    def.type === "figure"
-  ) {
-    setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
-  }
   if (
     siteOf(slot, hostSide) === "pale_arch" &&
     witnesser === hostSide &&
@@ -3731,14 +4514,6 @@ function applyRevelation(
     siteOf(slot, hostSide) === "abyss_cairn" &&
     witnesser === hostSide &&
     def.heresy === "deep" &&
-    def.type === "figure"
-  ) {
-    setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
-  }
-  if (
-    siteOf(slot, hostSide) === "bone_gallery" &&
-    witnesser === hostSide &&
-    def.heresy === "shell" &&
     def.type === "figure"
   ) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
@@ -3765,10 +4540,10 @@ function applyRevelation(
   if (def.id === "sunset_creditor" && altitude === 1) {
     const had = eclipseOf(state, hostSide) > 0;
     gainEclipse(state, hostSide, 1);
-    if (had) drawOne(state, hostSide);
+    if (had) abilitySight(state, hostSide);
   }
   if (def.id === "ochre_dancer" && altitude === 2 && controlsSiteId(state, hostSide, "veil_banner")) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (def.id === "bell_debt_walker" && anyAltitudeTolled(state)) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
@@ -3790,7 +4565,7 @@ function applyRevelation(
     placeTollPrefer(state, hostSide, [0, 2]);
   }
   if (def.id === "parasol_debtor" && anyAltitudeTolled(state)) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (def.id === "path_bellman") {
     const midAlready = altitudeIsTolled(state, 1);
@@ -3824,23 +4599,23 @@ function applyRevelation(
     const lowAlready = altitudeIsTolled(state, 2);
     const placed = placeToll(state, hostSide, 2);
     if (!placed && lowAlready) {
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
     }
   }
   if (def.id === "rope_auditor") {
     if (!placeToll(state, hostSide, 1)) {
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
     }
   }
   if (def.id === "moss_handmaid" && altitude === 1 && controlsSiteId(state, hostSide, "abyss_cairn")) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
     if (countVeiledFigures(state, hostSide) > 0) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
   }
   if (def.id === "sail_widow") {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
-    if (altitude === 1 && hasGraftSite(state, hostSide)) drawOne(state, hostSide);
+    if (altitude === 1 && hasGraftSite(state, hostSide)) abilitySight(state, hostSide);
   }
   if (def.id === "cutwork_widow") {
     markBlind(state, 2 as Altitude);
@@ -3851,13 +4626,13 @@ function applyRevelation(
   }
   if (def.id === "wick_oracle" && altitude === 1) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
-    if (hasVesselInPlay(state, hostSide)) drawOne(state, hostSide);
+    if (hasVesselInPlay(state, hostSide)) abilitySight(state, hostSide);
   }
   if (def.id === "tide_singer" && altitude === 2 && controlsSiteId(state, hostSide, "low_tide_shrine")) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
-    if (hasInhabitantInVessel(state, hostSide)) drawOne(state, hostSide);
+    if (hasInhabitantInVessel(state, hostSide)) abilitySight(state, hostSide);
   }
-  if (def.id === "millwright_colossus" && altitude === 1) drawOne(state, hostSide);
+  if (def.id === "millwright_colossus" && altitude === 1) abilitySight(state, hostSide);
   if (def.id === "perforated_abbess") {
     markBlind(state, altitude);
   }
@@ -3871,11 +4646,11 @@ function applyRevelation(
     u.stanceB = !u.stanceB;
     noteStanceSwitch(state, hostSide, altitude);
     if (u.stanceB && controlsSiteId(state, hostSide, "mask_gallery")) {
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
     }
   }
   if (def.id === "river_jack" && altitude === 1 && controlsSiteId(state, hostSide, "dust_ledger")) {
-    if (eclipseOf(state, hostSide) > 0) drawOne(state, hostSide);
+    if (eclipseOf(state, hostSide) > 0) abilitySight(state, hostSide);
     else setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
   }
   if (def.id === "pillar_sovereign" && altitude === 1) {
@@ -3883,17 +4658,17 @@ function applyRevelation(
     if (n > 0) gainEclipse(state, hostSide, n);
   }
   if (def.id === "salt_veil") {
-    if (controlsSiteId(state, hostSide, "bone_gallery")) drawOne(state, hostSide);
+    if (controlsSiteId(state, hostSide, "bone_gallery")) abilitySight(state, hostSide);
     if (hasVesselInPlay(state, hostSide)) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
   }
   if (def.id === "ring_warden" && controlsGazeAltitude(state, hostSide)) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (def.id === "stake_runner") {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
-    if (countVeiledFigures(state, hostSide) > 0) drawOne(state, hostSide);
+    if (countVeiledFigures(state, hostSide) > 0) abilitySight(state, hostSide);
   }
   if (def.id === "cataract_bell" && altitude === 1) {
     if (hasDeepSite(state, hostSide)) {
@@ -3904,7 +4679,7 @@ function applyRevelation(
     tuckIntoEmptyVessel(state, hostSide);
   }
   if (def.id === "arch_debtor" && altitude === 1 && controlsSiteId(state, hostSide, "pale_arch")) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
     markBlind(state, 2 as Altitude);
   }
   if (def.id === "parasol_debtor" && controlsSiteId(state, hostSide, "parasol_path")) {
@@ -3912,7 +4687,7 @@ function applyRevelation(
   }
   if (def.id === "key_debtor" && altitude === 1 && hasGraftSite(state, hostSide)) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
-    if (u.grafts.length > 0) drawOne(state, hostSide);
+    if (u.grafts.length > 0) abilitySight(state, hostSide);
   }
   if (def.id === "mesa_bell" && altitude === 0) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
@@ -3936,7 +4711,7 @@ function applyRevelation(
     }
   }
   if (def.id === "low_runner" && altitude === 2) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
     if (controlsSiteId(state, hostSide, "veil_banner")) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
@@ -3971,7 +4746,7 @@ function applyRevelation(
     if (controlsSiteId(state, hostSide, "veil_banner") || unitOf(state.altitudes[2], hostSide)?.veiled) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
-    if (countVeiledFigures(state, hostSide) >= 2) drawOne(state, hostSide);
+    if (countVeiledFigures(state, hostSide) >= 2) abilitySight(state, hostSide);
   }
   if (def.id === "iris_urn") {
     releaseInhabitant(state, hostSide, altitude, u);
@@ -3981,10 +4756,10 @@ function applyRevelation(
   }
   if (def.id === "key_cantor" && altitude === 1 && hasGraftSite(state, hostSide)) {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
-    if (u.grafts.length > 0) drawOne(state, hostSide);
+    if (u.grafts.length > 0) abilitySight(state, hostSide);
   }
   if (def.id === "dusk_cantor") {
-    if (eclipseOf(state, hostSide) > 0) drawOne(state, hostSide);
+    if (eclipseOf(state, hostSide) > 0) abilitySight(state, hostSide);
     if (altitude === 1) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
@@ -3999,7 +4774,7 @@ function applyRevelation(
   }
   if (def.id === "holecloak_auditor") {
     if (eclipseOf(state, hostSide) > 0) {
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     } else {
       gainEclipse(state, hostSide, 1);
@@ -4007,7 +4782,7 @@ function applyRevelation(
   }
   if (def.id === "amber_widow") {
     if (eclipseOf(state, other(hostSide)) > 0) gainEclipse(state, hostSide, 1);
-    if (eclipseOf(state, hostSide) > 0) drawOne(state, hostSide);
+    if (eclipseOf(state, hostSide) > 0) abilitySight(state, hostSide);
   }
   if (def.id === "windkey_courier") {
     setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
@@ -4022,8 +4797,8 @@ function applyRevelation(
   }
   if (def.id === "sundebt_widow") {
     if (spendEclipse(state, hostSide, 1)) {
-      drawOne(state, hostSide);
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
+      abilitySight(state, hostSide);
     } else {
       gainEclipse(state, hostSide, 1);
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
@@ -4031,12 +4806,12 @@ function applyRevelation(
   }
   if (def.id === "recall_cantor") {
     bounceFriendlyVeiledElsewhere(state, hostSide, altitude);
-    if (eclipseOf(state, hostSide) > 0) drawOne(state, hostSide);
+    if (eclipseOf(state, hostSide) > 0) abilitySight(state, hostSide);
     else setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
   }
   if (def.id === "tithe_urn") {
     releaseInhabitant(state, hostSide, altitude, u);
-    if (eclipseOf(state, hostSide) > 0) drawOne(state, hostSide);
+    if (eclipseOf(state, hostSide) > 0) abilitySight(state, hostSide);
   }
   if (def.id === "cliff_creditor") {
     const opp = other(hostSide);
@@ -4052,7 +4827,7 @@ function applyRevelation(
     state.debtSurgeArmed[hostSide] = true;
   }
   if (def.id === "mesa_duelist") {
-    if (midHasNoEnemyFigure(state, hostSide)) drawOne(state, hostSide);
+    if (midHasNoEnemyFigure(state, hostSide)) abilitySight(state, hostSide);
     if (eclipseOf(state, hostSide) > 0) state.mesaBuffAlt[hostSide] = altitude;
   }
   if (def.id === "coin_urn") {
@@ -4084,13 +4859,13 @@ function applyRevelation(
     if (n > 0) setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + n));
   }
   if (def.id === "horn_runner" && altitude === 1 && hasStanceBFigure(state, hostSide)) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
     if (u.stanceB) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
   }
   if (def.id === "midwick_voice") {
-    if (altitude === 1 && hasVesselInPlay(state, hostSide)) drawOne(state, hostSide);
+    if (altitude === 1 && hasVesselInPlay(state, hostSide)) abilitySight(state, hostSide);
     else setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
   }
   if (def.id === "parasol_runner" && altitude === 1 && controlsGazeAltitude(state, hostSide)) {
@@ -4117,7 +4892,7 @@ function applyRevelation(
 
   // ——— Waves 17–25 · Heresy Seals ———
   if (def.id === "ochre_warden" && altitude === 2 && countVeiledFigures(state, hostSide) > 0) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (
     siteOf(slot, hostSide) === "stake_mast" &&
@@ -4141,15 +4916,6 @@ function applyRevelation(
     if (altitude === 1 && !unitOf(slot, other(hostSide))) {
       gainEclipse(state, hostSide, 1);
     }
-  }
-  if (
-    siteOf(slot, hostSide) === "coin_gallery" &&
-    witnesser === hostSide &&
-    def.heresy === "deal" &&
-    def.type === "figure" &&
-    eclipseOf(state, hostSide) > 0
-  ) {
-    drawOne(state, hostSide);
   }
   if (
     siteOf(slot, hostSide) === "empty_mesa" &&
@@ -4179,7 +4945,7 @@ function applyRevelation(
     }
   }
   if (def.id === "brass_hound" && altitude === 1 && u.grafts.length > 0) {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
   }
   if (
     siteOf(slot, hostSide) === "sail_cache" &&
@@ -4234,10 +5000,10 @@ function applyRevelation(
     if (hasVesselInPlay(state, hostSide)) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
-    if (hasInhabitantInVessel(state, hostSide)) drawOne(state, hostSide);
+    if (hasInhabitantInVessel(state, hostSide)) abilitySight(state, hostSide);
   }
   if (def.id === "tide_chanter") {
-    if (altitude === 1 && hasInhabitantInVessel(state, hostSide)) drawOne(state, hostSide);
+    if (altitude === 1 && hasInhabitantInVessel(state, hostSide)) abilitySight(state, hostSide);
     else if (hasVesselInPlay(state, hostSide)) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
@@ -4246,7 +5012,7 @@ function applyRevelation(
     markBlind(state, altitude);
   }
   if (def.id === "gallery_keeper") {
-    if (hasInhabitantInVessel(state, hostSide)) drawOne(state, hostSide);
+    if (hasInhabitantInVessel(state, hostSide)) abilitySight(state, hostSide);
     state.vesselSurgeArmed[hostSide] = true;
   }
   if (def.id === "shard_blade" && hasVesselInPlay(state, hostSide)) {
@@ -4269,7 +5035,7 @@ function applyRevelation(
     if (altitude === 1) {
       setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
     }
-    if (countVeiledFigures(state, hostSide) > 0) drawOne(state, hostSide);
+    if (countVeiledFigures(state, hostSide) > 0) abilitySight(state, hostSide);
   }
   if (
     siteOf(slot, hostSide) === "cataract_cache" &&
@@ -4315,11 +5081,11 @@ function applyRevelation(
     if (n > 0) setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + n));
   }
   if (def.id === "highscar_lancer") {
-    if (altitude === 0) drawOne(state, hostSide);
+    if (altitude === 0) dealWillToOpponent(state, hostSide, 1);
     else setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
   }
   if (def.id === "scarsteel_cleaver") {
-    drawOne(state, hostSide);
+    abilitySight(state, hostSide);
     const openAlt = pickOtherFriendlyVeiledFigure(state, hostSide, altitude);
     if (openAlt != null) openOwnFigure(state, hostSide, openAlt, { discount: 1 });
   }
@@ -4338,13 +5104,13 @@ function applyRevelation(
     if (altitude === 0) {
       const foe = unitOf(state.altitudes[0], other(hostSide));
       if (foe) blindAltitude(state, hostSide, 0);
-      else drawOne(state, hostSide);
+      else abilitySight(state, hostSide);
     } else {
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
     }
   }
   if (def.id === "lowscar_warden") {
-    if (altitude === 2) drawOne(state, hostSide);
+    if (altitude === 2) dealWillToOpponent(state, hostSide, 1);
     else setSight(state, witnesser, Math.min(SIGHT_CARRY_CAP, sightOf(state, witnesser) + 1));
   }
   if (def.id === "ember_herald") {
@@ -4357,7 +5123,7 @@ function applyRevelation(
     if (openAlt != null) openOwnFigure(state, hostSide, openAlt, { discount: 1 });
     if (countWitnessedFigures(state, hostSide) >= 2) {
       dealWillToOpponent(state, hostSide, 1);
-      drawOne(state, hostSide);
+      abilitySight(state, hostSide);
     }
   }
   if (def.id === "ash_urn") {
@@ -4427,19 +5193,29 @@ function doWitness(
   if (!u || !u.veiled) return false;
   const def = getCard(u.cardId);
   if (def.type !== "figure" && def.type !== "vessel") return false;
-  const cost = witnessCostAt(altitude, def.witnessCost, enemyTarget);
+  let cost = witnessCostAt(altitude, def.witnessCost, enemyTarget);
+  if (!enemyTarget) {
+    cost = ownWitnessSightCost(state, side, altitude, u);
+  }
   if (sightOf(state, side) < cost) return false;
 
   setSight(state, side, sightOf(state, side) - cost);
   applySmotherSightTax(state, side);
   applyRopeAuditorTax(state, side, altitude);
   applyLowscarWitnessTax(state, side, altitude);
+  applyCinderWitnessTax(state, side, altitude);
+  applySiltthornWitnessTax(state, side, altitude);
+  applyThorncrownWitnessTax(state, side, altitude, u);
 
   // Motley: Gaze Busts before unveil; own Witness Folds ante that existed before Revelation
   const foldAfter = !enemyTarget && u.wagered;
   if (enemyTarget && u.wagered) {
     applyBust(state, targetSide, altitude, u);
   }
+
+  // Velvet Ruin: true Witness on Tempted → Brand (before unveil clears Veil)
+  const brandFromTempt = !enemyTarget && u.tempted && u.temptedBy != null;
+  const tempter = u.temptedBy;
 
   u.veiled = false;
   u.scrutiny = 0;
@@ -4449,6 +5225,10 @@ function doWitness(
     applyRevelation(state, side, targetSide, altitude, u, enemyTarget);
     u.revelationFired = true;
   }
+  if (brandFromTempt && tempter != null) {
+    applyBrand(state, tempter, altitude, u);
+  }
+  if (!enemyTarget) grantHalo(state, side, altitude, u);
   if (foldAfter && u.wagered) {
     foldWager(state, targetSide, altitude, u);
   }
@@ -4469,7 +5249,7 @@ function doWitness(
 
   // MID Revelation: own Witness draws 1
   if (!enemyTarget && altitude === 1) {
-    drawOne(state, side);
+    abilitySight(state, side);
   }
 
   if (enemyTarget) {
@@ -4556,9 +5336,19 @@ export function createMatch(opts?: {
     stanceUsed: { player: false, enemy: false },
     reveilUsed: { player: false, enemy: false },
     wagerUsed: { player: false, enemy: false },
+    pendingUpAnte: null,
+    wagerEntropy: 1,
+    mummerAnteDrawUsed: { player: false, enemy: false },
+    debtorTailsBuffUsed: { player: false, enemy: false },
+    capriceStealSightUsed: { player: false, enemy: false },
+    trickEclipseScored: { player: false, enemy: false },
     pressUsed: { player: false, enemy: false },
     figurePlaysThisWindow: { player: [0, 0, 0], enemy: [0, 0, 0] },
     pealUsed: { player: false, enemy: false },
+    temptUsed: { player: false, enemy: false },
+    desireAltarTemptFree: { player: true, enemy: true },
+    ruinBrandlaceTemptSight: { player: true, enemy: true },
+    ruinFullDevourArmed: { player: false, enemy: false },
     soundTollPealBonus: { player: false, enemy: false },
     debtorBustDrawUsed: { player: false, enemy: false },
     falseHoldArmed: { player: false, enemy: false },
@@ -4583,6 +5373,9 @@ export function createMatch(opts?: {
     skarothPowerArmed: { player: false, enemy: false },
     rivetCharmDrawUsed: { player: false, enemy: false },
     slagStrainDrawUsed: { player: false, enemy: false },
+    lumenShrineSustainFree: { player: true, enemy: true },
+    lumenUsherSustainSight: { player: true, enemy: true },
+    lumenFullRadianceArmed: { player: false, enemy: false },
     altitudes: emptyBoard(),
     hand,
     enemyHand,
@@ -4703,8 +5496,7 @@ export function legalIntents(state: MatchState): Intent[] {
     const slot = state.altitudes[alt];
     const u = unitOf(slot, side);
     if (u?.veiled && !slot.blinded) {
-      const def = getCard(u.cardId);
-      const cost = witnessCostAt(alt, def.witnessCost, false);
+      const cost = ownWitnessSightCost(state, side, alt, u);
       if (sight >= cost) out.push({ kind: "witness", altitude: alt });
     }
     if (
@@ -4760,6 +5552,34 @@ export function legalIntents(state: MatchState): Intent[] {
       sight >= 1
     ) {
       out.push({ kind: "peal", altitude: alt });
+    }
+    // Lumen Sustain — keep Halo through Blaze
+    if (
+      sidePlaysHeresy(state, side, "lumen") &&
+      u?.haloed &&
+      !u.veiled &&
+      !u.haloSustained &&
+      getCard(u.cardId).heresy === "lumen" &&
+      !slot.blinded
+    ) {
+      let cost = 1;
+      if (state.lumenShrineSustainFree[side] && siteOf(slot, side) === "lumen_shrine") cost = 0;
+      if (sight >= cost) out.push({ kind: "sustain", altitude: alt });
+    }
+    // Velvet Ruin Tempt — enemy Veiled bait
+    if (sidePlaysHeresy(state, side, "ruin") && !slot.blinded) {
+      const euTempt = unitOf(slot, other(side));
+      if (
+        euTempt?.veiled &&
+        !euTempt.tempted &&
+        (getCard(euTempt.cardId).type === "figure" || getCard(euTempt.cardId).type === "vessel")
+      ) {
+        const shrineFree =
+          state.desireAltarTemptFree[side] && siteOf(slot, side) === "desire_altar";
+        if (shrineFree || !state.temptUsed[side]) {
+          out.push({ kind: "tempt", altitude: alt });
+        }
+      }
     }
     const eu = unitOf(slot, other(side));
     if (eu?.veiled && !slot.blinded && altitudeHasGaze(state, alt, side)) {
@@ -4827,6 +5647,16 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
     return done();
   }
 
+  if (intent.kind === "sustain") {
+    trySustain(state, side, intent.altitude);
+    return done();
+  }
+
+  if (intent.kind === "tempt") {
+    tryTempt(state, side, intent.altitude);
+    return done();
+  }
+
   if (intent.kind === "witness") {
     doWitness(state, side, intent.altitude, !!intent.enemy);
     return done();
@@ -4884,8 +5714,8 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
       !MOTLEY_COURT_RITE_IDS.has(def.id) &&
       !BELLWARD_TOLL_RITE_IDS.has(def.id) &&
       !IRON_BREACH_RITE_IDS.has(def.id) &&
-      !DUSK_LEDGER_RITE_IDS.has(def.id) &&
-      !BONEWICK_RITE_IDS.has(def.id) &&
+      !LUMEN_HOST_RITE_IDS.has(def.id) &&
+      !VELVET_RUIN_RITE_IDS.has(def.id) &&
       !HERESY_SEALS_RITE_IDS.has(def.id)
     ) {
       return takeEvents(state);
@@ -4956,6 +5786,74 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
           }
         } else dealWillToOpponent(state, side, 2);
       }
+    } else if (def.id === "snuff_the_halo") {
+      const alt = intent.altitude;
+      const u = unitOf(state.altitudes[alt], side);
+      if (u?.haloed) {
+        clearHalo(u);
+        u.veiled = true;
+        setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 2));
+        push(state, { type: "reveil", side, altitude: alt, cardId: u.cardId });
+      }
+      const foe = unitOf(state.altitudes[alt], other(side));
+      if (foe && !foe.veiled) {
+        blindAltitude(state, side, alt);
+      }
+    } else if (def.id === "unwrite_the_sin") {
+      const alt = intent.altitude ?? 0;
+      const foe = unitOf(state.altitudes[alt], other(side));
+      if (foe?.branded) {
+        clearBrand(foe);
+        setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 2));
+      } else if (foe && !foe.veiled) {
+        blindAltitude(state, side, alt);
+      }
+    } else if (def.id === "invite_the_look") {
+      const alt = intent.altitude ?? 0;
+      const foe = unitOf(state.altitudes[alt], other(side));
+      if (foe) {
+        if (foe.veiled) {
+          if (!foe.tempted) tryTempt(state, side, alt, { skipUsed: true });
+          else applyBrand(state, side, alt, foe);
+        } else if (foe.branded) {
+          setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+        } else {
+          applyBrand(state, side, alt, foe);
+        }
+      }
+    } else if (def.id === "full_devour") {
+      setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+      state.ruinFullDevourArmed[side] = true;
+    } else if (def.id === "last_devour") {
+      const alt = intent.altitude ?? 0;
+      const foe = unitOf(state.altitudes[alt], other(side));
+      if (foe) {
+        if (foe.veiled) {
+          if (!foe.tempted) tryTempt(state, side, alt, { skipUsed: true });
+          else applyBrand(state, side, alt, foe);
+        } else if (foe.branded) {
+          dealWillToOpponent(state, side, 2);
+        } else {
+          applyBrand(state, side, alt, foe);
+        }
+      }
+    } else if (def.id === "kindle_the_halo") {
+      const alt = intent.altitude;
+      const u = unitOf(state.altitudes[alt], side);
+      if (u && getCard(u.cardId).type === "figure" && getCard(u.cardId).heresy === "lumen") {
+        if (u.veiled) openOwnFigure(state, side, alt, { free: true });
+        else if (u.haloed) trySustain(state, side, alt, { free: true });
+      }
+    } else if (def.id === "full_radiance") {
+      setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
+      state.lumenFullRadianceArmed[side] = true;
+    } else if (def.id === "last_radiance") {
+      const alt = intent.altitude;
+      const u = unitOf(state.altitudes[alt], side);
+      if (u && getCard(u.cardId).type === "figure" && getCard(u.cardId).heresy === "lumen") {
+        if (u.veiled) openOwnFigure(state, side, alt, { discount: 1 });
+        else if (u.haloed) dealWillToOpponent(state, side, 2);
+      }
     } else if (def.id === "false_hold") {
       state.falseHoldArmed[side] = true;
     } else if (def.id === "smile_that_holds") {
@@ -4966,7 +5864,7 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
         const wasB = u.stanceB;
         switchUnitStance(state, side, intent.altitude, u);
         if (!wasB && u.stanceB && countStanceBFigures(state, side) >= 2) {
-          drawOne(state, side);
+          abilitySight(state, side);
         }
       }
     } else if (def.id === "slip_the_mark") {
@@ -4984,13 +5882,13 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
         switchUnitStance(state, side, intent.altitude, u);
         if (!wasB && u.stanceB) {
           const otherU = switchOtherStance(state, side, intent.altitude);
-          if (u.stanceB && otherU?.stanceB) drawOne(state, side);
+          if (u.stanceB && otherU?.stanceB) abilitySight(state, side);
         }
       }
     } else if (def.id === "curtain_call") {
       const n = countStanceBFigures(state, side);
       if (n >= 1) {
-        drawOne(state, side);
+        gainFavor(state, side, 1);
         if (n >= 2) {
           setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
         }
@@ -5009,7 +5907,7 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
       }
     } else if (def.id === "jury_grin") {
       if (countStanceBFigures(state, side) >= 2) {
-        drawOne(state, side);
+        gainFavor(state, side, 1);
         setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
       } else {
         const u = unitOf(state.altitudes[intent.altitude], side);
@@ -5038,7 +5936,7 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
           blinds += 1;
         }
       }
-      if (blinds >= 2) drawOne(state, side);
+      if (blinds >= 2) abilitySight(state, side);
     } else if (def.id === "gala_call") {
       gainFavor(state, side, 1);
       state.galaSurgeArmed[side] = true;
@@ -5074,7 +5972,7 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
               setFavor(state, side, favorOf(state, side) - 1);
               gainEclipse(state, side, 1);
             } else {
-              drawOne(state, side);
+              abilitySight(state, side);
             }
           } else if (sightOf(state, side) >= 1 && u.veiled) {
             // Paid ante Wager (not Free) — Final Raise as ante push
@@ -5084,17 +5982,17 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
             u.wagerAnteFavor = false;
             push(state, { type: "wager", side, altitude: intent.altitude, cardId: u.cardId, free: false });
           } else {
-            drawOne(state, side);
+            abilitySight(state, side);
           }
         } else {
-          drawOne(state, side);
+          abilitySight(state, side);
         }
       }
     } else if (def.id === "ashen_tithe") {
       const u = unitOf(state.altitudes[intent.altitude], other(side));
       if (u?.stained && getCard(u.cardId).type === "figure") {
         setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
-        drawOne(state, side);
+        stainOtherEnemyFigure(state, side, intent.altitude);
         if (u.veiled) {
           blindAltitude(state, side, intent.altitude);
           tryPress(state, side, intent.altitude, { free: true });
@@ -5107,7 +6005,7 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
       const foe = unitOf(state.altitudes[intent.altitude], other(side));
       const wasStained = !!(foe?.stained);
       stainEnemyAt(state, side, intent.altitude);
-      if (intent.altitude === 1) drawOne(state, side);
+      if (intent.altitude === 1) abilitySight(state, side);
       if (wasStained) blindAltitude(state, side, intent.altitude);
     } else if (def.id === "depth_bell") {
       const n = Math.min(2, countDeepCards(state, side));
@@ -5119,7 +6017,7 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
         markBlind(state, intent.altitude);
       }
     } else if (def.id === "horn_tithe") {
-      if (hasStanceBFigure(state, side)) drawOne(state, side);
+      if (hasStanceBFigure(state, side)) abilitySight(state, side);
       else markBlind(state, intent.altitude);
     } else if (def.id === "stake_tithe") {
       if (hasCubeSite(state, side)) {
@@ -5128,39 +6026,39 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
         markBlind(state, 2 as Altitude);
       }
     } else if (def.id === "dusk_tithe") {
-      if (eclipseOf(state, side) > 0) drawOne(state, side);
+      if (eclipseOf(state, side) > 0) abilitySight(state, side);
       else markBlind(state, intent.altitude);
     } else if (def.id === "pale_tithe") {
       markBlind(state, 1 as Altitude);
-      if (controlsSiteId(state, side, "pale_arch")) drawOne(state, side);
+      if (controlsSiteId(state, side, "pale_arch")) abilitySight(state, side);
     } else if (def.id === "gaze_tithe") {
-      if (controlsGazeAltitude(state, side)) drawOne(state, side);
+      if (controlsGazeAltitude(state, side)) abilitySight(state, side);
       else markBlind(state, intent.altitude);
     } else if (def.id === "shell_tithe") {
-      if (hasVesselInPlay(state, side)) drawOne(state, side);
+      if (hasVesselInPlay(state, side)) abilitySight(state, side);
       else setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
     } else if (def.id === "cairn_tithe") {
-      if (hasDeepSite(state, side)) drawOne(state, side);
+      if (hasDeepSite(state, side)) abilitySight(state, side);
       else markBlind(state, intent.altitude);
     } else if (def.id === "hold_tithe") {
-      if (controlsSiteId(state, side, "veil_banner")) drawOne(state, side);
+      if (controlsSiteId(state, side, "veil_banner")) abilitySight(state, side);
       else markBlind(state, 2 as Altitude);
     } else if (def.id === "creditor_tithe") {
       if (eclipseOf(state, side) > 0) {
-        drawOne(state, side);
+        abilitySight(state, side);
         setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
       } else {
         gainEclipse(state, side, 1);
       }
     } else if (def.id === "settle_accounts") {
       if (spendEclipse(state, side, 1)) {
-        drawOne(state, side);
+        abilitySight(state, side);
       } else {
         setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
       }
     } else if (def.id === "call_the_debt") {
       bounceEnemyVeiledHere(state, side, intent.altitude);
-      if (eclipseOf(state, side) > 0) drawOne(state, side);
+      if (eclipseOf(state, side) > 0) abilitySight(state, side);
     } else if (def.id === "double_entry") {
       if (spendEclipse(state, side, 1)) {
         setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 2));
@@ -5169,19 +6067,19 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
       }
     } else if (def.id === "foreclose") {
       if (spendEclipse(state, side, 1)) {
-        if (bounceEnemyVeiledHere(state, side, intent.altitude)) drawOne(state, side);
+        if (bounceEnemyVeiledHere(state, side, intent.altitude)) abilitySight(state, side);
       } else {
         setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
       }
     } else if (def.id === "open_books") {
       if (midHasNoEnemyFigure(state, side)) {
         gainEclipse(state, side, 1);
-        drawOne(state, side);
+        abilitySight(state, side);
       } else {
         setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
       }
     } else if (def.id === "facet_tithe") {
-      if (hasStanceBFigure(state, side)) drawOne(state, side);
+      if (hasStanceBFigure(state, side)) abilitySight(state, side);
       else markBlind(state, intent.altitude);
     } else if (def.id === "key_tithe") {
       if (hasGraftSite(state, side)) {
@@ -5191,23 +6089,23 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
       }
     } else if (def.id === "aperture_tithe") {
       markBlind(state, 0 as Altitude);
-      if (controlsSiteId(state, side, "pale_arch")) drawOne(state, side);
+      if (controlsSiteId(state, side, "pale_arch")) abilitySight(state, side);
     } else if (def.id === "colony_tithe") {
-      if (countCoralSites(state, side) > 0) drawOne(state, side);
+      if (countCoralSites(state, side) > 0) abilitySight(state, side);
       else markBlind(state, intent.altitude);
     } else if (def.id === "wick_tithe") {
       if (hasInhabitantInVessel(state, side)) {
-        drawOne(state, side);
+        abilitySight(state, side);
         setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
       } else {
         setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
       }
     } else if (def.id === "forced_wick") {
       if (forceReleaseInhabitantToHand(state, side) && countVessels(state, side) > 1) {
-        drawOne(state, side);
+        abilitySight(state, side);
       }
     } else if (def.id === "empty_shell") {
-      if (hasEmptyVessel(state, side)) drawOne(state, side);
+      if (hasEmptyVessel(state, side)) abilitySight(state, side);
       else setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
     } else if (def.id === "shell_tax") {
       if (hasInhabitantInVessel(state, side)) {
@@ -5216,19 +6114,19 @@ export function applyIntent(state: MatchState, intent: Intent): OculusEvent[] {
         setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + 1));
       }
     } else if (def.id === "open_shell") {
-      drawOne(state, side);
+      abilitySight(state, side);
       tuckIntoEmptyVessel(state, side);
     } else if (def.id === "verdant_tithe") {
       const n = Math.min(2, countDeepCards(state, side));
       if (n > 0) setSight(state, side, Math.min(SIGHT_CARRY_CAP, sightOf(state, side) + n));
       else markBlind(state, intent.altitude);
     } else if (def.id === "iris_tithe") {
-      if (controlsGazeAltitude(state, side)) drawOne(state, side);
+      if (controlsGazeAltitude(state, side)) abilitySight(state, side);
       else markBlind(state, 0 as Altitude);
     } else {
       markBlind(state, intent.altitude);
-      if (def.id === "hole_choir") drawOne(state, side);
-      if (def.id === "ribbon_tithe" && controlsCoral(state, side)) drawOne(state, side);
+      if (def.id === "hole_choir") abilitySight(state, side);
+      if (def.id === "ribbon_tithe" && controlsCoral(state, side)) abilitySight(state, side);
     }
     push(state, { type: "rite", side, cardId, altitude: intent.altitude });
     return done();

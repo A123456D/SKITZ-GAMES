@@ -20,6 +20,7 @@ const JOBS = [
   { in: "sprite-wager-cash.png", out: "wager-cash.png", size: 128 },
   { in: "sprite-wager-bust.png", out: "wager-bust.png", size: 128 },
   { in: "sprite-stain-drip.png", out: "stain-drip.png", size: 112 },
+  { in: "sprite-halo-aureole.png", out: "halo-aureole.png", size: 128 },
 ];
 
 function isMagenta(r, g, b) {

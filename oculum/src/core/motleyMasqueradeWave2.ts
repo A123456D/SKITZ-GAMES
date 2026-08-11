@@ -1,9 +1,7 @@
 import type { CardDef } from "./types";
 
 /**
- * Motley Masquerade — Wave 2 Trick support pack.
- * Roles: Hall bank · Mask continuity · Flip graft · Ante rite · Cash chain risk.
- * Unique names — no reuse of shelved Motley Court ids.
+ * Motley Masquerade — Wave 2 (Cash/Bust support).
  */
 export const MOTLEY_MASQUERADE_WAVE2: CardDef[] = [
   {
@@ -18,10 +16,9 @@ export const MOTLEY_MASQUERADE_WAVE2: CardDef[] = [
     sightYield: 0,
     artSubject:
       "glamorous sexy motley masquerade scarlet dealer card table purple teal gold risk smile ornate court cliffs original",
-    veiledAbility:
-      "When this Cashes, draw 1. You may Wager this (ante 1 Sight).",
-    revelation: "Enter Stance B. If you control another Wagered Figure, draw 1.",
-    text: "Veiled: When this Cashes, draw 1. You may Wager this (ante 1 Sight). Revelation: Enter Stance B. If you control another Wagered Figure, draw 1. Bust: the opponent gains 1 Sight.",
+    veiledAbility: "You may Wager this (ante 1 Sight). Cash: Gain 1 Favor. Bust: Opponent gains 1 Sight.",
+    revelation: "Enter Stance B. If you control another Wagered Motley Figure, gain 1 Favor.",
+    text: "Veiled: You may Wager this (ante 1 Sight). Cash: Gain 1 Favor. Bust: Opponent gains 1 Sight. Revelation: Enter Stance B. If you control another Wagered Motley Figure, gain 1 Favor.",
   },
   {
     id: "velvet_antehall",
@@ -35,7 +32,7 @@ export const MOTLEY_MASQUERADE_WAVE2: CardDef[] = [
     sightYield: 0,
     artSubject:
       "motley masquerade velvet antehall purple teal gold ornate hall mirrors dice seals landmark cliffs original",
-    text: "Site. When a friendly Figure here Switches Stance, gain 1 Sight. When a friendly Figure here Cashes, gain 1 Sight.",
+    text: "Site. When a friendly Figure here Switches Stance, gain 1 Sight. Cash here: gain 1 Sight.",
   },
   {
     id: "masque_urn",
@@ -49,9 +46,9 @@ export const MOTLEY_MASQUERADE_WAVE2: CardDef[] = [
     sightYield: 0,
     artSubject:
       "motley masquerade masque urn vessel purple teal gold twin mask chamber ornate cliffs original",
-    revelation: "Free Wager this if able.",
-    text: "Vessel. On play, tuck a Figure from hand as Inhabitant if able. You may Wager this (ante 1 Sight). Revelation: Free Wager this if able. When this Falls or is Forced Exposed: Free Wager another friendly Veiled Figure if able.",
+    revelation: "Free Wager this.",
     veiledAbility: "You may Wager this (ante 1 Sight).",
+    text: "Vessel. On play, tuck a Figure from hand as Inhabitant if able. You may Wager this (ante 1 Sight). Revelation: Free Wager this. Fall: If you have Favor, gain 1 Sight.",
   },
   {
     id: "coinface_charm",
@@ -65,7 +62,7 @@ export const MOTLEY_MASQUERADE_WAVE2: CardDef[] = [
     sightYield: 0,
     artSubject:
       "motley masquerade coinface charm graft purple teal gold coin mask seal floating ornate cliffs original",
-    text: "Graft: +1 power while host Witnessed. When host Switches Stance while Veiled, gain 1 Sight. When host Cashes, draw 1.",
+    text: "Graft: +1 power while host Witnessed. When host Switches Stance while Veiled, gain 1 Sight. Cash: gain 1 Favor.",
   },
   {
     id: "raise_the_ante",
@@ -79,7 +76,7 @@ export const MOTLEY_MASQUERADE_WAVE2: CardDef[] = [
     sightYield: 0,
     artSubject:
       "motley masquerade raise the ante rite purple teal gold chips hand parchment ornate cliffs original",
-    text: "Choose an altitude. Ante 1 Sight to Wager your Veiled Figure there if able. If it was already Wagered, Blind that altitude this turn.",
+    text: "Choose an altitude. If your Motley there is already Wagered, Blind that altitude; otherwise Wager it (ante 1 Sight) if able.",
   },
 ];
 

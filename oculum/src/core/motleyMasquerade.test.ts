@@ -1,12 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach, afterAll } from "vitest";
 import { CARDS, getCard, teachDeck, teachDeckMotley } from "./cards";
 import { MOTLEY_MASQUERADE_WAVE1 } from "./motleyMasqueradeWave1";
 import { MOTLEY_MASQUERADE_WAVE2 } from "./motleyMasqueradeWave2";
 import { MOTLEY_MASQUERADE_WAVE3 } from "./motleyMasqueradeWave3";
 import { MOTLEY_MASQUERADE_WAVE4 } from "./motleyMasqueradeWave4";
+import { setMotleyWagerMode } from "./motleyKit";
 import { validateConstructedDeck } from "./construct";
 import { applyIntent, createMatch, legalIntents, unitPower } from "./match";
 import type { BoardUnit, MatchState, OculusEvent } from "./types";
+
+beforeEach(() => setMotleyWagerMode("cashbust"));
+afterAll(() => setMotleyWagerMode("cashbust"));
 
 function fig(cardId: string, opts: Partial<BoardUnit> = {}): BoardUnit {
   return {
@@ -25,10 +29,18 @@ function fig(cardId: string, opts: Partial<BoardUnit> = {}): BoardUnit {
     wagered: false,
     wagerAntePaid: false,
     wagerAnteFavor: false,
+    wagerHeads: false,
+    wagerPowerDelta: 0,
     openedSinceResolve: false,
     lastBreachOpened: false,
     pressed: false,
     pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
     ...opts,
   };
 }
@@ -67,7 +79,7 @@ describe("Motley Masquerade Wave 1", () => {
     expect(d.includes("final_raise")).toBe(false);
   });
 
-  it("Wager antes 1 Sight and Cash refunds + Mummer draw on Veiled win", () => {
+  it("Wager antes 1 Sight and Cash refunds + Mummer Favor on Veiled win", () => {
     const s = createMatch({ deck: teachDeck(), enemyDeck: teachDeck(), seed: 101 });
     s.altitudes[1].player = fig("whitecard_mummer", { veiled: true, stanceB: true });
     s.altitudes[1].enemy = fig("well_cantor", { veiled: true });
@@ -79,14 +91,13 @@ describe("Motley Masquerade Wave 1", () => {
     expect(s.altitudes[1].player?.wagerAntePaid).toBe(true);
     expect(s.sight).toBe(before - 1);
     expect(unitPower(s, 1, "player")).toBeGreaterThan(unitPower(s, 1, "enemy"));
-    const handBefore = s.hand.length;
+    const favorBefore = s.favor;
     const sightAfterAnte = s.sight;
     const ev = bothPassResolve(s);
     expect(ev.some((e) => e.type === "cash")).toBe(true);
     expect(s.altitudes[1].player?.wagered).toBe(false);
-    expect(s.hand.length).toBe(handBefore + 1);
-    // Cash refunds ante (+1) before next-turn Sight income
-    expect(ev.some((e) => e.type === "cash")).toBe(true);
+    expect(s.favor).toBeGreaterThan(favorBefore);
+    expect(ev.some((e) => e.type === "favor")).toBe(true);
     expect(sightAfterAnte).toBe(before - 1);
   });
 
@@ -119,7 +130,8 @@ describe("Motley Masquerade Wave 1", () => {
     const ev = applyIntent(s, { kind: "witness", altitude: 1 });
     expect(ev.some((e) => e.type === "fold")).toBe(true);
     expect(s.altitudes[1].player?.wagered).toBe(false);
-    expect(s.sight).toBe(before - 1 + 1);
+    // Witness cost −1, Mid Witness +1 Sight, Revelation if was Wagered +1 Sight
+    expect(s.sight).toBe(before - 1 + 1 + 1);
     expect(s.altitudes[1].player?.stanceB).toBe(true);
   });
 
@@ -134,7 +146,7 @@ describe("Motley Masquerade Wave 1", () => {
     expect(s.altitudes[0].player?.wagerAntePaid).toBe(false);
   });
 
-  it("Grinning Debtor draws on first friendly Bust", () => {
+  it("Grinning Debtor gains Favor on first friendly Bust", () => {
     const s = createMatch({ deck: teachDeck(), enemyDeck: teachDeck(), seed: 105 });
     s.altitudes[0].player = fig("grinning_debtor", { veiled: true });
     s.altitudes[1].player = fig("whitecard_mummer", {
@@ -143,10 +155,10 @@ describe("Motley Masquerade Wave 1", () => {
       wagerAntePaid: true,
     });
     s.altitudes[1].enemy = fig("smother_bride", { veiled: false });
-    const handBefore = s.hand.length;
+    const favorBefore = s.favor;
     const ev = bothPassResolve(s);
     expect(ev.some((e) => e.type === "bust")).toBe(true);
-    expect(s.hand.length).toBe(handBefore + 1);
+    expect(s.favor).toBeGreaterThan(favorBefore);
   });
 
   it("Cantor Hold switches another friendly Stance", () => {
@@ -222,7 +234,7 @@ describe("Motley Masquerade Wave 2", () => {
     expect(s.sight).toBe(before + 1);
   });
 
-  it("Scarlet Dealer Cashes into draw; Bust feeds foe Sight", () => {
+  it("Scarlet Dealer Cashes into Favor; Bust feeds foe Sight", () => {
     const s = createMatch({ deck: teachDeckMotley(), enemyDeck: teachDeck(), seed: 203 });
     s.altitudes[1].player = fig("scarlet_dealer", {
       veiled: true,
@@ -232,12 +244,11 @@ describe("Motley Masquerade Wave 2", () => {
     });
     s.altitudes[0].player = fig("whitecard_mummer", { veiled: true });
     s.altitudes[1].enemy = fig("well_cantor", { veiled: true });
-    s.deck = ["grinning_debtor"];
     expect(unitPower(s, 1, "player")).toBeGreaterThan(unitPower(s, 1, "enemy"));
-    const handBefore = s.hand.length;
+    const favorBefore = s.favor;
     const ev = bothPassResolve(s);
     expect(ev.some((e) => e.type === "cash")).toBe(true);
-    expect(s.hand.length).toBeGreaterThan(handBefore);
+    expect(s.favor).toBeGreaterThan(favorBefore);
     expect(s.altitudes[0].player?.wagered).toBe(false);
   });
 
@@ -292,7 +303,7 @@ describe("Motley Masquerade Wave 3", () => {
     expect(unitPower(s, 1, "player")).toBe(before + 1);
   });
 
-  it("Favor Broker antes Sight and Cashes with refund + draw", () => {
+  it("Favor Broker antes Sight and Cashes with refund + Favor", () => {
     const s = createMatch({ deck: teachDeckMotley(), enemyDeck: teachDeck(), seed: 302 });
     s.sight = 3;
     s.altitudes[1].player = fig("favor_broker", { veiled: true, stanceB: true });
@@ -300,10 +311,10 @@ describe("Motley Masquerade Wave 3", () => {
     applyIntent(s, { kind: "wager", altitude: 1 });
     expect(s.sight).toBe(2);
     expect(s.altitudes[1].player?.wagerAnteFavor).toBe(false);
-    const handBefore = s.hand.length;
+    const favorBefore = s.favor;
     const ev = bothPassResolve(s);
     expect(ev.some((e) => e.type === "cash")).toBe(true);
-    expect(s.hand.length).toBeGreaterThanOrEqual(handBefore);
+    expect(s.favor).toBeGreaterThan(favorBefore);
   });
 
   it("Spire Caprice gets +1 on High while Wagered", () => {
@@ -327,7 +338,7 @@ describe("Motley Masquerade Wave 4", () => {
   it("registers closing pack and Lady Masque Sovereign", () => {
     expect(MOTLEY_MASQUERADE_WAVE4).toHaveLength(5);
     expect(CARDS.filter((c) => c.heresy === "motley")).toHaveLength(20);
-    expect(CARDS).toHaveLength(80);
+    expect(CARDS).toHaveLength(120);
     const lm = getCard("lady_masque");
     expect(lm.sovereign).toBe(true);
     expect(getCard("blindfold_charm").type).toBe("relic");
@@ -357,17 +368,18 @@ describe("Motley Masquerade Wave 4", () => {
     expect(s.eclipse).toBe(before + 1);
   });
 
-  it("Final Raise without Favor draws when Wagered", () => {
+  it("Final Raise without Favor gains Sight when Wagered", () => {
     const s = createMatch({ deck: teachDeckMotley(), enemyDeck: teachDeck(), seed: 404 });
     s.hand = ["final_raise"];
     s.essence = 5;
     s.favor = 0;
-    s.deck = ["whitecard_mummer"];
+    s.sight = 2;
     s.altitudes[1].player = fig("diamond_widow", { veiled: true, wagered: true });
     const before = s.eclipse;
+    const sightBefore = s.sight;
     applyIntent(s, { kind: "rite", handIndex: 0, altitude: 1 });
     expect(s.eclipse).toBe(before);
-    expect(s.hand).toContain("whitecard_mummer");
+    expect(s.sight).toBeGreaterThan(sightBefore);
   });
 
   it("Lady Masque Witnessed: Cash 2+ → Eclipse; Veiled Masque is Sight-only", () => {

@@ -293,13 +293,7 @@ const SITE_HERESY_BOOST = new Set([
 
 function siteSynergyForFigure(siteId: string, figureHeresy: string, figureId: string): boolean {
   if (figureHeresy === "cube" && siteId === "veil_banner") return true;
-  if (figureHeresy === "deal" && (siteId === "dust_ledger" || siteId === "coin_gallery" || siteId === "empty_mesa")) {
-    return true;
-  }
   if (figureHeresy === "graft" && (siteId === "suture_mill" || siteId === "key_shrine")) return true;
-  if (figureHeresy === "shell" && (siteId === "bone_gallery" || siteId === "inhabit_dock" || siteId === "bone_mast")) {
-    return true;
-  }
   if (figureHeresy === "motley" && (siteId === "hall_of_borrowed_faces" || siteId === "grinning_colonnade")) {
     return true;
   }
@@ -372,6 +366,227 @@ function evalPosition(state: MatchState, side: Side): number {
 function terminalEval(sim: MatchState, side: Side): number {
   if (sim.winner === side) return 12_000;
   if (sim.winner === other(side)) return -12_000;
+  return 0;
+}
+
+/**
+ * Purpose layer — every intent must answer "what does this win me?"
+ * Rewards concrete outcomes (lane flip, Toll tax, seal deny, Break chips, Eclipse arm)
+ * and punishes craft verbs with no payoff this window.
+ */
+function purposeScore(state: MatchState, side: Side, i: Intent, d: AiDifficulty): number {
+  if (d === "easy") return 0;
+  const foe = other(side);
+  const hard = d === "hard";
+  let s = 0;
+
+  const laneSwing = (alt: Altitude, beforeMine: number, afterMine: number): number => {
+    const theirs = unitPower(state, alt, foe);
+    const wonBefore = beforeMine > theirs;
+    const wonAfter = afterMine > theirs;
+    if (!wonBefore && wonAfter) return hard ? 42 : 28; // flips a lost lane → Resolve chip
+    if (wonBefore && afterMine > beforeMine) return hard ? 14 : 8; // pad a winning chip
+    if (!wonBefore && afterMine >= theirs) return hard ? 18 : 12; // contest / deny
+    if (wonBefore && afterMine <= theirs) return hard ? -22 : -14; // throw away a win
+    return (afterMine - beforeMine) * (hard ? 3 : 2);
+  };
+
+  if (i.kind === "play") {
+    const id = handOf(state, side)[i.handIndex];
+    const def = getCard(id);
+    if (def.type === "figure" || def.type === "vessel") {
+      const before = unitPower(state, i.altitude, side);
+      // Approximate post-play Veiled body (overwrite clears prior)
+      const afterVeil = def.veiledPower + (i.altitude === 2 ? 1 : 0);
+      const afterWit = def.witnessedPower;
+      const foeU = foeUnit(state, side, i.altitude);
+      if (!foeU) {
+        // Empty lane: claim for Break — High first
+        s += i.altitude === 0 ? (hard ? 22 : 14) : i.altitude === 1 ? (hard ? 14 : 8) : (hard ? 10 : 6);
+      } else {
+        s += laneSwing(i.altitude, before, afterVeil);
+        // Prefer planting where Open would win later this window
+        if (afterWit > unitPower(state, i.altitude, foe)) s += hard ? 16 : 10;
+      }
+      // Craft purpose hooks
+      if (def.heresy === "toll") {
+        if (state.tollOwner[i.altitude] === side) s += hard ? 18 : 10; // +1 body on our trap
+        else if (!anyAltitudeTolled(state)) {
+          // Sound not castable this beat → don't freeze forever; still develop High
+          const canSound = handOf(state, side).includes("sound_the_toll") && essenceOf(state, side) >= 1;
+          if (!canSound) s += hard ? 12 : 6;
+        }
+      }
+      if (def.heresy === "breach" && foeU && !foeU.veiled) {
+        if (afterWit > unitPower(state, i.altitude, foe)) s += hard ? 20 : 12; // Breach Will target
+      }
+      if (def.heresy === "motley" && foeU?.stained) s += 10; // Hold wall vs Ink Erase
+    } else if (def.type === "site") {
+      // Sites are purpose when they enable craft lines or contested Gaze
+      if (foeUnit(state, side, i.altitude)) s += 8;
+      if (def.id === "ring_gaze" || def.id === "parasol_path") s += hard ? 16 : 10;
+    }
+  }
+
+  if (i.kind === "witness" && !i.enemy) {
+    const u = myUnit(state, side, i.altitude);
+    if (!u?.veiled) return s;
+    const def = getCard(u.cardId);
+    const before = unitPower(state, i.altitude, side);
+    const after = faceWitnessedPower(def, u.stanceB, graftWitnessBonus(u));
+    s += laneSwing(i.altitude, before, after);
+    // Revelation / craft unlock purpose
+    if (!u.revelationFired) {
+      if (def.heresy === "toll") s += hard ? 18 : 10; // plant Toll / Lure / income
+      if (def.heresy === "breach") s += hard ? 14 : 8;
+      if (def.heresy === "ink") s += hard ? 12 : 6;
+      if (def.heresy === "motley") s += 6;
+    }
+    // Break race: Open Motley Hold walls when we need Will chips
+    if (def.heresy === "motley" && u.stanceB && willPressure(state, side) > 5) {
+      if (after > unitPower(state, i.altitude, foe)) s += hard ? 36 : 22;
+    }
+    // Don't Open into a weaker face with no race need
+    if (after < before && willPressure(state, side) < 3) s -= hard ? 24 : 14;
+  }
+
+  if (i.kind === "witness" && i.enemy) {
+    const foeU = foeUnit(state, side, i.altitude);
+    if (!foeU?.veiled) return s;
+    const piece = foeMotleyEclipsePiece(state, side, i.altitude);
+    if (piece) s += hard ? 34 : 22; // deny Eclipse seal
+    const theirPow = unitPower(state, i.altitude, foe);
+    const mine = unitPower(state, i.altitude, side);
+    // Gaze to flip a lost contested lane after they lose Veil face
+    if (mine <= theirPow) s += hard ? 16 : 10;
+    if (foeU.stained && sidePlaysHeresy(state, side, "ink")) s += hard ? 18 : 10; // Press setup
+    if (state.tollOwner[i.altitude] === side) s += 12; // Lure / tax line
+    if (getCard(foeU.cardId).heresy === "breach" && foeU.veiled) s += 10; // strip agro Open
+  }
+
+  if (i.kind === "peal") {
+    // Peal purpose = tax when Resolve spend is real (we own Toll + contested/winning body)
+    if (state.tollOwner[i.altitude] !== side) {
+      s -= hard ? 30 : 18;
+    } else {
+      const mine = unitPower(state, i.altitude, side);
+      const theirs = unitPower(state, i.altitude, foe);
+      const foeU = foeUnit(state, side, i.altitude);
+      if (foeU && mine >= theirs) s += hard ? 36 : 24; // tax is live
+      else if (foeU) s += hard ? 10 : 4; // still arms trap
+      else s -= hard ? 20 : 12; // empty lane Peal is aimless
+      if (state.passed[foe]) s += 14; // Resolve coming
+    }
+  }
+
+  if (i.kind === "rite") {
+    const id = handOf(state, side)[i.handIndex];
+    if ((id === "sound_the_toll" || id === "ring_out") && i.altitude != null) {
+      const alt = i.altitude;
+      const mine = myUnit(state, side, alt);
+      const foeU = foeUnit(state, side, alt);
+      if (!altitudeIsTolled(state, alt)) {
+        // Place Toll where it immediately matters
+        if (mine) s += hard ? 22 : 14; // buff our body now
+        if (foeU) s += hard ? 18 : 12; // tax / Lure target
+        if (!mine && !foeU) s -= hard ? 16 : 8; // empty Toll is soft
+        if (alt === 0) s += 8;
+      } else if (foeU?.veiled) {
+        s += hard ? 20 : 12; // Sound Lure purpose
+      }
+    }
+  }
+
+  if (i.kind === "press") {
+    const mine = unitPower(state, i.altitude, side);
+    const theirs = unitPower(state, i.altitude, foe);
+    if (mine > theirs) s += hard ? 28 : 18; // Erase / Forced Expose on win
+    else s -= hard ? 20 : 12; // Press without a win is backlash bait
+  }
+
+  if (i.kind === "wager") {
+    const u = myUnit(state, side, i.altitude);
+    if (u) {
+      const mine = unitPower(state, i.altitude, side);
+      const theirs = unitPower(state, i.altitude, foe);
+      // Coinflip steal purpose / Stance swap purpose
+      if (mine + 1 > theirs - 1) s += hard ? 20 : 12;
+      if (!u.veiled) s += hard ? 16 : 10; // Heads → Eclipse arm
+      if (u.stanceB && u.veiled) s += hard ? 14 : 8; // Hold wall + ante
+    }
+  }
+
+  if (i.kind === "stance") {
+    const u = myUnit(state, side, i.altitude);
+    if (u?.veiled && !u.stanceB) {
+      const after = faceWitnessedPower(getCard(u.cardId), true, graftWitnessBonus(u));
+      const theirs = unitPower(state, i.altitude, foe);
+      if (after > theirs) s += hard ? 24 : 14; // Stance B wins the lane
+      const foeU = foeUnit(state, side, i.altitude);
+      if (foeU?.stained) s += hard ? 18 : 10; // Hold vs Erase
+    }
+  }
+
+  if (i.kind === "pass") {
+    // If any purposeful action exists, Pass is wrong
+    const legal = legalIntents(state);
+    const purposeful = legal.some((x) => {
+      if (x.kind === "pass") return false;
+      return purposeScoreLite(state, side, x) > 8;
+    });
+    if (purposeful) s -= hard ? 40 : 22;
+  }
+
+  return s;
+}
+
+/** Lightweight purpose peek to avoid recurse — used only for Pass refuse. */
+function purposeScoreLite(state: MatchState, side: Side, i: Intent): number {
+  const foe = other(side);
+  if (i.kind === "witness" && i.enemy) {
+    if (foeMotleyEclipsePiece(state, side, i.altitude)) return 30;
+    if (foeUnit(state, side, i.altitude)?.veiled) return 14;
+  }
+  if (i.kind === "witness" && !i.enemy) {
+    const u = myUnit(state, side, i.altitude);
+    if (!u?.veiled) return 0;
+    const after = faceWitnessedPower(getCard(u.cardId), u.stanceB, graftWitnessBonus(u));
+    const theirs = unitPower(state, i.altitude, foe);
+    if (after > unitPower(state, i.altitude, side) && after > theirs) return 28;
+    if (after > theirs) return 16;
+    if (getCard(u.cardId).heresy === "toll" && !u.revelationFired) return 18;
+    if (getCard(u.cardId).heresy === "breach" && after > theirs) return 22;
+  }
+  if (i.kind === "peal" && state.tollOwner[i.altitude] === side) {
+    const foeU = foeUnit(state, side, i.altitude);
+    if (foeU && unitPower(state, i.altitude, side) >= unitPower(state, i.altitude, foe)) return 26;
+  }
+  if (i.kind === "press") {
+    if (unitPower(state, i.altitude, side) > unitPower(state, i.altitude, foe)) return 30;
+  }
+  if (i.kind === "wager") {
+    const u = myUnit(state, side, i.altitude);
+    if (u?.stanceB) return 16;
+  }
+  if (i.kind === "stance") {
+    const u = myUnit(state, side, i.altitude);
+    if (u?.veiled && !u.stanceB) return 14;
+  }
+  if (i.kind === "rite") {
+    const id = handOf(state, side)[i.handIndex];
+    if ((id === "sound_the_toll" || id === "ring_out") && i.altitude != null) {
+      if (!altitudeIsTolled(state, i.altitude) && (myUnit(state, side, i.altitude) || foeUnit(state, side, i.altitude))) {
+        return 24;
+      }
+    }
+  }
+  if (i.kind === "play") {
+    const def = getCard(handOf(state, side)[i.handIndex]);
+    if (def.type === "figure" || def.type === "vessel") {
+      if (!myUnit(state, side, i.altitude)) return 12;
+      if (foeUnit(state, side, i.altitude)) return 10;
+    }
+  }
   return 0;
 }
 
@@ -648,11 +863,6 @@ function scorePlay(
       if (i.altitude === 2) s += 10;
       if (myUnit(state, side, i.altitude)) s += 8;
     }
-    if (def.id === "dust_ledger" || def.id === "empty_mesa" || def.id === "coin_gallery") {
-      s += 8;
-      const u = myUnit(state, side, i.altitude);
-      if (u && getCard(u.cardId).heresy === "deal") s += 10;
-    }
     if (def.id === "suture_mill" || def.id === "key_shrine") {
       s += 8;
       const u = myUnit(state, side, i.altitude);
@@ -895,7 +1105,12 @@ function scorePlay(
       !anyAltitudeTolled(state) &&
       hand.includes("sound_the_toll")
     ) {
-      s -= d === "hard" ? 52 : 14; // Sound first, then bodies
+      // Prefer Sound when castable — but don't freeze development forever
+      if (essenceOf(state, side) >= getCard("sound_the_toll").essence) {
+        s -= d === "hard" ? 24 : 10;
+      } else {
+        s += d === "hard" ? 8 : 4; // plant while Sound is unaffordable
+      }
     }
     // Bellward Will race — plant bodies where Witnessed (+Toll) would win the lane
     if (def.heresy === "toll" && (def.type === "figure" || def.type === "vessel")) {
@@ -920,9 +1135,6 @@ function scorePlay(
     }
     if (i.altitude === 1 && def.witnessedPower >= 3) s += 4;
     if (def.heresy === "cube" && mySite(state, side, i.altitude) === "veil_banner") s += 10;
-    if (def.heresy === "deal" && (mySite(state, side, i.altitude) === "dust_ledger" || mySite(state, side, i.altitude) === "coin_gallery" || mySite(state, side, i.altitude) === "empty_mesa")) s += 10;
-    if (def.heresy === "shell" && (mySite(state, side, i.altitude) === "bone_gallery" || mySite(state, side, i.altitude) === "inhabit_dock" || mySite(state, side, i.altitude) === "bone_mast")) s += 10;
-    if (def.heresy === "shell") s += 4;
     if (def.heresy === "graft" && mySite(state, side, i.altitude) === "suture_mill") s += 10;
     if (def.heresy === "graft" && mySite(state, side, i.altitude) === "key_shrine") s += 6;
     if (def.heresy === "motley" && mySite(state, side, i.altitude) === "hall_of_borrowed_faces") {
@@ -1069,16 +1281,6 @@ function scoreWitnessOwn(
     s += 14 + motleySealPressure(state, side) * 4;
   }
   if (mySite(state, side, alt) === "branch_rune_reliquary") s += 8;
-  if (mySite(state, side, alt) === "dust_ledger" && def.heresy === "deal") s += 10;
-  if ((mySite(state, side, alt) === "coin_gallery" || mySite(state, side, alt) === "empty_mesa") && def.heresy === "deal") s += 10;
-  if (
-    (mySite(state, side, alt) === "bone_gallery" ||
-      mySite(state, side, alt) === "inhabit_dock" ||
-      mySite(state, side, alt) === "bone_mast") &&
-    def.heresy === "shell"
-  ) {
-    s += 10;
-  }
   if (mySite(state, side, alt) === "key_shrine" && def.heresy === "graft") s += 10;
   if (mySite(state, side, alt) === "stake_cache" && def.heresy === "cube") s += 8;
   // Hall rewards Witnessing while already Stance B — do not force-enter B anymore
@@ -1185,10 +1387,15 @@ function scoreWitnessOwn(
 
   // Motley Trick: don't Witness into the weak Stance B face when Veiled B already wins
   if (def.heresy === "motley" && u.veiled) {
-    // Already Stance B Veiled — never Witness away the Hold + strong face unless desperate
+    // Already Stance B Veiled — Hold unless Break race needs the Open chip
     if (u.stanceB) {
       s -= 55;
       if (mine > theirs) s -= 20;
+      if (willPressure(state, side) > 5 && effectiveWit > theirs) {
+        s += 72; // cancel Hold lock — Open for Will
+      } else if (willPressure(state, side) > 8 && effectiveWit >= theirs) {
+        s += 48; // contest High / Mid when falling behind
+      }
     }
     const veiledBWouldWin =
       !u.stanceB &&
@@ -1690,27 +1897,42 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
     if (i.kind === "graft") return scoreGraft(state, side, i, d);
     if (i.kind === "rite") return scoreRite(state, side, i, d);
     if (i.kind === "stance") return scoreStance(state, side, i.altitude, d);
+    if (i.kind === "up_ante") {
+      // Second flip is free EV — take it when ahead or Favor for Eclipse
+      const u = myUnit(state, side, i.altitude);
+      let s = 14;
+      if (!u) return 8;
+      const mine = unitPower(state, i.altitude, side) + 1;
+      const theirs = unitPower(state, i.altitude, other(side)) - 1;
+      if (mine > theirs) s += 18;
+      if (favorOf(state, side) > 0) s += 10;
+      if (d === "hard") s += 6;
+      if (sightOf(state, side) <= 1) s -= 16; // Tails hurts when Sight-starved
+      return s;
+    }
+    if (i.kind === "skip_ante") {
+      // Prefer Up Ante unless Sight is critical
+      if (sightOf(state, side) <= 1) return 12;
+      return d === "hard" ? -6 : 2;
+    }
     if (i.kind === "wager") {
-      // Ante when Stance B unlocks Motley power-swap / Cash; skip suicidal Wagers
+      // Coinflip: ante for steal + optional Eclipse arm; Cash/Bust path kept for flag
       const u = myUnit(state, side, i.altitude);
       if (!u) return -5;
       const def = getCard(u.cardId);
-      let s = 6;
-      if (u.stanceB) s += d === "hard" ? 20 : d === "normal" ? 18 : 14;
-      else if (def.heresy === "motley" && u.veiled) s -= d === "hard" ? 28 : d === "normal" ? 24 : 18; // Stance B before Wager
+      let s = 10;
+      if (u.stanceB) s += d === "hard" ? 16 : 12;
       const mine = unitPower(state, i.altitude, side);
       const theirs = unitPower(state, i.altitude, other(side));
-      // Motley Stance B: Wager flips Veiled power to Witnessed — score the post-ante body
-      if (u.stanceB && def.heresy === "motley" && u.veiled) {
-        const after = faceWitnessedPower(def, true, graftWitnessBonus(u));
-        if (after > theirs) s += 36;
-        else if (after >= theirs) s += 10;
-        else s -= 12;
-      } else if (mine > theirs) s += 14;
-      else s -= 18; // Bust farm is bad
-      if (favorOf(state, side) > 0) s += 12; // Trick Eclipse armed
-      else s -= 4; // still Cash, but seals need Favor
-      if (u.cardId === "lady_masque") s += 8;
+      // Expected Heads steal often swings contested lanes
+      if (mine + 1 > theirs - 1) s += 22;
+      else if (mine >= theirs) s += 8;
+      else s -= 6;
+      if (!u.veiled) s += 10; // Witnessed Heads arms Trick Eclipse
+      if (favorOf(state, side) > 0) s += 8;
+      if (sightOf(state, side) <= 1) s -= 14;
+      if (u.cardId === "lady_masque") s += 6;
+      if (def.heresy !== "motley") s -= 20;
       return s;
     }
     if (i.kind === "press") {
@@ -1776,6 +1998,7 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
 
   const score = (i: Intent): number =>
     rawScore(i) +
+    purposeScore(state, side, i, d) +
     mindgameScale *
       (scoreMotleyMindgame(state, side, i) +
         scoreInkMindgame(state, side, i) +

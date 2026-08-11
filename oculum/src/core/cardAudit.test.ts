@@ -4,12 +4,14 @@ import { validateConstructedDeck } from "./construct";
 import { applyIntent, createMatch, legalIntents, unitPower } from "./match";
 
 describe("live craft pool", () => {
-  it("CARDS is Ink 20 + Motley 20 + Toll 20 (60)", () => {
+  it("CARDS is six live crafts at 20 each (120)", () => {
     expect(CARDS.filter((c) => c.heresy === "ink")).toHaveLength(20);
     expect(CARDS.filter((c) => c.heresy === "motley")).toHaveLength(20);
     expect(CARDS.filter((c) => c.heresy === "toll")).toHaveLength(20);
     expect(CARDS.filter((c) => c.heresy === "breach")).toHaveLength(20);
-    expect(CARDS).toHaveLength(80);
+    expect(CARDS.filter((c) => c.heresy === "lumen")).toHaveLength(20);
+    expect(CARDS.filter((c) => c.heresy === "ruin")).toHaveLength(20);
+    expect(CARDS).toHaveLength(120);
   });
 
   it("Ink, Motley, and Toll Teach decks are legal Constructed", () => {
@@ -21,12 +23,14 @@ describe("live craft pool", () => {
     expect(teachDeckToll()).toHaveLength(20);
   });
 
-  it("sovereigns are one per live craft", () => {
+  it("sovereigns are one per finished live craft", () => {
     expect(CARDS.filter((c) => c.sovereign).map((c) => c.id).sort()).toEqual([
       "carillon",
       "dahaka",
       "lady_masque",
       "skaroth",
+      "solarch",
+      "veloth",
     ]);
   });
 

@@ -2,8 +2,8 @@ import type { Heresy } from "./types";
 
 /**
  * Player-facing craft (heresy) names.
- * Soft reboot: Ink Abyss + Motley Masquerade + Bellward Toll + Scar Breach.
- * Dusk / Bonewick shelved; other ids remain typed for leftover match hooks.
+ * Soft reboot: Ink Abyss + Motley Masquerade + Bellward Toll + Scar Breach + Lumen Host + Velvet Ruin.
+ * Other ids remain typed for leftover match hooks / seals.
  */
 export const HERESY_LORE: Record<
   Heresy,
@@ -13,20 +13,20 @@ export const HERESY_LORE: Record<
   motley: { name: "Motley Masquerade", short: "Motley Masquerade", verb: "Trick" },
   toll: { name: "Bellward Toll", short: "Bellward", verb: "Toll" },
   breach: { name: "Scar Breach", short: "Scar Breach", verb: "Breach" },
+  lumen: { name: "Lumen Host", short: "Lumen Host", verb: "Radiance" },
+  ruin: { name: "Velvet Ruin", short: "Velvet Ruin", verb: "Devour" },
   cube: { name: "Ashlar Veil", short: "Ashlar", verb: "Hold" },
-  deal: { name: "Dusk Ledger", short: "Ledger", verb: "Debt" },
   many: { name: "Facet Host", short: "Facet", verb: "Stance" },
   graft: { name: "Keywright Join", short: "Keywright", verb: "Attach" },
   hollow: { name: "Cutwork Pale", short: "Cutwork", verb: "Blind" },
   coral: { name: "Branch-Rune", short: "Branch", verb: "Colony" },
-  shell: { name: "Bonewick", short: "Bonewick", verb: "Vessel" },
   deep: { name: "Cataract Verdure", short: "Cataract", verb: "Chain" },
   ring: { name: "Iris Circle", short: "Iris", verb: "Gaze" },
   neutral: { name: "Unbound", short: "Unbound", verb: "Law" },
 };
 
 /** Live Codex / builder craft filters. */
-export const HERESY_IDS = ["ink", "motley", "toll", "breach"] as const;
+export const HERESY_IDS = ["ink", "motley", "toll", "breach", "lumen", "ruin"] as const;
 export type LiveHeresy = (typeof HERESY_IDS)[number];
 
 /** Live-craft pitch: hook fantasy + flagship archetype for the heresy select screen. */
@@ -57,6 +57,16 @@ export const HERESY_PITCH: Record<LiveHeresy, HeresyPitch> = {
     archetype: "Face-up agro. Open Figures, Breach on wins, Overexpose on losses.",
     kit: "Open · Breach · Overexpose",
   },
+  lumen: {
+    hook: "The Eye's angels burn brightest when Named — and cannot stay Named for free.",
+    archetype: "High-commit midrange. Halo on Witness, Blaze on Pass, Sustain or Fall.",
+    kit: "Halo · Blaze · Fall",
+  },
+  ruin: {
+    hook: "Desire only fully exists when Witnessed — and Witnessing feeds it.",
+    archetype: "Midrange seduction. Tempt bait, Brand on their look, Devour on Pass.",
+    kit: "Tempt · Brand · Devour",
+  },
 };
 
 export function heresyName(h: Heresy): string {
@@ -84,6 +94,8 @@ export const HERESY_PICK_FACE: Record<LiveHeresy, string> = {
   motley: "lady_masque",
   toll: "bell_siren",
   breach: "rivet_vanguard",
+  lumen: "skyflare_seraph",
+  ruin: "crimson_vow",
 };
 
 export function heresyPickFace(h: Heresy): string | null {

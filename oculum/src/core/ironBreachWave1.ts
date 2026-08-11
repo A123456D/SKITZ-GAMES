@@ -47,8 +47,8 @@ export const IRON_BREACH_WAVE1: CardDef[] = [
     artSubject:
       "Scar Breach open-wound portrait — male human highscar lancer planted cliff lance at rest strap harness scar brands",
     veiledAbility: "While on High, +1 power.",
-    revelation: "If on High, draw 1; otherwise gain 1 Sight.",
-    text: "Veiled: While on High, +1 power. Revelation: If on High, draw 1; otherwise gain 1 Sight. While Witnessed on High: When this wins Resolve, deal +1 Will in addition to shared Breach. Overexpose: shared; on High, also take 1 Will.",
+    revelation: "If on High, deal 1 Will; otherwise gain 1 Sight.",
+    text: "Veiled: While on High, +1 power. Revelation: If on High, deal 1 Will; otherwise gain 1 Sight. While Witnessed on High: When this wins Resolve, deal +1 Will in addition to shared Breach. Overexpose: shared; on High, also take 1 Will.",
   },
   {
     id: "scarsteel_cleaver",
@@ -64,8 +64,8 @@ export const IRON_BREACH_WAVE1: CardDef[] = [
       "Scar Breach open-wound portrait — female human scarsteel cleaver planted stance cleaver at rest sexy-aggressive strap harness scar brands canyon",
     veiledAbility: "Whenever another friendly Figure becomes Witnessed, gain 1 Sight.",
     revelation:
-      "Draw 1. Then: you may Witness another friendly Veiled Figure paying 1 less Sight (min 0).",
-    text: "Veiled: Whenever another friendly Figure becomes Witnessed, gain 1 Sight. Revelation: Draw 1. Then: you may Witness another friendly Veiled Figure paying 1 less Sight (min 0). Overexpose: shared.",
+      "Gain 1 Sight. Then: you may Witness another friendly Veiled Figure paying 1 less Sight (min 0).",
+    text: "Veiled: Whenever another friendly Figure becomes Witnessed, gain 1 Sight. Revelation: Gain 1 Sight. Then: you may Witness another friendly Veiled Figure paying 1 less Sight (min 0). Overexpose: shared.",
   },
   {
     id: "slag_reaper",
@@ -79,9 +79,9 @@ export const IRON_BREACH_WAVE1: CardDef[] = [
     sightYield: 0,
     artSubject:
       "Scar Breach open-wound portrait — war-spirit slag reaper slag-scar body strap bindings eye-brand canyon scythe",
-    veiledAbility: "The first time each turn an enemy Figure becomes Strained, draw 1.",
+    veiledAbility: "The first time each turn an enemy Figure becomes Strained, gain 1 Sight.",
     revelation: "If any enemy Figure is Strained, deal 1 Will.",
-    text: "Veiled: The first time each turn an enemy Figure becomes Strained, draw 1. Revelation: If any enemy Figure is Strained, deal 1 Will. While Witnessed: If a Strained enemy Figure here loses Resolve, they Fall.",
+    text: "Veiled: The first time each turn an enemy Figure becomes Strained, gain 1 Sight. Revelation: If any enemy Figure is Strained, deal 1 Will. While Witnessed: If a Strained enemy Figure here loses Resolve, they Fall.",
   },
 ];
 

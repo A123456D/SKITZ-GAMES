@@ -18,8 +18,8 @@ export const IRON_BREACH_WAVE4: CardDef[] = [
     veiledAbility:
       "Whenever a friendly Figure becomes Witnessed, gain 1 Sight. The first time each Resolve you deal Breach Will, this has +1 power until end of that Resolve.",
     revelation:
-      "Witness another friendly Veiled Figure paying 1 less Sight (min 0) if able. If you control 2 or more Witnessed Figures after this (including this), deal 1 Will and draw 1.",
-    text: "SOVEREIGN. Veiled: Whenever a friendly Figure becomes Witnessed, gain 1 Sight. The first time each Resolve you deal Breach Will, this has +1 power until end of that Resolve. Revelation: Witness another friendly Veiled Figure paying 1 less Sight (min 0) if able. If you control 2+ Witnessed Figures after this (including this), deal 1 Will and draw 1. While Witnessed: your other Scar Breach Figures deal +1 Will Breach in addition to shared Breach (up to twice per Resolve). Overexpose: shared; opponent gains 1 Sight. Fall: Draw 1.",
+      "Witness another friendly Veiled Figure paying 1 less Sight (min 0) if able. If you control 2 or more Witnessed Figures after this (including this), deal 1 Will and gain 1 Sight.",
+    text: "SOVEREIGN. Veiled: Whenever a friendly Figure becomes Witnessed, gain 1 Sight. The first time each Resolve you deal Breach Will, this has +1 power until end of that Resolve. Revelation: Witness another friendly Veiled Figure paying 1 less Sight (min 0) if able. If you control 2+ Witnessed Figures after this (including this), deal 1 Will and gain 1 Sight. While Witnessed: your other Scar Breach Figures deal +1 Will Breach in addition to shared Breach (up to twice per Resolve). Overexpose: shared; opponent gains 1 Sight. Fall: Gain 1 Sight.",
   },
   {
     id: "eyebrand_charm",
@@ -32,7 +32,7 @@ export const IRON_BREACH_WAVE4: CardDef[] = [
     witnessedPower: 1,
     sightYield: 0,
     artSubject: "Scar Breach open-wound — eyebrand charm graft scar-welded iris strap seal",
-    text: "Graft: +1 power while host Witnessed. When host wins Resolve while Witnessed, gain 1 Sight. If that altitude is High, also draw 1.",
+    text: "Graft: +1 power while host Witnessed. When host wins Resolve while Witnessed, gain 1 Sight.",
   },
   {
     id: "ash_urn",
@@ -72,7 +72,7 @@ export const IRON_BREACH_WAVE4: CardDef[] = [
     witnessedPower: 0,
     sightYield: 0,
     artSubject: "Scar Breach open-wound — last breach rite final scar-seal war edict parchment",
-    text: "Choose an altitude with your Figure: if Veiled, Witness it paying 1 less Sight (min 0) — if that Figure Overexposes this Resolve, draw 1; if Witnessed, deal 2 Will.",
+    text: "Choose an altitude with your Figure: if Veiled, Witness it paying 1 less Sight (min 0) — if that Figure Overexposes this Resolve, gain 1 Sight; if Witnessed, deal 2 Will.",
   },
 ];
 

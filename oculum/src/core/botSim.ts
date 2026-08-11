@@ -1,8 +1,6 @@
 import { chooseAiMove } from "./ai";
 import {
   aiBellwardTollDeck,
-  aiBonewickDeck,
-  aiDuskLedgerDeck,
   aiInkAbyssDeck,
   aiIronBreachDeck,
   aiMotleyCourtDeck,
@@ -11,7 +9,7 @@ import { buildAutoDeck } from "./construct";
 import { applyIntent, createMatch } from "./match";
 import type { MatchState } from "./types";
 
-export type DeckKind = "ink" | "motley" | "toll" | "breach" | "dusk" | "bonewick" | "mixed";
+export type DeckKind = "ink" | "motley" | "toll" | "breach" | "mixed";
 
 export type MatchupSpec = {
   name: string;
@@ -58,8 +56,6 @@ function deckFor(kind: DeckKind, seed: number): string[] {
   if (kind === "motley") return aiMotleyCourtDeck();
   if (kind === "toll") return aiBellwardTollDeck();
   if (kind === "breach") return aiIronBreachDeck();
-  if (kind === "dusk") return aiDuskLedgerDeck();
-  if (kind === "bonewick") return aiBonewickDeck();
   return buildAutoDeck({ seed, heresy: "all" });
 }
 

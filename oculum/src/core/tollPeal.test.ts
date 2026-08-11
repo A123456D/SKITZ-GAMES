@@ -20,10 +20,18 @@ function fig(cardId: string, opts: Partial<BoardUnit> = {}): BoardUnit {
     wagered: false,
     wagerAntePaid: false,
     wagerAnteFavor: false,
+    wagerHeads: false,
+    wagerPowerDelta: 0,
     openedSinceResolve: false,
     lastBreachOpened: false,
     pressed: false,
     pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
     ...opts,
   };
 }
@@ -35,15 +43,13 @@ function bothPassResolve(s: MatchState): OculusEvent[] {
 }
 
 describe("Bellward Peal", () => {
-  it("Peal arm then Resolve spend → Peal pays (Sight + draw)", () => {
+  it("Peal arm then Resolve spend → Peal pays Sight", () => {
     const s = createMatch({ deck: teachDeckToll(), enemyDeck: teachDeck(), seed: 911 });
     s.altitudes[1].player = fig("clapper_cantor", { veiled: false, revelationFired: true });
     s.altitudes[1].enemy = fig("blot_herald", { veiled: false, revelationFired: true });
     s.tollOwner[1] = "player";
     s.sight = 3;
     s.hand = [];
-    s.deck = ["veil_ringer", "bell_siren", "path_bellman"];
-    const beforeHand = s.hand.length;
     const evPeal = applyIntent(s, { kind: "peal", altitude: 1 });
     expect(evPeal.some((e) => e.type === "peal")).toBe(true);
     expect(s.pealArmed[1]).toBe(true);
@@ -51,11 +57,12 @@ describe("Bellward Peal", () => {
 
     // Player stronger on Mid so enemy loses → Resolve spends Toll
     s.altitudes[1].player = fig("carillon", { veiled: false, revelationFired: true });
+    const sightBeforePay = s.sight;
     const ev = bothPassResolve(s);
     expect(ev.some((e) => e.type === "peal_pay")).toBe(true);
     expect(s.tollOwner[1]).toBe(null);
     expect(s.pealArmed[1]).toBe(false);
-    expect(s.hand.length).toBeGreaterThan(beforeHand);
+    expect(s.sight).toBeGreaterThan(sightBeforePay);
   });
 
   it("Lure clear of Pealed Toll without Banner → fizzle (no peal_pay)", () => {

@@ -21,7 +21,7 @@ export const BELLWARD_TOLL_WAVE4: CardDef[] = [
     veiledAbility: "Whenever Resonance happens for you, gain 1 Sight.",
     revelation:
       "Toll High if able and Toll Low if able. If High and Low are both Tolled after this, gain 1 Sight.",
-    text: "SOVEREIGN. Veiled: Whenever Resonance happens for you, gain 1 Sight. Revelation: Toll High if able and Toll Low if able. If High and Low are both Tolled after this, gain 1 Sight. While Witnessed: Whenever you Lure, Blind that altitude this turn. Peal: when Peal pays for you, Blind that altitude this turn. Fall: Draw 1.",
+    text: "SOVEREIGN. Veiled: Whenever Resonance happens for you, gain 1 Sight. Revelation: Toll High if able and Toll Low if able. If High and Low are both Tolled after this, gain 1 Sight. While Witnessed: Whenever you Lure, Blind that altitude this turn. Peal: when Peal pays for you, Blind that altitude this turn. Fall: Gain 1 Sight.",
   },
   {
     id: "siren_cord",
@@ -35,7 +35,7 @@ export const BELLWARD_TOLL_WAVE4: CardDef[] = [
     sightYield: 0,
     artSubject:
       "same Bellward Toll set style as Veil Ringer — siren cord charm graft crimson cloth cord bronze bell lure seal floating cliff ocean, unique crimson siren-knot cord inner frame, high-contrast crimson-white-charcoal bell shrine",
-    text: "Graft: +1 power while host Witnessed. When an enemy pays or touches Toll on the host's altitude while host is Witnessed, gain 1 Sight. If that altitude is Mid, also draw 1.",
+    text: "Graft: +1 power while host Witnessed. When an enemy pays or touches Toll on the host's altitude while host is Witnessed, gain 1 Sight.",
   },
   {
     id: "peal_urn",

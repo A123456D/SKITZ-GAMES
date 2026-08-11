@@ -33,8 +33,8 @@ export const BELLWARD_TOLL_WAVE3: CardDef[] = [
     artSubject:
       "same Bellward Toll set style as Veil Ringer — male human lowcloth warden crimson white cloth bronze bells low cliff banners ocean, unique crimson low-stone cloth-ward inner frame, high-contrast crimson-white-charcoal bell shrine",
     veiledAbility: "When this Holds on Low and Low is Tolled, Blind Low this turn.",
-    revelation: "Toll Low if able. If Low was already Tolled, draw 1.",
-    text: "Veiled: When this Holds on Low and Low is Tolled, Blind Low this turn. Revelation: Toll Low if able. If Low was already Tolled, draw 1.",
+    revelation: "Toll Low if able. If Low was already Tolled, gain 1 Sight.",
+    text: "Veiled: When this Holds on Low and Low is Tolled, Blind Low this turn. Revelation: Toll Low if able. If Low was already Tolled, gain 1 Sight.",
   },
   {
     id: "rope_auditor",
@@ -50,8 +50,8 @@ export const BELLWARD_TOLL_WAVE3: CardDef[] = [
       "same Bellward Toll set style as Veil Ringer — male human rope auditor crimson white cloth bronze bells ledger cliff banners ocean, unique crimson ledger-rope tally inner frame, high-contrast crimson-white-charcoal bell shrine",
     veiledAbility:
       "While Veiled: the first enemy Witness or Lure on a Tolled altitude each turn costs them +1 Sight.",
-    revelation: "Toll Mid if able; otherwise draw 1.",
-    text: "Veiled: While Veiled: the first enemy Witness or Lure on a Tolled altitude each turn costs them +1 Sight. Revelation: Toll Mid if able; otherwise draw 1.",
+    revelation: "Toll Mid if able; otherwise gain 1 Sight.",
+    text: "Veiled: While Veiled: the first enemy Witness or Lure on a Tolled altitude each turn costs them +1 Sight. Revelation: Toll Mid if able; otherwise gain 1 Sight.",
   },
   {
     id: "banner_bellwalk",

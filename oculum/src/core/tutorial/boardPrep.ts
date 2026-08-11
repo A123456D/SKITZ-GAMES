@@ -35,10 +35,18 @@ export function mintTutorUnit(cardId: string, opts: Partial<BoardUnit> = {}): Bo
     wagered: false,
     wagerAntePaid: false,
     wagerAnteFavor: false,
+    wagerHeads: false,
+    wagerPowerDelta: 0,
     openedSinceResolve: false,
     lastBreachOpened: false,
     pressed: false,
     pressedBy: null,
+    haloed: false,
+    haloSustained: false,
+    tempted: false,
+    temptedBy: null,
+    branded: false,
+    brandedBy: null,
     ...opts,
   };
 }

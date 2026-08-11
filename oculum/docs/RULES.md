@@ -18,7 +18,7 @@ Three **Altitudes** (lanes): **High · Mid · Low** — each has a standing Reve
 | Altitude | Sight / Gaze | Combat |
 |----------|--------------|--------|
 | **HIGH** | +1 Sight while you control a Witnessed Figure or Site here. **Gaze Witness costs 1 less Sight** (min 0). | Win damage +1 before soft Resolve |
-| **MID** | **Own Witness here: draw 1** | Default |
+| **MID** | **Own Witness here: gain 1 Sight** | Default |
 | **LOW** | **Own Witness and Gaze cost +1 Sight** | Veiled Figures +1 power |
 
 Each side may occupy an altitude with **one Figure or Site**. Relics **graft** onto Figures. Vessels may hold one Inhabitant.
@@ -73,21 +73,29 @@ Same Eye faith. Different craft. Each owns a **verb**, kit, and board relationsh
 | Craft | Verb | Private kit | Flagship archetype |
 |-------|------|-------------|--------------------|
 | **Ink Abyss** | Erase | Stain → **Press** → Forced Exposed; Blind deny | Midrange grind / removal |
-| **Motley Masquerade** | Trick | Stance + Wager (Cash/Bust); Stance B vs Erase | Midrange flip-tempo |
+| **Motley Masquerade** | Trick | Stance + coin-flip Wager (Heads/Tails); Stance B vs Erase | Midrange flip-tempo |
 | **Bellward Toll** | Toll | Sticky Toll + **Peal** arm/pay + Lure | Tempo trap tax / Break |
 | **Scar Breach** | Breach | Open → Breach Will on wins; **Overexpose** if you lose while Open | Face-up midrange-aggro |
+| **Lumen Host** | Radiance | **Halo** on own Witness; **Blaze** on Pass; **Sustain** or Re-Veil | High-commit midrange torch |
+| **Velvet Ruin** | Devour | **Tempt** bait → **Brand** on foe Witness → **Devour** on Pass | Midrange seduction / bait-Break |
 
-**Stance B:** swaps printed Veiled / Witnessed power until switched back — **Motley Figures only while Wagered** (Hold vs Erase still works without ante). Motley Figures may use the Stance action once per turn (no Third Face required). Veiled Motley Figures in Stance B **Hold** against Erase (Stain / False Hold Forced Exposed). Winning a lane while Veiled Stance B with a **paid Wager ante** grants **+1 Eclipse** (max once per Resolve) **if you already had Favor before that Resolve**, and **spends 1 Favor** (gala must be funded going in; Cash Favor mid-Resolve does not unlock Trick that beat). Empty-Sight Pass does **not** grant Eclipse.
+**Stance B:** swaps printed Veiled / Witnessed power until switched back — **Motley Figures only while Wagered** (Hold vs Erase still works without ante). Motley Figures may use the Stance action once per turn (no Third Face required). Veiled Motley Figures in Stance B **Hold** against Erase (Stain / False Hold Forced Exposed).
+
+**Motley Wager (coin flip):** Once per action window, ante **1 Sight** to Wager a Motley Figure/Vessel (**Veiled or Witnessed**). The coin flips immediately. **Heads:** steal **1 power** in that lane this Resolve (−1 enemy / +1 you) and you may optionally **Up the Ante** for a free second flip. **Tails:** lose **1 Sight** and **Re-Veil**. If you scored **Heads** this window and then **win Resolve while Witnessed**, gain **+1 Eclipse** (max once per side per Resolve) and spend **1 Favor** if you had Favor going in. Empty-Sight Pass does **not** grant Eclipse.
+
+Legacy Cash/Bust Wager (Veiled win Cash / lose Bust / paid-ante Trick Eclipse) remains behind `motleyKit` flag `cashbust` for rollback.
 
 **Jester risk (Motley):** commitment timing — which face shows when the Eye looks — not RNG. Stance B is Motley's answer to Ink Erase.
 
 **Ink Press:** Once per action window, spend 1 Sight to **Press** an enemy Veiled + Stained Figure (requires playing Ink). Pressed Figures have **−1 power** until Resolve. **Press into Motley Stance B is free and does not require Stain** (still once per window). When you win Resolve against that Pressed Figure while Veiled, Forced Expose + Strain even through Motley Stance B. If Resolve ends and they are still Veiled, **Smother backlash** — you lose 1 Sight. See `docs/CRAFT_DENSITY.md`.
 
-**Bellward Toll (Trap Tax):** Place **Toll** marks on altitudes. While you own Toll on a lane, **your Figures there have +1 power**, and **you may Gaze** enemy Veiled Figures there (the tax cuts both ways). An **opponent** who Witnesses/Gazes into your Toll spends 1 Sight if able; you gain **1 Sight**; thin **Resonance** fires; the mark **stays**. **Resolve** on that lane (either side loses) **spends** the Toll (tax + Resonance, then clear). Own Witness / Gaze on your own Toll leaves the trap. **Your** Lure clears it (no Sight tax) and Resonates. **Lure** forces a **true Witness**. **Peal:** once per window, spend 1 Sight to arm a Toll you own; when Resolve spends that Toll, Peal pays (+1 Sight + draw 1); Lure clear fizzles Peal unless Banner Bellwalk. Eclipse is a rare rider only.
+**Bellward Toll (Trap Tax):** Place **Toll** marks on altitudes. While you own Toll on a lane, **your Figures there have +1 power**, and **you may Gaze** enemy Veiled Figures there (the tax cuts both ways). An **opponent** who Witnesses/Gazes into your Toll spends 1 Sight if able; you gain **1 Sight**; thin **Resonance** fires; the mark **stays**. **Resolve** on that lane (either side loses) **spends** the Toll (tax + Resonance, then clear). Own Witness / Gaze on your own Toll leaves the trap. **Your** Lure clears it (no Sight tax) and Resonates. **Lure** forces a **true Witness**. **Peal:** once per window, spend 1 Sight to arm a Toll you own; when Resolve spends that Toll, Peal pays (+1 Sight); Lure clear fizzles Peal unless Banner Bellwalk. Eclipse is a rare rider only.
 
 **Scar Breach (Open / Breach / Overexpose):** Scar Breach Figures **Breach** only while **Witnessed**. When a Witnessed Scar Breach Figure **wins Resolve against a Witnessed enemy occupant**, after shared soft Resolve Will damage, deal **+1 Will** Breach — **at most twice per side per Resolve**. Riders (Highscar / Full Breach / Skaroth aura) add at most **+1** more on each payout (max **2** Breach Will per payout). Further contested Open wins that Resolve still do soft Resolve + Strain, but no further Breach Will. **Empty-lane** wins and **Veiled** wins do **not** Breach — **exception:** winning into a **Veiled Motley Stance B** Figure still Breaches (agro pierce vs Trick walls) and soft chip is densified (+1). **Veiled Ink** losers take at most **2** soft Will from Open Breach (Hold deny). Paying Sight to Witness is the agro commit (**Open**). **Overexpose** (agro Bust analogue): the first time each Resolve a friendly Scar Breach Figure **loses Resolve while Witnessed**, if it **became Witnessed since the previous Resolve**, its controller **loses 1 Sight** if able and **1 Will**. Cards may print stronger or mitigating Overexpose. High’s shared +1-before-halve still applies separately. Eclipse is a rare rider only. No Stain, Stance/Wager, or Toll marks. See `docs/CRAFT_DENSITY.md`.
 
-**Debt (Dusk — shelved):** Eclipse is a resource you seed (empty Mid, threshold Revelations) and spend (Settle Accounts and later waves).
+**Lumen Host (Halo / Blaze / Sustain):** When you **Witness your own** Lumen Figure, it becomes **Halo’d** (+1 power while Witnessed). When you **Pass**, each Halo’d Figure **Blazes** (1 Will if the lane is contested, else +1 Sight; cards may print more), then **Re-Veils** and loses Halo unless you **Sustained** it this window (1 Sight; Lumen Shrine can make the first Sustain on its lane free). Not Ink Stain/Press, Motley Stance/Wager, Toll/Peal, or Breach Overexpose (Overexpose = lose-while-Open tax; Radiance = voluntary light-rent after you chose to Witness). See `docs/LUMEN_WAVE1.md`.
+
+**Velvet Ruin (Tempt / Brand / Devour):** See `docs/RUIN_WAVE1.md`. **Tempt** an enemy Veiled Figure (once per window baseline): they Witness/Gaze it at **−1 Sight (min 0)** — bait, never forced (≠ Lure). When they **Witness** a Tempted Figure, clear Tempt, place a **Brand**, you gain **1 Sight** (≠ Stain/Erase). On **your Pass**, each Branded enemy **Devours**: **1 Will** if Witnessed, else you gain **1 Sight**; then Brands clear. Risk: they control whether the look feeds you.
 
 ### Archive / future crafts (hooks may remain in code)
 
@@ -95,10 +103,9 @@ Same Eye faith. Different craft. Each owns a **verb**, kit, and board relationsh
 |-------|------|------------|--------|
 | **Ashlar Veil** | Hold | Veil Banner / Low fortress | Veiled Ashlar losers take at most **1 Will** |
 | **Facet Host** | Flip | Third Face, galleries | Fall while **Stance B** → +1 Eclipse |
-| **Keywright Join** | Attach | Mills / shrines | Fall with grafts → **draw 1** |
+| **Keywright Join** | Attach | Mills / shrines | Witness with grafts → **gain 1 Sight** |
 | **Cutwork Pale** | Blind | Deny Sight | Blinded lanes skip Unmake that Resolve |
 | **Branch-Rune** | Colony | Reliquaries + Crown | Crown counts as Branch-Rune Site |
-| **Bonewick** | Vessel | Bone Gallery | Vessels refill lane on Fall |
 | **Cataract Verdure** | Chain | Matron Mid | Free Witness chains; Site payoffs |
 | **Iris Circle** | Gaze | Iris Gaze / Paths | **Iris owns Gaze** — steal Revelations |
 

@@ -51,10 +51,17 @@ import {
   IRON_BREACH_WAVE4,
   IRON_BREACH_WAVE4_RITE_IDS,
 } from "./ironBreachWave4";
+import { LUMEN_HOST_WAVE1, LUMEN_HOST_WAVE1_RITE_IDS } from "./lumenHostWave1";
+import { LUMEN_HOST_WAVE2, LUMEN_HOST_WAVE2_RITE_IDS } from "./lumenHostWave2";
+import { LUMEN_HOST_WAVE3, LUMEN_HOST_WAVE3_RITE_IDS } from "./lumenHostWave3";
+import { LUMEN_HOST_WAVE4, LUMEN_HOST_WAVE4_RITE_IDS } from "./lumenHostWave4";
+import { VELVET_RUIN_WAVE1, VELVET_RUIN_WAVE1_RITE_IDS } from "./velvetRuinWave1";
+import { VELVET_RUIN_WAVE2, VELVET_RUIN_WAVE2_RITE_IDS } from "./velvetRuinWave2";
+import { VELVET_RUIN_WAVE3, VELVET_RUIN_WAVE3_RITE_IDS } from "./velvetRuinWave3";
+import { VELVET_RUIN_WAVE4, VELVET_RUIN_WAVE4_RITE_IDS } from "./velvetRuinWave4";
 
 /**
- * Live collectible pool — Ink + Motley + Toll + Scar Breach (20 each).
- * Dusk / Bonewick still shelved.
+ * Live collectible pool — Ink + Motley + Toll + Scar Breach + Lumen Host + Velvet Ruin.
  */
 export const CARDS: CardDef[] = [
   ...INK_ABYSS_WAVE1,
@@ -73,6 +80,14 @@ export const CARDS: CardDef[] = [
   ...IRON_BREACH_WAVE2,
   ...IRON_BREACH_WAVE3,
   ...IRON_BREACH_WAVE4,
+  ...LUMEN_HOST_WAVE1,
+  ...LUMEN_HOST_WAVE2,
+  ...LUMEN_HOST_WAVE3,
+  ...LUMEN_HOST_WAVE4,
+  ...VELVET_RUIN_WAVE1,
+  ...VELVET_RUIN_WAVE2,
+  ...VELVET_RUIN_WAVE3,
+  ...VELVET_RUIN_WAVE4,
 ];
 
 export const INK_ABYSS_RITE_IDS = new Set([
@@ -102,8 +117,18 @@ export const IRON_BREACH_RITE_IDS = new Set([
   ...IRON_BREACH_WAVE3_RITE_IDS,
   ...IRON_BREACH_WAVE4_RITE_IDS,
 ]);
-export const DUSK_LEDGER_RITE_IDS = new Set<string>();
-export const BONEWICK_RITE_IDS = new Set<string>();
+export const LUMEN_HOST_RITE_IDS = new Set([
+  ...LUMEN_HOST_WAVE1_RITE_IDS,
+  ...LUMEN_HOST_WAVE2_RITE_IDS,
+  ...LUMEN_HOST_WAVE3_RITE_IDS,
+  ...LUMEN_HOST_WAVE4_RITE_IDS,
+]);
+export const VELVET_RUIN_RITE_IDS = new Set([
+  ...VELVET_RUIN_WAVE1_RITE_IDS,
+  ...VELVET_RUIN_WAVE2_RITE_IDS,
+  ...VELVET_RUIN_WAVE3_RITE_IDS,
+  ...VELVET_RUIN_WAVE4_RITE_IDS,
+]);
 
 const byId = new Map(CARDS.map((c) => [c.id, c]));
 
@@ -207,17 +232,53 @@ export function teachDeckBreach(): string[] {
   return out;
 }
 
-export function teachDeckDusk(): string[] {
-  return teachDeck();
-}
-
-export function teachDeckBonewick(): string[] {
-  return teachDeck();
-}
-
 /** @deprecated Use teachDeck() */
 export function starterDeck(): string[] {
   return teachDeck();
+}
+
+/** Lumen Host Teach — 2× Waves 1–2 (no Solarch / Last Radiance closer). Craft 20 → copy limit 2. */
+const TEACH_LUMEN_IDS = [
+  "halo_herald",
+  "candela_blade",
+  "skyflare_seraph",
+  "lumen_shrine",
+  "snuff_the_halo",
+  "ash_chorister",
+  "aureole_well",
+  "lumen_urn",
+  "halo_charm",
+  "kindle_the_halo",
+] as const;
+
+export function teachDeckLumen(): string[] {
+  const out: string[] = [];
+  for (const id of TEACH_LUMEN_IDS) {
+    out.push(id, id);
+  }
+  return out;
+}
+
+/** Velvet Ruin Teach — 2× Waves 1–2 (no Veloth / Last Devour). Craft 20 → copy limit 2. */
+const TEACH_RUIN_IDS = [
+  "thorn_liaison",
+  "crimson_vow",
+  "spire_hunger",
+  "desire_altar",
+  "unwrite_the_sin",
+  "vespera",
+  "thorn_font",
+  "want_urn",
+  "horn_charm",
+  "invite_the_look",
+] as const;
+
+export function teachDeckRuin(): string[] {
+  const out: string[] = [];
+  for (const id of TEACH_RUIN_IDS) {
+    out.push(id, id);
+  }
+  return out;
 }
 
 /** Flagship Teach deck for a live craft. */
@@ -225,6 +286,8 @@ export function teachDeckForHeresy(heresy: CardDef["heresy"]): string[] {
   if (heresy === "motley") return teachDeckMotley();
   if (heresy === "toll") return teachDeckToll();
   if (heresy === "breach") return teachDeckBreach();
+  if (heresy === "lumen") return teachDeckLumen();
+  if (heresy === "ruin") return teachDeckRuin();
   return teachDeck();
 }
 
@@ -238,10 +301,10 @@ export function heresyColor(heresy: CardDef["heresy"]): [number, number, number]
       return [0.55, 0.12, 0.14];
     case "breach":
       return [0.28, 0.22, 0.2];
-    case "deal":
-      return [0.55, 0.28, 0.12];
-    case "shell":
-      return [0.42, 0.52, 0.72];
+    case "lumen":
+      return [0.72, 0.58, 0.28];
+    case "ruin":
+      return [0.45, 0.1, 0.22];
     default:
       return [0.45, 0.42, 0.48];
   }

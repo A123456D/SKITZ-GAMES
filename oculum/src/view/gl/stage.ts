@@ -205,6 +205,8 @@ export class OculusStage {
   ];
   private lastBw = 0;
   private lastBh = 0;
+  /** Pointer hover — subtle lift for Witnessed cards under the cursor. */
+  private hoverSlot: { alt: Altitude; side: Side } | null = null;
   layout: StageLayout = { cssW: 1, cssH: 1, laneRects: [] };
 
   constructor(canvas: HTMLCanvasElement) {
@@ -545,6 +547,52 @@ export class OculusStage {
     this.texCache.clear();
   }
 
+  setHoverSlot(alt: Altitude | null, side: Side | null): void {
+    if (alt == null || side == null) {
+      this.hoverSlot = null;
+      return;
+    }
+    this.hoverSlot = { alt, side };
+  }
+
+  clearHoverSlot(): void {
+    this.hoverSlot = null;
+  }
+
+  /** Hit-test a figure/vessel card quad (CSS canvas coords). */
+  hitUnit(
+    x: number,
+    y: number,
+    state: MatchState,
+  ): { alt: Altitude; side: Side } | null {
+    for (let i = 0; i < this.layout.laneRects.length; i++) {
+      const lane = this.layout.laneRects[i];
+      const alt = i as Altitude;
+      for (const top of [true, false]) {
+        const side: Side = top ? "enemy" : "player";
+        const slot = state.altitudes[alt];
+        const u = side === "player" ? slot.player : slot.enemy;
+        if (!u) continue;
+        const rect = this.unitQuadRect(lane, top);
+        if (x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h) {
+          return { alt, side };
+        }
+      }
+    }
+    return null;
+  }
+
+  private unitQuadRect(
+    lane: { x: number; y: number; w: number; h: number },
+    top: boolean,
+  ): { x: number; y: number; w: number; h: number } {
+    let cardH = Math.min(lane.h * 0.32, lane.w * 1.18);
+    let cardW = cardH * (300 / 450);
+    const cx = lane.x + (lane.w - cardW) / 2;
+    const cy = top ? lane.y + lane.h * 0.08 : lane.y + lane.h - cardH - lane.h * 0.08;
+    return { x: cx, y: cy, w: cardW, h: cardH };
+  }
+
   setReduceMotion(on: boolean): void {
     this.reduceMotion = on;
   }
@@ -595,6 +643,12 @@ export class OculusStage {
         this.resolveFlash = Math.max(this.resolveFlash, 0.75 * soft);
       } else if (ev.type === "stain") {
         this.bump(ev.altitude, ev.side, 1.05 * soft, [0.25, 0.55, 0.42], 0.1 * soft);
+      } else if (ev.type === "halo") {
+        this.bump(ev.altitude, ev.side, 1.1 * soft, [0.95, 0.78, 0.35], 0.14 * soft);
+      } else if (ev.type === "blaze") {
+        this.bump(ev.altitude, ev.side, 1.25 * soft, [1.0, 0.55, 0.2], 0.16 * soft);
+      } else if (ev.type === "sustain") {
+        this.bump(ev.altitude, ev.side, 0.85 * soft, [0.85, 0.9, 0.55], 0.08 * soft);
       } else if (ev.type === "strain") {
         this.bump(ev.altitude, ev.side, 1.0 * soft, [0.7, 0.45, 0.2], 0.08 * soft);
       } else if (ev.type === "blind") {
@@ -608,7 +662,7 @@ export class OculusStage {
       } else if (ev.type === "peal" || ev.type === "peal_pay") {
         this.bump(ev.altitude, "player", 0.95 * soft, [0.75, 0.6, 0.25], 0.1 * soft);
         this.bump(ev.altitude, "enemy", 0.95 * soft, [0.75, 0.6, 0.25], 0.1 * soft);
-      } else if (ev.type === "wager" || ev.type === "cash") {
+      } else if (ev.type === "wager" || ev.type === "cash" || ev.type === "bust" || ev.type === "wager_flip") {
         this.bump(ev.altitude, ev.side, 0.9 * soft, [0.65, 0.5, 0.85], 0.1 * soft);
       } else if (ev.type === "eclipse") {
         this.resolveFlash = Math.max(this.resolveFlash, 0.55 * soft);
@@ -721,9 +775,9 @@ export class OculusStage {
     const u = side === "player" ? slot.player : slot.enemy;
     const site = side === "player" ? slot.playerSite : slot.enemySite;
     const fx = this.fx[alt][side];
-    const pulse = fx?.amount ?? 0;
+    let pulse = fx?.amount ?? 0;
     const pop = fx?.pop ?? 0;
-    const fxColor = fx?.color ?? ([0.55, 0.38, 0.14] as [number, number, number]);
+    let fxColor = fx?.color ?? ([0.55, 0.38, 0.14] as [number, number, number]);
     // Compact heroes leave a mid-lane gutter for power chips + site tokens
     let cardH = Math.min(lane.h * 0.32, lane.w * 1.18);
     let cardW = cardH * (300 / 450);
@@ -732,8 +786,34 @@ export class OculusStage {
       cardW *= s;
       cardH *= s;
     }
-    const cx = lane.x + (lane.w - cardW) / 2;
-    const cy = top ? lane.y + lane.h * 0.08 : lane.y + lane.h - cardH - lane.h * 0.08;
+    let cx = lane.x + (lane.w - cardW) / 2;
+    let cy = top ? lane.y + lane.h * 0.08 : lane.y + lane.h - cardH - lane.h * 0.08;
+
+    // Witnessed presence: slight idle float + stronger lift under pointer
+    const witnessed = !!u && !u.veiled;
+    const hovered =
+      witnessed &&
+      this.hoverSlot?.alt === alt &&
+      this.hoverSlot?.side === side;
+    if (witnessed && !this.reduceMotion) {
+      const phase = this.time * 2.15 + alt * 1.7 + (top ? 0.4 : 0);
+      const idle = Math.sin(phase) * (hovered ? 5.5 : 2.2);
+      cy += top ? idle : -idle;
+      const grow = hovered ? 1.055 : 1.018;
+      const nw = cardW * grow;
+      const nh = cardH * grow;
+      cx -= (nw - cardW) / 2;
+      cy -= (nh - cardH) / 2;
+      cardW = nw;
+      cardH = nh;
+      const breath = 0.1 + 0.06 * (0.5 + 0.5 * Math.sin(phase * 0.85));
+      pulse = Math.min(1.4, pulse + breath + (hovered ? 0.22 : 0));
+      if (!fx) {
+        fxColor = hovered ? [0.72, 0.55, 0.28] : [0.55, 0.42, 0.22];
+      } else if (hovered) {
+        fxColor = [0.72, 0.55, 0.28];
+      }
+    }
 
     if (u) {
       const tex = this.texFor(u.cardId, u.veiled);

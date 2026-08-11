@@ -21,7 +21,7 @@ export const INK_ABYSS_WAVE2: CardDef[] = [
       "Whenever an enemy Figure in another altitude becomes Forced Exposed, Stain a different enemy Figure if able.",
     revelation:
       "Stain the enemy Figure here if able. If it was already Stained, Blind this altitude this turn.",
-    text: "Veiled: Whenever an enemy Figure in another altitude becomes Forced Exposed, Stain a different enemy Figure if able. Revelation: Stain the enemy Figure here if able. If it was already Stained, Blind this altitude this turn. Press: when your Press Forces Exposed, draw 1.",
+    text: "Veiled: Whenever an enemy Figure in another altitude becomes Forced Exposed, Stain a different enemy Figure if able. Revelation: Stain the enemy Figure here if able. If it was already Stained, Blind this altitude this turn. Press: when your Press Forces Exposed, gain 1 Sight.",
   },
   {
     id: "blackwater_shrine",
@@ -78,7 +78,7 @@ export const INK_ABYSS_WAVE2: CardDef[] = [
     sightYield: 0,
     artSubject:
       "same Ink Abyss set style as Mire Duelist — ashen tithe rite pale hand black ink offering swamp seals parchment, unique cream offering-bowl inner frame, high-contrast cream-black ink-wash",
-    text: "Choose an altitude. If the enemy Figure there is Stained, gain 1 Sight and draw 1. If it is also Veiled, Blind that altitude this turn, then you may Press it paying 0 Sight (still once per window).",
+    text: "Choose an altitude. If the enemy Figure there is Stained, gain 1 Sight and Stain another enemy Figure if able. If it is also Veiled, Blind that altitude this turn, then you may Press it paying 0 Sight (still once per window).",
   },
 ];
 

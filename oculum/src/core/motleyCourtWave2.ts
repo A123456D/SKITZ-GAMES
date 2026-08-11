@@ -13,7 +13,7 @@ export const MOTLEY_COURT_WAVE2: CardDef[] = [
     witnessedPower: 4,
     sightYield: 0,
     artSubject: "motley mirrored jester split reflection purple teal cliffs original",
-    text: "Revelation: Switch Stance. If Stance B after, gain 1 Sight. If an enemy Figure here is Veiled, draw 1.",
+    text: "Revelation: Switch Stance. If Stance B after, gain 1 Sight. If an enemy Figure here is Veiled, gain 1 Favor.",
   },
   {
     id: "chance_step_dancer",
@@ -52,7 +52,7 @@ export const MOTLEY_COURT_WAVE2: CardDef[] = [
     witnessedPower: 3,
     sightYield: 0,
     artSubject: "motley borrowed-face urn smile spiral clay vessel original",
-    text: "Vessel. Revelation: Enter Stance B. If Stance B after, gain 1 Sight. Fall: If Stance B, draw 1.",
+    text: "Vessel. Revelation: Enter Stance B. If Stance B after, gain 1 Sight. Fall: If Stance B, gain 1 Sight.",
   },
   {
     id: "grinning_colonnade",
@@ -91,7 +91,7 @@ export const MOTLEY_COURT_WAVE2: CardDef[] = [
     witnessedPower: 0,
     sightYield: 0,
     artSubject: "motley echo the flip ripple second card rite original",
-    text: "Switch Stance on a friendly Figure. If it became Stance B, switch Stance on another friendly Figure. If both are Stance B after, draw 1.",
+    text: "Switch Stance on a friendly Figure. If it became Stance B, switch Stance on another friendly Figure. If both are Stance B after, gain 1 Sight.",
   },
   {
     id: "curtain_call",
@@ -104,7 +104,7 @@ export const MOTLEY_COURT_WAVE2: CardDef[] = [
     witnessedPower: 0,
     sightYield: 0,
     artSubject: "motley curtain call stage curtains amphitheater rite original",
-    text: "If you have a Stance B Figure, draw 1; if you have 2+, also gain 1 Sight. Otherwise gain 1 Sight.",
+    text: "If you have a Stance B Figure, gain 1 Favor; if you have 2+, also gain 1 Sight. Otherwise gain 1 Sight.",
   },
 ];
 
