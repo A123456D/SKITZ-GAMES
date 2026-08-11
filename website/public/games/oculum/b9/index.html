@@ -3,7 +3,7 @@
   <head>
     <script>
 (function () {
-  var KEY = "oculum-bust-v31";
+  var KEY = "oculum-bust-v32";
   try {
     if (sessionStorage.getItem(KEY) === "1") return;
     sessionStorage.setItem(KEY, "1");
@@ -11,8 +11,8 @@
   var done = function () {
     try {
       var u = new URL(location.href);
-      if (u.searchParams.get("v") !== "31") {
-        u.searchParams.set("v", "31");
+      if (u.searchParams.get("v") !== "32") {
+        u.searchParams.set("v", "32");
         location.replace(u.toString());
       }
     } catch (e2) {}
@@ -57,8 +57,8 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-pjDh7Zli.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-D5CaTsAr.css">
+    <script type="module" crossorigin src="./assets/index-DQkRjL-8.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-5voDEGFL.css">
   </head>
   <body class="on-menu">
     <div id="app">
@@ -398,8 +398,8 @@
           id="enemy-deck"
           class="match-deck match-deck--foe"
           hidden
-          aria-label="Foe library"
-          title="Foe library — cards left to draw"
+          aria-hidden="true"
+          tabindex="-1"
         >
           <span class="match-deck-stack" aria-hidden="true">
             <img class="match-deck-back match-deck-back--3" src="./assets/cards/card-back.jpg?v=1" alt="" draggable="false" />

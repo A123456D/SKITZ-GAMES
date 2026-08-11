@@ -3386,6 +3386,30 @@ body.dragging-card .alt-hit.legal {
   transition: none;
 }
 
+.hand-card.hand-reorder-only {
+  opacity: 0.88;
+  filter: saturate(0.92);
+}
+
+.hand-card.hand-reorder-only.selected {
+  opacity: 1;
+  filter: none;
+}
+
+#hand.is-reordering .hand-card {
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.hand-card.insert-before {
+  box-shadow: inset 3px 0 0 0 rgba(232, 210, 150, 0.95);
+  transform: translateX(4px);
+}
+
+.hand-card.insert-after {
+  box-shadow: inset -3px 0 0 0 rgba(232, 210, 150, 0.95);
+  transform: translateX(-4px);
+}
+
 #drag-layer {
   pointer-events: none;
   position: fixed;

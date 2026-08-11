@@ -144,7 +144,6 @@ const deckAnchor = document.getElementById("deck-anchor")!;
 const playerDeckEl = document.getElementById("player-deck") as HTMLButtonElement;
 const enemyDeckEl = document.getElementById("enemy-deck") as HTMLButtonElement;
 const playerDeckN = document.getElementById("player-deck-n")!;
-const enemyDeckN = document.getElementById("enemy-deck-n")!;
 const handEl = document.getElementById("hand")!;
 const handArea = document.getElementById("hand-area")!;
 const actionsEl = document.getElementById("actions")!;
@@ -248,6 +247,9 @@ type DragState = {
   active: boolean;
   cardSrc: string;
   dropping?: boolean;
+  /** Insert index while hovering the hand (reorder). */
+  reorderInsert?: number | null;
+  playable: boolean;
 };
 let drag: DragState | null = null;
 const DRAG_THRESHOLD = 28;
@@ -2120,7 +2122,7 @@ function syncHud(): void {
   willrowEl.hidden = false;
   handArea.hidden = !inMatch;
   actionsEl.hidden = !inMatch || mulliganActive;
-  enemyDeckEl.hidden = !inMatch;
+  enemyDeckEl.hidden = true;
   setEnemyTurn(state.active === "enemy");
 
   if (!inMatch) {
@@ -2557,14 +2559,22 @@ function syncHud(): void {
       (i) =>
         (i.kind === "play" || i.kind === "graft" || i.kind === "rite") && i.handIndex === index,
     );
+    const canReorder =
+      !mulliganActive &&
+      !spectatorMode &&
+      state!.phase === "play" &&
+      state!.active === "player" &&
+      mode === "play";
     const canSelect =
-      !mulliganActive && playable && state!.active === "player" && mode === "play";
+      canReorder && playable;
     if (mulliganActive) {
       btn.classList.add("mulligan-pick");
       if (mulliganSelected.has(index)) btn.classList.add("mulligan-out");
       btn.classList.remove("disabled");
-    } else if (!canSelect) {
+    } else if (!canSelect && !canReorder) {
       btn.classList.add("disabled");
+    } else if (!canSelect) {
+      btn.classList.add("hand-reorder-only");
     }
     if (selectedHand === index) btn.classList.add("selected");
     if (
@@ -2588,12 +2598,15 @@ function syncHud(): void {
       img.src = bakeCardFace(id, false).toDataURL("image/jpeg", 0.92);
     };
     btn.appendChild(img);
-    // Hand stays flat + opaque (foil tilt reserved for inspect / codex)
     btn.title = mulliganActive
       ? `${def.name} — tap to ${mulliganSelected.has(index) ? "keep" : "mulligan"} · hold to inspect`
-      : `${def.name} ? ${def.essence}E ? hold to inspect ? drag to play`;
+      : canSelect
+        ? `${def.name} · hold to inspect · drag to reorder or play`
+        : canReorder
+          ? `${def.name} · hold to inspect · drag to reorder`
+          : `${def.name} · hold to inspect`;
     const wasSelected = selectedHand === index;
-    if (!mulliganActive && canSelect) {
+    if (canReorder) {
       btn.addEventListener("pointerdown", (ev) => {
         if (ev.button != null && ev.button !== 0) return;
         if (uiPaused || drag?.dropping) return;
@@ -2607,20 +2620,27 @@ function syncHud(): void {
           startY: ev.clientY,
           active: false,
           cardSrc: img.src,
+          playable,
+          reorderInsert: null,
         };
-        // Keep the gesture through iOS Safari gesture cancellation
         try {
           btn.setPointerCapture(ev.pointerId);
         } catch {
           /* ignore */
         }
         playSfx("select");
-        highlightAltitudesForHand(index);
+        if (playable) highlightAltitudesForHand(index);
+        else {
+          for (const hit of altHits) {
+            hit.classList.remove("legal", "drop-target");
+            hit.classList.add("disabled");
+          }
+        }
         for (const el of handEl.querySelectorAll(".hand-card")) {
           el.classList.toggle("selected", el === btn);
         }
         if (flashTimer <= 0 && !state?.tutorial) {
-          showToast("Hold to inspect ? drag onto a lane to play.");
+          showToast(playable ? "Drag sideways to reorder · up onto a lane to play." : "Drag sideways to reorder.");
         }
       });
     }
@@ -2666,27 +2686,74 @@ function syncHud(): void {
 
 function syncDeckPiles(): void {
   const youN = state?.deck.length ?? 0;
-  const foeN = state?.enemyDeck.length ?? 0;
   playerDeckN.textContent = String(youN);
-  enemyDeckN.textContent = String(foeN);
   const youDepth = youN <= 0 ? 0 : youN === 1 ? 1 : youN === 2 ? 2 : 3;
-  const foeDepth = foeN <= 0 ? 0 : foeN === 1 ? 1 : foeN === 2 ? 2 : 3;
   playerDeckEl.dataset.depth = String(youDepth);
-  enemyDeckEl.dataset.depth = String(foeDepth);
   playerDeckEl.classList.toggle("is-empty", youN <= 0);
-  enemyDeckEl.classList.toggle("is-empty", foeN <= 0);
   playerDeckEl.setAttribute(
     "aria-label",
     youN <= 0 ? "Your library — empty" : `Your library — ${youN} cards`,
   );
-  enemyDeckEl.setAttribute(
-    "aria-label",
-    foeN <= 0 ? "Foe library — empty" : `Foe library — ${foeN} cards`,
-  );
-  // Keep card-back src fresh if cache-busted
+  enemyDeckEl.hidden = true;
   for (const img of document.querySelectorAll<HTMLImageElement>(".match-deck-back")) {
     if (!img.getAttribute("src")?.includes("card-back")) img.src = cardBackSrc();
   }
+}
+
+/** Hand insert index under pointer (0…hand.length), or null if outside the hand band. */
+function handInsertAtPoint(clientX: number, clientY: number): number | null {
+  const cards = [...handEl.querySelectorAll<HTMLElement>(".hand-card")];
+  if (!cards.length) return null;
+  const band = handArea.getBoundingClientRect();
+  if (clientY < band.top - 36 || clientY > band.bottom + 28) return null;
+  for (let i = 0; i < cards.length; i++) {
+    const r = cards[i].getBoundingClientRect();
+    if (clientX < r.left + r.width / 2) return i;
+  }
+  return cards.length;
+}
+
+function clearHandInsertHints(): void {
+  handEl.classList.remove("is-reordering");
+  for (const el of handEl.querySelectorAll(".hand-card")) {
+    el.classList.remove("insert-before", "insert-after");
+  }
+}
+
+function paintHandInsertHint(insertAt: number | null, fromIndex: number): void {
+  clearHandInsertHints();
+  if (insertAt === null) return;
+  const to = insertAt > fromIndex ? insertAt - 1 : insertAt;
+  if (to === fromIndex) return;
+  handEl.classList.add("is-reordering");
+  const cards = [...handEl.querySelectorAll<HTMLElement>(".hand-card")];
+  if (!cards.length) return;
+  if (insertAt >= cards.length) {
+    const tip =
+      cards.length - 1 === fromIndex && cards.length > 1
+        ? cards[cards.length - 2]
+        : cards[cards.length - 1];
+    tip.classList.add("insert-after");
+    return;
+  }
+  cards[insertAt].classList.add("insert-before");
+}
+
+function reorderHand(from: number, insertAt: number): boolean {
+  if (!state) return false;
+  let to = insertAt;
+  if (to > from) to -= 1;
+  if (to === from || to < 0 || to >= state.hand.length) return false;
+  const [card] = state.hand.splice(from, 1);
+  state.hand.splice(to, 0, card);
+  if (selectedHand === from) selectedHand = to;
+  else if (selectedHand !== null) {
+    if (from < selectedHand && to >= selectedHand) selectedHand -= 1;
+    else if (from > selectedHand && to <= selectedHand) selectedHand += 1;
+  }
+  playSfx("ui-tap");
+  persistProgress();
+  return true;
 }
 
 function punchDeck(side: "player" | "enemy"): void {
@@ -5239,6 +5306,7 @@ function endDragVisual(): void {
   dragGhost.style.filter = "";
   dragGhost.style.opacity = "";
   for (const hit of altHits) hit.classList.remove("drop-target");
+  clearHandInsertHints();
   drag = null;
 }
 
@@ -5616,18 +5684,6 @@ playerDeckEl.addEventListener("click", () => {
     n <= 0
       ? "Your library is empty — no more draws."
       : `Your library — ${n} card${n === 1 ? "" : "s"} left to draw.`,
-    paceMs(3200),
-    "play",
-  );
-});
-enemyDeckEl.addEventListener("click", () => {
-  if (!state || state.phase !== "play") return;
-  playSfx("ui-tap");
-  const n = state.enemyDeck.length;
-  flashToast(
-    n <= 0
-      ? "Foe library is empty."
-      : `Foe library — ${n} card${n === 1 ? "" : "s"} left.`,
     paceMs(3200),
     "play",
   );
@@ -6228,9 +6284,17 @@ window.addEventListener("pointermove", (ev) => {
     // Stop page scroll / bounce while dragging on iOS
     if (ev.cancelable) ev.preventDefault();
     moveDragGhost(ev.clientX, ev.clientY);
-    const alt = altitudeAtPoint(ev.clientX, ev.clientY);
+    const alt = drag.playable ? altitudeAtPoint(ev.clientX, ev.clientY) : null;
     for (const hit of altHits) {
       hit.classList.toggle("drop-target", alt !== null && Number(hit.dataset.alt) === alt);
+    }
+    if (alt === null) {
+      const insertAt = handInsertAtPoint(ev.clientX, ev.clientY);
+      drag.reorderInsert = insertAt;
+      paintHandInsertHint(insertAt, drag.handIndex);
+    } else {
+      drag.reorderInsert = null;
+      clearHandInsertHints();
     }
   }
 }, { passive: false });
@@ -6255,20 +6319,23 @@ window.addEventListener("pointerup", (ev) => {
     if (drag.dropping) return;
     const wasDragging = drag.active;
     const handIndex = drag.handIndex;
-    const alt = wasDragging ? altitudeAtPoint(ev.clientX, ev.clientY) : null;
+    const playable = drag.playable;
+    const reorderInsert = drag.reorderInsert ?? handInsertAtPoint(ev.clientX, ev.clientY);
+    const alt = wasDragging && playable ? altitudeAtPoint(ev.clientX, ev.clientY) : null;
     for (const hit of altHits) hit.classList.remove("drop-target");
     if (wasDragging && alt !== null) {
       drag.dropping = true;
       selectedHand = handIndex;
       mode = "play";
-      // Big summon/graft/rite ceremony runs inside commitPlayerIntent — don't skip it
       endDragVisual();
       tryAltitude(alt);
       return;
     }
+    const didReorder =
+      wasDragging && reorderInsert !== null && reorderHand(handIndex, reorderInsert);
     endDragVisual();
     if (wasDragging) {
-      selectedHand = handIndex;
+      if (!didReorder) selectedHand = handIndex;
       syncHud();
     }
   })();
