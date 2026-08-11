@@ -4410,7 +4410,8 @@ body.tutorial-soft #hand-area {
   width: 100%;
   min-width: 0;
   height: auto;
-  max-height: 112px;
+  /* Was 112 — two rows of kit buttons (Sustain / Tempt) clipped on narrow phones */
+  max-height: none;
   align-content: stretch;
   overflow: visible;
 }
@@ -4718,17 +4719,32 @@ button.ghost:active:not(:disabled),
 }
 
 /* —— Heresy select (Enter the Gaze) —— */
+/* Full-bleed scroll like menu-home — centered max-height sheets clip the last
+   craft cards (Lumen / Ruin) action buttons on short mobile viewports. */
 #heresy-pick.panel.sheet {
   z-index: 42;
-  max-height: calc(100% - 16px);
-  overflow: auto;
+  inset: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  transform: none;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 
 .heresy-pick-content {
   max-width: 28rem;
   margin: 0 auto;
   text-align: center;
-  padding-top: 18px;
+  padding-top: max(18px, calc(env(safe-area-inset-top, 0px) + 10px));
+  padding-bottom: max(32px, calc(env(safe-area-inset-bottom, 0px) + 28px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 
 .heresy-pick-blurb {
@@ -4799,6 +4815,8 @@ button.ghost:active:not(:disabled),
   flex-direction: column;
   gap: 12px;
   text-align: left;
+  /* Keep last craft card actions clear of the scroll edge / home indicator */
+  padding-bottom: 8px;
 }
 
 .tutorial-list {
@@ -4906,6 +4924,8 @@ button.ghost:active:not(:disabled),
 .heresy-card:nth-child(2) { animation-delay: 0.05s; }
 .heresy-card:nth-child(3) { animation-delay: 0.1s; }
 .heresy-card:nth-child(4) { animation-delay: 0.15s; }
+.heresy-card:nth-child(5) { animation-delay: 0.2s; }
+.heresy-card:nth-child(6) { animation-delay: 0.25s; }
 
 .heresy-card::before {
   content: "";
@@ -4923,6 +4943,8 @@ button.ghost:active:not(:disabled),
 .heresy-card--motley::before { background: linear-gradient(180deg, #e6c98a, #b07cff); }
 .heresy-card--toll::before { background: linear-gradient(180deg, #e8c070, #c45a3a); }
 .heresy-card--breach::before { background: linear-gradient(180deg, #d4cfc4, #a83228); }
+.heresy-card--lumen::before { background: linear-gradient(180deg, #f0d56a, #e8a030); }
+.heresy-card--ruin::before { background: linear-gradient(180deg, #c42848, #5a2080); }
 
 .heresy-card-head {
   margin: 0 0 8px;
@@ -5557,7 +5579,7 @@ button.menu-link:active {
     max-width: 920px;
     margin-inline: auto;
     gap: 8px;
-    max-height: 128px;
+    max-height: none;
   }
 
   #actions button {
