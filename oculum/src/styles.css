@@ -3070,6 +3070,73 @@ body.reduce-motion #phase-banner.phase-pop .phase-spark {
   }
 }
 
+/* Velvet Ruin Tempt — hanging thorn-eye lure over the board figure */
+.alt-tempt {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  right: 0;
+  width: clamp(2.4rem, 26%, 3.2rem);
+  height: clamp(2.4rem, 26%, 3.2rem);
+  margin-inline: auto;
+  padding: 0;
+  font-size: 0;
+  color: transparent;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  pointer-events: auto;
+  transform-origin: 50% 0%;
+}
+
+.alt-tempt[data-side="enemy"] {
+  top: 4%;
+}
+
+.alt-tempt[data-side="player"] {
+  top: 56.5%;
+}
+
+.alt-tempt::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: url("/assets/ui/fx/tempt-lure.png?v=1") top center / contain no-repeat;
+  transform-origin: 50% 0%;
+  animation: tempt-lure-sway 1.45s ease-in-out infinite;
+  filter: drop-shadow(0 0 5px rgba(176, 80, 224, 0.45)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+}
+
+.alt-tempt.badge-pop {
+  animation: alt-tempt-pop 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes alt-tempt-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.45) translateY(-6px);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.16) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes tempt-lure-sway {
+  0%,
+  100% {
+    transform: rotate(-5deg) translateY(0);
+  }
+  50% {
+    transform: rotate(5deg) translateY(2px);
+  }
+}
+
 .alt-badge--press {
   background: rgba(200, 70, 90, 0.95);
   color: #1a080c;
@@ -3323,7 +3390,8 @@ body.reduce-motion .ecl-pip.meter-pulse,
 body.reduce-motion .hand-card.dealt,
 body.reduce-motion .alt-badge--toll::before,
 body.reduce-motion .alt-stain::before,
-body.reduce-motion .alt-halo::before {
+body.reduce-motion .alt-halo::before,
+body.reduce-motion .alt-tempt::before {
   animation: none;
 }
 

@@ -703,6 +703,7 @@ const BADGE_TITLES: Record<string, string> = {
   STAIN: "STAIN — Ink Mark. If this Figure loses Resolve while still Veiled, Erase Forced Exposes them (unless Motley Stance B Holds). Press pierces Hold.",
   HALO: "HALO'D — Lumen Radiance. Blazes on Pass unless Sustained (then stays Halo'd).",
   SUSTAIN: "SUSTAINED — Halo kept through the next Blaze.",
+  TEMPT: "TEMPTED — Velvet Ruin bait. Witness / Gaze this Figure at −1 Sight (min 0). Looking clears Tempt and Brands it for the tempter.",
   PRESS: "PRESS — marked by Ink. If Ink wins Resolve here → Forced Expose. If Ink loses → backlash.",
   SCR: "SCRUTINY — stacks toward Forced Expose (at 2 the Veil breaks).",
   INH: "INHABITANT — a Figure tucked inside this Vessel / Urn.",
@@ -1123,6 +1124,9 @@ function syncSideStatus(
   const halo = hit.querySelector(
     `[data-halo][data-side="${side}"]`,
   ) as HTMLElement | null;
+  const tempt = hit.querySelector(
+    `[data-tempt][data-side="${side}"]`,
+  ) as HTMLElement | null;
   const press = row.querySelector("[data-press]") as HTMLElement | null;
   const scrutiny = row.querySelector("[data-scrutiny]") as HTMLElement | null;
   const inh = row.querySelector("[data-inh]") as HTMLButtonElement | null;
@@ -1140,6 +1144,7 @@ function syncSideStatus(
     u?.stained ? 1 : 0,
     u?.haloed ? 1 : 0,
     u?.haloSustained ? 1 : 0,
+    u?.tempted ? 1 : 0,
     u?.pressed ? 1 : 0,
     u?.scrutiny ?? 0,
     u?.inhabitant ? 1 : 0,
@@ -1157,6 +1162,7 @@ function syncSideStatus(
   syncBadge(stain, !!u?.stained, "STAIN", pop);
   syncBadge(halo, !!u?.haloed, u?.haloSustained ? "SUSTAIN" : "HALO", pop);
   if (halo) halo.classList.toggle("is-sustained", !!u?.haloed && !!u?.haloSustained);
+  syncBadge(tempt, !!u?.tempted, "TEMPT", pop);
   syncBadge(press, !!u?.pressed, "PRESS", pop);
   const scr = u?.scrutiny ?? 0;
   syncBadge(
@@ -5825,6 +5831,8 @@ for (const hit of altHits) {
       if (u.strained) lines.push("Strained");
       if (u.stained) lines.push("Stained");
       if (u.haloed) lines.push(u.haloSustained ? "Halo'd (Sustained)" : "Halo'd");
+      if (u.tempted) lines.push("Tempted");
+      if (u.branded) lines.push("Branded");
       if (u.inhabitant) lines.push("Has Inhabitant");
       if (u.grafts.length) lines.push(`${u.grafts.length} charm${u.grafts.length > 1 ? "s" : ""}`);
     } else if (inspectingSite) {
@@ -5959,7 +5967,7 @@ for (const hit of altHits) {
     flashToast(text, paceMs(5200), kind);
   };
   for (const el of hit.querySelectorAll<HTMLElement>(
-    "[data-veil], [data-scrutiny], [data-strain], [data-press], [data-stance-mark], [data-wager], [data-blind], [data-halo], [data-stain]",
+    "[data-veil], [data-scrutiny], [data-strain], [data-press], [data-stance-mark], [data-wager], [data-blind], [data-halo], [data-stain], [data-tempt]",
   )) {
     el.setAttribute("role", "button");
     el.tabIndex = 0;
@@ -5982,7 +5990,9 @@ for (const hit of altHits) {
           ? "stain"
           : key === "HALO" || key === "SUSTAIN"
             ? "rite"
-            : "witness",
+            : key === "TEMPT"
+              ? "wager"
+              : "witness",
       );
     });
   }

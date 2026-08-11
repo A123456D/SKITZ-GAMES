@@ -3,7 +3,7 @@
   <head>
     <script>
 (function () {
-  var KEY = "oculum-bust-v32";
+  var KEY = "oculum-bust-v33";
   try {
     if (sessionStorage.getItem(KEY) === "1") return;
     sessionStorage.setItem(KEY, "1");
@@ -11,8 +11,8 @@
   var done = function () {
     try {
       var u = new URL(location.href);
-      if (u.searchParams.get("v") !== "32") {
-        u.searchParams.set("v", "32");
+      if (u.searchParams.get("v") !== "33") {
+        u.searchParams.set("v", "33");
         location.replace(u.toString());
       }
     } catch (e2) {}
@@ -57,8 +57,8 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-DQkRjL-8.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-5voDEGFL.css">
+    <script type="module" crossorigin src="./assets/index-hPsr5KwA.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-B3vUFt_b.css">
   </head>
   <body class="on-menu">
     <div id="app">
@@ -265,6 +265,8 @@
             <span class="alt-stain" data-stain data-side="player" hidden title="Stained"></span>
             <span class="alt-halo" data-halo data-side="enemy" hidden title="Halo'd"></span>
             <span class="alt-halo" data-halo data-side="player" hidden title="Halo'd"></span>
+            <span class="alt-tempt" data-tempt data-side="enemy" hidden title="Tempted"></span>
+            <span class="alt-tempt" data-tempt data-side="player" hidden title="Tempted"></span>
             <div class="alt-status foe" data-side="enemy" aria-hidden="true">
               <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
@@ -304,6 +306,8 @@
             <span class="alt-stain" data-stain data-side="player" hidden title="Stained"></span>
             <span class="alt-halo" data-halo data-side="enemy" hidden title="Halo'd"></span>
             <span class="alt-halo" data-halo data-side="player" hidden title="Halo'd"></span>
+            <span class="alt-tempt" data-tempt data-side="enemy" hidden title="Tempted"></span>
+            <span class="alt-tempt" data-tempt data-side="player" hidden title="Tempted"></span>
             <div class="alt-status foe" data-side="enemy" aria-hidden="true">
               <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
@@ -343,6 +347,8 @@
             <span class="alt-stain" data-stain data-side="player" hidden title="Stained"></span>
             <span class="alt-halo" data-halo data-side="enemy" hidden title="Halo'd"></span>
             <span class="alt-halo" data-halo data-side="player" hidden title="Halo'd"></span>
+            <span class="alt-tempt" data-tempt data-side="enemy" hidden title="Tempted"></span>
+            <span class="alt-tempt" data-tempt data-side="player" hidden title="Tempted"></span>
             <div class="alt-status foe" data-side="enemy" aria-hidden="true">
               <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
