@@ -143,8 +143,10 @@ body:not(.on-menu) #stage {
     "board"
     "hand"
     "actions";
+  /* Android Chrome often reports safe-area-inset-bottom: 0 with 3-button nav,
+     which buried Witness/Pass/Tempt under the system bar. Hard floor ~nav height. */
   padding: calc(6px + env(safe-area-inset-top, 0px)) var(--pad)
-    calc(8px + env(safe-area-inset-bottom, 0px));
+    max(72px, calc(16px + env(safe-area-inset-bottom, 0px)));
   gap: 4px;
   z-index: 2;
   overflow: visible;
@@ -1530,7 +1532,7 @@ body.reduce-motion .victory-reveal.is-juiced .victory-score {
 }
 
 #toast {
-  /* Pin to the action row — small status line at the bottom of the screen */
+  /* Pin to the action row — status line just above Witness/Pass/kit buttons */
   grid-area: actions;
   position: absolute;
   left: 50%;
@@ -4410,10 +4412,13 @@ body.tutorial-soft #hand-area {
   width: 100%;
   min-width: 0;
   height: auto;
-  /* Was 112 — two rows of kit buttons (Sustain / Tempt) clipped on narrow phones */
+  min-height: 52px;
   max-height: none;
   align-content: stretch;
+  align-self: end;
   overflow: visible;
+  /* Never collapse when only a couple kit buttons are visible */
+  flex-shrink: 0;
 }
 
 /* Keep kit buttons above the hand fan (cards overflow their grid cell) */
@@ -5542,7 +5547,7 @@ button.menu-link:active {
   #hud {
     gap: 8px;
     padding: calc(10px + env(safe-area-inset-top, 0px)) var(--pad)
-      calc(12px + env(safe-area-inset-bottom, 0px));
+      max(32px, calc(16px + env(safe-area-inset-bottom, 0px)));
     grid-template-rows:
       auto
       auto
