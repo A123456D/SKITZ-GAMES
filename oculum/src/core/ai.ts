@@ -831,7 +831,8 @@ function evalAfterMove(
 
   if (searchDepth < 1) return ev - 6;
 
-  const reply = chooseAiMove(sim, { searchDepth: 0 });
+  // Depth 2+: model the foe with 1-ply search (bots-vs-bots / max strength).
+  const reply = chooseAiMove(sim, { searchDepth: searchDepth >= 2 ? 1 : 0 });
   applyIntent(sim, reply);
   // applyIntent mutates phase; TS can't see that after the early end-check above
   if (sim.winner != null || (sim.phase as MatchState["phase"]) === "end") {
@@ -857,6 +858,16 @@ function evalAfterMove(
         : evalPosition(followBranch, side) + evalMindgames(followBranch, side);
 
     ev = Math.min(ev, passEv, followEv) - 4;
+  }
+
+  // Extra ply for max-strength: if the window returns to us, take one greedy follow-up.
+  if (searchDepth >= 2 && sim.active === side && sim.phase === "play" && sim.winner == null) {
+    const next = chooseAiMove(sim, { searchDepth: 0 });
+    applyIntent(sim, next);
+    if (sim.winner != null || (sim.phase as MatchState["phase"]) === "end") {
+      return terminalEval(sim, side);
+    }
+    ev = evalPosition(sim, side) + evalMindgames(sim, side) - 4;
   }
 
   return ev;
@@ -1815,11 +1826,70 @@ function scoreRite(
   return s;
 }
 
+/** Velvet Ruin Tempt / Brand / Devour pressure. */
+function scoreRuinMindgame(state: MatchState, side: Side, i: Intent): number {
+  if (!sidePlaysHeresy(state, side, "ruin")) return 0;
+  let s = 0;
+  if (i.kind === "tempt") {
+    const foe = foeUnit(state, side, i.altitude);
+    if (foe?.veiled && !foe.tempted) s += 22;
+  }
+  if (i.kind === "witness" && i.enemy) {
+    const foe = foeUnit(state, side, i.altitude);
+    if (foe?.tempted && foe.temptedBy === side) s += 28;
+  }
+  if (i.kind === "pass") {
+    const branded = countEnemyBranded(state, side);
+    if (branded > 0) s += 12 + branded * 6; // Devour on Pass
+  }
+  if (i.kind === "play") {
+    const id = handOf(state, side)[i.handIndex];
+    if (getCard(id).heresy === "ruin" && getCard(id).type === "figure") {
+      if (countEnemyBranded(state, side) > 0 || countEnemyTempted(state, side) > 0) s += 8;
+    }
+  }
+  return s;
+}
+
+function countEnemyTempted(state: MatchState, side: Side): number {
+  let n = 0;
+  for (let a = 0; a < 3; a++) {
+    const u = foeUnit(state, side, a as Altitude);
+    if (u?.tempted && getCard(u.cardId).type === "figure") n += 1;
+  }
+  return n;
+}
+
+/** Lumen Host Halo / Blaze pressure. */
+function scoreLumenMindgame(state: MatchState, side: Side, i: Intent): number {
+  if (!sidePlaysHeresy(state, side, "lumen")) return 0;
+  let s = 0;
+  if (i.kind === "sustain") {
+    const u = myUnit(state, side, i.altitude);
+    if (u?.haloed && !u.haloSustained) s += 24;
+  }
+  if (i.kind === "witness" && !i.enemy) {
+    const u = myUnit(state, side, i.altitude);
+    if (u?.veiled && getCard(u.cardId).heresy === "lumen") s += 14;
+  }
+  if (i.kind === "pass") {
+    const haloed = countFriendlyHaloed(state, side);
+    const unsustained = [0, 1, 2].some((a) => {
+      const u = myUnit(state, side, a as Altitude);
+      return !!u?.haloed && !u.haloSustained;
+    });
+    if (haloed > 0 && !unsustained) s += 10 + haloed * 4; // Blaze ready
+    if (unsustained && sightOf(state, side) >= 1) s -= 18; // Sustain first
+  }
+  return s;
+}
+
 /**
  * Heuristic AI for the **active** seat.
- * Difficulty scales aggression; Hard uses 2-ply search + school mindgames.
+ * Difficulty scales aggression; Hard uses search + school mindgames.
+ * `searchDepth: 2` is max strength (bot-vs-bot / spectate).
  */
-export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }): Intent {
+export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 | 2 }): Intent {
   let intents = legalIntents(state);
   // Hard prune: never cast payoff rites with zero board setup
   intents = intents.filter((i) => {
@@ -1866,8 +1936,9 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
         sidePlaysHeresy(state, side, "breach") ||
         sidePlaysHeresy(state, side, "lumen") ||
         sidePlaysHeresy(state, side, "ruin")));
+  // Hard defaults to 1-ply; bot-vs-bot / spectate pass searchDepth: 2 for max strength.
   const searchDepth = opts?.searchDepth ?? (wantsSearch ? 1 : 0);
-  const mindgameScale = d === "hard" ? 1.5 : d === "normal" ? 0.7 : 0;
+  const mindgameScale = d === "hard" ? (searchDepth >= 2 ? 2 : 1.75) : d === "normal" ? 0.7 : 0;
 
   const rawScore = (i: Intent): number => {
     if (i.kind === "pass") {
@@ -2183,14 +2254,16 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
       (scoreMotleyMindgame(state, side, i) +
         scoreInkMindgame(state, side, i) +
         scoreTollMindgame(state, side, i) +
-        scoreBreachMindgame(state, side, i));
+        scoreBreachMindgame(state, side, i) +
+        scoreRuinMindgame(state, side, i) +
+        scoreLumenMindgame(state, side, i));
 
   const scored = intents
     .map((i) => ({ i, s: score(i) }))
     .sort((a, b) => b.s - a.s);
 
   if (searchDepth >= 1 && wantsSearch && scored.length > 1) {
-    const poolSize = d === "hard" ? 18 : 8;
+    const poolSize = searchDepth >= 2 ? 28 : d === "hard" ? 22 : 8;
     const pool = scored.slice(0, Math.min(poolSize, scored.length));
     let best = pool[0]!.i;
     let bestEval = -Infinity;

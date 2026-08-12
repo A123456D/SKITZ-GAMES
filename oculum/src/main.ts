@@ -1740,7 +1740,7 @@ function startSpectateBots(
   setEnemyTurn(false);
   document.body.classList.add("spectating");
   spectateChip.hidden = false;
-  spectateChip.textContent = `BOT SIM · HARD · ${SPECTATE_LABEL[bottom]} vs ${SPECTATE_LABEL[top]}`;
+  spectateChip.textContent = `BOT SIM · MAX · ${SPECTATE_LABEL[bottom]} vs ${SPECTATE_LABEL[top]}`;
   setMusicBed("match");
   void unlockAudio();
   takeEvents(state);
@@ -1755,7 +1755,7 @@ function startSpectateBots(
     ms: 2800,
   });
   explain(
-    `Bot sim — ${SPECTATE_LABEL[bottom]} (bottom) vs ${SPECTATE_LABEL[top]} (top). Full craft decks, shuffled. Open Log for the chronicle.`,
+    `Bot sim — ${SPECTATE_LABEL[bottom]} (bottom) vs ${SPECTATE_LABEL[top]} (top). Full craft decks, max-strength Hard AI. Open Log for the chronicle.`,
     2800,
     "round",
   );
@@ -5109,9 +5109,11 @@ function runSpectateStep(gen: number): void {
     try {
       const side = state.active;
       setEnemyTurn(side === "enemy");
-      const craft = side === "player" ? "Bellward" : "Motley";
+      const craft = SPECTATE_LABEL[side === "player" ? lastSpectate.bottom : lastSpectate.top];
       explain(`${craft}'s window — they choose an action now.`, 1400, "pass");
-      const intent = chooseAiMove(state);
+      // Bot-vs-bot always max strength (Hard + deep search), never settings difficulty.
+      state.aiDifficulty = "hard";
+      const intent = chooseAiMove(state, { searchDepth: 2 });
       await flySpectateIntent(intent, side);
       if (gen !== spectateGen || !state) {
         spectateBusy = false;

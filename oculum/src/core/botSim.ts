@@ -88,7 +88,9 @@ export function playBotMatch(opts: {
 
   let guard = 800;
   while (s.phase === "play" && guard-- > 0) {
-    applyIntent(s, chooseAiMove(s));
+    // Max-strength bots for sim / audit (Hard + deep search).
+    s.aiDifficulty = "hard";
+    applyIntent(s, chooseAiMove(s, { searchDepth: 2 }));
   }
 
   return {

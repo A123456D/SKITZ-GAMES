@@ -3,7 +3,7 @@
   <head>
     <script>
 (function () {
-  var KEY = "oculum-bust-v34";
+  var KEY = "oculum-bust-v35";
   try {
     if (sessionStorage.getItem(KEY) === "1") return;
     sessionStorage.setItem(KEY, "1");
@@ -11,8 +11,8 @@
   var done = function () {
     try {
       var u = new URL(location.href);
-      if (u.searchParams.get("v") !== "34") {
-        u.searchParams.set("v", "34");
+      if (u.searchParams.get("v") !== "35") {
+        u.searchParams.set("v", "35");
         location.replace(u.toString());
       }
     } catch (e2) {}
@@ -57,7 +57,7 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-DtPGFBlX.js"></script>
+    <script type="module" crossorigin src="./assets/index-CYvOxC39.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-D7NR6IMH.css">
   </head>
   <body class="on-menu">
@@ -267,10 +267,6 @@
             <span class="alt-halo" data-halo data-side="player" hidden title="Halo'd"></span>
             <span class="alt-tempt" data-tempt data-side="enemy" hidden title="Tempted"></span>
             <span class="alt-tempt" data-tempt data-side="player" hidden title="Tempted"></span>
-            <span class="alt-brand" data-brand data-side="enemy" hidden title="Branded"></span>
-            <span class="alt-brand" data-brand data-side="player" hidden title="Branded"></span>
-            <span class="alt-press-mark" data-press-mark data-side="enemy" hidden title="Pressed"></span>
-            <span class="alt-press-mark" data-press-mark data-side="player" hidden title="Pressed"></span>
             <div class="alt-status foe" data-side="enemy" aria-hidden="true">
               <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
@@ -312,10 +308,6 @@
             <span class="alt-halo" data-halo data-side="player" hidden title="Halo'd"></span>
             <span class="alt-tempt" data-tempt data-side="enemy" hidden title="Tempted"></span>
             <span class="alt-tempt" data-tempt data-side="player" hidden title="Tempted"></span>
-            <span class="alt-brand" data-brand data-side="enemy" hidden title="Branded"></span>
-            <span class="alt-brand" data-brand data-side="player" hidden title="Branded"></span>
-            <span class="alt-press-mark" data-press-mark data-side="enemy" hidden title="Pressed"></span>
-            <span class="alt-press-mark" data-press-mark data-side="player" hidden title="Pressed"></span>
             <div class="alt-status foe" data-side="enemy" aria-hidden="true">
               <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
@@ -357,10 +349,6 @@
             <span class="alt-halo" data-halo data-side="player" hidden title="Halo'd"></span>
             <span class="alt-tempt" data-tempt data-side="enemy" hidden title="Tempted"></span>
             <span class="alt-tempt" data-tempt data-side="player" hidden title="Tempted"></span>
-            <span class="alt-brand" data-brand data-side="enemy" hidden title="Branded"></span>
-            <span class="alt-brand" data-brand data-side="player" hidden title="Branded"></span>
-            <span class="alt-press-mark" data-press-mark data-side="enemy" hidden title="Pressed"></span>
-            <span class="alt-press-mark" data-press-mark data-side="player" hidden title="Pressed"></span>
             <div class="alt-status foe" data-side="enemy" aria-hidden="true">
               <span class="alt-badge alt-badge--veil" data-veil hidden>VEIL</span>
               <span class="alt-badge alt-badge--stance" data-stance-mark hidden></span>
