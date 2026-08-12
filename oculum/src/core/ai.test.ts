@@ -429,4 +429,172 @@ describe("AI", () => {
     }
     expect(peals).toBeGreaterThanOrEqual(18);
   });
+
+  it("prunes Invite the Look with no enemy figure to target", () => {
+    const s = createMatch({ seed: 77, aiDifficulty: "normal" });
+    s.active = "enemy";
+    s.enemyEssence = 3;
+    s.enemySight = 0;
+    s.enemyHand = ["invite_the_look"];
+    s.craftKits.enemy = ["ruin"];
+    s.altitudes[0].enemy = null;
+    s.altitudes[1].enemy = null;
+    s.altitudes[2].enemy = null;
+    s.altitudes[0].player = null;
+    s.altitudes[1].player = null;
+    s.altitudes[2].player = null;
+    const move = chooseAiMove(s);
+    expect(move.kind).toBe("pass");
+  });
+
+  it("does not Re-Veil a healthy winning body", () => {
+    let reveils = 0;
+    for (let i = 0; i < 20; i++) {
+      const s = createMatch({ seed: 900 + i, aiDifficulty: "hard" });
+      s.active = "enemy";
+      s.enemyEssence = 0;
+      s.enemySight = 2;
+      s.enemyHand = [];
+      s.craftKits.enemy = ["ink"];
+      s.altitudes[1].enemy = {
+        instanceId: "e1",
+        cardId: "blot_herald",
+        veiled: false,
+        hybridSite: false,
+        stanceB: false,
+        grafts: [],
+        inhabitant: null,
+        hasThirdFace: false,
+        strained: false,
+        stained: false,
+        revelationFired: true,
+        scrutiny: 0,
+        wagered: false,
+        wagerAntePaid: false,
+        wagerAnteFavor: false,
+        wagerHeads: false,
+        wagerPowerDelta: 0,
+        openedSinceResolve: true,
+        lastBreachOpened: false,
+        pressed: false,
+        pressedBy: null,
+        haloed: false,
+        haloSustained: false,
+        tempted: false,
+        temptedBy: null,
+        branded: false,
+        brandedBy: null,
+      };
+      s.altitudes[1].player = {
+        instanceId: "p1",
+        cardId: "mire_duelist",
+        veiled: true,
+        hybridSite: false,
+        stanceB: false,
+        grafts: [],
+        inhabitant: null,
+        hasThirdFace: false,
+        strained: false,
+        stained: false,
+        revelationFired: false,
+        scrutiny: 0,
+        wagered: false,
+        wagerAntePaid: false,
+        wagerAnteFavor: false,
+        wagerHeads: false,
+        wagerPowerDelta: 0,
+        openedSinceResolve: false,
+        lastBreachOpened: false,
+        pressed: false,
+        pressedBy: null,
+        haloed: false,
+        haloSustained: false,
+        tempted: false,
+        temptedBy: null,
+        branded: false,
+        brandedBy: null,
+      };
+      const legal = legalIntents(s);
+      expect(legal.some((x) => x.kind === "reveil")).toBe(true);
+      const move = chooseAiMove(s);
+      if (move.kind === "reveil") reveils += 1;
+    }
+    expect(reveils).toBe(0);
+  });
+
+  it("does not aimlessly Witness when Open loses the lane", () => {
+    let witnesses = 0;
+    for (let i = 0; i < 20; i++) {
+      const s = createMatch({ seed: 1100 + i, aiDifficulty: "normal" });
+      s.active = "enemy";
+      s.enemyEssence = 0;
+      s.enemySight = 4;
+      s.enemyHand = [];
+      s.craftKits.enemy = ["ink"];
+      // Weak Veiled body vs strong foe — Witnessed face still loses
+      s.altitudes[0].enemy = {
+        instanceId: "e1",
+        cardId: "blot_herald",
+        veiled: true,
+        hybridSite: false,
+        stanceB: false,
+        grafts: [],
+        inhabitant: null,
+        hasThirdFace: false,
+        strained: false,
+        stained: false,
+        revelationFired: true,
+        scrutiny: 0,
+        wagered: false,
+        wagerAntePaid: false,
+        wagerAnteFavor: false,
+        wagerHeads: false,
+        wagerPowerDelta: 0,
+        openedSinceResolve: false,
+        lastBreachOpened: false,
+        pressed: false,
+        pressedBy: null,
+        haloed: false,
+        haloSustained: false,
+        tempted: false,
+        temptedBy: null,
+        branded: false,
+        brandedBy: null,
+      };
+      s.altitudes[0].player = {
+        instanceId: "p1",
+        cardId: "skaroth",
+        veiled: false,
+        hybridSite: false,
+        stanceB: false,
+        grafts: [],
+        inhabitant: null,
+        hasThirdFace: false,
+        strained: false,
+        stained: false,
+        revelationFired: true,
+        scrutiny: 0,
+        wagered: false,
+        wagerAntePaid: false,
+        wagerAnteFavor: false,
+        wagerHeads: false,
+        wagerPowerDelta: 0,
+        openedSinceResolve: true,
+        lastBreachOpened: false,
+        pressed: false,
+        pressedBy: null,
+        haloed: false,
+        haloSustained: false,
+        tempted: false,
+        temptedBy: null,
+        branded: false,
+        brandedBy: null,
+      };
+      const legal = legalIntents(s);
+      expect(legal.some((x) => x.kind === "witness" && !x.enemy)).toBe(true);
+      const move = chooseAiMove(s);
+      if (move.kind === "witness" && !move.enemy) witnesses += 1;
+    }
+    expect(witnesses).toBeLessThanOrEqual(3);
+  });
 });

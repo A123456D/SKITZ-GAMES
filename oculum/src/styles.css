@@ -671,9 +671,6 @@ body.paused #altitudes {
 
 .will-side.foe {
   justify-content: flex-end;
-  /* Keep the Will track clear of the foe library pile */
-  padding-right: clamp(4px, 1.5vw, 8px);
-  margin-right: clamp(48px, 12vw, 68px);
 }
 
 .will-label {
@@ -1636,6 +1633,20 @@ body.tutorial-soft #toast-text {
 .lane-cue--blind {
   border-color: rgba(140, 140, 160, 0.75);
   color: #d8d8e8;
+}
+.lane-cue--brand {
+  border-color: rgba(210, 70, 110, 0.85);
+  color: #ffc0d0;
+  background: rgba(28, 8, 16, 0.92);
+}
+.lane-cue--devour {
+  border-color: rgba(160, 40, 80, 0.9);
+  color: #ffb0c8;
+  background: rgba(18, 6, 12, 0.94);
+  box-shadow: 0 10px 32px rgba(120, 20, 60, 0.45);
+}
+.lane-cue--hero.lane-cue--devour {
+  font-size: 0.82rem;
 }
 .lane-cue--resolve {
   border-color: rgba(212, 175, 55, 0.8);
@@ -2813,6 +2824,25 @@ body.reduce-motion #phase-banner.phase-pop .phase-spark {
   animation: lane-eclipse 0.7s ease-out;
 }
 
+.alt-hit.fx-devour {
+  animation: lane-devour 0.82s ease-out;
+  box-shadow:
+    inset 0 0 0 3px rgba(200, 60, 100, 0.85),
+    0 0 32px rgba(160, 30, 70, 0.42);
+}
+
+@keyframes lane-devour {
+  0% {
+    filter: brightness(1.65) saturate(1.35) hue-rotate(-6deg);
+  }
+  35% {
+    filter: brightness(1.25) saturate(1.2);
+  }
+  100% {
+    filter: none;
+  }
+}
+
 @keyframes lane-fx {
   0% {
     filter: brightness(1.2);
@@ -3137,6 +3167,173 @@ body.reduce-motion #phase-banner.phase-pop .phase-spark {
   }
 }
 
+/* Velvet Ruin Brand — thorn-eye seal on the board figure */
+.alt-brand {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  right: 0;
+  width: clamp(2.5rem, 28%, 3.4rem);
+  height: clamp(2.5rem, 28%, 3.4rem);
+  margin-inline: auto;
+  padding: 0;
+  font-size: 0;
+  color: transparent;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  pointer-events: auto;
+  transform-origin: 50% 50%;
+}
+
+.alt-brand[data-side="enemy"] {
+  top: 10%;
+}
+
+.alt-brand[data-side="player"] {
+  top: 62.5%;
+}
+
+.alt-brand::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid rgba(210, 70, 110, 0.88);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 120, 170, 0.45) 0%, transparent 42%),
+    radial-gradient(circle at 50% 50%, rgba(90, 20, 50, 0.55) 0%, rgba(40, 8, 24, 0.75) 72%);
+  box-shadow:
+    0 0 14px rgba(200, 50, 100, 0.55),
+    inset 0 0 10px rgba(120, 20, 60, 0.5);
+  animation: brand-seal-pulse 1.75s ease-in-out infinite;
+}
+
+.alt-brand::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 28%;
+  height: 28%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 200, 220, 0.95) 0%, rgba(180, 60, 100, 0.85) 55%, rgba(60, 10, 30, 0.95) 100%);
+  box-shadow: 0 0 6px rgba(255, 140, 180, 0.75);
+}
+
+.alt-brand.badge-pop {
+  animation: alt-brand-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes alt-brand-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.16);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes brand-seal-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.94;
+  }
+  50% {
+    transform: scale(1.07);
+    opacity: 1;
+  }
+}
+
+/* Ink Press — stamped mark on the board figure */
+.alt-press-mark {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  width: clamp(2.4rem, 26%, 3.2rem);
+  height: clamp(2.4rem, 26%, 3.2rem);
+  margin-inline: auto;
+  padding: 0;
+  font-size: 0;
+  color: transparent;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  pointer-events: auto;
+  transform-origin: 50% 50%;
+}
+
+.alt-press-mark[data-side="enemy"] {
+  top: 18%;
+}
+
+.alt-press-mark[data-side="player"] {
+  top: 70.5%;
+}
+
+.alt-press-mark::before {
+  content: "PRESS";
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px dashed rgba(230, 100, 120, 0.92);
+  background: rgba(120, 20, 40, 0.55);
+  color: #ffd0d8;
+  font-size: clamp(0.38rem, 2.8vw, 0.52rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+  line-height: 1;
+  box-shadow:
+    0 0 12px rgba(200, 60, 80, 0.45),
+    inset 0 0 8px rgba(80, 10, 30, 0.5);
+  animation: press-mark-pulse 1.5s ease-in-out infinite;
+}
+
+.alt-press-mark.badge-pop {
+  animation: alt-press-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes alt-press-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-18deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.12) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes press-mark-pulse {
+  0%,
+  100% {
+    opacity: 0.88;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
 .alt-badge--press {
   background: rgba(200, 70, 90, 0.95);
   color: #1a080c;
@@ -3391,7 +3588,9 @@ body.reduce-motion .hand-card.dealt,
 body.reduce-motion .alt-badge--toll::before,
 body.reduce-motion .alt-stain::before,
 body.reduce-motion .alt-halo::before,
-body.reduce-motion .alt-tempt::before {
+body.reduce-motion .alt-tempt::before,
+body.reduce-motion .alt-brand::before,
+body.reduce-motion .alt-press-mark::before {
   animation: none;
 }
 
@@ -3779,6 +3978,31 @@ body.reduce-motion #fx-dim {
 .combat-fx--press .combat-arrow-path {
   stroke: rgba(230, 100, 120, 0.95);
   filter: drop-shadow(0 0 8px rgba(200, 60, 80, 0.5));
+}
+
+.combat-fx--tempt {
+  color: #c878e8;
+}
+.combat-fx--tempt .combat-arrow-path {
+  stroke: rgba(190, 110, 230, 0.95);
+  filter: drop-shadow(0 0 8px rgba(160, 70, 200, 0.55));
+}
+
+.combat-fx--brand {
+  color: #e86088;
+}
+.combat-fx--brand .combat-arrow-path {
+  stroke: rgba(220, 80, 120, 0.95);
+  filter: drop-shadow(0 0 10px rgba(180, 40, 80, 0.55));
+}
+
+.combat-fx--devour {
+  color: #a83058;
+}
+.combat-fx--devour .combat-arrow-path {
+  stroke: rgba(180, 40, 80, 0.98);
+  stroke-width: 3.2;
+  filter: drop-shadow(0 0 12px rgba(140, 20, 60, 0.65));
 }
 
 .combat-fx--peal,

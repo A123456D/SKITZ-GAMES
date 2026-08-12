@@ -434,13 +434,16 @@ function purposeScore(state: MatchState, side: Side, i: Intent, d: AiDifficulty)
     const def = getCard(u.cardId);
     const before = unitPower(state, i.altitude, side);
     const after = faceWitnessedPower(def, u.stanceB, graftWitnessBonus(u));
-    s += laneSwing(i.altitude, before, after);
-    // Revelation / craft unlock purpose
+    const swing = laneSwing(i.altitude, before, after);
+    s += swing;
+    // Revelation only counts when it unlocks a craft line that matters this window
     if (!u.revelationFired) {
-      if (def.heresy === "toll") s += hard ? 18 : 10; // plant Toll / Lure / income
-      if (def.heresy === "breach") s += hard ? 14 : 8;
-      if (def.heresy === "ink") s += hard ? 12 : 6;
-      if (def.heresy === "motley") s += 6;
+      if (def.heresy === "toll") s += hard ? 18 : 10;
+      if (def.heresy === "breach" && after > unitPower(state, i.altitude, foe)) s += hard ? 14 : 8;
+      if (def.heresy === "ruin") s += hard ? 12 : 6; // Tempt / Brand Revs
+      if (def.heresy === "lumen") s += hard ? 12 : 6; // Halo Rev
+      // Ink / Motley Revelation alone is not purpose without a lane swing
+      if ((def.heresy === "ink" || def.heresy === "motley") && swing <= 0) s -= hard ? 10 : 6;
     }
     // Break race: Open Motley Hold walls when we need Will chips
     if (def.heresy === "motley" && u.stanceB && willPressure(state, side) > 5) {
@@ -457,11 +460,15 @@ function purposeScore(state: MatchState, side: Side, i: Intent, d: AiDifficulty)
     if (piece) s += hard ? 34 : 22; // deny Eclipse seal
     const theirPow = unitPower(state, i.altitude, foe);
     const mine = unitPower(state, i.altitude, side);
-    // Gaze to flip a lost contested lane after they lose Veil face
+    // Gaze only purposeful when contested, Press setup, Toll tax, or strip agro
     if (mine <= theirPow) s += hard ? 16 : 10;
-    if (foeU.stained && sidePlaysHeresy(state, side, "ink")) s += hard ? 18 : 10; // Press setup
-    if (state.tollOwner[i.altitude] === side) s += 12; // Lure / tax line
-    if (getCard(foeU.cardId).heresy === "breach" && foeU.veiled) s += 10; // strip agro Open
+    else s -= hard ? 12 : 8; // already winning into Veiled chip — don't waste Sight
+    if (foeU.stained && sidePlaysHeresy(state, side, "ink")) s += hard ? 18 : 10;
+    if (state.tollOwner[i.altitude] === side) s += 12;
+    if (getCard(foeU.cardId).heresy === "breach" && foeU.veiled) s += 10;
+    if (!piece && mine > theirPow && !(foeU.stained && sidePlaysHeresy(state, side, "ink"))) {
+      s -= hard ? 18 : 12; // aimless Gaze on a losing Veiled body
+    }
   }
 
   if (i.kind === "peal") {
@@ -545,7 +552,13 @@ function purposeScoreLite(state: MatchState, side: Side, i: Intent): number {
   const foe = other(side);
   if (i.kind === "witness" && i.enemy) {
     if (foeMotleyEclipsePiece(state, side, i.altitude)) return 30;
-    if (foeUnit(state, side, i.altitude)?.veiled) return 14;
+    const foeU = foeUnit(state, side, i.altitude);
+    if (!foeU?.veiled) return 0;
+    const mine = unitPower(state, i.altitude, side);
+    const theirs = unitPower(state, i.altitude, foe);
+    if (foeU.stained && sidePlaysHeresy(state, side, "ink")) return 22;
+    if (mine <= theirs) return 14; // contested strip
+    return 0; // already winning into Veil — not purposeful
   }
   if (i.kind === "witness" && !i.enemy) {
     const u = myUnit(state, side, i.altitude);
@@ -578,6 +591,18 @@ function purposeScoreLite(state: MatchState, side: Side, i: Intent): number {
       if (!altitudeIsTolled(state, i.altitude) && (myUnit(state, side, i.altitude) || foeUnit(state, side, i.altitude))) {
         return 24;
       }
+    }
+    if (id === "invite_the_look" || id === "last_devour") {
+      if (i.altitude != null && foeUnit(state, side, i.altitude)?.veiled) return 20;
+      if (i.altitude != null && foeUnit(state, side, i.altitude)?.branded) return 18;
+    }
+    if (id === "kindle_the_halo" && i.altitude != null) {
+      const u = myUnit(state, side, i.altitude);
+      if (u?.veiled && getCard(u.cardId).heresy === "lumen") return 22;
+      if (u?.haloed && !u.haloSustained) return 18;
+    }
+    if ((id === "full_devour" && countEnemyBranded(state, side) > 0) || (id === "full_radiance" && countFriendlyHaloed(state, side) > 0)) {
+      return 16;
     }
   }
   if (i.kind === "play") {
@@ -1208,6 +1233,24 @@ function countEnemyStained(state: MatchState, side: Side): number {
   return n;
 }
 
+function countEnemyBranded(state: MatchState, side: Side): number {
+  let n = 0;
+  for (let a = 0; a < 3; a++) {
+    const u = foeUnit(state, side, a as Altitude);
+    if (u?.branded && getCard(u.cardId).type === "figure") n += 1;
+  }
+  return n;
+}
+
+function countFriendlyHaloed(state: MatchState, side: Side): number {
+  let n = 0;
+  for (let a = 0; a < 3; a++) {
+    const u = myUnit(state, side, a as Altitude);
+    if (u?.haloed) n += 1;
+  }
+  return n;
+}
+
 function scoreWitnessOwn(
   state: MatchState,
   side: Side,
@@ -1218,7 +1261,8 @@ function scoreWitnessOwn(
   if (!u) return 0;
   const def = getCard(u.cardId);
   const hand = handOf(state, side);
-  let s = 50 + (2 - alt);
+  // Must earn Witness — no free +50 for Opening.
+  let s = -6 + (alt === 0 ? 2 : 0);
 
   if (def.id === "root_chassis") {
     const sight = sightOf(state, side);
@@ -1439,10 +1483,25 @@ function scoreWitnessOwn(
   if (u.strained && theirs >= mine) s -= 12;
   if (u.strained && theirs < mine) s += 6;
 
-  if (alt === 1) s += 14;
-  if (alt === 2 && theirs <= mine) s -= 10;
+  // Mid is not free EV — only pad when the Open actually wins or sets craft
+  if (alt === 1 && effectiveWit > theirs) s += 6;
+  if (alt === 2 && theirs <= mine && effectiveWit <= theirs) s -= 14;
 
-  if (d === "hard") s += 8;
+  // Aimless Open gate: no lane flip, no craft Revelation, no Break need → sit Veiled
+  const flipsLane = effectiveWit > theirs && mine <= theirs;
+  const padsWin = effectiveWit > theirs && mine > theirs;
+  const craftRev =
+    !u.revelationFired &&
+    (def.heresy === "toll" ||
+      def.heresy === "breach" ||
+      def.heresy === "ruin" ||
+      def.heresy === "lumen" ||
+      (def.heresy === "ink" && !foeUnit(state, side, alt)?.veiled));
+  if (!flipsLane && !padsWin && !craftRev && willPressure(state, side) < 6) {
+    s -= d === "hard" ? 48 : 36;
+  }
+
+  if (d === "hard") s += 4;
   if (d === "easy") s -= 10;
   void hand;
   return s;
@@ -1540,8 +1599,8 @@ function scoreRite(
   d: AiDifficulty,
 ): number {
   const id = handOf(state, side)[i.handIndex];
-  // Rites are tempo sinks — default below Pass (0) unless a real payoff lights up.
-  let s = d === "hard" ? -6 : d === "easy" ? 2 : -4;
+  // Rites are tempo sinks — default well below Pass unless a real payoff lights up.
+  let s = d === "hard" ? -42 : d === "easy" ? -6 : -34;
 
   if (id === "dusk_tithe" || id === "creditor_tithe") {
     s += eclipseOf(state, side) > 0 ? 28 : 4;
@@ -1678,6 +1737,80 @@ function scoreRite(
     }
   }
 
+  // Velvet Ruin — Tempt / Brand / Devour rites
+  if (id === "invite_the_look" || id === "last_devour") {
+    if (i.altitude != null) {
+      const foe = foeUnit(state, side, i.altitude);
+      if (!foe || getCard(foe.cardId).type !== "figure") {
+        s -= 40;
+      } else if (foe.veiled && !foe.tempted) {
+        s += d === "hard" ? 52 : 38; // plant bait
+      } else if (foe.veiled && foe.tempted) {
+        s += d === "hard" ? 58 : 44; // Brand without Witness
+      } else if (!foe.veiled && foe.branded && id === "last_devour") {
+        s += 62; // cash 2 Will
+      } else if (!foe.veiled && foe.branded) {
+        s += 18; // Sight cash
+      } else if (!foe.veiled && !foe.branded) {
+        s += 36; // Brand face-up
+      } else {
+        s += 2;
+      }
+    }
+  }
+  if (id === "unwrite_the_sin") {
+    if (i.altitude != null) {
+      const foe = foeUnit(state, side, i.altitude);
+      if (foe?.branded) s += 40; // cash Brand → Sight
+      else if (foe && !foe.veiled) s += 28; // Blind Witnessed lane
+      else s -= 30;
+    }
+  }
+  if (id === "full_devour") {
+    const branded = countEnemyBranded(state, side);
+    if (branded > 0) {
+      s += 36 + branded * 6;
+      for (let a = 0; a < 3; a++) {
+        const foe = foeUnit(state, side, a as Altitude);
+        if (foe?.branded && !foe.veiled) s += 10; // Devour Will live
+      }
+    } else {
+      s -= 40;
+    }
+  }
+
+  // Lumen Host — Halo / Blaze rites
+  if (id === "kindle_the_halo") {
+    if (i.altitude != null) {
+      const mine = myUnit(state, side, i.altitude);
+      if (mine?.veiled && getCard(mine.cardId).heresy === "lumen") s += 48; // free Witness + Halo
+      else if (mine?.haloed && !mine.haloSustained) s += 40; // free Sustain
+      else s -= 36;
+    }
+  }
+  if (id === "snuff_the_halo") {
+    if (i.altitude != null) {
+      const mine = myUnit(state, side, i.altitude);
+      const foe = foeUnit(state, side, i.altitude);
+      if (mine?.haloed) s += 34; // cash Halo → Sight + Re-Veil
+      else if (foe && !foe.veiled) s += 30; // Blind
+      else s -= 36;
+    }
+  }
+  if (id === "full_radiance") {
+    const haloed = countFriendlyHaloed(state, side);
+    if (haloed > 0) s += 34 + haloed * 6;
+    else s -= 40;
+  }
+  if (id === "last_radiance") {
+    if (i.altitude != null) {
+      const mine = myUnit(state, side, i.altitude);
+      if (mine?.haloed) s += 56; // 2 Will
+      else if (mine?.veiled && getCard(mine.cardId).heresy === "lumen") s += 36;
+      else s -= 36;
+    }
+  }
+
   // Unknown / unmatched rites: stay near Pass unless something else bumped them
   return s;
 }
@@ -1688,15 +1821,33 @@ function scoreRite(
  */
 export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }): Intent {
   let intents = legalIntents(state);
-  // Hard prune: never cast Stain-payoff rites with zero Stain on board
+  // Hard prune: never cast payoff rites with zero board setup
   intents = intents.filter((i) => {
     if (i.kind !== "rite") return true;
     const id = handOf(state, state.active)[i.handIndex];
-    if (id !== "ashen_tithe" && id !== "mire_surge") return true;
-    if (id === "ashen_tithe" && i.altitude != null) {
-      return !!foeUnit(state, state.active, i.altitude)?.stained;
+    if (id === "ashen_tithe") {
+      return i.altitude != null && !!foeUnit(state, state.active, i.altitude)?.stained;
     }
-    return countEnemyStained(state, state.active) > 0;
+    if (id === "mire_surge") return countEnemyStained(state, state.active) > 0;
+    if (id === "invite_the_look" || id === "last_devour" || id === "unwrite_the_sin") {
+      if (i.altitude == null) return false;
+      const foe = foeUnit(state, state.active, i.altitude);
+      return !!foe && getCard(foe.cardId).type === "figure";
+    }
+    if (id === "full_devour") return countEnemyBranded(state, state.active) > 0;
+    if (id === "kindle_the_halo" || id === "last_radiance") {
+      if (i.altitude == null) return false;
+      const mine = myUnit(state, state.active, i.altitude);
+      return !!mine && getCard(mine.cardId).heresy === "lumen";
+    }
+    if (id === "snuff_the_halo") {
+      if (i.altitude == null) return false;
+      const mine = myUnit(state, state.active, i.altitude);
+      const foe = foeUnit(state, state.active, i.altitude);
+      return !!mine?.haloed || !!(foe && !foe.veiled);
+    }
+    if (id === "full_radiance") return countFriendlyHaloed(state, state.active) > 0;
+    return true;
   });
   if (intents.length === 0) return { kind: "pass" };
 
@@ -1712,7 +1863,9 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
       (sidePlaysHeresy(state, side, "motley") ||
         sidePlaysHeresy(state, side, "ink") ||
         sidePlaysHeresy(state, side, "toll") ||
-        sidePlaysHeresy(state, side, "breach")));
+        sidePlaysHeresy(state, side, "breach") ||
+        sidePlaysHeresy(state, side, "lumen") ||
+        sidePlaysHeresy(state, side, "ruin")));
   const searchDepth = opts?.searchDepth ?? (wantsSearch ? 1 : 0);
   const mindgameScale = d === "hard" ? 1.5 : d === "normal" ? 0.7 : 0;
 
@@ -1854,43 +2007,47 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
       return s;
     }
     if (i.kind === "witness" && i.enemy) {
-      let s = 40;
-      if (d === "hard") s += 28;
-      else if (d === "normal") s += 12;
-      if (d === "easy") s -= 22;
-      s += 6;
-      if (i.altitude === 0) s += 16;
-      if (i.altitude === 2) s -= 10;
+      let s = -10;
+      if (d === "hard") s += 6;
+      if (d === "easy") s -= 16;
+      if (i.altitude === 0) s += 8;
+      if (i.altitude === 2) s -= 8;
       const foe = foeUnit(state, side, i.altitude);
-      if (foe?.veiled) s += 22;
-      if (foe && !foe.veiled && foe.strained) s += 18;
+      if (!foe?.veiled) return -40;
       const mine = unitPower(state, i.altitude, side);
       const theirs = unitPower(state, i.altitude, other(side));
-      if (foe && mine > theirs) s += 10;
+      // Contested / ahead-after-Open only
+      if (mine <= theirs) s += 28;
+      else s -= 18; // already winning into Veil armor — conserve Sight
+      if (foe.strained) s += 12;
       // Strip Motley Hold walls that are winning / tying the lane
-      if (foe?.veiled && theirs >= mine) s += 14;
-      if (foe?.veiled && foe.stanceB && getCard(foe.cardId).heresy === "motley") s += 18;
-      if (foe?.veiled && foe.wagered && getCard(foe.cardId).heresy === "motley") s += 12;
+      if (theirs >= mine) s += 10;
+      if (foe.stanceB && getCard(foe.cardId).heresy === "motley") s += 18;
+      if (foe.wagered && getCard(foe.cardId).heresy === "motley") s += 12;
       // Interrupt Motley Eclipse — Gaze Wager / Masque / Stance-B Veiled
       s += scoreContestMotleyLane(state, side, i.altitude, "gaze");
       // Bellward: Gaze contested lanes (tax on our Toll, or swing a lost race)
-      if (sidePlaysHeresy(state, side, "toll") && foe?.veiled) {
+      if (sidePlaysHeresy(state, side, "toll") && foe.veiled) {
         if (state.tollOwner[i.altitude] === side) s += 8;
         if (mine > 0 && theirs >= mine) s += 12;
       }
       // Scar Breach: Gaze to Open foes so Breach Will can fire
-      if (sidePlaysBreach(state, side) && foe?.veiled) {
+      if (sidePlaysBreach(state, side) && foe.veiled) {
         const mineU = myUnit(state, side, i.altitude);
         if (mineU && !mineU.veiled && getCard(mineU.cardId).heresy === "breach") {
           const foeDef = getCard(foe.cardId);
           const theirWit = faceWitnessedPower(foeDef, foe.stanceB, graftWitnessBonus(foe));
-          if (mine > theirWit) s += 34; // expose then still win → Breach
-          else if (mine > theirs) s -= 12; // currently winning into Veiled chip only; Gaze may flip
+          if (mine > theirWit) s += 34;
+          else if (mine > theirs) s -= 12;
           else s += 8;
         } else {
-          s += 10; // set up future Breach lanes
+          s += 4;
         }
         if (state.tollOwner[i.altitude] != null && state.tollOwner[i.altitude] !== side) s -= 14;
+      }
+      // Velvet Ruin: Gaze Tempted foe to Brand
+      if (sidePlaysHeresy(state, side, "ruin") && foe.tempted && foe.temptedBy === side) {
+        s += 36;
       }
       return s;
     }
@@ -1972,28 +2129,51 @@ export function chooseAiMove(state: MatchState, opts?: { searchDepth?: 0 | 1 }):
     }
     if (i.kind === "reveil") {
       const u = myUnit(state, side, i.altitude);
-      let s = 8;
-      if (u?.strained) s += 28;
-      if (d === "hard" && u?.strained) s += 10;
+      let s = -30;
+      if (!u || u.veiled) return -50;
+      const mine = unitPower(state, i.altitude, side);
+      const theirs = unitPower(state, i.altitude, other(side));
+      if (u.strained) s += 52;
+      if (d === "hard" && u.strained) s += 8;
       if (d === "easy") s -= 8;
       // Don't hide a racing body against Motley seals unless Strained
-      if (!u?.strained && scoreContestMotleyLane(state, side, i.altitude, "race") > 0) {
-        s -= 20 + motleySealPressure(state, side) * 6;
+      if (!u.strained && scoreContestMotleyLane(state, side, i.altitude, "race") > 0) {
+        s -= 24 + motleySealPressure(state, side) * 6;
       }
+      // Healthy winning body: never Re-Veil
+      if (!u.strained && mine > theirs) s -= 28;
       // Ink: Re-Veil to deny Open Breach Will
-      if (u && !u.veiled && getCard(u.cardId).heresy === "ink") {
+      if (getCard(u.cardId).heresy === "ink") {
         const foe = foeUnit(state, side, i.altitude);
         if (foe && !foe.veiled && getCard(foe.cardId).heresy === "breach") {
-          const mine = unitPower(state, i.altitude, side);
-          const theirs = unitPower(state, i.altitude, other(side));
-          if (mine <= theirs) s += 36;
-          else s += 12;
+          if (mine <= theirs) s += 48;
+          else s += 16;
         }
       }
+      // Lumen: Re-Veil rarely — Halo wants to stay Open unless Strained
+      if (getCard(u.cardId).heresy === "lumen" && u.haloed && !u.strained) s -= 20;
+      return s;
+    }
+    if (i.kind === "tempt") {
+      const foe = foeUnit(state, side, i.altitude);
+      if (!foe?.veiled || foe.tempted) return -40;
+      let s = 34;
+      if (d === "hard") s += 10;
+      if (i.altitude === 1) s += 6;
+      if (willPressure(state, side) > 4) s += 8;
+      return s;
+    }
+    if (i.kind === "sustain") {
+      const u = myUnit(state, side, i.altitude);
+      if (!u?.haloed || u.haloSustained) return -40;
+      let s = 32;
+      if (d === "hard") s += 8;
+      if (state.passed[other(side)]) s += 16; // Blaze incoming
+      if (willPressure(state, side) > 3) s += 8;
       return s;
     }
     if (i.kind === "play") return scorePlay(state, side, i, d);
-    return 1;
+    return -8;
   };
 
   const score = (i: Intent): number =>
