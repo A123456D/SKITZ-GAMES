@@ -179,24 +179,22 @@ export function KeyboardPanel({ transport }: Props) {
         shiftKeycaps.current += 1
       }
       presses.current[id] = { code: key.code, tempShift: false }
-      setDown((d) => ({ ...d, [id]: true }))
       transport.key(key.code, true)
+      setDown((d) => ({ ...d, [id]: true }))
       return
     }
 
     const needTempShift = !!key.shift && shiftKeycaps.current === 0
     if (needTempShift) transport.key('ShiftLeft', true)
     presses.current[id] = { code: key.code, tempShift: needTempShift }
-    setDown((d) => ({ ...d, [id]: true }))
     transport.key(key.code, true)
+    setDown((d) => ({ ...d, [id]: true }))
   }
 
   const releaseKey = (id: string) => {
     const rec = presses.current[id]
     if (!rec) return
     delete presses.current[id]
-    setDown((d) => ({ ...d, [id]: false }))
-
     transport.key(rec.code, false)
 
     if (rec.code === 'ShiftLeft' || rec.code === 'ShiftRight') {
@@ -206,6 +204,7 @@ export function KeyboardPanel({ transport }: Props) {
     if (rec.tempShift && shiftKeycaps.current === 0) {
       transport.key('ShiftLeft', false)
     }
+    setDown((d) => ({ ...d, [id]: false }))
   }
 
   const rows = LAYOUTS[layout]

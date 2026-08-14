@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const LOGO = join(root, '..', 'website', 'public', 'images', 'pc-controller-logo.png')
+const LOGO = join(root, 'assets', 'pc-controller-logo.png')
 const RES = join(root, 'android', 'app', 'src', 'main', 'res')
 
 /** Logo palette — keep in sync with --bg-0 / --accent in src/index.css. */
@@ -30,15 +30,15 @@ async function write(file, buffer) {
 }
 
 /**
- * Drop the logo's flat dark backdrop so the artwork can sit on the adaptive
- * background layer. Ramped rather than thresholded to keep edges clean.
+ * Drop the logo's dark tile so only the bright mouse and its amber halo sit on
+ * the adaptive background layer. Ramped rather than hard-cut for clean edges.
  */
 async function cutout() {
   const { data, info } = await sharp(LOGO).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const out = Buffer.from(data)
   for (let i = 0; i < out.length; i += 4) {
     const brightest = Math.max(out[i], out[i + 1], out[i + 2])
-    const alpha = Math.min(1, Math.max(0, (brightest - 16) / 18))
+    const alpha = Math.min(1, Math.max(0, (brightest - 65) / 45))
     out[i + 3] = Math.round(out[i + 3] * alpha)
   }
   return sharp(out, { raw: { width: info.width, height: info.height, channels: 4 } })

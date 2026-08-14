@@ -381,7 +381,7 @@ export function TouchScreen({ transport }: Props) {
           : undefined
 
   return (
-    <section className="screen touch-screen">
+    <section className={`screen touch-screen${keysOpen ? ' keys-open' : ''}`}>
       <div className="pad-wrap">
         <div className="sens-panel">
           <SensSlider

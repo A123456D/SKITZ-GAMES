@@ -18,37 +18,37 @@ const EMPTY: GamepadState = {
   buttons: {},
 }
 
-/** Middle keys — no WASD / arrows (left stick covers movement). */
+/** Four deliberate rows; the left stick already covers WASD / arrows. */
 const MID_KEYS: { label: string; code: string; wide?: boolean }[] = [
-  { label: 'G', code: 'KeyG' },
-  { label: 'T', code: 'KeyT' },
-  { label: 'F', code: 'KeyF' },
-  { label: 'X', code: 'KeyX' },
-  { label: 'Z', code: 'KeyZ' },
-  { label: 'C', code: 'KeyC' },
-  { label: 'V', code: 'KeyV' },
-  { label: 'R', code: 'KeyR' },
   { label: 'Q', code: 'KeyQ' },
-  { label: 'Y', code: 'KeyY' },
+  { label: 'E', code: 'KeyE' },
+  { label: 'R', code: 'KeyR' },
+  { label: 'C', code: 'KeyC' },
+  { label: 'Z', code: 'KeyZ' },
+  { label: 'X', code: 'KeyX' },
+  { label: 'V', code: 'KeyV' },
+  { label: 'F', code: 'KeyF' },
   { label: '1', code: 'Digit1' },
   { label: '2', code: 'Digit2' },
   { label: '3', code: 'Digit3' },
   { label: '4', code: 'Digit4' },
-  { label: '5', code: 'Digit5' },
-  { label: '⇧', code: 'ShiftLeft', wide: true },
-  { label: 'Ctrl', code: 'ControlLeft', wide: true },
+  { label: 'Space', code: 'Space', wide: true },
+  { label: 'Ctrl', code: 'ControlLeft' },
+  { label: 'Shift', code: 'ShiftLeft' },
 ]
 
 export function GameScreen({ transport }: Props) {
   const state = useRef<GamepadState>({ ...EMPTY, buttons: {} })
   const stickPtr = useRef<number | null>(null)
+  const stickKnob = useRef<HTMLDivElement | null>(null)
   const padPtr = useRef<number | null>(null)
   const padLast = useRef<{ x: number; y: number } | null>(null)
   const btnPtr = useRef<Record<string, number | null>>({})
+  const mouseBtnPtr = useRef<Record<string, number | null>>({})
   const downRef = useRef<Record<string, boolean>>({})
+  const mouseDownRef = useRef<Record<string, boolean>>({})
   const sensRef = useRef(loadInputSettings())
 
-  const [knobs, setKnobs] = useState({ lx: 0, ly: 0 })
   const [down, setDown] = useState<Record<string, boolean>>({})
   const [padActive, setPadActive] = useState(false)
   const [sens, setSens] = useState<InputSettings>(() => sensRef.current)
@@ -68,12 +68,17 @@ export function GameScreen({ transport }: Props) {
     padPtr.current = null
     padLast.current = null
     btnPtr.current = {}
+    mouseBtnPtr.current = {}
     for (const code of Object.keys(downRef.current)) {
       if (downRef.current[code]) transport.key(code, false)
     }
+    for (const button of Object.keys(mouseDownRef.current)) {
+      if (mouseDownRef.current[button]) transport.mouseButton(button as 'left' | 'right', false)
+    }
     downRef.current = {}
+    mouseDownRef.current = {}
     state.current = { ...EMPTY, buttons: {} }
-    setKnobs({ lx: 0, ly: 0 })
+    moveStickKnob(0, 0)
     setDown({})
     setPadActive(false)
     publishStick()
@@ -108,7 +113,7 @@ export function GameScreen({ transport }: Props) {
     const ny = Math.abs(y) < 0.12 ? 0 : y
     state.current.lx = nx
     state.current.ly = ny
-    setKnobs({ lx: nx, ly: ny })
+    moveStickKnob(nx, ny)
     publishStick()
     if (nx === 0 && ny === 0) {
       window.setTimeout(() => {
@@ -208,16 +213,16 @@ export function GameScreen({ transport }: Props) {
 
   const press = (code: string) => {
     downRef.current[code] = true
-    setDown((d) => ({ ...d, [code]: true }))
     transport.key(code, true)
+    setDown((d) => ({ ...d, [code]: true }))
   }
 
   const release = (code: string) => {
     if (!downRef.current[code]) return
     downRef.current[code] = false
     btnPtr.current[code] = null
-    setDown((d) => ({ ...d, [code]: false }))
     transport.key(code, false)
+    setDown((d) => ({ ...d, [code]: false }))
     window.setTimeout(() => {
       if (!downRef.current[code]) transport.key(code, false)
     }, 32)
@@ -244,9 +249,41 @@ export function GameScreen({ transport }: Props) {
     },
   })
 
-  const knobStyle = (x: number, y: number) => ({
-    transform: `translate(calc(-50% + ${x * 34}%), calc(-50% + ${y * 34}%))`,
+  const releaseMouse = (button: 'left' | 'right') => {
+    if (!mouseDownRef.current[button]) return
+    mouseDownRef.current[button] = false
+    mouseBtnPtr.current[button] = null
+    transport.mouseButton(button, false)
+    setDown((d) => ({ ...d, [`mouse-${button}`]: false }))
+  }
+
+  const bindMouseButton = (button: 'left' | 'right') => ({
+    onPointerDown: (e: PointerEvent<HTMLButtonElement>) => {
+      e.preventDefault()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      mouseBtnPtr.current[button] = e.pointerId
+      mouseDownRef.current[button] = true
+      transport.mouseButton(button, true)
+      setDown((d) => ({ ...d, [`mouse-${button}`]: true }))
+    },
+    onPointerUp: (e: PointerEvent<HTMLButtonElement>) => {
+      if (mouseBtnPtr.current[button] !== e.pointerId) return
+      releaseMouse(button)
+    },
+    onPointerCancel: (e: PointerEvent<HTMLButtonElement>) => {
+      if (mouseBtnPtr.current[button] !== e.pointerId) return
+      releaseMouse(button)
+    },
+    onLostPointerCapture: (e: PointerEvent<HTMLButtonElement>) => {
+      if (mouseBtnPtr.current[button] !== e.pointerId) return
+      releaseMouse(button)
+    },
   })
+
+  const moveStickKnob = (x: number, y: number) => {
+    if (!stickKnob.current) return
+    stickKnob.current.style.transform = `translate(calc(-50% + ${x * 34}%), calc(-50% + ${y * 34}%))`
+  }
 
   return (
     <section className="screen game-screen">
@@ -266,7 +303,7 @@ export function GameScreen({ transport }: Props) {
       <div className="game-layout">
         <div className="game-cluster game-cluster-l">
           <div className="stick" {...bindLeftStick()}>
-            <div className="stick-knob" style={knobStyle(knobs.lx, knobs.ly)} />
+            <div ref={stickKnob} className="stick-knob" />
           </div>
         </div>
 
@@ -286,13 +323,31 @@ export function GameScreen({ transport }: Props) {
         </div>
 
         <div className="game-cluster game-cluster-pad">
-          <div
-            className={`look-pad${padActive ? ' active' : ''}`}
-            role="application"
-            aria-label="Look touchpad"
-            {...bindLookPad()}
-          >
-            <span className="look-pad__label">LOOK</span>
+          <div className="look-controls">
+            <div
+              className={`look-pad${padActive ? ' active' : ''}`}
+              role="application"
+              aria-label="Look touchpad"
+              {...bindLookPad()}
+            >
+              <span className="look-pad__label">LOOK</span>
+            </div>
+            <div className="look-mouse-buttons" role="group" aria-label="Mouse buttons">
+              <button
+                type="button"
+                className={`look-mouse-button${down['mouse-left'] ? ' down' : ''}`}
+                {...bindMouseButton('left')}
+              >
+                Left
+              </button>
+              <button
+                type="button"
+                className={`look-mouse-button${down['mouse-right'] ? ' down' : ''}`}
+                {...bindMouseButton('right')}
+              >
+                Right
+              </button>
+            </div>
           </div>
         </div>
       </div>
