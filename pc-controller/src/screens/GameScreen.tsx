@@ -18,12 +18,10 @@ const EMPTY: GamepadState = {
   buttons: {},
 }
 
-/** Four deliberate rows; the left stick already covers WASD / arrows. */
-const MID_KEYS: { label: string; code: string; wide?: boolean }[] = [
-  { label: 'Q', code: 'KeyQ' },
+/** General actions; movement is handled by the left stick. */
+const MID_KEYS: { label: string; code: string }[] = [
   { label: 'E', code: 'KeyE' },
   { label: 'R', code: 'KeyR' },
-  { label: 'C', code: 'KeyC' },
   { label: 'Z', code: 'KeyZ' },
   { label: 'X', code: 'KeyX' },
   { label: 'V', code: 'KeyV' },
@@ -32,9 +30,15 @@ const MID_KEYS: { label: string; code: string; wide?: boolean }[] = [
   { label: '2', code: 'Digit2' },
   { label: '3', code: 'Digit3' },
   { label: '4', code: 'Digit4' },
-  { label: 'Space', code: 'Space', wide: true },
+]
+
+/** High-use actions kept beside the look pad for simultaneous input. */
+const LOOK_KEYS: { label: string; code: string; wide?: boolean }[] = [
+  { label: 'C', code: 'KeyC' },
+  { label: 'Q', code: 'KeyQ' },
   { label: 'Ctrl', code: 'ControlLeft' },
   { label: 'Shift', code: 'ShiftLeft' },
+  { label: 'Space', code: 'Space', wide: true },
 ]
 
 export function GameScreen({ transport }: Props) {
@@ -290,14 +294,6 @@ export function GameScreen({ transport }: Props) {
       <div className="game-intro">
         <h1 className="headline">Gamepad</h1>
         <p className="sub">Left stick move · Keys · Right pad look. Rotate for full layout.</p>
-        <div className="sens-panel compact">
-          <SensSlider
-            label="Look"
-            setting="look"
-            value={sens.look}
-            onChange={(look) => updateSens({ look })}
-          />
-        </div>
       </div>
 
       <div className="game-layout">
@@ -309,11 +305,11 @@ export function GameScreen({ transport }: Props) {
 
         <div className="game-cluster game-cluster-keys">
           <div className="game-key-grid" role="group" aria-label="Game keys">
-            {MID_KEYS.map(({ label, code, wide }) => (
+            {MID_KEYS.map(({ label, code }) => (
               <button
                 key={code}
                 type="button"
-                className={`game-key${wide ? ' wide' : ''}${down[code] ? ' down' : ''}`}
+                className={`game-key${down[code] ? ' down' : ''}`}
                 {...bindKey(code)}
               >
                 {label}
@@ -332,6 +328,18 @@ export function GameScreen({ transport }: Props) {
             >
               <span className="look-pad__label">LOOK</span>
             </div>
+            <div className="look-quick-keys" role="group" aria-label="Quick game keys">
+              {LOOK_KEYS.map(({ label, code, wide }) => (
+                <button
+                  key={code}
+                  type="button"
+                  className={`look-quick-key${wide ? ' wide' : ''}${down[code] ? ' down' : ''}`}
+                  {...bindKey(code)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="look-mouse-buttons" role="group" aria-label="Mouse buttons">
               <button
                 type="button"
@@ -347,6 +355,14 @@ export function GameScreen({ transport }: Props) {
               >
                 Right
               </button>
+            </div>
+            <div className="look-sens">
+              <SensSlider
+                label="Sensitivity"
+                setting="look"
+                value={sens.look}
+                onChange={(look) => updateSens({ look })}
+              />
             </div>
           </div>
         </div>
