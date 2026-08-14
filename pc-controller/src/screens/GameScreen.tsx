@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { SensSlider } from '../components/SensSlider'
-import { haptic } from '../haptics'
+import { coalesced } from '../pointer'
 import { loadInputSettings, saveInputSettings, type InputSettings } from '../settings'
 import type { GamepadState, Transport } from '../transport'
 
@@ -137,7 +137,6 @@ export function GameScreen({ transport }: Props) {
       onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
         e.currentTarget.setPointerCapture(e.pointerId)
         stickPtr.current = e.pointerId
-        haptic('selection')
         move(e)
       },
       onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
@@ -171,15 +170,20 @@ export function GameScreen({ transport }: Props) {
         padPtr.current = e.pointerId
         padLast.current = { x: e.clientX, y: e.clientY }
         setPadActive(true)
-        haptic('selection')
       },
       onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
-        if (padPtr.current !== e.pointerId || !padLast.current) return
-        const dx = e.clientX - padLast.current.x
-        const dy = e.clientY - padLast.current.y
-        padLast.current = { x: e.clientX, y: e.clientY }
+        const last = padLast.current
+        if (padPtr.current !== e.pointerId || !last) return
         const g = gain()
-        if (dx || dy) transport.mouseMove(dx * g, dy * g)
+        let moveX = 0
+        let moveY = 0
+        for (const point of coalesced(e)) {
+          moveX += (point.clientX - last.x) * g
+          moveY += (point.clientY - last.y) * g
+          last.x = point.clientX
+          last.y = point.clientY
+        }
+        if (moveX || moveY) transport.mouseMove(moveX, moveY)
       },
       onPointerUp: (e: PointerEvent<HTMLDivElement>) => {
         if (padPtr.current !== e.pointerId) return
@@ -205,7 +209,6 @@ export function GameScreen({ transport }: Props) {
   const press = (code: string) => {
     downRef.current[code] = true
     setDown((d) => ({ ...d, [code]: true }))
-    haptic('light')
     transport.key(code, true)
   }
 

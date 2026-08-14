@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react'
-import { haptic } from '../haptics'
 import type { Transport } from '../transport'
 
 type Layout = 'letters' | 'numbers' | 'symbols'
@@ -181,7 +180,6 @@ export function KeyboardPanel({ transport }: Props) {
       }
       presses.current[id] = { code: key.code, tempShift: false }
       setDown((d) => ({ ...d, [id]: true }))
-      haptic('light')
       transport.key(key.code, true)
       return
     }
@@ -190,7 +188,6 @@ export function KeyboardPanel({ transport }: Props) {
     if (needTempShift) transport.key('ShiftLeft', true)
     presses.current[id] = { code: key.code, tempShift: needTempShift }
     setDown((d) => ({ ...d, [id]: true }))
-    haptic('light')
     transport.key(key.code, true)
   }
 
@@ -235,7 +232,6 @@ export function KeyboardPanel({ transport }: Props) {
                   onPointerDown={(e) => {
                     e.preventDefault()
                     releaseAll()
-                    haptic('selection')
                     setLayout(key.layout)
                   }}
                 >

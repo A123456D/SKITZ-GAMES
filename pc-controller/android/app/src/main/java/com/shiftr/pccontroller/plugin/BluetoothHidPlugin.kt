@@ -9,8 +9,9 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
-import android.os.Looper
+import android.os.Process
 import androidx.core.content.ContextCompat
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
@@ -46,7 +47,17 @@ class BluetoothHidPlugin : Plugin() {
     private var service: HidService? = null
     private var controller: HidController? = null
     private var bound = false
-    private val handler = Handler(Looper.getMainLooper())
+    /**
+     * HID reports go out on their own thread. On the main looper they queue
+     * behind WebView rendering, which showed up as the cursor drifting on
+     * after the finger lifted.
+     */
+    private val outThread = HandlerThread("hid-out", Process.THREAD_PRIORITY_URGENT_DISPLAY)
+    private val outHandler: Handler by lazy {
+        if (!outThread.isAlive) outThread.start()
+        Handler(outThread.looper)
+    }
+
     private var pendingGamepad: Runnable? = null
     private var pendingMouseDx = 0
     private var pendingMouseDy = 0
@@ -69,7 +80,7 @@ class BluetoothHidPlugin : Plugin() {
         synchronized(mouseLock) {
             if ((pendingMouseDx != 0 || pendingMouseDy != 0) && !mouseFlushPosted) {
                 mouseFlushPosted = true
-                handler.post { flushPendingMouse() }
+                outHandler.post { flushPendingMouse() }
             }
         }
     }
@@ -108,6 +119,7 @@ class BluetoothHidPlugin : Plugin() {
             }
             bound = false
         }
+        if (outThread.isAlive) outThread.quitSafely()
         super.handleOnDestroy()
     }
 
@@ -252,13 +264,13 @@ class BluetoothHidPlugin : Plugin() {
     fun mouseMove(call: PluginCall) {
         val dx = call.getInt("dx") ?: 0
         val dy = call.getInt("dy") ?: 0
-        // Coalesce on the main handler so a Capacitor backlog merges into one report.
+        // Merge anything that piled up behind the bridge into a single report.
         synchronized(mouseLock) {
             pendingMouseDx += dx
             pendingMouseDy += dy
             if (!mouseFlushPosted) {
                 mouseFlushPosted = true
-                handler.post { flushPendingMouse() }
+                outHandler.post { flushPendingMouse() }
             }
         }
         call.resolve()
@@ -274,14 +286,18 @@ class BluetoothHidPlugin : Plugin() {
                 "middle" -> 2
                 else -> 0
             }
-        controller?.setMouseButton(index, down)
+        // Same thread as moves so a click can never overtake pending motion.
+        outHandler.post {
+            flushPendingMouse()
+            controller?.setMouseButton(index, down)
+        }
         call.resolve()
     }
 
     @PluginMethod
     fun mouseScroll(call: PluginCall) {
         val dy = call.getInt("dy") ?: 0
-        controller?.sendMouse(0, 0, wheel = dy)
+        outHandler.post { controller?.sendMouse(0, 0, wheel = dy) }
         call.resolve()
     }
 
@@ -289,7 +305,7 @@ class BluetoothHidPlugin : Plugin() {
     fun key(call: PluginCall) {
         val code = call.getString("code") ?: return call.reject("code required")
         val down = call.getBoolean("down") ?: false
-        controller?.keyEvent(code, down)
+        outHandler.post { controller?.keyEvent(code, down) }
         call.resolve()
     }
 
@@ -297,7 +313,7 @@ class BluetoothHidPlugin : Plugin() {
     fun consumer(call: PluginCall) {
         val action = call.getString("action") ?: return call.reject("action required")
         val down = call.getBoolean("down") ?: false
-        controller?.consumer(action, down)
+        outHandler.post { controller?.consumer(action, down) }
         call.resolve()
     }
 
@@ -320,15 +336,15 @@ class BluetoothHidPlugin : Plugin() {
             call.resolve()
             return
         }
-        // Apply on main thread, latest call wins via posted runnable replacing pending.
-        pendingGamepad?.let { handler.removeCallbacks(it) }
+        // Latest call wins — a replaced runnable can't leave a stick key stuck.
+        pendingGamepad?.let { outHandler.removeCallbacks(it) }
         val task =
             Runnable {
                 pendingGamepad = null
                 c.gamepad(lx, ly, rx, ry, buttons, lookGain)
             }
         pendingGamepad = task
-        handler.post(task)
+        outHandler.post(task)
         call.resolve()
     }
 

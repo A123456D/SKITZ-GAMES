@@ -1,5 +1,4 @@
 import { useState, type PointerEvent } from 'react'
-import { haptic } from '../haptics'
 import type { Transport } from '../transport'
 
 type Props = {
@@ -39,8 +38,6 @@ export function TvScreen({ transport }: Props) {
 
   const pressConsumer = (action: string) => {
     setDown((d) => ({ ...d, [action]: true }))
-    const strong = ['netflix', 'prime', 'appletv', 'disney', 'ok', 'power'].includes(action)
-    haptic(strong ? 'medium' : 'light')
     transport.consumer(action, true)
   }
 
@@ -51,7 +48,6 @@ export function TvScreen({ transport }: Props) {
 
   const pressKey = (code: string) => {
     setDown((d) => ({ ...d, [code]: true }))
-    haptic('light')
     transport.key(code, true)
   }
 
@@ -114,7 +110,6 @@ export function TvScreen({ transport }: Props) {
             type="button"
             className={`tv-panel-tab${panel === tab.id ? ' active' : ''}`}
             onClick={() => {
-              haptic('selection')
               setPanel(tab.id)
             }}
           >

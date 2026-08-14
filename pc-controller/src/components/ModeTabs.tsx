@@ -1,4 +1,3 @@
-import { haptic } from '../haptics'
 import type { ControllerMode } from '../transport'
 
 const TABS: { id: ControllerMode; label: string }[] = [
@@ -22,7 +21,6 @@ export function ModeTabs({ mode, onChange }: Props) {
           className={`tab${mode === tab.id ? ' active' : ''}`}
           onClick={() => {
             if (tab.id === mode) return
-            haptic('selection')
             onChange(tab.id)
           }}
         >

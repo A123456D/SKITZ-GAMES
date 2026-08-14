@@ -658,7 +658,8 @@ class HidController(private val context: Context) {
     private fun flushKeyboard(): Boolean {
         val host = hostDevice
         val hid = hidDevice
-        if (host == null || hid == null || !registered || !isConnectedTo(host)) return false
+        // Hot path: skip getConnectionState — the binder round trip lags fast typing.
+        if (host == null || hid == null || !registered) return false
         val key = pressedKeys.firstOrNull() ?: 0
         val report = byteArrayOf(modifierByte, 0, key)
         return try {
@@ -671,7 +672,7 @@ class HidController(private val context: Context) {
     private fun flushConsumer(): Boolean {
         val host = hostDevice
         val hid = hidDevice
-        if (host == null || hid == null || !registered || !isConnectedTo(host)) return false
+        if (host == null || hid == null || !registered) return false
         val report =
             byteArrayOf(
                 (consumerBits and 0xff).toByte(),

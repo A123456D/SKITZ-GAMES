@@ -1,7 +1,7 @@
 import { useRef, useState, type PointerEvent } from 'react'
 import { KeyboardPanel } from '../components/KeyboardPanel'
 import { SensSlider } from '../components/SensSlider'
-import { haptic } from '../haptics'
+import { accel, coalesced } from '../pointer'
 import { loadInputSettings, saveInputSettings, type InputSettings } from '../settings'
 import type { Transport } from '../transport'
 
@@ -31,6 +31,7 @@ type PadGesture = {
   startTime: number
   lastX: number
   lastY: number
+  lastT: number
   totalMove: number
   isDoubleHold: boolean
   dragArmed: boolean
@@ -74,13 +75,11 @@ export function TouchScreen({ transport }: Props) {
   const clickLeft = () => {
     transport.mouseButton('left', true)
     transport.mouseButton('left', false)
-    haptic('medium')
   }
 
   const clickRight = () => {
     transport.mouseButton('right', true)
     transport.mouseButton('right', false)
-    haptic('medium')
   }
 
   const endDrag = () => {
@@ -112,7 +111,6 @@ export function TouchScreen({ transport }: Props) {
     if (!keysOpen && fromBottom < 56) {
       edgeSwipe.current = { y: e.clientY, active: true }
       e.currentTarget.setPointerCapture(e.pointerId)
-      haptic('selection')
       return
     }
 
@@ -128,6 +126,7 @@ export function TouchScreen({ transport }: Props) {
       startTime: now,
       lastX: e.clientX,
       lastY: e.clientY,
+      lastT: e.timeStamp,
       totalMove: 0,
       isDoubleHold,
       dragArmed: isDoubleHold,
@@ -137,7 +136,6 @@ export function TouchScreen({ transport }: Props) {
     multiScrollY.current = 0
     multiMoved.current = false
     setActive(true)
-    haptic('light')
     updateGlint(e)
   }
 
@@ -177,11 +175,25 @@ export function TouchScreen({ transport }: Props) {
 
     if (e.pointerId !== g.pointerId) return
 
-    const dx = e.clientX - g.lastX
-    const dy = e.clientY - g.lastY
-    g.lastX = e.clientX
-    g.lastY = e.clientY
-    g.totalMove += Math.abs(dx) + Math.abs(dy)
+    const sens = sensRef.current.pointer
+    let moveX = 0
+    let moveY = 0
+
+    // Android batches touch samples between frames — replaying the coalesced
+    // points keeps curves smooth instead of drawing one long straight jump.
+    for (const point of coalesced(e)) {
+      const dx = point.clientX - g.lastX
+      const dy = point.clientY - g.lastY
+      const dt = point.timeStamp - g.lastT
+      g.lastX = point.clientX
+      g.lastY = point.clientY
+      g.lastT = point.timeStamp
+      const distance = Math.hypot(dx, dy)
+      g.totalMove += distance
+      const scale = accel(distance, dt) * sens
+      moveX += dx * scale
+      moveY += dy * scale
+    }
 
     // Double-tap + hold → left-button drag
     if (g.dragArmed && !g.dragging) {
@@ -189,12 +201,10 @@ export function TouchScreen({ transport }: Props) {
       if (heldMs >= DRAG_ARM_MS || g.totalMove > DRAG_ARM_MOVE) {
         g.dragging = true
         transport.mouseButton('left', true)
-        haptic('medium')
       }
     }
 
-    const sens = sensRef.current.pointer
-    if (dx || dy) transport.mouseMove(dx * sens, dy * sens)
+    if (moveX || moveY) transport.mouseMove(moveX, moveY)
     updateGlint(e)
   }
 
@@ -202,7 +212,6 @@ export function TouchScreen({ transport }: Props) {
     if (edgeSwipe.current?.active) {
       const opened = sheetOffsetRef.current >= SWIPE_OPEN
       setKeysOpen(opened)
-      if (opened) haptic('medium')
       setOffset(0)
       edgeSwipe.current = null
       return
@@ -297,7 +306,6 @@ export function TouchScreen({ transport }: Props) {
     e.currentTarget.setPointerCapture(e.pointerId)
     scrollLastY.current = e.clientY
     scrollTick.current = 0
-    haptic('selection')
   }
 
   const onScrollMove = (e: PointerEvent<HTMLDivElement>) => {
@@ -310,7 +318,6 @@ export function TouchScreen({ transport }: Props) {
     scrollTick.current += Math.abs(dy)
     if (scrollTick.current > 48) {
       scrollTick.current = 0
-      haptic('light')
     }
   }
 
@@ -321,7 +328,6 @@ export function TouchScreen({ transport }: Props) {
   const onHandleDown = (e: PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId)
     sheetDrag.current = { y: e.clientY, moved: false }
-    haptic('selection')
   }
 
   const onHandleMove = (e: PointerEvent<HTMLDivElement>) => {
@@ -339,10 +345,7 @@ export function TouchScreen({ transport }: Props) {
     if (!sheetDrag.current) return
     const moved = sheetDrag.current.moved
     if (!moved) {
-      setKeysOpen((v) => {
-        haptic(v ? 'light' : 'medium')
-        return !v
-      })
+      setKeysOpen((v) => !v)
       setOffset(0)
       sheetDrag.current = null
       return
@@ -350,11 +353,9 @@ export function TouchScreen({ transport }: Props) {
     if (keysOpen) {
       if (sheetOffsetRef.current >= SWIPE_CLOSE) {
         setKeysOpen(false)
-        haptic('light')
       }
     } else if (sheetOffsetRef.current >= SWIPE_OPEN) {
       setKeysOpen(true)
-      haptic('medium')
     }
     setOffset(0)
     sheetDrag.current = null
@@ -362,7 +363,6 @@ export function TouchScreen({ transport }: Props) {
 
   const press = (id: string, action: () => void) => {
     setDown((d) => ({ ...d, [id]: true }))
-    haptic('medium')
     action()
   }
 

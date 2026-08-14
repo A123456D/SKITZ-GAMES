@@ -57,49 +57,40 @@ export function createBluetoothTransport(): Transport & {
   let scrollAccY = 0
   let moveInFlight = false
   let scrollInFlight = false
-  let moveRaf = 0
-  let scrollRaf = 0
   let gamepadLatest: GamepadState | null = null
   let gamepadFlushScheduled = false
   const listeners = new Set<Listener>()
 
   const notify = () => listeners.forEach((fn) => fn())
 
-  /** One bridge call at a time — queued Capacitor moves cause post-lift ghost motion. */
-  const flushMouseMove = () => {
-    moveRaf = 0
+  /**
+   * Send immediately, but keep only one bridge call in flight. Anything that
+   * piles up while a call is pending is merged into the next one, so the cursor
+   * never replays stale motion after the finger lifts.
+   */
+  const pumpMouseMove = () => {
     if (link !== 'bluetooth') {
       moveAccX = 0
       moveAccY = 0
-      moveInFlight = false
       return
     }
     if (moveInFlight) return
-    const ix = Math.trunc(moveAccX)
-    const iy = Math.trunc(moveAccY)
+    const ix = Math.round(moveAccX)
+    const iy = Math.round(moveAccY)
     if (!ix && !iy) return
     moveAccX -= ix
     moveAccY -= iy
     moveInFlight = true
     void BluetoothHid.mouseMove({ dx: ix, dy: iy }).finally(() => {
       moveInFlight = false
-      if (Math.trunc(moveAccX) || Math.trunc(moveAccY)) {
-        if (!moveRaf) moveRaf = requestAnimationFrame(flushMouseMove)
-      }
+      pumpMouseMove()
     })
   }
 
-  const scheduleMouseMove = () => {
-    if (moveRaf || moveInFlight) return
-    moveRaf = requestAnimationFrame(flushMouseMove)
-  }
-
-  const flushMouseScroll = () => {
-    scrollRaf = 0
+  const pumpMouseScroll = () => {
     if (link !== 'bluetooth') {
       scrollAccX = 0
       scrollAccY = 0
-      scrollInFlight = false
       return
     }
     if (scrollInFlight) return
@@ -111,15 +102,8 @@ export function createBluetoothTransport(): Transport & {
     scrollInFlight = true
     void BluetoothHid.mouseScroll({ dx: ix, dy: iy }).finally(() => {
       scrollInFlight = false
-      if (Math.trunc(scrollAccX) || Math.trunc(scrollAccY)) {
-        if (!scrollRaf) scrollRaf = requestAnimationFrame(flushMouseScroll)
-      }
+      pumpMouseScroll()
     })
-  }
-
-  const scheduleMouseScroll = () => {
-    if (scrollRaf || scrollInFlight) return
-    scrollRaf = requestAnimationFrame(flushMouseScroll)
   }
 
   const applyNative = (s: HidNativeState) => {
@@ -350,17 +334,13 @@ export function createBluetoothTransport(): Transport & {
       if (link !== 'bluetooth') return
       moveAccX += dx
       moveAccY += dy
-      scheduleMouseMove()
+      pumpMouseMove()
     },
     mouseButton(button: 'left' | 'right' | 'middle', down: boolean) {
       if (link !== 'bluetooth') return
-      // Flush pending cursor motion before the click (don't wait on bridge).
-      if (moveRaf) {
-        cancelAnimationFrame(moveRaf)
-        moveRaf = 0
-      }
-      const ix = Math.trunc(moveAccX)
-      const iy = Math.trunc(moveAccY)
+      // Land any pending motion first so the click hits where the finger was.
+      const ix = Math.round(moveAccX)
+      const iy = Math.round(moveAccY)
       if (ix || iy) {
         moveAccX -= ix
         moveAccY -= iy
@@ -372,7 +352,7 @@ export function createBluetoothTransport(): Transport & {
       if (link !== 'bluetooth') return
       scrollAccX += dx
       scrollAccY += dy
-      scheduleMouseScroll()
+      pumpMouseScroll()
     },
     key(code: string, down: boolean) {
       if (link === 'wifi-tv') {

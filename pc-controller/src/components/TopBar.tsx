@@ -1,4 +1,3 @@
-import { haptic } from '../haptics'
 import type { ConnectionState, DeviceInfo } from '../transport'
 
 type Props = {
@@ -34,7 +33,6 @@ export function TopBar({ state, device, onStatusTap }: Props) {
         className="status-pill"
         onClick={() => {
           if (!onStatusTap) return
-          haptic(connected ? 'warning' : 'selection')
           onStatusTap()
         }}
         title={connected ? 'Tap to disconnect' : 'Tap to connect'}

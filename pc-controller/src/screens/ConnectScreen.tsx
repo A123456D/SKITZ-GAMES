@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { haptic } from '../haptics'
 import type { AppTransport } from '../transport'
 import type { DeviceInfo } from '../transport'
 
@@ -51,7 +50,6 @@ export function ConnectScreen({ transport, devices, onScan, onConnect, onClose }
             type="button"
             className="btn ghost connect-close"
             onClick={() => {
-              haptic('selection')
               onClose()
             }}
           >
@@ -67,7 +65,6 @@ export function ConnectScreen({ transport, devices, onScan, onConnect, onClose }
             className="btn"
             disabled={scanning || connecting}
             onClick={() => {
-              haptic('medium')
               void onScan()
             }}
           >
@@ -78,7 +75,6 @@ export function ConnectScreen({ transport, devices, onScan, onConnect, onClose }
             className="btn ghost"
             disabled={!transport.makeDiscoverable}
             onClick={() => {
-              haptic('selection')
               void transport.makeDiscoverable?.()
             }}
           >
@@ -89,7 +85,6 @@ export function ConnectScreen({ transport, devices, onScan, onConnect, onClose }
             className="btn ghost"
             disabled={!transport.restartHid}
             onClick={() => {
-              haptic('warning')
               void transport.restartHid?.()
             }}
           >
@@ -104,7 +99,6 @@ export function ConnectScreen({ transport, devices, onScan, onConnect, onClose }
           className="btn"
           disabled={scanning || connecting}
           onClick={() => {
-            haptic('medium')
             void onScan()
           }}
         >
@@ -148,7 +142,6 @@ export function ConnectScreen({ transport, devices, onScan, onConnect, onClose }
               className="btn"
               disabled={!manualHost.trim() || connecting}
               onClick={() => {
-                haptic('success')
                 const id = `${manualProto}:${manualHost.trim()}`
                 setBusyId(id)
                 void onConnect(id).finally(() => setBusyId(null))
@@ -169,7 +162,6 @@ export function ConnectScreen({ transport, devices, onScan, onConnect, onClose }
             className="device"
             disabled={connecting}
             onClick={() => {
-              haptic('success')
               setBusyId(device.id)
               void onConnect(device.id).finally(() => setBusyId(null))
             }}
@@ -190,7 +182,6 @@ export function ConnectScreen({ transport, devices, onScan, onConnect, onClose }
             className="device"
             disabled={connecting}
             onClick={() => {
-              haptic('success')
               setBusyId(device.id)
               void onConnect(device.id).finally(() => setBusyId(null))
             }}
