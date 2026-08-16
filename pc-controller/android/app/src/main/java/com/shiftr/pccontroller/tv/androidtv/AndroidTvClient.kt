@@ -8,7 +8,6 @@ import kotlinx.coroutines.withContext
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.InetSocketAddress
-import java.net.Socket
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.TrustManager
@@ -17,11 +16,7 @@ import java.security.cert.X509Certificate
 
 /**
  * Best-effort Android / Google / Fire TV Wi‑Fi remote.
- *
- * Full cert pairing (port 6467) varies by OEM; when Wi‑Fi session isn't available,
- * the app still controls these TVs over Bluetooth HID (same UI).
- *
- * This client sends raw key frames on an already-trusted SSL session when possible.
+ * OEM pairing on 6467 is not universal — Bluetooth HID is the reliable path.
  */
 class AndroidTvClient(
     override val host: String,
@@ -35,7 +30,6 @@ class AndroidTvClient(
     override suspend fun connect(): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
-                // Attempt SSL to command port with trust-all (paired devices may still reject)
                 val tm =
                     arrayOf<TrustManager>(
                         object : X509TrustManager {
@@ -49,19 +43,16 @@ class AndroidTvClient(
                 val ctx = SSLContext.getInstance("TLS")
                 ctx.init(null, tm, null)
                 val s = ctx.socketFactory.createSocket() as SSLSocket
-                s.connect(InetSocketAddress(host, 6466), 4000)
+                s.connect(InetSocketAddress(host, 6466), 8000)
                 s.startHandshake()
                 socket = s
                 out = DataOutputStream(s.getOutputStream())
                 input = DataInputStream(s.getInputStream())
-                // Send configure / start-ish preamble used by many clients
-                writeRaw(byteArrayOf(0x0a, 0x00)) // soft ping; ignored if rejected
+                writeRaw(byteArrayOf(0x0a, 0x00))
             }.recoverCatching {
-                // Soft-fail: mark "connected" for UI routing to Bluetooth fallback messaging
                 error(
-                    "Wi‑Fi remote needs one-time pairing on this TV. " +
-                        "Use Bluetooth (Start HID) for Google/Android/Fire TV, " +
-                        "or Roku/Samsung/LG/Bravia Wi‑Fi from the TV scan list.",
+                    "This Android/Fire TV needs Bluetooth, not Wi‑Fi. " +
+                        "Tap Make phone discoverable, then pair Pc Controller in the TV Bluetooth list.",
                 )
             }
         }

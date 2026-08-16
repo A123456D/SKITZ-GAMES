@@ -3,10 +3,10 @@ package com.shiftr.pccontroller.tv.lg
 import android.content.Context
 import com.shiftr.pccontroller.tv.TvActions
 import com.shiftr.pccontroller.tv.TvClient
+import com.shiftr.pccontroller.tv.TvHttp
 import com.shiftr.pccontroller.tv.TvProtocol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -25,12 +25,7 @@ class LgClient(
 ) : TvClient {
     override val protocol = TvProtocol.LG
 
-    private val http =
-        OkHttpClient.Builder()
-            .connectTimeout(5, TimeUnit.SECONDS)
-            .readTimeout(0, TimeUnit.MILLISECONDS)
-            .hostnameVerifier { _, _ -> true }
-            .build()
+    private val http = TvHttp.client()
 
     private var mainSocket: WebSocket? = null
     private var inputSocket: WebSocket? = null
@@ -51,52 +46,65 @@ class LgClient(
         withContext(Dispatchers.IO) {
             runCatching {
                 if (connected.get()) return@runCatching
-                val latch = CountDownLatch(1)
-                var error: String? = null
-                mainSocket =
-                    http.newWebSocket(
-                        Request.Builder().url("ws://$host:3000").build(),
-                        object : WebSocketListener() {
-                            override fun onOpen(webSocket: WebSocket, response: Response) {
-                                webSocket.send(registerPayload().toString())
-                            }
+                val urls = listOf("wss://$host:3001", "ws://$host:3000")
+                var lastError: String? = null
+                for (url in urls) {
+                    lastError = null
+                    val latch = CountDownLatch(1)
+                    val err = AtomicReference<String?>(null)
+                    mainSocket?.cancel()
+                    mainSocket =
+                        http.newWebSocket(
+                            Request.Builder().url(url).build(),
+                            object : WebSocketListener() {
+                                override fun onOpen(webSocket: WebSocket, response: Response) {
+                                    webSocket.send(registerPayload().toString())
+                                }
 
-                            override fun onMessage(webSocket: WebSocket, text: String) {
-                                val json = JSONObject(text)
-                                val type = json.optString("type")
-                                val payload = json.optJSONObject("payload")
-                                when (type) {
-                                    "registered" -> {
-                                        payload?.optString("client-key")?.takeIf { it.isNotBlank() }?.let { saveKey(it) }
-                                        connected.set(true)
-                                        openInputSocket(webSocket)
-                                        latch.countDown()
+                                override fun onMessage(webSocket: WebSocket, text: String) {
+                                    val json = JSONObject(text)
+                                    val type = json.optString("type")
+                                    val payload = json.optJSONObject("payload")
+                                    payload?.optString("socketPath")?.takeIf { it.isNotBlank() }?.let {
+                                        openInputSocketUrl(it)
                                     }
-                                    "error" -> {
-                                        error = payload?.optString("errorText") ?: "Accept pairing on the LG TV"
+                                    when (type) {
+                                        "registered" -> {
+                                            payload?.optString("client-key")?.takeIf { it.isNotBlank() }?.let { saveKey(it) }
+                                            connected.set(true)
+                                            requestPointerSocket(webSocket)
+                                            latch.countDown()
+                                        }
+                                        "error" -> {
+                                            err.set(payload?.optString("errorText") ?: "Accept pairing on the LG TV")
+                                            latch.countDown()
+                                        }
+                                    }
+                                    payload?.optString("client-key")?.takeIf { it.isNotBlank() }?.let {
+                                        saveKey(it)
+                                        connected.set(true)
+                                        requestPointerSocket(webSocket)
                                         latch.countDown()
                                     }
                                 }
-                                payload?.optString("client-key")?.takeIf { it.isNotBlank() }?.let {
-                                    saveKey(it)
-                                    connected.set(true)
-                                    openInputSocket(webSocket)
+
+                                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                                    err.set(t.message)
                                     latch.countDown()
                                 }
-                            }
 
-                            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                                error = t.message
-                                latch.countDown()
-                            }
-
-                            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                                connected.set(false)
-                            }
-                        },
-                    )
-                latch.await(45, TimeUnit.SECONDS)
-                if (!connected.get()) error(error ?: "LG pairing timed out — accept on the TV screen")
+                                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                                    connected.set(false)
+                                }
+                            },
+                        )
+                    latch.await(45, TimeUnit.SECONDS)
+                    if (connected.get()) return@runCatching
+                    lastError = err.get()
+                    mainSocket?.cancel()
+                    mainSocket = null
+                }
+                error(lastError ?: "LG pairing timed out — accept Pc Controller on the TV (up to 45s)")
             }
         }
 
@@ -142,7 +150,7 @@ class LgClient(
             )
     }
 
-    private fun openInputSocket(main: WebSocket) {
+    private fun requestPointerSocket(main: WebSocket) {
         val id = nextId++
         main.send(
             JSONObject()
@@ -152,10 +160,14 @@ class LgClient(
                 .put("payload", JSONObject())
                 .toString(),
         )
-        // Response handled loosely: also try connecting known path
+        openInputSocketUrl("ws://$host:3000/input")
+    }
+
+    private fun openInputSocketUrl(url: String) {
+        inputSocket?.cancel()
         inputSocket =
             http.newWebSocket(
-                Request.Builder().url("ws://$host:3000/input").build(),
+                Request.Builder().url(url).build(),
                 object : WebSocketListener() {
                     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = Unit
                 },

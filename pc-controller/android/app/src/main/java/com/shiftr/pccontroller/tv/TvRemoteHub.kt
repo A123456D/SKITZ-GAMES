@@ -39,6 +39,37 @@ class TvRemoteHub(private val context: Context) {
                 ?: return Result.failure(IllegalArgumentException("Unknown TV $id — scan first"))
         active.get()?.disconnect()
         val client = createClient(device, psk)
+        when (device.protocol) {
+            TvProtocol.SAMSUNG ->
+                listener?.invoke(
+                    false,
+                    device.name,
+                    device.protocol.name,
+                    "Look at the TV now — tap Allow for Pc Controller (up to 30s)",
+                )
+            TvProtocol.LG ->
+                listener?.invoke(
+                    false,
+                    device.name,
+                    device.protocol.name,
+                    "Look at the LG — accept the pairing popup (up to 45s)",
+                )
+            TvProtocol.BRAVIA ->
+                listener?.invoke(
+                    false,
+                    device.name,
+                    device.protocol.name,
+                    "Bravia: IP control must be on. Default PIN 0000.",
+                )
+            TvProtocol.ANDROID_TV, TvProtocol.FIRE_TV ->
+                listener?.invoke(
+                    false,
+                    device.name,
+                    device.protocol.name,
+                    "Trying Wi‑Fi… if this fails, pair Bluetooth HID on the TV",
+                )
+            else -> Unit
+        }
         val result = client.connect()
         if (result.isSuccess) {
             active.set(client)
@@ -95,7 +126,7 @@ class TvRemoteHub(private val context: Context) {
     private fun createClient(device: DiscoveredTv, psk: String?): TvClient {
         return when (device.protocol) {
             TvProtocol.ROKU -> RokuClient(device.host, device.name)
-            TvProtocol.SAMSUNG -> SamsungClient(device.host, device.name)
+            TvProtocol.SAMSUNG -> SamsungClient(context, device.host, device.name)
             TvProtocol.LG -> LgClient(context, device.host, device.name)
             TvProtocol.BRAVIA -> BraviaClient(device.host, device.name, psk ?: "0000")
             TvProtocol.ANDROID_TV, TvProtocol.FIRE_TV ->

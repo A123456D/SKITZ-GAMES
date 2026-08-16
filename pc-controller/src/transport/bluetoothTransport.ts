@@ -291,6 +291,9 @@ export function createBluetoothTransport(): Transport & {
       try {
         const isBluetoothMac = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(deviceId)
         if (!isBluetoothMac) {
+          nativeMessage = 'Look at the TV — tap Allow for Pc Controller'
+          nativeDetail = '2018 Q6F only shows the popup on Wi‑Fi port 8002. Stay on the Home screen.'
+          notify()
           const res = await TvRemote.connect({ id: deviceId })
           link = 'wifi-tv'
           state = 'connected'

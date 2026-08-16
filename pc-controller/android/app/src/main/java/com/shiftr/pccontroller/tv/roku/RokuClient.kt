@@ -2,22 +2,17 @@ package com.shiftr.pccontroller.tv.roku
 
 import com.shiftr.pccontroller.tv.TvActions
 import com.shiftr.pccontroller.tv.TvClient
+import com.shiftr.pccontroller.tv.TvHttp
 import com.shiftr.pccontroller.tv.TvProtocol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
 
 class RokuClient(
     override val host: String,
     override val deviceName: String = "Roku",
-    private val http: OkHttpClient =
-        OkHttpClient.Builder()
-            .connectTimeout(3, TimeUnit.SECONDS)
-            .readTimeout(3, TimeUnit.SECONDS)
-            .build(),
+    private val http: okhttp3.OkHttpClient = TvHttp.client(connectSec = 5, readMs = 4000, pingSec = 0),
 ) : TvClient {
     override val protocol = TvProtocol.ROKU
     private val base get() = "http://$host:8060"
@@ -27,8 +22,13 @@ class RokuClient(
             runCatching {
                 val req = Request.Builder().url("$base/query/device-info").get().build()
                 http.newCall(req).execute().use { resp ->
-                    if (!resp.isSuccessful) error("Roku not reachable (${resp.code})")
+                    if (!resp.isSuccessful) {
+                        error("Roku refused control (${resp.code}). Enable Settings → System → Advanced system settings → Control by mobile apps.")
+                    }
                 }
+            }.recoverCatching { e ->
+                if (e.message?.contains("Roku refused") == true) throw e
+                error("Roku not reachable at $host — same Wi‑Fi, Control by mobile apps on, TV not asleep.")
             }
         }
 

@@ -2,14 +2,13 @@ package com.shiftr.pccontroller.tv.bravia
 
 import com.shiftr.pccontroller.tv.TvActions
 import com.shiftr.pccontroller.tv.TvClient
+import com.shiftr.pccontroller.tv.TvHttp
 import com.shiftr.pccontroller.tv.TvProtocol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
 
 /**
  * Sony Bravia IRCC over HTTP.
@@ -22,11 +21,7 @@ class BraviaClient(
 ) : TvClient {
     override val protocol = TvProtocol.BRAVIA
 
-    private val http =
-        OkHttpClient.Builder()
-            .connectTimeout(4, TimeUnit.SECONDS)
-            .readTimeout(4, TimeUnit.SECONDS)
-            .build()
+    private val http = TvHttp.client(connectSec = 5, readMs = 5000, pingSec = 0)
 
     override suspend fun connect(): Result<Unit> =
         withContext(Dispatchers.IO) {
@@ -35,12 +30,24 @@ class BraviaClient(
                     Request.Builder()
                         .url("http://$host/sony/system")
                         .addHeader("Content-Type", "application/json")
+                        .addHeader("X-Auth-PSK", psk)
                         .post(
-                            """{"method":"getRemoteDeviceSettings","params":[],"id":1,"version":"1.0"}"""
+                            """{"method":"getPowerStatus","params":[],"id":1,"version":"1.0"}"""
                                 .toRequestBody("application/json".toMediaType()),
                         )
                         .build()
-                http.newCall(req).execute().use { /* reachable enough */ }
+                http.newCall(req).execute().use { resp ->
+                    when {
+                        resp.isSuccessful -> Unit
+                        resp.code == 403 ->
+                            error("Bravia rejected the PIN. Network → IP control: enable it and set Pre-Shared Key (try 0000).")
+                        else ->
+                            error("Bravia IP control not ready (${resp.code}). Enable Remote Start / IP control, same Wi‑Fi.")
+                    }
+                }
+            }.recoverCatching { e ->
+                if (e.message?.startsWith("Bravia") == true) throw e
+                error("Bravia not reachable at $host — enable IP control, same Wi‑Fi as the phone.")
             }
         }
 

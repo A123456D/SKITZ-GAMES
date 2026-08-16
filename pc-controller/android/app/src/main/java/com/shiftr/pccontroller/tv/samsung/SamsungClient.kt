@@ -1,13 +1,14 @@
 package com.shiftr.pccontroller.tv.samsung
 
+import android.content.Context
 import android.util.Base64
+import android.util.Log
 import com.shiftr.pccontroller.tv.TvActions
 import com.shiftr.pccontroller.tv.TvClient
+import com.shiftr.pccontroller.tv.TvHttp
 import com.shiftr.pccontroller.tv.TvProtocol
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -17,23 +18,23 @@ import org.json.JSONObject
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Samsung Tizen remote via WebSocket (SmartThings remote channel).
- * First connect: accept "Pc Controller" on the TV popup.
+ * Samsung Tizen remote (2016+ including 2018 Q6F).
+ *
+ * Pairing popup only appears on **wss://:8002** with the TV's self-signed cert
+ * accepted. Socket-open is not enough — wait for `ms.channel.connect`.
  */
 class SamsungClient(
+    private val context: Context,
     override val host: String,
     override val deviceName: String = "Samsung TV",
-    private val http: OkHttpClient =
-        OkHttpClient.Builder()
-            .connectTimeout(5, TimeUnit.SECONDS)
-            .readTimeout(0, TimeUnit.MILLISECONDS)
-            .pingInterval(20, TimeUnit.SECONDS)
-            .hostnameVerifier { _, _ -> true }
-            .build(),
 ) : TvClient {
     override val protocol = TvProtocol.SAMSUNG
+
+    private val tag = "SamsungClient"
+    private val http = TvHttp.client()
     private var socket: WebSocket? = null
     private val connected = AtomicBoolean(false)
 
@@ -42,69 +43,132 @@ class SamsungClient(
             runCatching {
                 if (connected.get()) return@runCatching
                 val name = Base64.encodeToString("Pc Controller".toByteArray(), Base64.NO_WRAP)
-                val url =
-                    "wss://$host:8002/api/v2/channels/samsung.remote.control?name=$name"
-                val latch = CountDownLatch(1)
-                var error: String? = null
-                val req = Request.Builder().url(url).build()
-                socket =
-                    http.newWebSocket(
-                        req,
-                        object : WebSocketListener() {
-                            override fun onOpen(webSocket: WebSocket, response: Response) {
-                                connected.set(true)
-                                latch.countDown()
-                            }
-
-                            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                                // Fallback to ws://8001
-                                error = t.message
-                                latch.countDown()
-                            }
-
-                            override fun onMessage(webSocket: WebSocket, text: String) {
-                                // token / allowed events ignored for key sending
-                            }
-
-                            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                                connected.set(false)
-                            }
-                        },
+                val token = loadToken()
+                val secure =
+                    openChannel(
+                        url = channelUrl("wss", 8002, name, token),
+                        waitSeconds = PAIR_SECONDS,
                     )
-                latch.await(6, TimeUnit.SECONDS)
-                if (!connected.get()) {
-                    socket?.cancel()
-                    connectPlain(name)
+                if (secure == ChannelResult.Connected) return@runCatching
+                if (secure == ChannelResult.Denied) {
+                    error(DENIED)
+                }
+                if (secure == ChannelResult.TimedOut) {
+                    error(TIMEOUT)
+                }
+                // 8002 unreachable (older sets) — 8001 will not show a popup on Q6F.
+                val plain =
+                    openChannel(
+                        url = channelUrl("ws", 8001, name, token),
+                        waitSeconds = PAIR_SECONDS,
+                    )
+                when (plain) {
+                    ChannelResult.Connected -> Unit
+                    ChannelResult.Denied -> error(DENIED)
+                    ChannelResult.TimedOut -> error(TIMEOUT)
+                    ChannelResult.Unreachable -> error(UNREACHABLE)
                 }
             }
         }
 
-    private fun connectPlain(name: String) {
+    private fun channelUrl(scheme: String, port: Int, name: String, token: String?): String {
+        val base = "$scheme://$host:$port/api/v2/channels/samsung.remote.control?name=$name"
+        return if (token.isNullOrBlank()) base else "$base&token=$token"
+    }
+
+    private enum class ChannelResult {
+        Connected,
+        Denied,
+        TimedOut,
+        Unreachable,
+    }
+
+    private fun openChannel(url: String, waitSeconds: Long): ChannelResult {
+        socket?.cancel()
         val latch = CountDownLatch(1)
-        val url = "ws://$host:8001/api/v2/channels/samsung.remote.control?name=$name"
+        val outcome = AtomicReference(ChannelResult.Unreachable)
         val req = Request.Builder().url(url).build()
-        socket =
+        Log.i(tag, "open $url")
+        val ws =
             http.newWebSocket(
                 req,
                 object : WebSocketListener() {
                     override fun onOpen(webSocket: WebSocket, response: Response) {
-                        connected.set(true)
-                        latch.countDown()
+                        Log.i(tag, "socket open — waiting for TV Allow")
+                    }
+
+                    override fun onMessage(webSocket: WebSocket, text: String) {
+                        Log.i(tag, "msg $text")
+                        handleChannelMessage(text, outcome, latch)
+                    }
+
+                    override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                        handleChannelMessage(bytes.utf8(), outcome, latch)
                     }
 
                     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                        latch.countDown()
+                        Log.w(tag, "fail ${t.message}")
+                        connected.set(false)
+                        if (latch.count > 0) latch.countDown()
                     }
 
                     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                         connected.set(false)
+                        if (latch.count > 0) latch.countDown()
                     }
-
-                    override fun onMessage(webSocket: WebSocket, bytes: ByteString) = Unit
                 },
             )
-        latch.await(6, TimeUnit.SECONDS)
-        if (!connected.get()) error("Samsung TV did not allow the connection — accept the popup on the TV")
+        socket = ws
+        val arrived = latch.await(waitSeconds, TimeUnit.SECONDS)
+        if (!arrived) {
+            ws.cancel()
+            return ChannelResult.TimedOut
+        }
+        val result = outcome.get()
+        if (result != ChannelResult.Connected) {
+            ws.cancel()
+            socket = null
+        }
+        return result
+    }
+
+    private fun handleChannelMessage(
+        text: String,
+        outcome: AtomicReference<ChannelResult>,
+        latch: CountDownLatch,
+    ) {
+        val event =
+            try {
+                JSONObject(text).optString("event")
+            } catch (_: Exception) {
+                ""
+            }
+        when (event) {
+            "ms.channel.connect" -> {
+                try {
+                    val token =
+                        JSONObject(text)
+                            .optJSONObject("data")
+                            ?.optString("token")
+                            .orEmpty()
+                    if (token.isNotBlank()) saveToken(token)
+                } catch (_: Exception) {
+                }
+                connected.set(true)
+                outcome.set(ChannelResult.Connected)
+                latch.countDown()
+            }
+            "ms.channel.unauthorized", "ms.channel.clientConnectDenied" -> {
+                connected.set(false)
+                outcome.set(ChannelResult.Denied)
+                latch.countDown()
+            }
+            "ms.channel.timeOut" -> {
+                connected.set(false)
+                outcome.set(ChannelResult.TimedOut)
+                latch.countDown()
+            }
+        }
     }
 
     override suspend fun disconnect() {
@@ -149,25 +213,18 @@ class SamsungClient(
         val key =
             when {
                 code.startsWith("Digit") -> "KEY_${code.removePrefix("Digit")}"
-                code.startsWith("Key") && code.length == 4 -> null // letters via KEY_ not reliable
                 code == "Enter" -> "KEY_ENTER"
                 code == "Backspace" -> "KEY_BACK"
                 code == "Space" -> "KEY_ENTER"
                 code == "Escape" -> "KEY_RETURN"
                 else -> null
-            } ?: return sendLetter(code)
+            } ?: return false
         return sendKey(key)
     }
 
     override suspend fun launchApp(appId: String): Boolean =
         withContext(Dispatchers.IO) {
             runCatching {
-                // REST app launch (Tizen 2016+)
-                val body =
-                    JSONObject()
-                        .put("id", appId)
-                        .toString()
-                        .toByteArray()
                 val req =
                     Request.Builder()
                         .url("http://$host:8001/api/v2/applications/$appId")
@@ -176,7 +233,6 @@ class SamsungClient(
                 http.newCall(req).execute().use { resp ->
                     if (resp.isSuccessful) return@runCatching true
                 }
-                // Fallback: remote app launch command over WS
                 sendWsCommand(
                     JSONObject()
                         .put("method", "ms.channel.emit")
@@ -195,11 +251,6 @@ class SamsungClient(
                 )
             }.getOrDefault(false)
         }
-
-    private fun sendLetter(code: String): Boolean {
-        // Samsung doesn't expose full keyboard over remote channel reliably
-        return false
-    }
 
     private fun sendKey(key: String): Boolean {
         return sendWsCommand(
@@ -220,5 +271,23 @@ class SamsungClient(
         val ws = socket ?: return false
         if (!connected.get()) return false
         return ws.send(payload.toString())
+    }
+
+    private fun prefs() = context.getSharedPreferences("samsung_tv_tokens", Context.MODE_PRIVATE)
+
+    private fun loadToken(): String? = prefs().getString(host, null)
+
+    private fun saveToken(token: String) {
+        prefs().edit().putString(host, token).apply()
+    }
+
+    companion object {
+        private const val PAIR_SECONDS = 30L
+        private const val DENIED =
+            "TV blocked Pc Controller — Settings → General → External Device Manager → Device Connection Manager → Device List, delete it, then Connect again and tap Allow"
+        private const val TIMEOUT =
+            "No Allow popup on the TV. On a 2018 Q6F: leave the Home screen (not an app), Settings → General → External Device Manager → Device Connection Manager → Access Notification = First time only. Then Connect again and watch the TV for 30s."
+        private const val UNREACHABLE =
+            "Could not reach the Samsung remote port. Confirm the TV IP under Network settings (not a soundbar), same Wi‑Fi as the phone."
     }
 }
