@@ -32,8 +32,12 @@ import kotlinx.coroutines.launch
         ),
     ],
 )
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class TvRemotePlugin : Plugin() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    // Preserve down/up order without blocking Capacitor's bridge thread.
+    private val inputScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
     private var hub: TvRemoteHub? = null
 
     override fun load() {
@@ -133,23 +137,29 @@ class TvRemotePlugin : Plugin() {
     fun sendAction(call: PluginCall) {
         val action = call.getString("action") ?: return call.reject("action required")
         val down = call.getBoolean("down") ?: true
-        val ok = hub?.sendAction(action, down) == true
-        call.resolve(JSObject().put("ok", ok))
+        inputScope.launch {
+            val ok = hub?.sendAction(action, down) == true
+            call.resolve(JSObject().put("ok", ok))
+        }
     }
 
     @PluginMethod
     fun sendKey(call: PluginCall) {
         val code = call.getString("code") ?: return call.reject("code required")
         val down = call.getBoolean("down") ?: true
-        val ok = hub?.sendKey(code, down) == true
-        call.resolve(JSObject().put("ok", ok))
+        inputScope.launch {
+            val ok = hub?.sendKey(code, down) == true
+            call.resolve(JSObject().put("ok", ok))
+        }
     }
 
     @PluginMethod
     fun launchApp(call: PluginCall) {
         val action = call.getString("action") ?: return call.reject("action required")
-        val ok = hub?.launchApp(action) == true
-        call.resolve(JSObject().put("ok", ok))
+        scope.launch(Dispatchers.IO) {
+            val ok = hub?.launchApp(action) == true
+            call.resolve(JSObject().put("ok", ok))
+        }
     }
 }
 

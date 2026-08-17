@@ -78,6 +78,9 @@ export function createDemoTransport(): Transport & { subscribe: (fn: Listener) =
     key(code, down) {
       log('key', { code, down })
     },
+    tapKey(code, shift) {
+      log('tapKey', { code, shift })
+    },
     consumer(action, down) {
       if (down && ['netflix', 'prime', 'appletv', 'disney'].includes(action)) {
         log('launchApp', action)

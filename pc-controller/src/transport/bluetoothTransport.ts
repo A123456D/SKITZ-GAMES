@@ -55,34 +55,24 @@ export function createBluetoothTransport(): Transport & {
   let moveAccY = 0
   let scrollAccX = 0
   let scrollAccY = 0
-  let moveInFlight = false
-  let scrollInFlight = false
   const listeners = new Set<Listener>()
 
   const notify = () => listeners.forEach((fn) => fn())
 
-  /**
-   * Send immediately, but keep only one bridge call in flight. Anything that
-   * piles up while a call is pending is merged into the next one, so the cursor
-   * never replays stale motion after the finger lifts.
-   */
+  // Native code coalesces pending reports. Do not serialize Capacitor calls
+  // here: waiting for each bridge promise makes the pointer trail the finger.
   const pumpMouseMove = () => {
     if (link !== 'bluetooth') {
       moveAccX = 0
       moveAccY = 0
       return
     }
-    if (moveInFlight) return
     const ix = Math.round(moveAccX)
     const iy = Math.round(moveAccY)
     if (!ix && !iy) return
     moveAccX -= ix
     moveAccY -= iy
-    moveInFlight = true
-    void BluetoothHid.mouseMove({ dx: ix, dy: iy }).finally(() => {
-      moveInFlight = false
-      pumpMouseMove()
-    })
+    void BluetoothHid.mouseMove({ dx: ix, dy: iy })
   }
 
   const pumpMouseScroll = () => {
@@ -91,17 +81,12 @@ export function createBluetoothTransport(): Transport & {
       scrollAccY = 0
       return
     }
-    if (scrollInFlight) return
     const ix = Math.trunc(scrollAccX)
     const iy = Math.trunc(scrollAccY)
     if (!ix && !iy) return
     scrollAccX -= ix
     scrollAccY -= iy
-    scrollInFlight = true
-    void BluetoothHid.mouseScroll({ dx: ix, dy: iy }).finally(() => {
-      scrollInFlight = false
-      pumpMouseScroll()
-    })
+    void BluetoothHid.mouseScroll({ dx: ix, dy: iy })
   }
 
   const applyNative = (s: HidNativeState) => {
@@ -361,6 +346,13 @@ export function createBluetoothTransport(): Transport & {
         return
       }
       void BluetoothHid.key({ code, down })
+    },
+    tapKey(code: string, shift = false) {
+      if (link === 'wifi-tv') {
+        void TvRemote.sendKey({ code, down: true }).then(() => TvRemote.sendKey({ code, down: false }))
+        return
+      }
+      void BluetoothHid.tapKey({ code, shift })
     },
     consumer(action: string, down: boolean) {
       if (link === 'wifi-tv') {

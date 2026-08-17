@@ -4,9 +4,10 @@ type Props = {
   state: ConnectionState
   device: DeviceInfo | null
   onStatusTap?: () => void
+  onManualTap?: () => void
 }
 
-export function TopBar({ state, device, onStatusTap }: Props) {
+export function TopBar({ state, device, onStatusTap, onManualTap }: Props) {
   const label =
     state === 'connected' && device
       ? device.name
@@ -28,18 +29,29 @@ export function TopBar({ state, device, onStatusTap }: Props) {
       <div className="brand">
         Pc <span>Controller</span>
       </div>
-      <button
-        type="button"
-        className="status-pill"
-        onClick={() => {
-          if (!onStatusTap) return
-          onStatusTap()
-        }}
-        title={connected ? 'Tap to disconnect' : 'Tap to connect'}
-      >
-        <span className={`status-dot ${tone}`} />
-        {label}
-      </button>
+      <div className="topbar-actions">
+        <button
+          type="button"
+          className="topbar-tool"
+          aria-label="Open user manual"
+          title="User manual"
+          onClick={onManualTap}
+        >
+          ?
+        </button>
+        <button
+          type="button"
+          className="status-pill"
+          onClick={() => {
+            if (!onStatusTap) return
+            onStatusTap()
+          }}
+          title={connected ? 'Tap to disconnect' : 'Tap to connect'}
+        >
+          <span className={`status-dot ${tone}`} />
+          <span className="status-label">{label}</span>
+        </button>
+      </div>
     </header>
   )
 }

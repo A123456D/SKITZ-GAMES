@@ -35,6 +35,7 @@ export interface BluetoothHidPlugin {
   mouseButton(options: { button: string; down: boolean }): Promise<void>
   mouseScroll(options: { dx?: number; dy: number }): Promise<void>
   key(options: { code: string; down: boolean }): Promise<void>
+  tapKey(options: { code: string; shift?: boolean }): Promise<void>
   consumer(options: { action: string; down: boolean }): Promise<void>
   addListener(
     eventName: 'hidState',

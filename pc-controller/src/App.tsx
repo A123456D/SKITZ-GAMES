@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ManualSheet } from './components/ManualSheet'
 import { ModeTabs } from './components/ModeTabs'
 import { PhoneShell } from './components/PhoneShell'
 import { TopBar } from './components/TopBar'
@@ -35,6 +36,7 @@ export default function App() {
   const [devices, setDevices] = useState<DeviceInfo[]>([])
   const [mode, setMode] = useState<ControllerMode>('touch')
   const [showConnect, setShowConnect] = useState(false)
+  const [showManual, setShowManual] = useState(false)
 
   useEffect(() => transport.subscribe(() => tick((n) => n + 1)), [transport])
 
@@ -103,7 +105,12 @@ export default function App() {
         <TopBar
           state={transport.state}
           device={transport.device}
+          onManualTap={() => {
+            setShowConnect(false)
+            setShowManual(true)
+          }}
           onStatusTap={() => {
+            setShowManual(false)
             if (connected) {
               void onDisconnect()
             } else {
@@ -132,6 +139,20 @@ export default function App() {
                 onConnect={onConnect}
                 onClose={() => setShowConnect(false)}
               />
+            </div>
+          </div>
+        )}
+
+        {showManual && (
+          <div className="connect-overlay" role="dialog" aria-label="User manual">
+            <button
+              type="button"
+              className="connect-backdrop"
+              aria-label="Close"
+              onClick={() => setShowManual(false)}
+            />
+            <div className="connect-sheet support-sheet">
+              <ManualSheet onClose={() => setShowManual(false)} />
             </div>
           </div>
         )}

@@ -11,8 +11,9 @@ import com.shiftr.pccontroller.tv.samsung.SamsungClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 class TvRemoteHub(private val context: Context) {
@@ -21,6 +22,10 @@ class TvRemoteHub(private val context: Context) {
     private val discovery = TvDiscovery(context)
     private val active = AtomicReference<TvClient?>(null)
     private val lastDevices = AtomicReference<List<DiscoveredTv>>(emptyList())
+    private val lastConnection = AtomicReference<SavedConnection?>(null)
+    private val reconnecting = AtomicBoolean(false)
+
+    private data class SavedConnection(val device: DiscoveredTv, val psk: String?)
 
     var listener: ((connected: Boolean, name: String?, protocol: String?, message: String) -> Unit)? = null
 
@@ -37,38 +42,50 @@ class TvRemoteHub(private val context: Context) {
             lastDevices.get().find { it.id == id }
                 ?: id.toDiscoveredOrNull()
                 ?: return Result.failure(IllegalArgumentException("Unknown TV $id — scan first"))
+        lastConnection.set(SavedConnection(device, psk))
+        return connectDevice(device, psk)
+    }
+
+    private suspend fun connectDevice(
+        device: DiscoveredTv,
+        psk: String?,
+        showPairingHelp: Boolean = true,
+    ): Result<Unit> {
         active.get()?.disconnect()
         val client = createClient(device, psk)
-        when (device.protocol) {
-            TvProtocol.SAMSUNG ->
-                listener?.invoke(
-                    false,
-                    device.name,
-                    device.protocol.name,
-                    "Look at the TV now — tap Allow for Pc Controller (up to 30s)",
-                )
-            TvProtocol.LG ->
-                listener?.invoke(
-                    false,
-                    device.name,
-                    device.protocol.name,
-                    "Look at the LG — accept the pairing popup (up to 45s)",
-                )
-            TvProtocol.BRAVIA ->
-                listener?.invoke(
-                    false,
-                    device.name,
-                    device.protocol.name,
-                    "Bravia: IP control must be on. Default PIN 0000.",
-                )
-            TvProtocol.ANDROID_TV, TvProtocol.FIRE_TV ->
-                listener?.invoke(
-                    false,
-                    device.name,
-                    device.protocol.name,
-                    "Trying Wi‑Fi… if this fails, pair Bluetooth HID on the TV",
-                )
-            else -> Unit
+        client.onSessionLost = { handleSessionLost(client) }
+        if (showPairingHelp) {
+            when (device.protocol) {
+                TvProtocol.SAMSUNG ->
+                    listener?.invoke(
+                        false,
+                        device.name,
+                        device.protocol.name,
+                        "Look at the TV now — tap Allow for Pc Controller (up to 30s)",
+                    )
+                TvProtocol.LG ->
+                    listener?.invoke(
+                        false,
+                        device.name,
+                        device.protocol.name,
+                        "Look at the LG — accept the pairing popup (up to 45s)",
+                    )
+                TvProtocol.BRAVIA ->
+                    listener?.invoke(
+                        false,
+                        device.name,
+                        device.protocol.name,
+                        "Bravia: IP control must be on. Default PIN 0000.",
+                    )
+                TvProtocol.ANDROID_TV, TvProtocol.FIRE_TV ->
+                    listener?.invoke(
+                        false,
+                        device.name,
+                        device.protocol.name,
+                        "Trying Wi‑Fi… if this fails, pair Bluetooth HID on the TV",
+                    )
+                else -> Unit
+            }
         }
         val result = client.connect()
         if (result.isSuccess) {
@@ -86,40 +103,81 @@ class TvRemoteHub(private val context: Context) {
         listener?.invoke(false, null, null, "TV disconnected")
     }
 
-    fun isConnected(): Boolean = active.get() != null
+    fun isConnected(): Boolean = active.get()?.isLive() == true
 
     fun activeProtocol(): String? = active.get()?.protocol?.name
 
     fun activeName(): String? = active.get()?.deviceName
 
-    fun sendAction(action: String, down: Boolean): Boolean {
+    suspend fun sendAction(action: String, down: Boolean): Boolean {
         val client = active.get() ?: return false
         return try {
-            runBlocking(Dispatchers.IO) { client.sendAction(action, down) }
+            client.sendAction(action, down).also { ok ->
+                if (!ok && !client.isLive()) handleSessionLost(client)
+            }
         } catch (e: Exception) {
             Log.w(tag, "sendAction", e)
+            handleSessionLost(client)
             false
         }
     }
 
-    fun sendKey(code: String, down: Boolean): Boolean {
+    suspend fun sendKey(code: String, down: Boolean): Boolean {
         val client = active.get() ?: return false
         return try {
-            runBlocking(Dispatchers.IO) { client.sendKeyCode(code, down) }
+            client.sendKeyCode(code, down).also { ok ->
+                if (!ok && !client.isLive()) handleSessionLost(client)
+            }
         } catch (e: Exception) {
             Log.w(tag, "sendKey", e)
+            handleSessionLost(client)
             false
         }
     }
 
-    fun launchApp(action: String): Boolean {
+    suspend fun launchApp(action: String): Boolean {
         val client = active.get() ?: return false
         val appId = TvActions.streamingAppId(action, client.protocol) ?: return false
         return try {
-            runBlocking(Dispatchers.IO) { client.launchApp(appId) }
+            client.launchApp(appId).also { ok ->
+                if (!ok && !client.isLive()) handleSessionLost(client)
+            }
         } catch (e: Exception) {
             Log.w(tag, "launchApp", e)
+            handleSessionLost(client)
             false
+        }
+    }
+
+    private fun handleSessionLost(client: TvClient) {
+        if (!active.compareAndSet(client, null)) return
+        listener?.invoke(
+            false,
+            client.deviceName,
+            client.protocol.name,
+            "TV connection lost · reconnecting…",
+        )
+        reconnectLast()
+    }
+
+    private fun reconnectLast() {
+        val saved = lastConnection.get() ?: return
+        if (!reconnecting.compareAndSet(false, true)) return
+        scope.launch {
+            try {
+                delay(350)
+                val result = connectDevice(saved.device, saved.psk, showPairingHelp = false)
+                if (result.isFailure) {
+                    listener?.invoke(
+                        false,
+                        saved.device.name,
+                        saved.device.protocol.name,
+                        "TV reconnect failed · tap the connection status to retry",
+                    )
+                }
+            } finally {
+                reconnecting.set(false)
+            }
         }
     }
 

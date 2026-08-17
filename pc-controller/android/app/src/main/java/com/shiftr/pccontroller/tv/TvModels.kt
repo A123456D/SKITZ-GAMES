@@ -23,10 +23,14 @@ interface TvClient {
     val protocol: TvProtocol
     val deviceName: String
     val host: String
+    var onSessionLost: (() -> Unit)?
+        get() = null
+        set(_) {}
 
     suspend fun connect(): Result<Unit>
     suspend fun disconnect()
     suspend fun sendAction(action: String, down: Boolean): Boolean
     suspend fun sendKeyCode(code: String, down: Boolean): Boolean
     suspend fun launchApp(appId: String): Boolean
+    fun isLive(): Boolean = true
 }

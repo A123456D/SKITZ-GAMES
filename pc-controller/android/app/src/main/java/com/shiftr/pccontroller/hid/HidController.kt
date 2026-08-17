@@ -518,6 +518,35 @@ class HidController(private val context: Context) {
         return flushKeyboard()
     }
 
+    /**
+     * Sends a complete key stroke in one native queue job. This avoids two to
+     * four WebView/Capacitor round trips for every on-screen key tap.
+     */
+    fun tapKey(domCode: String, withShift: Boolean): Boolean {
+        val (usage, mod) = HidKeys.fromDomCode(domCode)
+        if (usage == HidKeys.NONE || mod.toInt() != 0) return false
+
+        val originalModifiers = modifierByte
+        var ok = true
+        if (withShift) {
+            val shiftMod = HidKeys.fromDomCode("ShiftLeft").second
+            modifierByte = (modifierByte.toInt() or shiftMod.toInt()).toByte()
+            ok = flushKeyboard() && ok
+        }
+
+        val wasPressed = pressedKeys.contains(usage)
+        pressedKeys.add(usage)
+        ok = flushKeyboard() && ok
+        if (!wasPressed) pressedKeys.remove(usage)
+        ok = flushKeyboard() && ok
+
+        if (modifierByte != originalModifiers) {
+            modifierByte = originalModifiers
+            ok = flushKeyboard() && ok
+        }
+        return ok
+    }
+
     fun consumer(action: String, down: Boolean): Boolean {
         // Map UI actions → consumer bitfield or keyboard fallback
         when (action) {

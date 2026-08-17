@@ -21,5 +21,6 @@ export type Transport = {
   mouseButton: (button: 'left' | 'right' | 'middle', down: boolean) => void
   mouseScroll: (dx: number, dy: number) => void
   key: (code: string, down: boolean) => void
+  tapKey: (code: string, shift?: boolean) => void
   consumer: (action: string, down: boolean) => void
 }

@@ -1,4 +1,4 @@
-import { useState, type PointerEvent } from 'react'
+import { useRef, useState, type PointerEvent } from 'react'
 import type { Transport } from '../transport'
 
 type Props = {
@@ -35,23 +35,34 @@ const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 export function TvScreen({ transport }: Props) {
   const [down, setDown] = useState<Record<string, boolean>>({})
   const [panel, setPanel] = useState<Panel>('remote')
+  const activePresses = useRef(new Set<string>())
 
   const pressConsumer = (action: string) => {
+    const id = `consumer:${action}`
+    if (activePresses.current.has(id)) return
+    activePresses.current.add(id)
     setDown((d) => ({ ...d, [action]: true }))
     transport.consumer(action, true)
   }
 
   const releaseConsumer = (action: string) => {
+    const id = `consumer:${action}`
+    if (!activePresses.current.delete(id)) return
     setDown((d) => ({ ...d, [action]: false }))
     transport.consumer(action, false)
   }
 
   const pressKey = (code: string) => {
+    const id = `key:${code}`
+    if (activePresses.current.has(id)) return
+    activePresses.current.add(id)
     setDown((d) => ({ ...d, [code]: true }))
     transport.key(code, true)
   }
 
   const releaseKey = (code: string) => {
+    const id = `key:${code}`
+    if (!activePresses.current.delete(id)) return
     setDown((d) => ({ ...d, [code]: false }))
     transport.key(code, false)
   }
@@ -59,21 +70,23 @@ export function TvScreen({ transport }: Props) {
   const bindConsumer = (action: string) => ({
     onPointerDown: (e: PointerEvent) => {
       e.preventDefault()
+      e.currentTarget.setPointerCapture(e.pointerId)
       pressConsumer(action)
     },
     onPointerUp: () => releaseConsumer(action),
-    onPointerLeave: () => down[action] && releaseConsumer(action),
-    onPointerCancel: () => down[action] && releaseConsumer(action),
+    onPointerCancel: () => releaseConsumer(action),
+    onLostPointerCapture: () => releaseConsumer(action),
   })
 
   const bindKey = (code: string) => ({
     onPointerDown: (e: PointerEvent) => {
       e.preventDefault()
+      e.currentTarget.setPointerCapture(e.pointerId)
       pressKey(code)
     },
     onPointerUp: () => releaseKey(code),
-    onPointerLeave: () => down[code] && releaseKey(code),
-    onPointerCancel: () => down[code] && releaseKey(code),
+    onPointerCancel: () => releaseKey(code),
+    onLostPointerCapture: () => releaseKey(code),
   })
 
   const numberCode = (n: string) => {

@@ -50,3 +50,9 @@
 
 /games/oculum/b9/assets/cards/*
   Cache-Control: public, max-age=3600, must-revalidate
+
+# Force Android packages to download instead of opening in the browser.
+/apps/pc-controller/downloads/pc-controller.apk
+  Content-Type: application/vnd.android.package-archive
+  Content-Disposition: attachment; filename="pc-controller.apk"
+  Cache-Control: no-cache, no-store, must-revalidate

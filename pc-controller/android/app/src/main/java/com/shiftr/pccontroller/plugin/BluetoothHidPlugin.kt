@@ -70,24 +70,30 @@ class BluetoothHidPlugin : Plugin() {
 
     private var pendingMouseDx = 0
     private var pendingMouseDy = 0
+    private var pendingMouseWheel = 0
     private var mouseFlushPosted = false
     private val mouseLock = Any()
 
     private fun flushPendingMouse() {
         val dx: Int
         val dy: Int
+        val wheel: Int
         synchronized(mouseLock) {
             dx = pendingMouseDx
             dy = pendingMouseDy
+            wheel = pendingMouseWheel.coerceIn(-127, 127)
             pendingMouseDx = 0
             pendingMouseDy = 0
+            pendingMouseWheel -= wheel
             mouseFlushPosted = false
         }
-        if (dx != 0 || dy != 0) {
-            controller?.sendMouse(dx, dy)
+        if (dx != 0 || dy != 0 || wheel != 0) {
+            controller?.sendMouse(dx, dy, wheel = wheel)
         }
         synchronized(mouseLock) {
-            if ((pendingMouseDx != 0 || pendingMouseDy != 0) && !mouseFlushPosted) {
+            if ((pendingMouseDx != 0 || pendingMouseDy != 0 || pendingMouseWheel != 0) &&
+                !mouseFlushPosted
+            ) {
                 mouseFlushPosted = true
                 outHandler.post { flushPendingMouse() }
             }
@@ -307,7 +313,13 @@ class BluetoothHidPlugin : Plugin() {
     @PluginMethod
     fun mouseScroll(call: PluginCall) {
         val dy = call.getInt("dy") ?: 0
-        outHandler.post { controller?.sendMouse(0, 0, wheel = dy) }
+        synchronized(mouseLock) {
+            pendingMouseWheel += dy
+            if (!mouseFlushPosted) {
+                mouseFlushPosted = true
+                outHandler.post { flushPendingMouse() }
+            }
+        }
         call.resolve()
     }
 
@@ -316,6 +328,14 @@ class BluetoothHidPlugin : Plugin() {
         val code = call.getString("code") ?: return call.reject("code required")
         val down = call.getBoolean("down") ?: false
         keyHandler.post { controller?.keyEvent(code, down) }
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun tapKey(call: PluginCall) {
+        val code = call.getString("code") ?: return call.reject("code required")
+        val shift = call.getBoolean("shift") ?: false
+        keyHandler.post { controller?.tapKey(code, shift) }
         call.resolve()
     }
 

@@ -37,14 +37,24 @@ class SamsungClient(
     override val deviceName: String = "Samsung TV",
 ) : TvClient {
     override val protocol = TvProtocol.SAMSUNG
+    override var onSessionLost: (() -> Unit)? = null
 
     private val tag = "SamsungClient"
-    private val http = TvHttp.client()
+    // Older Tizen firmware can close remote sockets in response to WebSocket pings.
+    private val http = TvHttp.client(pingSec = 0)
     private val infoHttp = TvHttp.client(connectSec = 2, readMs = 2000, pingSec = 0)
     private var socket: WebSocket? = null
     private val connected = AtomicBoolean(false)
-    private val installedApps = ConcurrentHashMap<String, String>()
+    private data class InstalledApp(val id: String, val type: Int)
+
+    private val installedApps = ConcurrentHashMap<String, InstalledApp>()
     private val appListLatch = AtomicReference(CountDownLatch(0))
+
+    override fun isLive(): Boolean = connected.get() && socket != null
+
+    private fun markSessionLost() {
+        if (connected.getAndSet(false)) onSessionLost?.invoke()
+    }
 
     override suspend fun connect(): Result<Unit> =
         withContext(Dispatchers.IO) {
@@ -133,12 +143,12 @@ class SamsungClient(
 
                     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                         Log.w(tag, "fail ${t.message}")
-                        connected.set(false)
+                        markSessionLost()
                         if (latch.count > 0) latch.countDown()
                     }
 
                     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                        connected.set(false)
+                        markSessionLost()
                         if (latch.count > 0) latch.countDown()
                     }
                 },
@@ -184,12 +194,12 @@ class SamsungClient(
                 latch.countDown()
             }
             "ms.channel.unauthorized", "ms.channel.clientConnectDenied" -> {
-                connected.set(false)
+                markSessionLost()
                 outcome.set(ChannelResult.Denied)
                 latch.countDown()
             }
             "ms.channel.timeOut" -> {
-                connected.set(false)
+                markSessionLost()
                 outcome.set(ChannelResult.TimedOut)
                 latch.countDown()
             }
@@ -208,7 +218,10 @@ class SamsungClient(
                         val app = apps.optJSONObject(i) ?: continue
                         val id = app.optString("appId")
                         val name = app.optString("name").lowercase()
-                        if (id.isNotBlank() && name.isNotBlank()) installedApps[name] = id
+                        val type = app.optInt("app_type", 2)
+                        if (id.isNotBlank() && name.isNotBlank()) {
+                            installedApps[name] = InstalledApp(id, type)
+                        }
                     }
                 }
                 appListLatch.get().countDown()
@@ -233,7 +246,7 @@ class SamsungClient(
         latch.await(2, TimeUnit.SECONDS)
     }
 
-    private fun installedAppId(fallbackId: String): String {
+    private fun installedApp(fallbackId: String): InstalledApp {
         val names =
             when (fallbackId) {
                 "11101200001" -> listOf("netflix")
@@ -245,13 +258,13 @@ class SamsungClient(
         for (wanted in names) {
             installedApps.entries.firstOrNull { (name, _) -> wanted in name }?.let { return it.value }
         }
-        return fallbackId
+        return InstalledApp(fallbackId, 2)
     }
 
     override suspend fun disconnect() {
+        connected.set(false)
         socket?.close(1000, "bye")
         socket = null
-        connected.set(false)
     }
 
     override suspend fun sendAction(action: String, down: Boolean): Boolean {
@@ -304,45 +317,27 @@ class SamsungClient(
     override suspend fun launchApp(appId: String): Boolean =
         withContext(Dispatchers.IO) {
             runCatching {
-                val resolvedId = installedAppId(appId)
-                // Standard control-channel launch is Samsung's preferred path.
-                // Q6F firmware may accept ed.apps.launch without opening the
-                // app, so try all three known local mechanisms in order.
-                val standardSent =
-                    sendWsCommand(
-                        JSONObject()
-                            .put("method", "ms.application.start")
-                            .put("id", System.currentTimeMillis().toString())
-                            .put("params", JSONObject().put("id", resolvedId)),
-                    )
-                delay(350)
-
-                val remoteSent =
-                    sendWsCommand(
-                        JSONObject()
-                            .put("method", "ms.channel.emit")
-                            .put(
-                                "params",
-                                JSONObject()
-                                    .put("event", "ed.apps.launch")
-                                    .put("to", "host")
-                                    .put(
-                                        "data",
-                                        JSONObject()
-                                            .put("appId", resolvedId)
-                                            .put("action_type", "DEEP_LINK"),
-                                    ),
-                            ),
-                    )
-                delay(350)
-
-                val req =
-                    Request.Builder()
-                        .url("http://$host:8001/api/v2/applications/$resolvedId")
-                        .post(okhttp3.RequestBody.create(null, ByteArray(0)))
-                        .build()
-                val restSent = http.newCall(req).execute().use { it.isSuccessful }
-                standardSent || remoteSent || restSent
+                val app = installedApp(appId)
+                val actionType = if (app.type == 4) "NATIVE_LAUNCH" else "DEEP_LINK"
+                // Use the exact launch mode advertised by this TV. Sending
+                // several incompatible methods can make Q6F firmware close
+                // the authorized remote socket.
+                sendWsCommand(
+                    JSONObject()
+                        .put("method", "ms.channel.emit")
+                        .put(
+                            "params",
+                            JSONObject()
+                                .put("event", "ed.apps.launch")
+                                .put("to", "host")
+                                .put(
+                                    "data",
+                                    JSONObject()
+                                        .put("appId", app.id)
+                                        .put("action_type", actionType),
+                                ),
+                        ),
+                )
             }.getOrDefault(false)
         }
 
@@ -364,7 +359,9 @@ class SamsungClient(
     private fun sendWsCommand(payload: JSONObject): Boolean {
         val ws = socket ?: return false
         if (!connected.get()) return false
-        return ws.send(payload.toString())
+        val sent = ws.send(payload.toString())
+        if (!sent) markSessionLost()
+        return sent
     }
 
     private fun rememberMac() {

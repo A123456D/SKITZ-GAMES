@@ -26,6 +26,7 @@ class LgClient(
     override val deviceName: String = "LG TV",
 ) : TvClient {
     override val protocol = TvProtocol.LG
+    override var onSessionLost: (() -> Unit)? = null
 
     private val http = TvHttp.client()
 
@@ -37,6 +38,12 @@ class LgClient(
     private val appListRequestId = AtomicInteger(-1)
     private val appListLatch = AtomicReference(CountDownLatch(0))
     private val installedApps = ConcurrentHashMap<String, String>()
+
+    override fun isLive(): Boolean = connected.get() && mainSocket != null
+
+    private fun markSessionLost() {
+        if (connected.getAndSet(false)) onSessionLost?.invoke()
+    }
 
     private fun prefs() = context.getSharedPreferences("lg_tv_keys", Context.MODE_PRIVATE)
 
@@ -96,11 +103,12 @@ class LgClient(
 
                                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                                     err.set(t.message)
+                                    markSessionLost()
                                     latch.countDown()
                                 }
 
                                 override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                                    connected.set(false)
+                                    markSessionLost()
                                 }
                             },
                         )
@@ -175,17 +183,19 @@ class LgClient(
             http.newWebSocket(
                 Request.Builder().url(url).build(),
                 object : WebSocketListener() {
-                    override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = Unit
+                    override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                        markSessionLost()
+                    }
                 },
             )
     }
 
     override suspend fun disconnect() {
+        connected.set(false)
         inputSocket?.close(1000, null)
         mainSocket?.close(1000, null)
         inputSocket = null
         mainSocket = null
-        connected.set(false)
     }
 
     override suspend fun sendAction(action: String, down: Boolean): Boolean {
@@ -300,17 +310,16 @@ class LgClient(
 
     private fun sendButton(name: String): Boolean {
         val msg = "type:button\nname:$name\n\n"
-        inputSocket?.send(msg)
-        // Also notify main channel for TVs that route buttons differently
-        return ssap("ssap://system.launcher/open", JSONObject().put("target", name)) ||
-            (inputSocket != null)
+        val sent = inputSocket?.send(msg) == true
+        if (!sent) markSessionLost()
+        return sent
     }
 
     private fun ssap(uri: String, payload: JSONObject = JSONObject()): Boolean {
         val ws = mainSocket ?: return false
         if (!connected.get()) return false
         val id = nextId.getAndIncrement()
-        return ws.send(
+        val sent = ws.send(
             JSONObject()
                 .put("id", id)
                 .put("type", "request")
@@ -318,5 +327,7 @@ class LgClient(
                 .put("payload", payload)
                 .toString(),
         )
+        if (!sent) markSessionLost()
+        return sent
     }
 }

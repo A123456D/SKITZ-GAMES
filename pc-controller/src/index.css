@@ -148,7 +148,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   min-height: 36px;
 }
 
@@ -164,7 +164,36 @@ button {
   color: var(--accent);
 }
 
+.topbar-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.topbar-tool {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--accent);
+  border: 1px solid var(--line);
+  background: rgba(236, 163, 60, 0.06);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.topbar-tool:active {
+  transform: scale(0.94);
+  background: rgba(236, 163, 60, 0.16);
+}
+
 .status-pill {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -172,6 +201,13 @@ button {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+.status-label {
+  max-width: min(30vw, 118px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 button.status-pill:active {
@@ -252,7 +288,7 @@ button.status-pill:active {
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 6px;
   padding: 4px;
   align-self: end;
@@ -423,6 +459,41 @@ button.status-pill:active {
     var(--bg-1);
   border-top: 1px solid var(--line);
   box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.support-sheet {
+  max-height: min(90%, 760px);
+}
+
+.support-panel {
+  gap: 16px;
+}
+
+.manual-content {
+  display: grid;
+  gap: 10px;
+}
+
+.manual-section {
+  padding: 13px 14px;
+  border-radius: 15px;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.manual-section h2 {
+  margin: 0 0 5px;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  letter-spacing: -0.01em;
+}
+
+.manual-section p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
 }
 
 .connect-panel {

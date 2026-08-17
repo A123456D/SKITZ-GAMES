@@ -144,8 +144,8 @@ type Props = {
 
 type PressRec = {
   code: string
-  /** Temporary ShiftLeft this press owns (not from the Shift keycap). */
-  tempShift: boolean
+  /** Non-modifiers are sent as one native down/up transaction. */
+  tapped: boolean
 }
 
 export function KeyboardPanel({ transport }: Props) {
@@ -157,10 +157,7 @@ export function KeyboardPanel({ transport }: Props) {
 
   const releaseAll = () => {
     for (const [id, rec] of Object.entries(presses.current)) {
-      transport.key(rec.code, false)
-      if (rec.tempShift && shiftKeycaps.current === 0) {
-        transport.key('ShiftLeft', false)
-      }
+      if (!rec.tapped) transport.key(rec.code, false)
       delete presses.current[id]
     }
     if (shiftKeycaps.current > 0) {
@@ -178,16 +175,15 @@ export function KeyboardPanel({ transport }: Props) {
       if (key.code === 'ShiftLeft' || key.code === 'ShiftRight') {
         shiftKeycaps.current += 1
       }
-      presses.current[id] = { code: key.code, tempShift: false }
+      presses.current[id] = { code: key.code, tapped: false }
       transport.key(key.code, true)
       setDown((d) => ({ ...d, [id]: true }))
       return
     }
 
     const needTempShift = !!key.shift && shiftKeycaps.current === 0
-    if (needTempShift) transport.key('ShiftLeft', true)
-    presses.current[id] = { code: key.code, tempShift: needTempShift }
-    transport.key(key.code, true)
+    presses.current[id] = { code: key.code, tapped: true }
+    transport.tapKey(key.code, needTempShift)
     setDown((d) => ({ ...d, [id]: true }))
   }
 
@@ -195,15 +191,12 @@ export function KeyboardPanel({ transport }: Props) {
     const rec = presses.current[id]
     if (!rec) return
     delete presses.current[id]
-    transport.key(rec.code, false)
+    if (!rec.tapped) transport.key(rec.code, false)
 
     if (rec.code === 'ShiftLeft' || rec.code === 'ShiftRight') {
       shiftKeycaps.current = Math.max(0, shiftKeycaps.current - 1)
     }
 
-    if (rec.tempShift && shiftKeycaps.current === 0) {
-      transport.key('ShiftLeft', false)
-    }
     setDown((d) => ({ ...d, [id]: false }))
   }
 
