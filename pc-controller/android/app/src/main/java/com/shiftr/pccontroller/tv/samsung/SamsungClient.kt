@@ -8,6 +8,7 @@ import com.shiftr.pccontroller.tv.TvClient
 import com.shiftr.pccontroller.tv.TvHttp
 import com.shiftr.pccontroller.tv.TvProtocol
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import okhttp3.Response
@@ -15,6 +16,9 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
 import org.json.JSONObject
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -36,6 +40,7 @@ class SamsungClient(
 
     private val tag = "SamsungClient"
     private val http = TvHttp.client()
+    private val infoHttp = TvHttp.client(connectSec = 2, readMs = 2000, pingSec = 0)
     private var socket: WebSocket? = null
     private val connected = AtomicBoolean(false)
     private val installedApps = ConcurrentHashMap<String, String>()
@@ -47,12 +52,23 @@ class SamsungClient(
                 if (connected.get()) return@runCatching
                 val name = Base64.encodeToString("Pc Controller".toByteArray(), Base64.NO_WRAP)
                 val token = loadToken()
-                val secure =
+                var secure =
                     openChannel(
                         url = channelUrl("wss", 8002, name, token),
                         waitSeconds = PAIR_SECONDS,
                     )
+                // A previously paired TV may be asleep. Wake it, then retry
+                // the authorized channel without requiring a physical remote.
+                if (secure == ChannelResult.Unreachable && wakeOnLan()) {
+                    delay(WAKE_WAIT_MS)
+                    secure =
+                        openChannel(
+                            url = channelUrl("wss", 8002, name, token),
+                            waitSeconds = PAIR_SECONDS,
+                        )
+                }
                 if (secure == ChannelResult.Connected) {
+                    rememberMac()
                     requestInstalledApps()
                     return@runCatching
                 }
@@ -69,7 +85,10 @@ class SamsungClient(
                         waitSeconds = PAIR_SECONDS,
                     )
                 when (plain) {
-                    ChannelResult.Connected -> requestInstalledApps()
+                    ChannelResult.Connected -> {
+                        rememberMac()
+                        requestInstalledApps()
+                    }
                     ChannelResult.Denied -> error(DENIED)
                     ChannelResult.TimedOut -> error(TIMEOUT)
                     ChannelResult.Unreachable -> error(UNREACHABLE)
@@ -237,6 +256,9 @@ class SamsungClient(
 
     override suspend fun sendAction(action: String, down: Boolean): Boolean {
         if (!down) return true
+        if (action == "power") {
+            return if (connected.get()) sendKey("KEY_POWER") else wakeOnLan()
+        }
         TvActions.streamingAppId(action, protocol)?.let { return launchApp(it) }
         val key =
             when (action) {
@@ -254,7 +276,6 @@ class SamsungClient(
                 "volUp" -> "KEY_VOLUP"
                 "volDown" -> "KEY_VOLDOWN"
                 "mute" -> "KEY_MUTE"
-                "power" -> "KEY_POWER"
                 "info" -> "KEY_INFO"
                 "input" -> "KEY_SOURCE"
                 "red" -> "KEY_RED"
@@ -284,10 +305,19 @@ class SamsungClient(
         withContext(Dispatchers.IO) {
             runCatching {
                 val resolvedId = installedAppId(appId)
-                // Q6F-era Tizen reliably launches apps over the authorized
-                // remote WebSocket. The REST endpoint can return 200 without
-                // actually opening the app, so it is fallback-only.
-                val sent =
+                // Standard control-channel launch is Samsung's preferred path.
+                // Q6F firmware may accept ed.apps.launch without opening the
+                // app, so try all three known local mechanisms in order.
+                val standardSent =
+                    sendWsCommand(
+                        JSONObject()
+                            .put("method", "ms.application.start")
+                            .put("id", System.currentTimeMillis().toString())
+                            .put("params", JSONObject().put("id", resolvedId)),
+                    )
+                delay(350)
+
+                val remoteSent =
                     sendWsCommand(
                         JSONObject()
                             .put("method", "ms.channel.emit")
@@ -304,16 +334,15 @@ class SamsungClient(
                                     ),
                             ),
                     )
-                if (sent) return@runCatching true
+                delay(350)
 
                 val req =
                     Request.Builder()
                         .url("http://$host:8001/api/v2/applications/$resolvedId")
                         .post(okhttp3.RequestBody.create(null, ByteArray(0)))
                         .build()
-                http.newCall(req).execute().use { resp ->
-                    resp.isSuccessful
-                }
+                val restSent = http.newCall(req).execute().use { it.isSuccessful }
+                standardSent || remoteSent || restSent
             }.getOrDefault(false)
         }
 
@@ -338,6 +367,69 @@ class SamsungClient(
         return ws.send(payload.toString())
     }
 
+    private fun rememberMac() {
+        val urls =
+            listOf(
+                "http://$host:8001/api/v2/",
+                "https://$host:8002/api/v2/",
+            )
+        for (url in urls) {
+            val mac =
+                runCatching {
+                    val req = Request.Builder().url(url).get().build()
+                    infoHttp.newCall(req).execute().use { resp ->
+                        if (!resp.isSuccessful) return@use null
+                        JSONObject(resp.body?.string().orEmpty())
+                            .optJSONObject("device")
+                            ?.optString("wifiMac")
+                            ?.takeIf { it.isNotBlank() }
+                    }
+                }.getOrNull()
+            if (mac != null && parseMac(mac) != null) {
+                prefs().edit().putString("mac:$host", mac).apply()
+                return
+            }
+        }
+    }
+
+    private fun wakeOnLan(): Boolean {
+        val mac = prefs().getString("mac:$host", null) ?: return false
+        val address = parseMac(mac) ?: return false
+        val packet = ByteArray(6 + 16 * address.size)
+        for (i in 0 until 6) packet[i] = 0xff.toByte()
+        for (i in 0 until 16) {
+            System.arraycopy(address, 0, packet, 6 + i * address.size, address.size)
+        }
+        val targets =
+            buildSet {
+                add("255.255.255.255")
+                val parts = host.split(".")
+                if (parts.size == 4) add("${parts[0]}.${parts[1]}.${parts[2]}.255")
+            }
+        return runCatching {
+            DatagramSocket().use { socket ->
+                socket.broadcast = true
+                for (target in targets) {
+                    val inet = InetAddress.getByName(target)
+                    for (port in listOf(9, 7)) {
+                        socket.send(DatagramPacket(packet, packet.size, inet, port))
+                    }
+                }
+            }
+            true
+        }.getOrDefault(false)
+    }
+
+    private fun parseMac(value: String): ByteArray? {
+        val parts = value.trim().split(":", "-")
+        if (parts.size != 6) return null
+        return try {
+            ByteArray(6) { parts[it].toInt(16).toByte() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun prefs() = context.getSharedPreferences("samsung_tv_tokens", Context.MODE_PRIVATE)
 
     private fun loadToken(): String? = prefs().getString(host, null)
@@ -348,6 +440,7 @@ class SamsungClient(
 
     companion object {
         private const val PAIR_SECONDS = 30L
+        private const val WAKE_WAIT_MS = 6_000L
         private const val DENIED =
             "TV blocked Pc Controller — Settings → General → External Device Manager → Device Connection Manager → Device List, delete it, then Connect again and tap Allow"
         private const val TIMEOUT =

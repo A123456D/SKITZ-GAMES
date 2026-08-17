@@ -366,7 +366,13 @@ export function createBluetoothTransport(): Transport & {
       if (link === 'wifi-tv') {
         // Vendor clients route streaming actions through their own app IDs.
         // Do not also call launchApp here: that sent every shortcut twice.
-        void TvRemote.sendAction({ action, down })
+        void TvRemote.sendAction({ action, down }).then((result) => {
+          if (action !== 'power' || !down) return
+          nativeMessage = result.ok
+            ? 'Power command sent · wake may take a few seconds'
+            : 'Could not wake TV · connect once while it is on and enable Power On with Mobile'
+          notify()
+        })
         return
       }
       void BluetoothHid.consumer({ action, down })

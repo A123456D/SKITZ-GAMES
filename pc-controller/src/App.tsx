@@ -7,6 +7,28 @@ import { TouchScreen } from './screens/TouchScreen'
 import { TvScreen } from './screens/TvScreen'
 import { createTransport, type ControllerMode, type DeviceInfo } from './transport'
 
+const SAVED_TV_KEY = 'pc-controller.saved-tv'
+
+function loadSavedTv(): DeviceInfo | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(SAVED_TV_KEY) ?? 'null') as DeviceInfo | null
+    return value?.kind === 'tv' && value.id ? value : null
+  } catch {
+    return null
+  }
+}
+
+function rememberTv(device: DeviceInfo | null) {
+  if (device?.kind !== 'tv') return
+  localStorage.setItem(SAVED_TV_KEY, JSON.stringify(device))
+}
+
+function withSavedTv(devices: DeviceInfo[]) {
+  const saved = loadSavedTv()
+  if (!saved || devices.some((device) => device.id === saved.id)) return devices
+  return [saved, ...devices]
+}
+
 export default function App() {
   const transport = useMemo(() => createTransport(), [])
   const [, tick] = useState(0)
@@ -40,13 +62,16 @@ export default function App() {
 
   const onScan = async () => {
     const list = await transport.startScan()
-    setDevices(list)
+    setDevices(withSavedTv(list))
   }
 
   const onConnect = async (id: string) => {
     try {
       await transport.connect(id)
-      if (transport.state === 'connected') setShowConnect(false)
+      if (transport.state === 'connected') {
+        rememberTv(transport.device)
+        setShowConnect(false)
+      }
     } catch {
       /* keep sheet open; error shows in ConnectScreen */
     }
@@ -55,6 +80,22 @@ export default function App() {
   const onDisconnect = async () => {
     await transport.disconnect()
   }
+
+  // Native app: reconnect the last TV without making the user scan/select it.
+  useEffect(() => {
+    if (!transport.isNative) return
+    const saved = loadSavedTv()
+    if (!saved) return
+    setDevices((current) => withSavedTv(current))
+    void transport
+      .connect(saved.id)
+      .then(() => {
+        if (transport.state === 'connected') rememberTv(transport.device ?? saved)
+      })
+      .catch(() => {
+        // Keep the saved row available for a manual retry.
+      })
+  }, [transport])
 
   return (
     <PhoneShell>
