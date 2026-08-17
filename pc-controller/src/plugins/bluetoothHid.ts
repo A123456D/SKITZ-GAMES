@@ -36,14 +36,6 @@ export interface BluetoothHidPlugin {
   mouseScroll(options: { dx?: number; dy: number }): Promise<void>
   key(options: { code: string; down: boolean }): Promise<void>
   consumer(options: { action: string; down: boolean }): Promise<void>
-  gamepad(options: {
-    lx: number
-    ly: number
-    rx: number
-    ry: number
-    lookGain?: number
-    buttons: Record<string, boolean>
-  }): Promise<void>
   addListener(
     eventName: 'hidState',
     listenerFunc: (state: HidNativeState) => void,

@@ -1,6 +1,6 @@
 # Pc Controller
 
-Phone remote for PC and Smart TV — touchpad, keyboard, TV remote, and gamepad.
+Phone remote for PC and Smart TV — touchpad, keyboard, and TV remote.
 
 One React UI. The web app and Android APK render the **same** build (Capacitor WebView). Desktop preview uses a phone stage so layout matches the device.
 
@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints. Scan → pick a demo device → use Touch / Keys / TV / Game.
+Open the URL Vite prints. Scan → pick a demo device → use Touch / Keys / TV.
 
 ## Android APK (same UI + real Bluetooth)
 

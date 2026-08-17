@@ -1,6 +1,6 @@
 import { BluetoothHid, type HidNativeState } from '../plugins/bluetoothHid'
 import { TvRemote } from '../plugins/tvRemote'
-import type { DeviceInfo, GamepadState, Transport } from './types'
+import type { DeviceInfo, Transport } from './types'
 
 type Listener = () => void
 type LinkMode = 'none' | 'bluetooth' | 'wifi-tv'
@@ -57,8 +57,6 @@ export function createBluetoothTransport(): Transport & {
   let scrollAccY = 0
   let moveInFlight = false
   let scrollInFlight = false
-  let gamepadLatest: GamepadState | null = null
-  let gamepadFlushScheduled = false
   const listeners = new Set<Listener>()
 
   const notify = () => listeners.forEach((fn) => fn())
@@ -366,41 +364,12 @@ export function createBluetoothTransport(): Transport & {
     },
     consumer(action: string, down: boolean) {
       if (link === 'wifi-tv') {
-        if (['netflix', 'prime', 'disney', 'appletv'].includes(action) && down) {
-          void TvRemote.launchApp({ action })
-        }
+        // Vendor clients route streaming actions through their own app IDs.
+        // Do not also call launchApp here: that sent every shortcut twice.
         void TvRemote.sendAction({ action, down })
         return
       }
       void BluetoothHid.consumer({ action, down })
-    },
-    gamepad(next: GamepadState) {
-      if (link !== 'bluetooth') return
-      // Latest-wins coalesce — prevents an older "stick held" packet from
-      // arriving after release and leaving WASD stuck auto-repeating.
-      gamepadLatest = {
-        lx: next.lx,
-        ly: next.ly,
-        rx: next.rx,
-        ry: next.ry,
-        lookGain: next.lookGain ?? 34,
-        buttons: { ...next.buttons },
-      }
-      if (gamepadFlushScheduled) return
-      gamepadFlushScheduled = true
-      queueMicrotask(() => {
-        gamepadFlushScheduled = false
-        const g = gamepadLatest
-        if (!g || link !== 'bluetooth') return
-        void BluetoothHid.gamepad({
-          lx: g.lx,
-          ly: g.ly,
-          rx: g.rx,
-          ry: g.ry,
-          lookGain: g.lookGain ?? 34,
-          buttons: g.buttons,
-        })
-      })
     },
   }
 }

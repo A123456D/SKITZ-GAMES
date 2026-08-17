@@ -3,7 +3,7 @@ import { createBluetoothTransport } from './bluetoothTransport'
 import { createDemoTransport } from './demoTransport'
 import type { Transport } from './types'
 
-export type { ConnectionState, ControllerMode, DeviceInfo, GamepadState, Transport } from './types'
+export type { ConnectionState, ControllerMode, DeviceInfo, Transport } from './types'
 
 export type AppTransport = Transport & {
   subscribe: (fn: () => void) => () => void

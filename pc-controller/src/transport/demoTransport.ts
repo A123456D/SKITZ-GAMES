@@ -1,4 +1,4 @@
-import type { DeviceInfo, GamepadState, Transport } from './types'
+import type { DeviceInfo, Transport } from './types'
 
 const DEMO_DEVICES: DeviceInfo[] = [
   { id: 'demo-pc', name: 'SHIFTR Desk PC', kind: 'pc', protocol: 'bluetooth' },
@@ -84,9 +84,6 @@ export function createDemoTransport(): Transport & { subscribe: (fn: Listener) =
       } else {
         log('consumer', { action, down })
       }
-    },
-    gamepad(next: GamepadState) {
-      log('gamepad', next)
     },
   }
 

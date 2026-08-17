@@ -3,7 +3,6 @@ import { ModeTabs } from './components/ModeTabs'
 import { PhoneShell } from './components/PhoneShell'
 import { TopBar } from './components/TopBar'
 import { ConnectScreen } from './screens/ConnectScreen'
-import { GameScreen } from './screens/GameScreen'
 import { TouchScreen } from './screens/TouchScreen'
 import { TvScreen } from './screens/TvScreen'
 import { createTransport, type ControllerMode, type DeviceInfo } from './transport'
@@ -74,7 +73,6 @@ export default function App() {
 
         {mode === 'touch' && <TouchScreen transport={transport} />}
         {mode === 'tv' && <TvScreen transport={transport} />}
-        {mode === 'game' && <GameScreen transport={transport} />}
         <ModeTabs mode={mode} onChange={setMode} />
 
         {showConnect && (

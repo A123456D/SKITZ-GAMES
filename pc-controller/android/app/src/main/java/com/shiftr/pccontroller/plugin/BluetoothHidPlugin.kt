@@ -57,8 +57,17 @@ class BluetoothHidPlugin : Plugin() {
         if (!outThread.isAlive) outThread.start()
         Handler(outThread.looper)
     }
+    /**
+     * Keyboard reports must never wait behind touchpad motion. Keeping their
+     * ordered queue separate removes the noticeable key-down/key-up lag while
+     * preserving modifier ordering.
+     */
+    private val keyThread = HandlerThread("hid-key", Process.THREAD_PRIORITY_URGENT_DISPLAY)
+    private val keyHandler: Handler by lazy {
+        if (!keyThread.isAlive) keyThread.start()
+        Handler(keyThread.looper)
+    }
 
-    private var pendingGamepad: Runnable? = null
     private var pendingMouseDx = 0
     private var pendingMouseDy = 0
     private var mouseFlushPosted = false
@@ -120,6 +129,7 @@ class BluetoothHidPlugin : Plugin() {
             bound = false
         }
         if (outThread.isAlive) outThread.quitSafely()
+        if (keyThread.isAlive) keyThread.quitSafely()
         super.handleOnDestroy()
     }
 
@@ -305,7 +315,7 @@ class BluetoothHidPlugin : Plugin() {
     fun key(call: PluginCall) {
         val code = call.getString("code") ?: return call.reject("code required")
         val down = call.getBoolean("down") ?: false
-        outHandler.post { controller?.keyEvent(code, down) }
+        keyHandler.post { controller?.keyEvent(code, down) }
         call.resolve()
     }
 
@@ -314,37 +324,6 @@ class BluetoothHidPlugin : Plugin() {
         val action = call.getString("action") ?: return call.reject("action required")
         val down = call.getBoolean("down") ?: false
         outHandler.post { controller?.consumer(action, down) }
-        call.resolve()
-    }
-
-    @PluginMethod
-    fun gamepad(call: PluginCall) {
-        val lx = call.getFloat("lx") ?: 0f
-        val ly = call.getFloat("ly") ?: 0f
-        val rx = call.getFloat("rx") ?: 0f
-        val ry = call.getFloat("ry") ?: 0f
-        val lookGain = call.getFloat("lookGain") ?: 34f
-        val buttonsObj = call.getObject("buttons") ?: JSObject()
-        val buttons = HashMap<String, Boolean>()
-        val keys = buttonsObj.keys()
-        while (keys.hasNext()) {
-            val k = keys.next()
-            buttons[k] = buttonsObj.getBool(k) == true
-        }
-        val c = controller
-        if (c == null) {
-            call.resolve()
-            return
-        }
-        // Latest call wins — a replaced runnable can't leave a stick key stuck.
-        pendingGamepad?.let { outHandler.removeCallbacks(it) }
-        val task =
-            Runnable {
-                pendingGamepad = null
-                c.gamepad(lx, ly, rx, ry, buttons, lookGain)
-            }
-        pendingGamepad = task
-        outHandler.post(task)
         call.resolve()
     }
 

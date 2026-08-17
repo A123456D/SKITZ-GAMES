@@ -3,7 +3,6 @@ import type { ControllerMode } from '../transport'
 const TABS: { id: ControllerMode; label: string }[] = [
   { id: 'touch', label: 'Touch' },
   { id: 'tv', label: 'TV' },
-  { id: 'game', label: 'Game' },
 ]
 
 type Props = {

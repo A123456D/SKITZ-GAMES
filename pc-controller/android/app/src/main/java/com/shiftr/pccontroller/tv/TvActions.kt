@@ -15,9 +15,10 @@ object TvActions {
             TvProtocol.SAMSUNG ->
                 when (action) {
                     "netflix" -> "11101200001"
-                    "prime" -> "3201907919771"
-                    "disney" -> "3201907016597"
-                    "appletv" -> "3201910019365"
+                    // Pre-2020 Tizen IDs used by the 2018 Q6F.
+                    "prime" -> "3201512006785"
+                    "disney" -> "3201901017640"
+                    "appletv" -> "3201807016597"
                     else -> null
                 }
             TvProtocol.LG ->

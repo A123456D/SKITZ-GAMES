@@ -13,8 +13,10 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -31,7 +33,10 @@ class LgClient(
     private var inputSocket: WebSocket? = null
     private val connected = AtomicBoolean(false)
     private val clientKey = AtomicReference(loadKey())
-    private var nextId = 1
+    private val nextId = AtomicInteger(1)
+    private val appListRequestId = AtomicInteger(-1)
+    private val appListLatch = AtomicReference(CountDownLatch(0))
+    private val installedApps = ConcurrentHashMap<String, String>()
 
     private fun prefs() = context.getSharedPreferences("lg_tv_keys", Context.MODE_PRIVATE)
 
@@ -65,6 +70,7 @@ class LgClient(
                                     val json = JSONObject(text)
                                     val type = json.optString("type")
                                     val payload = json.optJSONObject("payload")
+                                    handleAppList(json, payload)
                                     payload?.optString("socketPath")?.takeIf { it.isNotBlank() }?.let {
                                         openInputSocketUrl(it)
                                     }
@@ -151,7 +157,7 @@ class LgClient(
     }
 
     private fun requestPointerSocket(main: WebSocket) {
-        val id = nextId++
+        val id = nextId.getAndIncrement()
         main.send(
             JSONObject()
                 .put("id", id)
@@ -244,7 +250,53 @@ class LgClient(
     }
 
     override suspend fun launchApp(appId: String): Boolean =
-        ssap("ssap://system.launcher/launch", JSONObject().put("id", appId))
+        ssap(
+            "ssap://system.launcher/launch",
+            JSONObject().put("id", resolveAppId(appId)),
+        )
+
+    private fun handleAppList(json: JSONObject, payload: JSONObject?) {
+        if (json.optInt("id", -1) != appListRequestId.get()) return
+        val apps = payload?.optJSONArray("apps") ?: return
+        installedApps.clear()
+        for (i in 0 until apps.length()) {
+            val app = apps.optJSONObject(i) ?: continue
+            val id = app.optString("id")
+            val title = app.optString("title").lowercase()
+            if (id.isNotBlank() && title.isNotBlank()) installedApps[title] = id
+        }
+        appListLatch.get().countDown()
+    }
+
+    private fun resolveAppId(fallbackId: String): String {
+        val wanted =
+            when (fallbackId) {
+                "netflix" -> listOf("netflix")
+                "amazon" -> listOf("prime video", "amazon prime", "amazon")
+                "com.disney.disneyplus-prod" -> listOf("disney+", "disney plus", "disney")
+                "com.apple.appletv" -> listOf("apple tv")
+                else -> emptyList()
+            }
+        if (wanted.isEmpty()) return fallbackId
+        val ws = mainSocket ?: return fallbackId
+        val id = nextId.getAndIncrement()
+        val latch = CountDownLatch(1)
+        appListRequestId.set(id)
+        appListLatch.set(latch)
+        ws.send(
+            JSONObject()
+                .put("id", id)
+                .put("type", "request")
+                .put("uri", "ssap://com.webos.applicationManager/listApps")
+                .put("payload", JSONObject())
+                .toString(),
+        )
+        latch.await(2, TimeUnit.SECONDS)
+        for (name in wanted) {
+            installedApps.entries.firstOrNull { (title, _) -> name in title }?.let { return it.value }
+        }
+        return fallbackId
+    }
 
     private fun sendButton(name: String): Boolean {
         val msg = "type:button\nname:$name\n\n"
@@ -257,7 +309,7 @@ class LgClient(
     private fun ssap(uri: String, payload: JSONObject = JSONObject()): Boolean {
         val ws = mainSocket ?: return false
         if (!connected.get()) return false
-        val id = nextId++
+        val id = nextId.getAndIncrement()
         return ws.send(
             JSONObject()
                 .put("id", id)

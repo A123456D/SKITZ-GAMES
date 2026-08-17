@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 
 /**
  * Sony Bravia IRCC over HTTP.
@@ -123,8 +124,14 @@ class BraviaClient(
     override suspend fun launchApp(appId: String): Boolean =
         withContext(Dispatchers.IO) {
             runCatching {
+                val uri = resolveAppUri(appId) ?: return@runCatching false
                 val body =
-                    """{"method":"setActiveApp","version":"1.0","id":1,"params":[{"uri":"localapp://webappruntime?url=$appId"}]}"""
+                    JSONObject()
+                        .put("method", "setActiveApp")
+                        .put("version", "1.0")
+                        .put("id", 1)
+                        .put("params", org.json.JSONArray().put(JSONObject().put("uri", uri)))
+                        .toString()
                 val req =
                     Request.Builder()
                         .url("http://$host/sony/appControl")
@@ -135,6 +142,49 @@ class BraviaClient(
                 http.newCall(req).execute().use { it.isSuccessful }
             }.getOrDefault(false)
         }
+
+    private fun resolveAppUri(appName: String): String? {
+        val wanted =
+            when (appName.lowercase()) {
+                "netflix" -> listOf("netflix")
+                "prime video" -> listOf("prime video", "amazon prime", "amazon")
+                "disney+" -> listOf("disney+", "disney plus", "disney")
+                "apple tv" -> listOf("apple tv")
+                else -> listOf(appName.lowercase())
+            }
+        return try {
+            val body =
+                JSONObject()
+                    .put("method", "getApplicationList")
+                    .put("version", "1.0")
+                    .put("id", 1)
+                    .put("params", org.json.JSONArray())
+                    .toString()
+            val req =
+                Request.Builder()
+                    .url("http://$host/sony/appControl")
+                    .addHeader("X-Auth-PSK", psk)
+                    .addHeader("Content-Type", "application/json")
+                    .post(body.toRequestBody("application/json".toMediaType()))
+                    .build()
+            http.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                val root = JSONObject(resp.body?.string().orEmpty())
+                val apps = root.optJSONArray("result")?.optJSONArray(0) ?: return@use null
+                for (name in wanted) {
+                    for (i in 0 until apps.length()) {
+                        val app = apps.optJSONObject(i) ?: continue
+                        if (name in app.optString("title").lowercase()) {
+                            return@use app.optString("uri").takeIf { it.isNotBlank() }
+                        }
+                    }
+                }
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     private suspend fun ircc(code: String): Boolean =
         withContext(Dispatchers.IO) {

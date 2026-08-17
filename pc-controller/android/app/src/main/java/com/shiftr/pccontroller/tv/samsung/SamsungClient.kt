@@ -16,6 +16,7 @@ import okhttp3.WebSocketListener
 import okio.ByteString
 import org.json.JSONObject
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -37,6 +38,8 @@ class SamsungClient(
     private val http = TvHttp.client()
     private var socket: WebSocket? = null
     private val connected = AtomicBoolean(false)
+    private val installedApps = ConcurrentHashMap<String, String>()
+    private val appListLatch = AtomicReference(CountDownLatch(0))
 
     override suspend fun connect(): Result<Unit> =
         withContext(Dispatchers.IO) {
@@ -49,7 +52,10 @@ class SamsungClient(
                         url = channelUrl("wss", 8002, name, token),
                         waitSeconds = PAIR_SECONDS,
                     )
-                if (secure == ChannelResult.Connected) return@runCatching
+                if (secure == ChannelResult.Connected) {
+                    requestInstalledApps()
+                    return@runCatching
+                }
                 if (secure == ChannelResult.Denied) {
                     error(DENIED)
                 }
@@ -63,7 +69,7 @@ class SamsungClient(
                         waitSeconds = PAIR_SECONDS,
                     )
                 when (plain) {
-                    ChannelResult.Connected -> Unit
+                    ChannelResult.Connected -> requestInstalledApps()
                     ChannelResult.Denied -> error(DENIED)
                     ChannelResult.TimedOut -> error(TIMEOUT)
                     ChannelResult.Unreachable -> error(UNREACHABLE)
@@ -168,7 +174,59 @@ class SamsungClient(
                 outcome.set(ChannelResult.TimedOut)
                 latch.countDown()
             }
+            "ed.installedApp.get" -> {
+                val apps =
+                    try {
+                        JSONObject(text)
+                            .optJSONObject("data")
+                            ?.optJSONArray("data")
+                    } catch (_: Exception) {
+                        null
+                    }
+                if (apps != null) {
+                    installedApps.clear()
+                    for (i in 0 until apps.length()) {
+                        val app = apps.optJSONObject(i) ?: continue
+                        val id = app.optString("appId")
+                        val name = app.optString("name").lowercase()
+                        if (id.isNotBlank() && name.isNotBlank()) installedApps[name] = id
+                    }
+                }
+                appListLatch.get().countDown()
+            }
         }
+    }
+
+    private fun requestInstalledApps() {
+        val latch = CountDownLatch(1)
+        appListLatch.set(latch)
+        sendWsCommand(
+            JSONObject()
+                .put("method", "ms.channel.emit")
+                .put(
+                    "params",
+                    JSONObject()
+                        .put("event", "ed.installedApp.get")
+                        .put("to", "host"),
+                ),
+        )
+        // Supported Q6F-era sets answer immediately; newer sets may omit it.
+        latch.await(2, TimeUnit.SECONDS)
+    }
+
+    private fun installedAppId(fallbackId: String): String {
+        val names =
+            when (fallbackId) {
+                "11101200001" -> listOf("netflix")
+                "3201512006785" -> listOf("prime video", "amazon prime", "amazon")
+                "3201901017640" -> listOf("disney+", "disney plus", "disney")
+                "3201807016597" -> listOf("apple tv")
+                else -> emptyList()
+            }
+        for (wanted in names) {
+            installedApps.entries.firstOrNull { (name, _) -> wanted in name }?.let { return it.value }
+        }
+        return fallbackId
     }
 
     override suspend fun disconnect() {
@@ -225,30 +283,37 @@ class SamsungClient(
     override suspend fun launchApp(appId: String): Boolean =
         withContext(Dispatchers.IO) {
             runCatching {
+                val resolvedId = installedAppId(appId)
+                // Q6F-era Tizen reliably launches apps over the authorized
+                // remote WebSocket. The REST endpoint can return 200 without
+                // actually opening the app, so it is fallback-only.
+                val sent =
+                    sendWsCommand(
+                        JSONObject()
+                            .put("method", "ms.channel.emit")
+                            .put(
+                                "params",
+                                JSONObject()
+                                    .put("event", "ed.apps.launch")
+                                    .put("to", "host")
+                                    .put(
+                                        "data",
+                                        JSONObject()
+                                            .put("appId", resolvedId)
+                                            .put("action_type", "DEEP_LINK"),
+                                    ),
+                            ),
+                    )
+                if (sent) return@runCatching true
+
                 val req =
                     Request.Builder()
-                        .url("http://$host:8001/api/v2/applications/$appId")
+                        .url("http://$host:8001/api/v2/applications/$resolvedId")
                         .post(okhttp3.RequestBody.create(null, ByteArray(0)))
                         .build()
                 http.newCall(req).execute().use { resp ->
-                    if (resp.isSuccessful) return@runCatching true
+                    resp.isSuccessful
                 }
-                sendWsCommand(
-                    JSONObject()
-                        .put("method", "ms.channel.emit")
-                        .put(
-                            "params",
-                            JSONObject()
-                                .put("event", "ed.apps.launch")
-                                .put("to", "host")
-                                .put(
-                                    "data",
-                                    JSONObject()
-                                        .put("appId", appId)
-                                        .put("action_type", "DEEP_LINK"),
-                                ),
-                        ),
-                )
             }.getOrDefault(false)
         }
 

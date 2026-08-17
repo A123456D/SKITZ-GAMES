@@ -83,14 +83,43 @@ class RokuClient(
     override suspend fun launchApp(appId: String): Boolean =
         withContext(Dispatchers.IO) {
             runCatching {
+                val resolvedId = resolveAppId(appId)
                 val req =
                     Request.Builder()
-                        .url("$base/launch/$appId")
+                        .url("$base/launch/$resolvedId")
                         .post(ByteArray(0).toRequestBody(null))
                         .build()
                 http.newCall(req).execute().use { it.isSuccessful }
             }.getOrDefault(false)
         }
+
+    private fun resolveAppId(fallbackId: String): String {
+        val wanted =
+            when (fallbackId) {
+                "12" -> listOf("netflix")
+                "13" -> listOf("prime video", "amazon prime", "amazon")
+                "291097" -> listOf("disney+", "disney plus", "disney")
+                "551012" -> listOf("apple tv")
+                else -> emptyList()
+            }
+        if (wanted.isEmpty()) return fallbackId
+        return runCatching {
+            val req = Request.Builder().url("$base/query/apps").get().build()
+            http.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@use fallbackId
+                val body = resp.body?.string().orEmpty()
+                val apps =
+                    Regex("""<app\b[^>]*\bid="([^"]+)"[^>]*>(.*?)</app>""", RegexOption.IGNORE_CASE)
+                        .findAll(body)
+                        .map { it.groupValues[2].lowercase() to it.groupValues[1] }
+                        .toList()
+                for (name in wanted) {
+                    apps.firstOrNull { (title, _) -> name in title }?.let { return@use it.second }
+                }
+                fallbackId
+            }
+        }.getOrDefault(fallbackId)
+    }
 
     private suspend fun postKey(key: String): Boolean =
         withContext(Dispatchers.IO) {

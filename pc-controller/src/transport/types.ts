@@ -1,6 +1,6 @@
 export type ConnectionState = 'idle' | 'scanning' | 'connecting' | 'connected' | 'error'
 
-export type ControllerMode = 'touch' | 'tv' | 'game'
+export type ControllerMode = 'touch' | 'tv'
 
 export type DeviceInfo = {
   id: string
@@ -22,15 +22,4 @@ export type Transport = {
   mouseScroll: (dx: number, dy: number) => void
   key: (code: string, down: boolean) => void
   consumer: (action: string, down: boolean) => void
-  gamepad: (state: GamepadState) => void
-}
-
-export type GamepadState = {
-  lx: number
-  ly: number
-  rx: number
-  ry: number
-  /** Right-stick mouse look multiplier (native HID). */
-  lookGain?: number
-  buttons: Record<string, boolean>
 }
