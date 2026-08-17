@@ -7,13 +7,6 @@ type Props = {
 
 type Panel = 'remote' | 'num' | 'abc'
 
-const APPS = [
-  { id: 'netflix', label: 'Netflix', tone: 'netflix' },
-  { id: 'prime', label: 'Prime', tone: 'prime' },
-  { id: 'appletv', label: 'Apple TV', tone: 'apple' },
-  { id: 'disney', label: 'Disney+', tone: 'disney' },
-] as const
-
 const SYSTEM = [
   { label: '⌂', action: 'home' },
   { label: '⌫', action: 'back' },
@@ -97,19 +90,6 @@ export function TvScreen({ transport }: Props) {
 
   return (
     <section className="screen tv-screen">
-      <div className="tv-apps">
-        {APPS.map((app) => (
-          <button
-            key={app.id}
-            type="button"
-            className={`tv-app ${app.tone}${down[app.id] ? ' down' : ''}`}
-            {...bindConsumer(app.id)}
-          >
-            {app.label}
-          </button>
-        ))}
-      </div>
-
       <div className="tv-panel-tabs">
         {(
           [

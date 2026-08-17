@@ -24,7 +24,7 @@ downloads:
 
 - **Bluetooth HID** — mouse and keyboard on PC (and TVs that accept a BT keyboard)
 - **Wi‑Fi TV remotes** — Roku, Samsung, LG, Bravia, Android/Google TV on the same network
-- Touchpad with side scroll, swipe-up keyboard, and TV D‑pad + streaming app buttons
+- Touchpad with side scroll, swipe-up keyboard, and a responsive TV D‑pad
 
 **Needs Android 9+.** Keep the app open while pairing Bluetooth. For Wi‑Fi TVs, phone and TV must share the same network.
 

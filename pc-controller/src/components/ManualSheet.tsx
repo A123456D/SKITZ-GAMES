@@ -34,10 +34,6 @@ export function ManualSheet({ onClose }: Props) {
           Enable Power On with Mobile in the TV network settings. Connect once while the TV is on
           so its MAC address is saved. The Power button can then wake it from standby.
         </ManualSection>
-        <ManualSection title="Streaming buttons">
-          Netflix, Prime Video, Disney+, and Apple TV launch the matching installed app when the TV
-          exposes app launching. The app must already be installed and available in your region.
-        </ManualSection>
         <ManualSection title="Automatic reconnect">
           The last successfully connected TV is remembered and reconnected when Pc Controller
           opens. A saved TV stays in the connection list even when it is temporarily offline.

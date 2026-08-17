@@ -33,7 +33,7 @@ npx cap open android
 | Fire TV | Bluetooth HID (and Wi‑Fi discovery when advertised) |
 | Any TV that accepts a BT keyboard | Bluetooth HID |
 
-Same Wi‑Fi as the TV is required for Wi‑Fi remotes. Streaming buttons (Netflix / Prime / Disney+ / Apple TV) launch vendor app IDs where the platform supports it.
+Same Wi‑Fi as the TV is required for Wi‑Fi remotes.
 Samsung TVs also save their Wi‑Fi MAC while connected so Power can wake them with Wake-on-LAN when **Power On with Mobile** is enabled.
 The last successful TV is remembered on the phone and reconnected automatically the next time the app opens.
 

@@ -864,56 +864,6 @@ button.status-pill:active {
   gap: 10px;
 }
 
-.tv-apps {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.tv-app {
-  min-height: 44px;
-  padding: 0 4px;
-  border-radius: 12px;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.62rem;
-  letter-spacing: -0.01em;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: var(--bg-2);
-  color: var(--text);
-  transition:
-    transform 100ms ease,
-    filter 100ms ease,
-    background 100ms ease;
-}
-
-.tv-app:active,
-.tv-app.down {
-  transform: scale(0.96);
-  filter: brightness(1.1);
-}
-
-.tv-app.netflix {
-  background: linear-gradient(160deg, #e50914, #b20710);
-  border-color: transparent;
-}
-
-.tv-app.prime {
-  background: linear-gradient(160deg, #00a8e1, #0f79af);
-  border-color: transparent;
-}
-
-.tv-app.apple {
-  background: linear-gradient(160deg, #3a3a3c, #1c1c1e);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-.tv-app.disney {
-  background: linear-gradient(160deg, #113ccf, #0b1f66);
-  border-color: transparent;
-}
-
 .tv-panel-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1505,11 +1455,6 @@ button.status-pill:active {
     gap: 6px;
   }
 
-  .tv-apps .tv-app {
-    min-height: 36px;
-    font-size: 0.58rem;
-  }
-
   .tv-panel-tab {
     height: 28px;
   }
@@ -1630,11 +1575,6 @@ button.status-pill:active {
 @container device (max-width: 360px) {
   .brand {
     font-size: 1rem;
-  }
-
-  .tv-app {
-    font-size: 0.55rem;
-    min-height: 40px;
   }
 
   .status-pill {
