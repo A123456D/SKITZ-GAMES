@@ -27,6 +27,8 @@ android/captures
 *.apk
 *.aab
 *.keystore
+*.jks
+android/keystore.properties
 
 # Env
 .env

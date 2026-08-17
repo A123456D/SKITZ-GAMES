@@ -106,7 +106,23 @@ async function main() {
   }
   await write(join(root, 'public', 'favicon.png'), await sharp(LOGO).resize(64, 64).png().toBuffer())
 
-  console.log('icons + splash written from', LOGO)
+  // Google Play feature graphic: 1024 x 500.
+  const featureW = 1024
+  const featureH = 500
+  const mark = Math.round(featureH * 0.58)
+  const scaled = await sharp(art)
+    .resize(mark, mark, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .toBuffer()
+  const feature = await sharp({
+    create: { width: featureW, height: featureH, channels: 4, background: { ...BACKDROP, alpha: 1 } },
+  })
+    .composite([{ input: scaled, gravity: 'centre' }])
+    .png()
+    .toBuffer()
+  await write(join(root, 'assets', 'store', 'feature-graphic.png'), feature)
+  await write(join(root, 'public', 'feature-graphic.png'), feature)
+
+  console.log('icons + splash + feature graphic written from', LOGO)
 }
 
 main().catch((err) => {

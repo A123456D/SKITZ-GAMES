@@ -1,0 +1,158 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+---
+
+<BaseLayout
+	title="Pc Controller privacy policy"
+	description="Privacy policy for the Pc Controller Android application."
+>
+	<SiteHeader />
+	<main class="site-main">
+		<section class="section">
+			<div class="wrap policy">
+				<p class="eyebrow">Pc Controller · legal</p>
+				<h1 class="section-title">Privacy policy</h1>
+				<p class="updated">Effective 17 August 2026</p>
+
+				<div class="policy-summary">
+					<strong>Short version:</strong> Pc Controller does not require an account, contain ads,
+					use analytics, or send your control activity to SKITZ servers. Device and pairing
+					information stays on your Android device.
+				</div>
+
+				<section>
+					<h2>Information processed by the app</h2>
+					<p>
+						Pc Controller processes Bluetooth device names and addresses, nearby TV names and IP
+						addresses, and remote-control commands so it can connect to devices you select. Samsung
+						pairing tokens and TV MAC addresses, LG pairing keys, the last selected TV, and app
+						preferences may be stored locally on your Android device.
+					</p>
+				</section>
+
+				<section>
+					<h2>How information is used</h2>
+					<p>
+						This information is used only to discover, pair with, reconnect to, wake, and control
+						your own computers and televisions. Commands are sent directly between your phone and
+						the selected device over Bluetooth or your local Wi-Fi network.
+					</p>
+				</section>
+
+				<section>
+					<h2>Information collected by SKITZ</h2>
+					<p>
+						The Android app does not transmit personal information, pairing credentials, device
+						addresses, or control activity to SKITZ. It has no SKITZ account system, advertising,
+						analytics, crash-reporting service, or cloud database. App fonts are bundled with the
+						install package and are not loaded from Google Fonts or other third-party font services.
+					</p>
+				</section>
+
+				<section>
+					<h2>Permissions</h2>
+					<ul>
+						<li><strong>Bluetooth and nearby devices:</strong> connect to and advertise as a Bluetooth HID remote.</li>
+						<li><strong>Nearby Wi-Fi and network access:</strong> find and control supported TVs on your local network.</li>
+						<li><strong>Notifications and foreground service:</strong> keep an active Bluetooth controller session visible and reliable.</li>
+						<li><strong>Legacy location permission on Android 11 and earlier:</strong> required by Android for Bluetooth discovery; Pc Controller does not collect or store your location.</li>
+					</ul>
+				</section>
+
+				<section>
+					<h2>Storage, sharing, and retention</h2>
+					<p>
+						Locally saved connection information remains on the device until the app is cleared or
+						uninstalled. Pc Controller does not sell or share this information with SKITZ or data
+						brokers. The app communicates with the computers and TVs you explicitly choose to
+						control.
+					</p>
+				</section>
+
+				<section>
+					<h2>Children</h2>
+					<p>
+						Pc Controller is a general utility and is not directed to children. It does not
+						knowingly collect personal information from children.
+					</p>
+				</section>
+
+				<section>
+					<h2>Security</h2>
+					<p>
+						Pairing credentials remain in Android app storage. Some television protocols use local
+						network HTTP or self-signed certificates because that is what the television provides.
+						Use Pc Controller only on a trusted home or private network.
+					</p>
+				</section>
+
+				<section>
+					<h2>Changes and contact</h2>
+					<p>
+						This policy may be updated when app behavior changes. Questions about this policy can
+						be sent to <a href="mailto:toonersai@gmail.com">toonersai@gmail.com</a>.
+					</p>
+				</section>
+			</div>
+		</section>
+	</main>
+	<SiteFooter />
+</BaseLayout>
+
+<style>
+	.policy {
+		max-width: 48rem;
+	}
+
+	.updated {
+		margin: -0.6rem 0 1.4rem;
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: 0.82rem;
+	}
+
+	.policy-summary {
+		margin-bottom: 2rem;
+		padding: 1.1rem 1.2rem;
+		border: 1px solid var(--line);
+		background: var(--paper-2);
+		font-family: var(--font-type);
+		line-height: 1.6;
+	}
+
+	.policy section {
+		margin-top: 1.75rem;
+	}
+
+	.policy h2 {
+		margin: 0 0 0.6rem;
+		font-family: var(--font-display);
+		font-size: 1.25rem;
+	}
+
+	.policy p,
+	.policy li {
+		color: var(--ink);
+		font-family: var(--font-type);
+		line-height: 1.65;
+	}
+
+	.policy p {
+		margin: 0;
+	}
+
+	.policy ul {
+		display: grid;
+		gap: 0.55rem;
+		margin: 0;
+		padding-left: 1.25rem;
+	}
+
+	.policy a {
+		color: inherit;
+		text-decoration-thickness: 2px;
+		text-underline-offset: 3px;
+	}
+</style>

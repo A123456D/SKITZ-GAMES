@@ -1,15 +1,39 @@
+import java.util.Properties
+
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
+
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+def releaseSigningKeys = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword']
+def hasReleaseSigning = releaseSigningKeys.every { keystoreProperties.getProperty(it)?.trim() }
+
+if (keystorePropertiesFile.exists() && !hasReleaseSigning) {
+    throw new GradleException('android/keystore.properties is incomplete; copy every value from keystore.properties.example')
+}
 
 android {
     namespace = "com.shiftr.pccontroller"
     compileSdk = rootProject.ext.compileSdkVersion
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(keystoreProperties.getProperty('storeFile'))
+                storePassword keystoreProperties.getProperty('storePassword')
+                keyAlias keystoreProperties.getProperty('keyAlias')
+                keyPassword keystoreProperties.getProperty('keyPassword')
+            }
+        }
+    }
     defaultConfig {
         applicationId "com.shiftr.pccontroller"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 20
-        versionName "1.7.4"
+        versionCode 21
+        versionName "1.7.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
@@ -18,7 +42,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug
+            signingConfig hasReleaseSigning ? signingConfigs.release : null
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -28,6 +52,17 @@ android {
     }
     kotlin {
         jvmToolchain(21)
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def releaseRequested = graph.allTasks.any {
+        it.project == project && (it.name == 'bundleRelease' || it.name == 'assembleRelease')
+    }
+    if (releaseRequested && !hasReleaseSigning) {
+        throw new GradleException(
+            'Release signing is not configured. Copy android/keystore.properties.example to android/keystore.properties and add your private passwords.'
+        )
     }
 }
 

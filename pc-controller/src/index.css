@@ -15,7 +15,7 @@
   --ok: #4ecf8a;
   --danger: #e86a5c;
   --radius: 18px;
-  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', 'Bricolage Grotesque', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
@@ -494,6 +494,15 @@ button.status-pill:active {
   color: var(--muted);
   font-size: 0.74rem;
   line-height: 1.5;
+}
+
+.privacy-link {
+  justify-self: start;
+  color: var(--accent);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .connect-panel {

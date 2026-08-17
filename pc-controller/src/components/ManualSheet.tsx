@@ -38,6 +38,14 @@ export function ManualSheet({ onClose }: Props) {
           The last successfully connected TV is remembered and reconnected when Pc Controller
           opens. A saved TV stays in the connection list even when it is temporarily offline.
         </ManualSection>
+        <a
+          className="privacy-link"
+          href="https://skitz-games.pages.dev/apps/pc-controller/privacy/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Privacy policy
+        </a>
       </div>
     </section>
   )

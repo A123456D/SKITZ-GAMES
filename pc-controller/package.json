@@ -10,12 +10,15 @@
     "icons": "node scripts/make-icons.mjs",
     "preview": "vite preview",
     "sync:android": "npm run build && npx cap sync android",
+    "bundle:android": "npm run sync:android && android\\gradlew.bat -p android :app:bundleRelease",
     "open:android": "npx cap open android"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
