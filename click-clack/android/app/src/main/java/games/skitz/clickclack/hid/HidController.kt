@@ -196,7 +196,7 @@ class HidController(private val context: Context) {
                             val empty =
                                 when (id.toInt()) {
                                     HidDescriptors.MOUSE_REPORT_ID -> ByteArray(7)
-                                    HidDescriptors.KEYBOARD_REPORT_ID -> ByteArray(3)
+                                    HidDescriptors.KEYBOARD_REPORT_ID -> ByteArray(8)
                                     else -> ByteArray(max(1, bufferSize).coerceAtMost(16))
                                 }
                             hid.replyReport(host, type, id, empty)
@@ -532,9 +532,12 @@ class HidController(private val context: Context) {
         // Match the working mouse hot path: Android's connection-state binder can
         // return stale DISCONNECTED while interrupt reports still reach the host.
         // Trust the callback-owned host and let sendReport() be the source of truth.
-        // Kontroller keyboard: modifier + reserved + single key
-        val key = pressedKeys.firstOrNull() ?: 0
-        val report = byteArrayOf(modifierByte, 0, key)
+        // Standard keyboard report: modifier, reserved, then six key slots.
+        val report = ByteArray(8)
+        report[0] = modifierByte
+        pressedKeys.take(6).forEachIndexed { index, key ->
+            report[index + 2] = key
+        }
         return try {
             hid.sendReport(host, HidDescriptors.KEYBOARD_REPORT_ID, report)
         } catch (_: SecurityException) {

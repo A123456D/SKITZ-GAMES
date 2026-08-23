@@ -101,7 +101,9 @@ object HidDescriptors {
             0x95.toByte(), 0x01,
             0x75, 0x08,
             0x81.toByte(), 0x01,
-            0x95.toByte(), 0x01,
+            // Match Pc Controller's six-key report. Windows caches one HID
+            // descriptor for the phone, so both apps must use the same shape.
+            0x95.toByte(), 0x06,
             0x75, 0x08,
             0x15, 0x00,
             0x25, 0x65,

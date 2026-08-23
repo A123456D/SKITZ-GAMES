@@ -196,7 +196,7 @@ class HidController(private val context: Context) {
                             val empty =
                                 when (id.toInt()) {
                                     HidDescriptors.MOUSE_REPORT_ID -> ByteArray(7)
-                                    HidDescriptors.KEYBOARD_REPORT_ID -> ByteArray(3)
+                                    HidDescriptors.KEYBOARD_REPORT_ID -> ByteArray(8)
                                     HidDescriptors.CONSUMER_REPORT_ID -> ByteArray(2)
                                     else -> ByteArray(max(1, bufferSize).coerceAtMost(16))
                                 }
@@ -515,12 +515,7 @@ class HidController(private val context: Context) {
             return flushKeyboard()
         }
         if (usage == HidKeys.NONE) return false
-        if (down) {
-            pressedKeys.clear()
-            pressedKeys.add(usage)
-        } else {
-            pressedKeys.remove(usage)
-        }
+        if (down) pressedKeys.add(usage) else pressedKeys.remove(usage)
         return flushKeyboard()
     }
 
@@ -581,8 +576,12 @@ class HidController(private val context: Context) {
         val hid = hidDevice
         // Hot path: skip getConnectionState — the binder round trip lags fast typing.
         if (host == null || hid == null || !registered) return false
-        val key = pressedKeys.firstOrNull() ?: 0
-        val report = byteArrayOf(modifierByte, 0, key)
+        // Standard keyboard report: modifier, reserved, then six key slots.
+        val report = ByteArray(8)
+        report[0] = modifierByte
+        pressedKeys.take(6).forEachIndexed { index, key ->
+            report[index + 2] = key
+        }
         return try {
             hid.sendReport(host, HidDescriptors.KEYBOARD_REPORT_ID, report)
         } catch (_: SecurityException) {
