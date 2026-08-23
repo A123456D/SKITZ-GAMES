@@ -60,6 +60,7 @@ fun KeyboardScreen(
     var gui by remember { mutableStateOf(false) }
     val deviceLandscape =
         LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // Prefer wide layout whenever the window is landscape-shaped (not only sensor flag).
     val landscape = forceLandscape || deviceLandscape
 
     fun currentMods(): Byte {
@@ -312,7 +313,9 @@ fun KeyboardScreen(
                 .fillMaxSize()
                 .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
-        if (landscape) {
+        val wide = maxWidth > maxHeight
+        val useLandscape = landscape || wide
+        if (useLandscape) {
             // During Keys orientation lock, first frame can still be portrait-sized.
             // Never use coerceIn(min, max) when max can be < min — that crashes the app.
             val gap = 5.dp

@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.content.res.Configuration
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -104,6 +105,12 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         // Android auto-unregisters HID when not foreground — re-register every resume.
+        maybeStartHid()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Rotate / fold can drop the HID host link — re-attach without leaving the app.
         maybeStartHid()
     }
 

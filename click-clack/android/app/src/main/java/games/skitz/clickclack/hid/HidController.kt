@@ -526,33 +526,22 @@ class HidController(private val context: Context) {
     }
 
     private fun flushKeyboard(): Boolean {
-        val host = hostDevice
-        val hid = hidDevice
-        if (host == null || hid == null || !registered) {
-            onReportFailed("No HID host — Connect screen → Connect HID")
-            return false
-        }
-        if (!isConnectedTo(host)) {
-            onReportFailed("HID link dropped — Connect screen → Connect HID")
-            return false
-        }
+        val host = hostDevice ?: return false
+        val hid = hidDevice ?: return false
+        if (!registered) return false
+        // Soft-fail like mouse: never clear hostDevice on a single bad report.
+        // Aggressive disconnect made Keys go dead after a transient BT blip (e.g. rotate).
+        if (!isConnectedTo(host)) return false
         // Kontroller keyboard: modifier + reserved + single key
         val key = pressedKeys.firstOrNull() ?: 0
         val report = byteArrayOf(modifierByte, 0, key)
         return try {
-            val ok = hid.sendReport(host, HidDescriptors.KEYBOARD_REPORT_ID, report)
-            if (!ok) onReportFailed("Key report blocked — keep app open, tap Connect HID")
-            ok
-        } catch (e: SecurityException) {
-            onReportFailed("Bluetooth permission denied")
+            hid.sendReport(host, HidDescriptors.KEYBOARD_REPORT_ID, report)
+        } catch (_: SecurityException) {
+            false
+        } catch (_: Exception) {
             false
         }
-    }
-
-    private fun onReportFailed(message: String) {
-        hostDevice = null
-        if (!wantRunning || !registered) return
-        emit(HidConnectionState.WaitingForHost, hostName = null, message = message, detail = diagLine())
     }
 
     @SuppressLint("MissingPermission")

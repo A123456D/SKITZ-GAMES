@@ -1,9 +1,5 @@
 package games.skitz.clickclack.ui
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
-import android.content.pm.ActivityInfo
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -39,7 +34,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -106,21 +100,8 @@ fun SkitzControllerApp(
     val state by (controller?.state ?: fallback).collectAsState()
     var tab by rememberSaveable { mutableIntStateOf(0) }
 
-    // Keys tab is landscape-only (matches approved design).
-    val activity = LocalContext.current.findActivity()
-    DisposableEffect(tab, activity) {
-        if (tab == 2) {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        } else {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        }
-        onDispose {
-            // Only reset when leaving Keys — avoid fighting the next effect on tab change.
-            if (tab == 2) {
-                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            }
-        }
-    }
+    // Do NOT force landscape on Keys — setRequestedOrientation drops HID on many OEMs
+    // (Samsung especially), which made typing look completely dead.
 
     Scaffold(
         containerColor = TechBg,
@@ -159,7 +140,6 @@ fun SkitzControllerApp(
                 else ->
                     KeyboardScreen(
                         connected = state.connection == HidConnectionState.Connected,
-                        forceLandscape = true,
                         onKeyDown = { controller?.keyDown(it) },
                         onKeyUp = { controller?.keyUp(it) },
                         onModifiers = { controller?.setModifiers(it) },
@@ -300,13 +280,4 @@ private fun KeysIcon(color: Color) {
             cap = StrokeCap.Round,
         )
     }
-}
-
-private fun Context.findActivity(): Activity? {
-    var ctx: Context? = this
-    while (ctx is ContextWrapper) {
-        if (ctx is Activity) return ctx
-        ctx = ctx.baseContext
-    }
-    return ctx as? Activity
 }
