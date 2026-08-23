@@ -10,6 +10,7 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
 import com.getcapacitor.annotation.PermissionCallback
+import com.shiftr.pccontroller.hid.InputJsBridge
 import com.shiftr.pccontroller.tv.TvRemoteHub
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +43,7 @@ class TvRemotePlugin : Plugin() {
 
     override fun load() {
         hub = TvRemoteHub(context.applicationContext)
+        InputJsBridge.tvHub = hub
         hub?.listener = { connected, name, protocol, message ->
             val obj =
                 JSObject()
@@ -133,24 +135,18 @@ class TvRemotePlugin : Plugin() {
         )
     }
 
-    @PluginMethod
+    @PluginMethod(returnType = PluginMethod.RETURN_NONE)
     fun sendAction(call: PluginCall) {
-        val action = call.getString("action") ?: return call.reject("action required")
+        val action = call.getString("action") ?: return
         val down = call.getBoolean("down") ?: true
-        inputScope.launch {
-            val ok = hub?.sendAction(action, down) == true
-            call.resolve(JSObject().put("ok", ok))
-        }
+        inputScope.launch { hub?.sendAction(action, down) }
     }
 
-    @PluginMethod
+    @PluginMethod(returnType = PluginMethod.RETURN_NONE)
     fun sendKey(call: PluginCall) {
-        val code = call.getString("code") ?: return call.reject("code required")
+        val code = call.getString("code") ?: return
         val down = call.getBoolean("down") ?: true
-        inputScope.launch {
-            val ok = hub?.sendKey(code, down) == true
-            call.resolve(JSObject().put("ok", ok))
-        }
+        inputScope.launch { hub?.sendKey(code, down) }
     }
 
     @PluginMethod

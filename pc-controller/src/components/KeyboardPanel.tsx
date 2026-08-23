@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { nativeInput, sendPcKey } from '../nativeInput'
 import type { Transport } from '../transport'
 
 type Layout = 'letters' | 'numbers' | 'symbols'
@@ -144,28 +145,32 @@ type Props = {
 
 type PressRec = {
   code: string
-  /** Non-modifiers are sent as one native down/up transaction. */
-  tapped: boolean
+  tempShift: boolean
 }
 
 export function KeyboardPanel({ transport }: Props) {
   const [layout, setLayout] = useState<Layout>('letters')
-  const [down, setDown] = useState<Record<string, boolean>>({})
   const presses = useRef<Record<string, PressRec>>({})
-  /** How many Shift keycaps are currently held (sticky hold). */
   const shiftKeycaps = useRef(0)
 
   const releaseAll = () => {
     for (const [id, rec] of Object.entries(presses.current)) {
-      if (!rec.tapped) transport.key(rec.code, false)
+      sendKey(rec.code, false)
+      if (rec.tempShift && shiftKeycaps.current === 0) {
+        sendKey('ShiftLeft', false)
+      }
       delete presses.current[id]
     }
     if (shiftKeycaps.current > 0) {
-      transport.key('ShiftLeft', false)
-      transport.key('ShiftRight', false)
+      sendKey('ShiftLeft', false)
+      sendKey('ShiftRight', false)
       shiftKeycaps.current = 0
     }
-    setDown({})
+  }
+
+  const sendKey = (code: string, down: boolean) => {
+    sendPcKey(code, down)
+    if (!nativeInput()) transport.key(code, down)
   }
 
   const pressKey = (id: string, key: { label: string; code: string; shift?: boolean }) => {
@@ -175,29 +180,28 @@ export function KeyboardPanel({ transport }: Props) {
       if (key.code === 'ShiftLeft' || key.code === 'ShiftRight') {
         shiftKeycaps.current += 1
       }
-      presses.current[id] = { code: key.code, tapped: false }
-      transport.key(key.code, true)
-      setDown((d) => ({ ...d, [id]: true }))
+      presses.current[id] = { code: key.code, tempShift: false }
+      sendKey(key.code, true)
       return
     }
 
-    const needTempShift = !!key.shift && shiftKeycaps.current === 0
-    presses.current[id] = { code: key.code, tapped: true }
-    transport.tapKey(key.code, needTempShift)
-    setDown((d) => ({ ...d, [id]: true }))
+    const tempShift = !!key.shift && shiftKeycaps.current === 0
+    if (tempShift) sendKey('ShiftLeft', true)
+    presses.current[id] = { code: key.code, tempShift }
+    sendKey(key.code, true)
   }
 
   const releaseKey = (id: string) => {
     const rec = presses.current[id]
     if (!rec) return
     delete presses.current[id]
-    if (!rec.tapped) transport.key(rec.code, false)
-
+    sendKey(rec.code, false)
+    if (rec.tempShift && shiftKeycaps.current === 0) {
+      sendKey('ShiftLeft', false)
+    }
     if (rec.code === 'ShiftLeft' || rec.code === 'ShiftRight') {
       shiftKeycaps.current = Math.max(0, shiftKeycaps.current - 1)
     }
-
-    setDown((d) => ({ ...d, [id]: false }))
   }
 
   const rows = LAYOUTS[layout]
@@ -237,15 +241,25 @@ export function KeyboardPanel({ transport }: Props) {
               <button
                 key={id}
                 type="button"
-                className={`keycap${key.className ? ` ${key.className}` : ''}${down[id] ? ' down' : ''}`}
+                className={`keycap${key.className ? ` ${key.className}` : ''}`}
                 onPointerDown={(e) => {
                   e.preventDefault()
                   e.currentTarget.setPointerCapture(e.pointerId)
+                  e.currentTarget.classList.add('down')
                   pressKey(id, key)
                 }}
-                onPointerUp={() => releaseKey(id)}
-                onPointerCancel={() => releaseKey(id)}
-                onLostPointerCapture={() => releaseKey(id)}
+                onPointerUp={(e) => {
+                  e.currentTarget.classList.remove('down')
+                  releaseKey(id)
+                }}
+                onPointerCancel={(e) => {
+                  e.currentTarget.classList.remove('down')
+                  releaseKey(id)
+                }}
+                onLostPointerCapture={(e) => {
+                  e.currentTarget.classList.remove('down')
+                  releaseKey(id)
+                }}
               >
                 {key.label}
               </button>

@@ -36,10 +36,15 @@ export interface BluetoothHidPlugin {
   mouseScroll(options: { dx?: number; dy: number }): Promise<void>
   key(options: { code: string; down: boolean }): Promise<void>
   tapKey(options: { code: string; shift?: boolean }): Promise<void>
+  setKeyboardVisible(options: { visible: boolean }): Promise<void>
   consumer(options: { action: string; down: boolean }): Promise<void>
   addListener(
     eventName: 'hidState',
     listenerFunc: (state: HidNativeState) => void,
+  ): Promise<PluginListenerHandle>
+  addListener(
+    eventName: 'keyboardClosed',
+    listenerFunc: () => void,
   ): Promise<PluginListenerHandle>
 }
 

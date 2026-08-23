@@ -5,6 +5,7 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
+import com.shiftr.pccontroller.hid.InputJsBridge;
 import com.shiftr.pccontroller.plugin.BluetoothHidPlugin;
 import com.shiftr.pccontroller.plugin.TvRemotePlugin;
 
@@ -21,6 +22,9 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         hideSystemBars();
+        if (getBridge() != null) {
+            InputJsBridge.attach(getBridge().getWebView());
+        }
     }
 
     @Override

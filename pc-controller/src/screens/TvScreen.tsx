@@ -26,7 +26,6 @@ const NUMBERS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '0', '⌫'] a
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 export function TvScreen({ transport }: Props) {
-  const [down, setDown] = useState<Record<string, boolean>>({})
   const [panel, setPanel] = useState<Panel>('remote')
   const activePresses = useRef(new Set<string>())
 
@@ -34,14 +33,12 @@ export function TvScreen({ transport }: Props) {
     const id = `consumer:${action}`
     if (activePresses.current.has(id)) return
     activePresses.current.add(id)
-    setDown((d) => ({ ...d, [action]: true }))
     transport.consumer(action, true)
   }
 
   const releaseConsumer = (action: string) => {
     const id = `consumer:${action}`
     if (!activePresses.current.delete(id)) return
-    setDown((d) => ({ ...d, [action]: false }))
     transport.consumer(action, false)
   }
 
@@ -49,14 +46,12 @@ export function TvScreen({ transport }: Props) {
     const id = `key:${code}`
     if (activePresses.current.has(id)) return
     activePresses.current.add(id)
-    setDown((d) => ({ ...d, [code]: true }))
     transport.key(code, true)
   }
 
   const releaseKey = (code: string) => {
     const id = `key:${code}`
     if (!activePresses.current.delete(id)) return
-    setDown((d) => ({ ...d, [code]: false }))
     transport.key(code, false)
   }
 
@@ -64,22 +59,42 @@ export function TvScreen({ transport }: Props) {
     onPointerDown: (e: PointerEvent) => {
       e.preventDefault()
       e.currentTarget.setPointerCapture(e.pointerId)
+      e.currentTarget.classList.add('down')
       pressConsumer(action)
     },
-    onPointerUp: () => releaseConsumer(action),
-    onPointerCancel: () => releaseConsumer(action),
-    onLostPointerCapture: () => releaseConsumer(action),
+    onPointerUp: (e: PointerEvent<HTMLButtonElement>) => {
+      e.currentTarget.classList.remove('down')
+      releaseConsumer(action)
+    },
+    onPointerCancel: (e: PointerEvent<HTMLButtonElement>) => {
+      e.currentTarget.classList.remove('down')
+      releaseConsumer(action)
+    },
+    onLostPointerCapture: (e: PointerEvent<HTMLButtonElement>) => {
+      e.currentTarget.classList.remove('down')
+      releaseConsumer(action)
+    },
   })
 
   const bindKey = (code: string) => ({
     onPointerDown: (e: PointerEvent) => {
       e.preventDefault()
       e.currentTarget.setPointerCapture(e.pointerId)
+      e.currentTarget.classList.add('down')
       pressKey(code)
     },
-    onPointerUp: () => releaseKey(code),
-    onPointerCancel: () => releaseKey(code),
-    onLostPointerCapture: () => releaseKey(code),
+    onPointerUp: (e: PointerEvent<HTMLButtonElement>) => {
+      e.currentTarget.classList.remove('down')
+      releaseKey(code)
+    },
+    onPointerCancel: (e: PointerEvent<HTMLButtonElement>) => {
+      e.currentTarget.classList.remove('down')
+      releaseKey(code)
+    },
+    onLostPointerCapture: (e: PointerEvent<HTMLButtonElement>) => {
+      e.currentTarget.classList.remove('down')
+      releaseKey(code)
+    },
   })
 
   const numberCode = (n: string) => {
@@ -118,7 +133,7 @@ export function TvScreen({ transport }: Props) {
               <button
                 key={item.action}
                 type="button"
-                className={`action-key${down[item.action] ? ' down' : ''}`}
+                className="action-key"
                 {...bindConsumer(item.action)}
               >
                 {item.label}
@@ -128,21 +143,21 @@ export function TvScreen({ transport }: Props) {
 
           <div className="dpad">
             <div className="dpad-btn empty" />
-            <button type="button" className={`dpad-btn${down.up ? ' down' : ''}`} {...bindConsumer('up')}>
+            <button type="button" className="dpad-btn" {...bindConsumer('up')}>
               ▲
             </button>
             <div className="dpad-btn empty" />
-            <button type="button" className={`dpad-btn${down.left ? ' down' : ''}`} {...bindConsumer('left')}>
+            <button type="button" className="dpad-btn" {...bindConsumer('left')}>
               ◀
             </button>
-            <button type="button" className={`dpad-btn ok${down.ok ? ' down' : ''}`} {...bindConsumer('ok')}>
+            <button type="button" className="dpad-btn ok" {...bindConsumer('ok')}>
               OK
             </button>
-            <button type="button" className={`dpad-btn${down.right ? ' down' : ''}`} {...bindConsumer('right')}>
+            <button type="button" className="dpad-btn" {...bindConsumer('right')}>
               ▶
             </button>
             <div className="dpad-btn empty" />
-            <button type="button" className={`dpad-btn${down.down ? ' down' : ''}`} {...bindConsumer('down')}>
+            <button type="button" className="dpad-btn" {...bindConsumer('down')}>
               ▼
             </button>
             <div className="dpad-btn empty" />
@@ -151,7 +166,7 @@ export function TvScreen({ transport }: Props) {
           <div className="media-row">
             <button
               type="button"
-              className={`action-key${down.volDown ? ' down' : ''}`}
+              className="action-key"
               {...bindConsumer('volDown')}
             >
               Vol −
@@ -160,7 +175,7 @@ export function TvScreen({ transport }: Props) {
               <button
                 key={item.action}
                 type="button"
-                className={`action-key${down[item.action] ? ' down' : ''}`}
+                className="action-key"
                 {...bindConsumer(item.action)}
               >
                 {item.label}
@@ -168,7 +183,7 @@ export function TvScreen({ transport }: Props) {
             ))}
             <button
               type="button"
-              className={`action-key${down.volUp ? ' down' : ''}`}
+              className="action-key"
               {...bindConsumer('volUp')}
             >
               Vol +
@@ -180,7 +195,7 @@ export function TvScreen({ transport }: Props) {
               <button
                 key={item.action}
                 type="button"
-                className={`action-key${down[item.action] ? ' down' : ''}`}
+                className="action-key"
                 {...bindConsumer(item.action)}
               >
                 {item.label}
@@ -188,14 +203,14 @@ export function TvScreen({ transport }: Props) {
             ))}
             <button
               type="button"
-              className={`action-key${down.info ? ' down' : ''}`}
+              className="action-key"
               {...bindConsumer('info')}
             >
               Info
             </button>
             <button
               type="button"
-              className={`action-key${down.input ? ' down' : ''}`}
+              className="action-key"
               {...bindConsumer('input')}
             >
               Input
@@ -214,7 +229,7 @@ export function TvScreen({ transport }: Props) {
                 <button
                   key={n}
                   type="button"
-                  className={`tv-pad-key${down[code] ? ' down' : ''}`}
+                  className="tv-pad-key"
                   {...bindKey(code)}
                 >
                   {n}
@@ -235,7 +250,7 @@ export function TvScreen({ transport }: Props) {
                 <button
                   key={letter}
                   type="button"
-                  className={`tv-pad-key${down[code] ? ' down' : ''}`}
+                  className="tv-pad-key"
                   {...bindKey(code)}
                 >
                   {letter}
@@ -246,21 +261,21 @@ export function TvScreen({ transport }: Props) {
           <div className="tv-abc-extras">
             <button
               type="button"
-              className={`tv-pad-key wide${down.Space ? ' down' : ''}`}
+              className="tv-pad-key wide"
               {...bindKey('Space')}
             >
               Space
             </button>
             <button
               type="button"
-              className={`tv-pad-key${down.Backspace ? ' down' : ''}`}
+              className="tv-pad-key"
               {...bindKey('Backspace')}
             >
               ⌫
             </button>
             <button
               type="button"
-              className={`tv-pad-key${down.Enter ? ' down' : ''}`}
+              className="tv-pad-key"
               {...bindKey('Enter')}
             >
               ⏎

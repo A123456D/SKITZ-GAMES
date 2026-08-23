@@ -1,7 +1,9 @@
-import { useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { KeyboardPanel } from '../components/KeyboardPanel'
 import { SensSlider } from '../components/SensSlider'
 import { accel, coalesced } from '../pointer'
+import { BluetoothHid } from '../plugins/bluetoothHid'
 import { loadInputSettings, saveInputSettings, type InputSettings } from '../settings'
 import type { Transport } from '../transport'
 
@@ -39,6 +41,7 @@ type PadGesture = {
 }
 
 export function TouchScreen({ transport }: Props) {
+  const nativeKeys = Capacitor.isNativePlatform()
   const scrollLastY = useRef<number | null>(null)
   const edgeSwipe = useRef<{ y: number; active: boolean } | null>(null)
   const sheetDrag = useRef<{ y: number; moved: boolean } | null>(null)
@@ -59,6 +62,26 @@ export function TouchScreen({ transport }: Props) {
   const [sheetOffset, setSheetOffset] = useState(0)
   const [sens, setSens] = useState<InputSettings>(() => sensRef.current)
   const glintRef = useRef<HTMLDivElement | null>(null)
+
+  // Native keyboard: touch → Android view → Bluetooth HID (no WebView bridge).
+  useEffect(() => {
+    if (!nativeKeys) return
+    void BluetoothHid.setKeyboardVisible({ visible: keysOpen })
+  }, [nativeKeys, keysOpen])
+
+  useEffect(() => {
+    if (!nativeKeys) return
+    let handle: { remove: () => void } | undefined
+    void BluetoothHid.addListener('keyboardClosed', () => {
+      setKeysOpen(false)
+      setOffset(0)
+    }).then((h) => {
+      handle = h
+    })
+    return () => {
+      handle?.remove()
+    }
+  }, [nativeKeys])
 
   const updateSens = (patch: Partial<InputSettings>) => {
     const next = { ...sensRef.current, ...patch }
@@ -454,21 +477,23 @@ export function TouchScreen({ transport }: Props) {
         </div>
       </div>
 
-      <div
-        className={`keyboard-sheet${keysOpen ? ' open' : ''}${sheetOffset > 0 ? ' dragging' : ''}`}
-        style={sheetStyle}
-      >
+      {!nativeKeys && (
         <div
-          className="sheet-handle"
-          onPointerDown={onHandleDown}
-          onPointerMove={onHandleMove}
-          onPointerUp={onHandleUp}
-          onPointerCancel={onHandleUp}
+          className={`keyboard-sheet${keysOpen ? ' open' : ''}${sheetOffset > 0 ? ' dragging' : ''}`}
+          style={sheetStyle}
         >
-          <span className="sheet-grip" />
+          <div
+            className="sheet-handle"
+            onPointerDown={onHandleDown}
+            onPointerMove={onHandleMove}
+            onPointerUp={onHandleUp}
+            onPointerCancel={onHandleUp}
+          >
+            <span className="sheet-grip" />
+          </div>
+          <KeyboardPanel transport={transport} />
         </div>
-        <KeyboardPanel transport={transport} />
-      </div>
+      )}
     </section>
   )
 }

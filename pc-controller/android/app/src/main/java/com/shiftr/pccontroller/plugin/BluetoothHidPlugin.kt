@@ -12,6 +12,10 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Process
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
@@ -25,6 +29,8 @@ import com.shiftr.pccontroller.hid.HidConnectionState
 import com.shiftr.pccontroller.hid.HidController
 import com.shiftr.pccontroller.hid.HidService
 import com.shiftr.pccontroller.hid.HidUiState
+import com.shiftr.pccontroller.hid.InputJsBridge
+import com.shiftr.pccontroller.hid.NativeKeyboardView
 
 @CapacitorPlugin(
     name = "BluetoothHid",
@@ -57,16 +63,7 @@ class BluetoothHidPlugin : Plugin() {
         if (!outThread.isAlive) outThread.start()
         Handler(outThread.looper)
     }
-    /**
-     * Keyboard reports must never wait behind touchpad motion. Keeping their
-     * ordered queue separate removes the noticeable key-down/key-up lag while
-     * preserving modifier ordering.
-     */
-    private val keyThread = HandlerThread("hid-key", Process.THREAD_PRIORITY_URGENT_DISPLAY)
-    private val keyHandler: Handler by lazy {
-        if (!keyThread.isAlive) keyThread.start()
-        Handler(keyThread.looper)
-    }
+    private var keyboardView: NativeKeyboardView? = null
 
     private var pendingMouseDx = 0
     private var pendingMouseDy = 0
@@ -106,6 +103,7 @@ class BluetoothHidPlugin : Plugin() {
                 val local = binder as HidService.LocalBinder
                 service = local.getService()
                 controller = service?.controller
+                InputJsBridge.hid = controller
                 bound = true
                 controller?.listener =
                     HidStateListenerBridge { state ->
@@ -118,12 +116,19 @@ class BluetoothHidPlugin : Plugin() {
             override fun onServiceDisconnected(name: ComponentName?) {
                 bound = false
                 controller = null
+                InputJsBridge.hid = null
                 service = null
             }
         }
 
     override fun load() {
         bindHidService()
+        activity.runOnUiThread { InputJsBridge.attach(bridge.webView) }
+    }
+
+    override fun handleOnStart() {
+        super.handleOnStart()
+        activity.runOnUiThread { InputJsBridge.attach(bridge.webView) }
     }
 
     override fun handleOnDestroy() {
@@ -134,8 +139,8 @@ class BluetoothHidPlugin : Plugin() {
             }
             bound = false
         }
+        detachKeyboard()
         if (outThread.isAlive) outThread.quitSafely()
-        if (keyThread.isAlive) keyThread.quitSafely()
         super.handleOnDestroy()
     }
 
@@ -323,19 +328,31 @@ class BluetoothHidPlugin : Plugin() {
         call.resolve()
     }
 
-    @PluginMethod
+    @PluginMethod(returnType = PluginMethod.RETURN_NONE)
     fun key(call: PluginCall) {
-        val code = call.getString("code") ?: return call.reject("code required")
+        val code = call.getString("code") ?: return
         val down = call.getBoolean("down") ?: false
-        keyHandler.post { controller?.keyEvent(code, down) }
-        call.resolve()
+        // Do not queue on outHandler — a backlog here is the keyboard lag users saw.
+        controller?.keyEvent(code, down)
+    }
+
+    @PluginMethod(returnType = PluginMethod.RETURN_NONE)
+    fun tapKey(call: PluginCall) {
+        val code = call.getString("code") ?: return
+        val shift = call.getBoolean("shift") ?: false
+        val hid = controller ?: return
+        if (shift) hid.keyEvent("ShiftLeft", true)
+        hid.keyEvent(code, true)
+        hid.keyEvent(code, false)
+        if (shift) hid.keyEvent("ShiftLeft", false)
     }
 
     @PluginMethod
-    fun tapKey(call: PluginCall) {
-        val code = call.getString("code") ?: return call.reject("code required")
-        val shift = call.getBoolean("shift") ?: false
-        keyHandler.post { controller?.tapKey(code, shift) }
+    fun setKeyboardVisible(call: PluginCall) {
+        val visible = call.getBoolean("visible") ?: false
+        activity.runOnUiThread {
+            if (visible) showKeyboard() else hideKeyboard()
+        }
         call.resolve()
     }
 
@@ -343,8 +360,59 @@ class BluetoothHidPlugin : Plugin() {
     fun consumer(call: PluginCall) {
         val action = call.getString("action") ?: return call.reject("action required")
         val down = call.getBoolean("down") ?: false
-        outHandler.post { controller?.consumer(action, down) }
+        controller?.consumer(action, down)
         call.resolve()
+    }
+
+    private fun showKeyboard() {
+        val host = keyboardHost() ?: return
+        val existing = keyboardView
+        val params =
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM,
+            )
+        if (existing == null) {
+            val view =
+                NativeKeyboardView(
+                    activity,
+                    { controller },
+                    {
+                        hideKeyboard()
+                        notifyListeners("keyboardClosed", JSObject())
+                    },
+                )
+            view.elevation = 64f
+            view.translationZ = 64f
+            view.setZ(1000f)
+            keyboardView = view
+            host.addView(view, params)
+        } else {
+            existing.reset()
+            if (existing.parent !== host) {
+                (existing.parent as? ViewGroup)?.removeView(existing)
+                host.addView(existing, params)
+            }
+        }
+        keyboardView?.visibility = View.VISIBLE
+        keyboardView?.bringToFront()
+        host.bringChildToFront(keyboardView)
+    }
+
+    private fun hideKeyboard() {
+        keyboardView?.reset()
+        keyboardView?.visibility = View.GONE
+    }
+
+    private fun detachKeyboard() {
+        val view = keyboardView ?: return
+        (view.parent as? ViewGroup)?.removeView(view)
+        keyboardView = null
+    }
+
+    private fun keyboardHost(): ViewGroup? {
+        return activity.findViewById(android.R.id.content)
     }
 
     private fun bindHidService() {

@@ -5,6 +5,17 @@ import type { DeviceInfo, Transport } from './types'
 type Listener = () => void
 type LinkMode = 'none' | 'bluetooth' | 'wifi-tv'
 
+type NativeInput = {
+  key: (code: string, down: boolean) => void
+  tvKey: (code: string, down: boolean) => void
+  consumer: (action: string, down: boolean) => void
+  tvConsumer: (action: string, down: boolean) => void
+}
+
+function nativeInput(): NativeInput | undefined {
+  return (window as Window & { HidInput?: NativeInput }).HidInput
+}
+
 function mapConnection(state: HidNativeState): Transport['state'] {
   switch (state.connection) {
     case 'Connected':
@@ -341,33 +352,37 @@ export function createBluetoothTransport(): Transport & {
       pumpMouseScroll()
     },
     key(code: string, down: boolean) {
+      const native = nativeInput()
       if (link === 'wifi-tv') {
-        void TvRemote.sendKey({ code, down })
+        if (native) native.tvKey(code, down)
+        else void TvRemote.sendKey({ code, down })
         return
       }
-      void BluetoothHid.key({ code, down })
+      if (native) native.key(code, down)
+      else void BluetoothHid.key({ code, down })
     },
     tapKey(code: string, shift = false) {
-      if (link === 'wifi-tv') {
-        void TvRemote.sendKey({ code, down: true }).then(() => TvRemote.sendKey({ code, down: false }))
-        return
-      }
-      void BluetoothHid.tapKey({ code, shift })
+      if (shift) this.key('ShiftLeft', true)
+      this.key(code, true)
+      this.key(code, false)
+      if (shift) this.key('ShiftLeft', false)
     },
     consumer(action: string, down: boolean) {
+      const native = nativeInput()
       if (link === 'wifi-tv') {
-        // Vendor clients route streaming actions through their own app IDs.
-        // Do not also call launchApp here: that sent every shortcut twice.
-        void TvRemote.sendAction({ action, down }).then((result) => {
-          if (action !== 'power' || !down) return
-          nativeMessage = result.ok
-            ? 'Power command sent · wake may take a few seconds'
-            : 'Could not wake TV · connect once while it is on and enable Power On with Mobile'
-          notify()
-        })
+        if (native) {
+          native.tvConsumer(action, down)
+          if (action === 'power' && down) {
+            nativeMessage = 'Power command sent · wake may take a few seconds'
+            notify()
+          }
+          return
+        }
+        void TvRemote.sendAction({ action, down })
         return
       }
-      void BluetoothHid.consumer({ action, down })
+      if (native) native.consumer(action, down)
+      else void BluetoothHid.consumer({ action, down })
     },
   }
 }

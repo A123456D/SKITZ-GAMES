@@ -67,6 +67,7 @@ class HidController(private val context: Context) {
     private var uiState = HidUiState(message = "Tap Start HID to begin")
     var listener: HidStateListener? = null
 
+    /** Modifiers from held keycaps (Shift, Ctrl, …). */
     private var modifierByte: Byte = 0
     private val pressedKeys = LinkedHashSet<Byte>()
     private var mouseButtons = 0
@@ -195,7 +196,7 @@ class HidController(private val context: Context) {
                             val empty =
                                 when (id.toInt()) {
                                     HidDescriptors.MOUSE_REPORT_ID -> ByteArray(7)
-                                    HidDescriptors.KEYBOARD_REPORT_ID -> ByteArray(8)
+                                    HidDescriptors.KEYBOARD_REPORT_ID -> ByteArray(3)
                                     HidDescriptors.CONSUMER_REPORT_ID -> ByteArray(2)
                                     else -> ByteArray(max(1, bufferSize).coerceAtMost(16))
                                 }
@@ -514,37 +515,19 @@ class HidController(private val context: Context) {
             return flushKeyboard()
         }
         if (usage == HidKeys.NONE) return false
-        if (down) pressedKeys.add(usage) else pressedKeys.remove(usage)
+        if (down) {
+            pressedKeys.clear()
+            pressedKeys.add(usage)
+        } else {
+            pressedKeys.remove(usage)
+        }
         return flushKeyboard()
     }
 
-    /**
-     * Sends a complete key stroke in one native queue job. This avoids two to
-     * four WebView/Capacitor round trips for every on-screen key tap.
-     */
-    fun tapKey(domCode: String, withShift: Boolean): Boolean {
-        val (usage, mod) = HidKeys.fromDomCode(domCode)
-        if (usage == HidKeys.NONE || mod.toInt() != 0) return false
-
-        val originalModifiers = modifierByte
-        var ok = true
-        if (withShift) {
-            val shiftMod = HidKeys.fromDomCode("ShiftLeft").second
-            modifierByte = (modifierByte.toInt() or shiftMod.toInt()).toByte()
-            ok = flushKeyboard() && ok
-        }
-
-        val wasPressed = pressedKeys.contains(usage)
-        pressedKeys.add(usage)
-        ok = flushKeyboard() && ok
-        if (!wasPressed) pressedKeys.remove(usage)
-        ok = flushKeyboard() && ok
-
-        if (modifierByte != originalModifiers) {
-            modifierByte = originalModifiers
-            ok = flushKeyboard() && ok
-        }
-        return ok
+    fun releaseAllKeys(): Boolean {
+        modifierByte = 0
+        pressedKeys.clear()
+        return flushKeyboard()
     }
 
     fun consumer(action: String, down: Boolean): Boolean {
@@ -598,13 +581,8 @@ class HidController(private val context: Context) {
         val hid = hidDevice
         // Hot path: skip getConnectionState — the binder round trip lags fast typing.
         if (host == null || hid == null || !registered) return false
-        // Standard keyboard report: modifier, reserved, then up to six keys.
-        // This is required for diagonal WASD and actions such as W + Space.
-        val report = ByteArray(8)
-        report[0] = modifierByte
-        pressedKeys.take(6).forEachIndexed { index, key ->
-            report[index + 2] = key
-        }
+        val key = pressedKeys.firstOrNull() ?: 0
+        val report = byteArrayOf(modifierByte, 0, key)
         return try {
             hid.sendReport(host, HidDescriptors.KEYBOARD_REPORT_ID, report)
         } catch (_: SecurityException) {

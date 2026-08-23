@@ -496,6 +496,43 @@ button.status-pill:active {
   line-height: 1.5;
 }
 
+.manual-section p + p,
+.manual-section p + ol,
+.manual-section p + ul {
+  margin-top: 8px;
+}
+
+.manual-body {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.manual-body p {
+  margin: 0;
+}
+
+.manual-body p + p,
+.manual-body p + ol,
+.manual-body p + ul {
+  margin-top: 8px;
+}
+
+.manual-body ol,
+.manual-body ul {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+
+.manual-body li + li {
+  margin-top: 4px;
+}
+
+.manual-body strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .privacy-link {
   justify-self: start;
   color: var(--accent);
