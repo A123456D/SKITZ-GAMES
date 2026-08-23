@@ -529,9 +529,9 @@ class HidController(private val context: Context) {
         val host = hostDevice ?: return false
         val hid = hidDevice ?: return false
         if (!registered) return false
-        // Soft-fail like mouse: never clear hostDevice on a single bad report.
-        // Aggressive disconnect made Keys go dead after a transient BT blip (e.g. rotate).
-        if (!isConnectedTo(host)) return false
+        // Match the working mouse hot path: Android's connection-state binder can
+        // return stale DISCONNECTED while interrupt reports still reach the host.
+        // Trust the callback-owned host and let sendReport() be the source of truth.
         // Kontroller keyboard: modifier + reserved + single key
         val key = pressedKeys.firstOrNull() ?: 0
         val report = byteArrayOf(modifierByte, 0, key)
