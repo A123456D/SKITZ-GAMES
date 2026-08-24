@@ -1,12 +1,36 @@
-/* PulseFold — offline cache (pulsefold-v25).
+/**
+ * Shared Skitz game service worker — network-first shell so deploys don't pin
+ * a dead hashed bundle (Android Chrome cache-first pin class).
+ *
+ * Rules:
+ * - Precache only shell (index + manifest)
+ * - Shell / JS / CSS: network-first, cache on success
+ * - Binary assets: network-first with safeToCache (never store HTML as image)
+ * - Skip Range / music / audio streaming paths
+ * - Activate: keep only current CACHE
+ */
+export function buildGameSw({
+  cacheName,
+  skipPathIncludes = ["/music/", "/audio/", "/playlist/"],
+  binaryPathIncludes = [],
+  precache = ["./", "./index.html", "./manifest.webmanifest"],
+  label = "Skitz game",
+} = {}) {
+  if (!cacheName) throw new Error("buildGameSw: cacheName required");
+
+  const skipLit = JSON.stringify(skipPathIncludes);
+  const binLit = JSON.stringify(binaryPathIncludes);
+  const precacheLit = JSON.stringify(precache);
+
+  return `/* ${label} — offline cache (${cacheName}).
  * Network-first shell. Never cache text/html as an image/audio asset. */
-const CACHE = "pulsefold-v25";
-const SKIP_PATHS = ["/audio/","/playlist/"];
-const BINARY_EXTRA = [];
-const PRECACHE = ["./","./index.html","./manifest.webmanifest"];
+const CACHE = ${JSON.stringify(cacheName)};
+const SKIP_PATHS = ${skipLit};
+const BINARY_EXTRA = ${binLit};
+const PRECACHE = ${precacheLit};
 
 const ASSET_EXT =
-  /\.(png|jpe?g|gif|webp|avif|svg|ico|mp3|ogg|wav|webm|mp4|m4a|woff2?|ttf|otf)$/i;
+  /\\.(png|jpe?g|gif|webp|avif|svg|ico|mp3|ogg|wav|webm|mp4|m4a|woff2?|ttf|otf)$/i;
 
 function shouldSkip(url) {
   return SKIP_PATHS.some((p) => url.pathname.includes(p));
@@ -117,3 +141,20 @@ self.addEventListener("fetch", (event) => {
     })(),
   );
 });
+`;
+}
+
+/** Tiny client register snippet for main.ts / index.html */
+export const SW_REGISTER_SNIPPET = `if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker
+      .register("./sw.js", { updateViaCache: "none" })
+      .then((reg) => {
+        void reg.update();
+      })
+      .catch(() => {
+        /* offline install is best-effort */
+      });
+  });
+}
+`;

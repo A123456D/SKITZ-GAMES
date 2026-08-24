@@ -1,6 +1,7 @@
-import { cpSync, mkdirSync, rmSync, existsSync, writeFileSync, readFileSync, readdirSync, unlinkSync } from "node:fs";
+import { cpSync, mkdirSync, rmSync, existsSync, writeFileSync, readdirSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildGameSw } from "../../scripts/skitz-game-sw.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -10,9 +11,9 @@ const dest = join(root, "..", "website", "public", "games", "oculum", "web");
 const destFresh = join(root, "..", "website", "public", "games", "oculum", "b9");
 const siteImg = join(root, "..", "website", "public", "images", "oculum-seal.png");
 const seal = join(root, "public", "assets", "ui", "seal-eye.png");
-/** Bump whenever shipping a critical client fix so phones drop stale SW caches. */
-const SW_CACHE = "oculum-beta-v35";
-const BUST = "35";
+/** Bump on every meaningful ship so activate drops stale shells. */
+const SW_CACHE = "oculum-v36";
+const BUST = "36";
 
 if (!existsSync(dist)) {
   console.error("Missing dist/ — run npm run build first");
@@ -50,81 +51,22 @@ if (existsSync(seal)) {
   cpSync(seal, siteImg);
 }
 
-const bustScript = `<script>
-(function () {
-  var KEY = "oculum-bust-v${BUST}";
-  try {
-    if (sessionStorage.getItem(KEY) === "1") return;
-    sessionStorage.setItem(KEY, "1");
-  } catch (e) {}
-  var done = function () {
-    try {
-      var u = new URL(location.href);
-      if (u.searchParams.get("v") !== "${BUST}") {
-        u.searchParams.set("v", "${BUST}");
-        location.replace(u.toString());
-      }
-    } catch (e2) {}
-  };
-  var run = async function () {
-    try {
-      if ("serviceWorker" in navigator) {
-        var regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map(function (r) { return r.unregister(); }));
-      }
-      if (window.caches && caches.keys) {
-        var keys = await caches.keys();
-        await Promise.all(keys.map(function (k) { return caches.delete(k); }));
-      }
-    } catch (e3) {}
-    done();
-  };
-  void run();
-})();
-</script>`;
+const offlineSw = buildGameSw({
+  cacheName: SW_CACHE,
+  label: "OCULUM",
+  skipPathIncludes: ["/music/", "/audio/"],
+  binaryPathIncludes: ["/assets/cards/", "/assets/ui/"],
+  precache: ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"],
+});
 
-const killSw = `const CACHE = "${SW_CACHE}";
-self.addEventListener("install", (e) => {
-  e.waitUntil(self.skipWaiting());
-});
-self.addEventListener("activate", (e) => {
-  e.waitUntil((async () => {
-    const keys = await caches.keys();
-    await Promise.all(keys.map((k) => caches.delete(k)));
-    await self.registration.unregister();
-    const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const c of clients) {
-      try {
-        const u = new URL(c.url);
-        u.searchParams.set("v", "${BUST}");
-        await c.navigate(u.toString());
-      } catch (_) {
-        /* ignore */
-      }
-    }
-  })());
-});
-self.addEventListener("fetch", (e) => {
-  e.respondWith(fetch(e.request));
-});
-`;
-
-function patchShell(target) {
-  const indexPath = join(target, "index.html");
-  const indexHtml = readFileSync(indexPath, "utf8");
-  if (!indexHtml.includes(`oculum-bust-v${BUST}`)) {
-    writeFileSync(
-      indexPath,
-      indexHtml.replace(/<head[^>]*>/i, (m) => `${m}\n    ${bustScript}`),
-    );
-  }
-  writeFileSync(join(target, "sw.js"), killSw);
+function writeSw(target) {
+  writeFileSync(join(target, "sw.js"), offlineSw);
 }
 
-patchShell(dest);
-patchShell(destFresh);
+writeSw(dest);
+writeSw(destFresh);
 
-// Escape hatch under old /web/ scope if a stale SW ever lets network through.
+// Escape hatch under old /web/ scope if a stale SW ever misbehaves.
 writeFileSync(
   join(dest, "fresh.html"),
   `<!doctype html><meta charset="utf-8"><title>OCULUM</title>

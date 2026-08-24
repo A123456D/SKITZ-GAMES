@@ -1,38 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <script>
-(function () {
-  var KEY = "oculum-bust-v35";
-  try {
-    if (sessionStorage.getItem(KEY) === "1") return;
-    sessionStorage.setItem(KEY, "1");
-  } catch (e) {}
-  var done = function () {
-    try {
-      var u = new URL(location.href);
-      if (u.searchParams.get("v") !== "35") {
-        u.searchParams.set("v", "35");
-        location.replace(u.toString());
-      }
-    } catch (e2) {}
-  };
-  var run = async function () {
-    try {
-      if ("serviceWorker" in navigator) {
-        var regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map(function (r) { return r.unregister(); }));
-      }
-      if (window.caches && caches.keys) {
-        var keys = await caches.keys();
-        await Promise.all(keys.map(function (k) { return caches.delete(k); }));
-      }
-    } catch (e3) {}
-    done();
-  };
-  void run();
-})();
-</script>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -57,7 +25,7 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-CYvOxC39.js"></script>
+    <script type="module" crossorigin src="./assets/index-C27GDFHf.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-D7NR6IMH.css">
   </head>
   <body class="on-menu">

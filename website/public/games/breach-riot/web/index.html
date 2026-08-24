@@ -34,5 +34,16 @@
     <div id="app">
       <canvas id="game" width="720" height="1280"></canvas>
     </div>
-  </body>
+    <script data-skitz-sw-register>
+(function () {
+  if (!("serviceWorker" in navigator)) return;
+  window.addEventListener("load", function () {
+    navigator.serviceWorker
+      .register("./sw.js", { updateViaCache: "none" })
+      .then(function (reg) { return reg.update(); })
+      .catch(function () {});
+  });
+})();
+</script>
+</body>
 </html>

@@ -1,7 +1,7 @@
-/* PulseFold — offline cache (pulsefold-v25).
+/* Nexus Chess — offline cache (nexus-chess-v1).
  * Network-first shell. Never cache text/html as an image/audio asset. */
-const CACHE = "pulsefold-v25";
-const SKIP_PATHS = ["/audio/","/playlist/"];
+const CACHE = "nexus-chess-v1";
+const SKIP_PATHS = ["/music/","/audio/","/playlist/"];
 const BINARY_EXTRA = [];
 const PRECACHE = ["./","./index.html","./manifest.webmanifest"];
 

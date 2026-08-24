@@ -1,6 +1,7 @@
-import { cpSync, mkdirSync, rmSync, existsSync } from "node:fs";
+import { cpSync, mkdirSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildGameSw } from "../../scripts/skitz-game-sw.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -16,4 +17,13 @@ mkdirSync(dirname(dest), { recursive: true });
 rmSync(dest, { recursive: true, force: true });
 mkdirSync(dest, { recursive: true });
 cpSync(dist, dest, { recursive: true });
+
+writeFileSync(
+  join(dest, "sw.js"),
+  buildGameSw({
+    cacheName: "nexus-chess-v1",
+    label: "Nexus Chess",
+  }),
+);
+
 console.log(`Copied ${dist} → ${dest}`);

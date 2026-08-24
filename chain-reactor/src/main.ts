@@ -1040,3 +1040,16 @@ if (import.meta.hot) {
     window.removeEventListener("resize", resize);
   });
 }
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker
+      .register("./sw.js", { updateViaCache: "none" })
+      .then((reg) => {
+        void reg.update();
+      })
+      .catch(() => {
+        /* offline install is best-effort */
+      });
+  });
+}

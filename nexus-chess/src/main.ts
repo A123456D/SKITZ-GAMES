@@ -948,3 +948,16 @@ void loadNexusMark();
 void loadAbilityIcons();
 void loadSfx();
 document.querySelector('meta[name="theme-color"]')?.setAttribute("content", Theme.bg);
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker
+      .register("./sw.js", { updateViaCache: "none" })
+      .then((reg) => {
+        void reg.update();
+      })
+      .catch(() => {
+        /* offline install is best-effort */
+      });
+  });
+}

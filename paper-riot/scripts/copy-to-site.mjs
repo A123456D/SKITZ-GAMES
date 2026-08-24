@@ -1,6 +1,7 @@
 import { cpSync, mkdirSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildGameSw } from "../../scripts/skitz-game-sw.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
@@ -17,12 +18,12 @@ rmSync(dest, { recursive: true, force: true });
 mkdirSync(dest, { recursive: true });
 cpSync(dist, dest, { recursive: true });
 
-// Minimal SW so PWA install path matches other SKITZ games.
 writeFileSync(
   join(dest, "sw.js"),
-  `self.addEventListener('install', e => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
-`,
+  buildGameSw({
+    cacheName: "paper-riot-v1",
+    label: "Paper Riot",
+  }),
 );
 
 console.log(`Copied ${dist} → ${dest}`);

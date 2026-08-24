@@ -1,12 +1,19 @@
-/* Breach Riot — install shell only; never cache HTML as binary assets. */
-const CACHE = "breach-riot-v2";
-const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
+/* Breach Riot — offline cache (breach-riot-v3).
+ * Network-first shell. Never cache text/html as an image/audio asset. */
+const CACHE = "breach-riot-v3";
+const SKIP_PATHS = ["/music/","/audio/","/playlist/"];
+const BINARY_EXTRA = [];
+const PRECACHE = ["./","./index.html","./manifest.webmanifest","./icon-192.png","./icon-512.png"];
 
 const ASSET_EXT =
   /\.(png|jpe?g|gif|webp|avif|svg|ico|mp3|ogg|wav|webm|mp4|m4a|woff2?|ttf|otf)$/i;
 
+function shouldSkip(url) {
+  return SKIP_PATHS.some((p) => url.pathname.includes(p));
+}
+
 function isBinaryAsset(url) {
-  return ASSET_EXT.test(url.pathname) || url.pathname.includes("/assets/");
+  return ASSET_EXT.test(url.pathname) || BINARY_EXTRA.some((p) => url.pathname.includes(p));
 }
 
 function safeToCache(req, res) {
@@ -18,60 +25,95 @@ function safeToCache(req, res) {
     !ct.includes("image") &&
     !ct.includes("audio") &&
     !ct.includes("font") &&
-    !ct.includes("octet-stream") &&
-    !ct.includes("javascript") &&
-    !ct.includes("css")
+    !ct.includes("octet-stream")
   ) {
-    // Allow caching shell HTML only for navigate/html requests handled below.
     return false;
   }
   return true;
 }
 
-self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
-});
-
-self.addEventListener("activate", (e) => {
-  e.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      try {
+        await cache.addAll(PRECACHE);
+      } catch (_) {
+        /* shell may 404 in some mirrors — still activate */
+      }
+      self.skipWaiting();
+    })(),
   );
 });
 
-self.addEventListener("fetch", (e) => {
-  const req = e.request;
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })(),
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
   if (req.method !== "GET") return;
+
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  if (shouldSkip(url)) return;
 
   const isShell =
     req.mode === "navigate" || url.pathname.endsWith(".html") || url.pathname.endsWith("/");
+  const isScript =
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".css") ||
+    url.pathname.endsWith(".webmanifest") ||
+    url.pathname.endsWith("/sw.js");
 
-  e.respondWith(
+  if (isShell || isScript) {
+    event.respondWith(
+      (async () => {
+        try {
+          const fresh = await fetch(req);
+          if (safeToCache(req, fresh)) {
+            const cache = await caches.open(CACHE);
+            cache.put(req, fresh.clone());
+          }
+          return fresh;
+        } catch {
+          const cached = await caches.match(req);
+          if (cached) return cached;
+          if (isShell) return caches.match("./index.html");
+          return Response.error();
+        }
+      })(),
+    );
+    return;
+  }
+
+  event.respondWith(
     (async () => {
       try {
-        const res = await fetch(req);
-        if (isShell && res.ok) {
+        const fresh = await fetch(req);
+        if (safeToCache(req, fresh)) {
           const cache = await caches.open(CACHE);
-          cache.put(req, res.clone());
-        } else if (safeToCache(req, res)) {
-          const cache = await caches.open(CACHE);
-          cache.put(req, res.clone());
+          cache.put(req, fresh.clone());
         }
-        return res;
+        if (fresh.ok) return fresh;
       } catch {
-        const hit = await caches.match(req);
-        if (hit) {
-          const ct = (hit.headers.get("content-type") || "").toLowerCase();
-          if (isBinaryAsset(url) && ct.includes("text/html")) return Response.error();
-          return hit;
-        }
-        if (isShell) return caches.match("./index.html");
-        return Response.error();
+        /* fall through to cache */
       }
+      const cached = await caches.match(req);
+      if (cached) {
+        const ct = (cached.headers.get("content-type") || "").toLowerCase();
+        if (isBinaryAsset(url) && ct.includes("text/html")) {
+          return Response.error();
+        }
+        return cached;
+      }
+      return Response.error();
     })(),
   );
 });

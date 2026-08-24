@@ -1,19 +1,32 @@
-/* Pulse Link — Android install / offline cache.
- * Never cache text/html as an image/audio asset (SPA 200 poison). */
-const CACHE = "pulse-link-v19";
+/* Pulse Link — offline cache (pulse-link-v20).
+ * Network-first shell. Never cache text/html as an image/audio asset. */
+const CACHE = "pulse-link-v20";
+const SKIP_PATHS = ["/music/"];
+const BINARY_EXTRA = [];
+const PRECACHE = ["./","./index.html","./manifest.webmanifest"];
 
 const ASSET_EXT =
   /\.(png|jpe?g|gif|webp|avif|svg|ico|mp3|ogg|wav|webm|mp4|m4a|woff2?|ttf|otf)$/i;
 
+function shouldSkip(url) {
+  return SKIP_PATHS.some((p) => url.pathname.includes(p));
+}
+
 function isBinaryAsset(url) {
-  return ASSET_EXT.test(url.pathname) || url.pathname.includes("/music/");
+  return ASSET_EXT.test(url.pathname) || BINARY_EXTRA.some((p) => url.pathname.includes(p));
 }
 
 function safeToCache(req, res) {
   if (!res || !res.ok) return false;
   const ct = (res.headers.get("content-type") || "").toLowerCase();
   if (ct.includes("text/html")) return false;
-  if (isBinaryAsset(new URL(req.url)) && !ct.includes("image") && !ct.includes("audio") && !ct.includes("font") && !ct.includes("octet-stream")) {
+  if (
+    isBinaryAsset(new URL(req.url)) &&
+    !ct.includes("image") &&
+    !ct.includes("audio") &&
+    !ct.includes("font") &&
+    !ct.includes("octet-stream")
+  ) {
     return false;
   }
   return true;
@@ -23,7 +36,11 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE);
-      await cache.addAll(["./", "./index.html", "./manifest.webmanifest"]);
+      try {
+        await cache.addAll(PRECACHE);
+      } catch (_) {
+        /* shell may 404 in some mirrors — still activate */
+      }
       self.skipWaiting();
     })(),
   );
@@ -45,9 +62,7 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-
-  // Never intercept music — Range requests break under respondWith.
-  if (url.pathname.includes("/music/")) return;
+  if (shouldSkip(url)) return;
 
   const isShell =
     req.mode === "navigate" || url.pathname.endsWith(".html") || url.pathname.endsWith("/");
@@ -86,8 +101,6 @@ self.addEventListener("fetch", (event) => {
           const cache = await caches.open(CACHE);
           cache.put(req, fresh.clone());
         }
-        // Network-first for art: never prefer a poisoned HTML cache entry.
-        if (fresh.ok && safeToCache(req, fresh)) return fresh;
         if (fresh.ok) return fresh;
       } catch {
         /* fall through to cache */

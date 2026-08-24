@@ -11,7 +11,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "smoke:assets": "node scripts/smoke-assets.mjs"
+    "smoke:assets": "node scripts/smoke-assets.mjs",
+    "enable-offline": "node ../scripts/enable-offline-games.mjs"
   },
   "dependencies": {
     "astro": "^7.1.3"

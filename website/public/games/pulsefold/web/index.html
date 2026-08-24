@@ -23,5 +23,16 @@
   </head>
   <body>
     <div id="app"></div>
-  </body>
+    <script data-skitz-sw-register>
+(function () {
+  if (!("serviceWorker" in navigator)) return;
+  window.addEventListener("load", function () {
+    navigator.serviceWorker
+      .register("./sw.js", { updateViaCache: "none" })
+      .then(function (reg) { return reg.update(); })
+      .catch(function () {});
+  });
+})();
+</script>
+</body>
 </html>
