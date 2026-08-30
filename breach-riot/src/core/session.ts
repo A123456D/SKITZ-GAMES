@@ -84,7 +84,7 @@ export function startSession(level: LevelDef, deck: Deck): Session {
     scrambleAt: 0,
     rng: mulberry32(level.seed ^ 0x9e3779b9),
     coach,
-    timerStarted: false,
+    timerStarted: true,
     timeLeft: timeLimit,
     timedOut: false,
   };
@@ -141,7 +141,7 @@ export function tryPick(session: Session, pos: Pos): PickResult {
     daemons,
     picks,
     coach: null,
-    timerStarted: true,
+    timerStarted: session.timerStarted,
   };
 
   let scrambled: Pos[] = [];
@@ -155,9 +155,6 @@ export function tryPick(session: Session, pos: Pos): PickResult {
   }
 
   if (remaining === 0 || currentLegal(next).length === 0) {
-    next = resolveRound(next);
-  } else if (next.daemons.every((d) => d.completed)) {
-    // All Datamines uploaded — don't force junk filler picks.
     next = resolveRound(next);
   }
 

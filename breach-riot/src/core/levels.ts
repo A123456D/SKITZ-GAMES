@@ -26,7 +26,7 @@ export const LEVELS: LevelDef[] = [
     timeLimit: 35,
     seed: 201,
     twists: {
-      coach: "Opening pick must be on the top row. Study the matrix — the clock starts on first pick.",
+      coach: "Opening pick must be on the top row. Next pick is that COLUMN, then ROW, repeating. The clock is already running.",
     },
     datamines: [
       dm(1, ["1C", "55"]),

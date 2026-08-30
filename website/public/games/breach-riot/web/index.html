@@ -27,12 +27,24 @@
       href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-CxVx6Jd3.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-t-7JCddX.css">
+    <script type="module" crossorigin src="./assets/index-DvGHgIAb.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BOB1sA-1.css">
   </head>
   <body>
     <div id="app">
-      <canvas id="game" width="720" height="1280"></canvas>
+      <div id="stage">
+        <canvas id="game" width="720" height="1280"></canvas>
+        <label id="handle-wrap" class="hidden">
+          <span>USERNAME</span>
+          <input
+            id="handle-input"
+            maxlength="16"
+            autocomplete="username"
+            spellcheck="false"
+            placeholder="YOUR NAME"
+          />
+        </label>
+      </div>
     </div>
   </body>
 </html>

@@ -31,7 +31,19 @@
   </head>
   <body>
     <div id="app">
-      <canvas id="game" width="720" height="1280"></canvas>
+      <div id="stage">
+        <canvas id="game" width="720" height="1280"></canvas>
+        <label id="handle-wrap" class="hidden">
+          <span>USERNAME</span>
+          <input
+            id="handle-input"
+            maxlength="16"
+            autocomplete="username"
+            spellcheck="false"
+            placeholder="YOUR NAME"
+          />
+        </label>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

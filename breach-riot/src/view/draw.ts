@@ -1,5 +1,6 @@
+import { formatTime, type ScoreEntry } from "../core/board";
+import { sequenceStillPossible } from "../core/buffer";
 import type { Session } from "../core/session";
-import { canConfirm } from "../core/session";
 import { LEVELS } from "../core/levels";
 import {
   ALMOST_IN_COST,
@@ -10,14 +11,14 @@ import {
   DISTRICT_NAMES,
   timeUpgradeCost,
 } from "../core/economy";
-import { canUnlockDistrict } from "../core/save";
+import { canUnlockDistrict, hasUsername } from "../core/save";
 import type { Pos, Progress } from "../core/types";
 import { getFlashes, getPunches, getShake } from "./motion";
 import { H, W, theme } from "./theme";
 
 export { W, H };
 
-export type Screen = "home" | "how" | "map" | "deck" | "play" | "result";
+export type Screen = "register" | "home" | "how" | "map" | "deck" | "play" | "result" | "scores";
 
 export type UiButton = {
   id: string;
@@ -110,18 +111,19 @@ function drawResourceHud(ctx: CanvasRenderingContext2D, progress: Progress, y: n
 
 export function homeButtons(progress: Progress): UiButton[] {
   const bw = W - PAD * 2;
-  const bh = 64;
+  const bh = 56;
   const cx = PAD;
-  let y = 720;
+  let y = 680;
   return [
     { id: "play", x: cx, y, w: bw, h: bh, label: "PLAY" },
-    { id: "map", x: cx, y: (y += bh + 16), w: bw, h: bh, label: "ACCESS MAP" },
-    { id: "deck", x: cx, y: (y += bh + 16), w: bw, h: bh, label: "DECK" },
-    { id: "how", x: cx, y: (y += bh + 16), w: bw, h: bh, label: "HOW TO BREACH" },
+    { id: "map", x: cx, y: (y += bh + 12), w: bw, h: bh, label: "ACCESS MAP" },
+    { id: "scores", x: cx, y: (y += bh + 12), w: bw, h: bh, label: "SCOREBOARD" },
+    { id: "deck", x: cx, y: (y += bh + 12), w: bw, h: bh, label: "DECK" },
+    { id: "how", x: cx, y: (y += bh + 12), w: bw, h: bh, label: "HOW TO BREACH" },
     {
       id: "sound",
       x: cx,
-      y: (y += bh + 16),
+      y: (y += bh + 12),
       w: bw,
       h: bh,
       label: progress.sound ? "SOUND: ON" : "SOUND: OFF",
@@ -152,15 +154,22 @@ export function drawHome(
 
   ctx.fillStyle = theme.muted;
   ctx.font = "600 22px 'Chakra Petch', sans-serif";
-  ctx.fillText("TRACE. CRACK. OVERRIDE.", W / 2, 440);
-  drawResourceHud(ctx, progress, 478);
+  ctx.fillText("TRACE. CRACK. OVERRIDE.", W / 2, 430);
+  if (hasUsername(progress)) {
+    ctx.fillStyle = theme.accent;
+    ctx.font = "700 20px 'JetBrains Mono', monospace";
+    ctx.fillText(progress.handle, W / 2, 462);
+    drawResourceHud(ctx, progress, 498);
+  } else {
+    drawResourceHud(ctx, progress, 468);
+  }
 
   // Decorative matrix strip
   ctx.font = "700 18px 'JetBrains Mono', monospace";
   const demo = ["1C", "55", "7A", "BD", "E9", "FF"];
   demo.forEach((tok, i) => {
     const x = 90 + i * 90;
-    const y = 540;
+    const y = 500;
     roundRect(ctx, x, y, 70, 48, 6);
     ctx.fillStyle = i === Math.floor(t * 2) % 6 ? theme.accent : theme.bg2;
     ctx.fill();
@@ -178,14 +187,153 @@ export function drawHome(
   return buttons;
 }
 
+export function registerButtons(): UiButton[] {
+  return [
+    {
+      id: "claim",
+      x: PAD,
+      y: 760,
+      w: W - PAD * 2,
+      h: 72,
+      label: "CLAIM USERNAME",
+    },
+  ];
+}
+
+export function drawRegister(ctx: CanvasRenderingContext2D, t: number): UiButton[] {
+  drawBackground(ctx, t);
+  ctx.fillStyle = theme.accent2;
+  ctx.font = "800 22px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("SKITZ", W / 2, 180);
+  ctx.fillStyle = theme.text;
+  ctx.font = "800 56px 'Chakra Petch', sans-serif";
+  ctx.fillText("NAME YOURSELF", W / 2, 280);
+  wrapText(
+    ctx,
+    "Pick a username before you breach. Scores and campaign progress follow this name.",
+    W / 2,
+    330,
+    W - PAD * 2,
+    30,
+    theme.muted,
+  );
+  ctx.fillStyle = theme.dim;
+  ctx.font = "600 16px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("3–16 LETTERS, NUMBERS, SPACE, _ -", W / 2, 720);
+  const buttons = registerButtons();
+  for (const b of buttons) drawButton(ctx, b, { primary: true });
+  return buttons;
+}
+
+export function scoresButtons(tab: "world" | "local"): UiButton[] {
+  const bw = (W - PAD * 2 - 16) / 2;
+  return [
+    {
+      id: "scores-world",
+      x: PAD,
+      y: 210,
+      w: bw,
+      h: 52,
+      label: tab === "world" ? "WORLD ●" : "WORLD",
+    },
+    {
+      id: "scores-local",
+      x: PAD + bw + 16,
+      y: 210,
+      w: bw,
+      h: 52,
+      label: tab === "local" ? "THIS DEVICE ●" : "THIS DEVICE",
+    },
+    { id: "scores-back", x: PAD, y: H - 120, w: W - PAD * 2, h: 64, label: "HOME" },
+  ];
+}
+
+export function drawScores(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  progress: Progress,
+  tab: "world" | "local",
+  world: ScoreEntry[],
+  status: string,
+): UiButton[] {
+  drawBackground(ctx, t);
+  ctx.fillStyle = theme.accent;
+  ctx.font = "800 22px 'Chakra Petch', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("SCOREBOARD", W / 2, 120);
+  ctx.fillStyle = theme.text;
+  ctx.font = "800 40px 'Chakra Petch', sans-serif";
+  ctx.fillText(hasUsername(progress) ? progress.handle : "NO NAME", W / 2, 168);
+  ctx.fillStyle = theme.muted;
+  ctx.font = "600 16px 'Chakra Petch', sans-serif";
+  ctx.fillText(
+    `BEST ${String(progress.bestScore).padStart(6, "0")}   RUNS ${progress.games}`,
+    W / 2,
+    198,
+  );
+
+  const rows: ScoreEntry[] =
+    tab === "world"
+      ? world
+      : progress.runs.map((run) => ({
+          name: progress.handle || "—",
+          score: run.score,
+          level: run.level,
+          stars: run.stars,
+          time: run.time,
+          at: run.at,
+        }));
+
+  ctx.fillStyle = theme.dim;
+  ctx.font = "600 16px 'Chakra Petch', sans-serif";
+  ctx.fillText(status, W / 2, 284);
+
+  const y0 = 320;
+  if (!rows.length) {
+    ctx.fillStyle = theme.muted;
+    ctx.font = "600 22px 'Chakra Petch', sans-serif";
+    ctx.fillText(tab === "world" ? "No world scores yet." : "No runs on this device.", W / 2, 420);
+  } else {
+    rows.slice(0, 12).forEach((row, i) => {
+      const y = y0 + i * 56;
+      const mine = row.name === progress.handle;
+      ctx.fillStyle = mine ? theme.accent : theme.text;
+      ctx.font = "700 20px 'JetBrains Mono', monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(String(i + 1).padStart(2, "0"), PAD, y);
+      ctx.fillText(row.name, PAD + 56, y);
+      ctx.textAlign = "right";
+      ctx.fillText(String(row.score).padStart(6, "0"), W - PAD, y);
+      ctx.fillStyle = theme.muted;
+      ctx.font = "600 14px 'Chakra Petch', sans-serif";
+      ctx.fillText(
+        `L${row.level}  ${"★".repeat(row.stars) || "—"}  ${formatTime(row.time)}`,
+        W - PAD,
+        y + 22,
+      );
+    });
+  }
+
+  const buttons = scoresButtons(tab);
+  for (const b of buttons) {
+    const on =
+      (b.id === "scores-world" && tab === "world") ||
+      (b.id === "scores-local" && tab === "local");
+    drawButton(ctx, b, { primary: on });
+  }
+  return buttons;
+}
+
 const HOW_PANELS = [
   {
     title: "PATH",
-    body: "First pick must be on the top row. Then alternate: same ROW, then same COLUMN. Each cell once — picked cells blank out.",
+    body: "First pick must be on the top row. Then the same COLUMN as that pick, then the same ROW, then column, row… Each cell once — picked cells blank out.",
   },
   {
     title: "TIME",
-    body: "The breach clock only starts after your first pick. Study the matrix, plan your route, then commit fast.",
+    body: "The breach clock starts as soon as the matrix appears. Trace a path that uploads Datamines before the buffer fills or time runs out.",
   },
   {
     title: "BUFFER",
@@ -193,7 +341,7 @@ const HOW_PANELS = [
   },
   {
     title: "DATAMINES",
-    body: "V1 Basic, V2 Advanced, V3 Expert — each pays Scrap and Components. Clear more Datamines in one breach to stack loot.",
+    body: "Each Datamine is a queue. Matched codes come off the front and the rest slide forward. Overlapping lines share that front — one pick can advance two sequences, or rewind a line if you break the chain.",
   },
   {
     title: "REWARDS",
@@ -523,21 +671,10 @@ export function cellCenter(layout: BoardLayout, pos: Pos): { x: number; y: numbe
   };
 }
 
-export function playButtons(session: Session): UiButton[] {
-  const buttons: UiButton[] = [
+export function playButtons(_session: Session): UiButton[] {
+  return [
     { id: "play-menu", x: W - PAD - 120, y: 24, w: 120, h: 48, label: "MAP" },
   ];
-  if (canConfirm(session)) {
-    buttons.push({
-      id: "confirm",
-      x: W - PAD - 340,
-      y: 24,
-      w: 200,
-      h: 48,
-      label: "UPLOAD",
-    });
-  }
-  return buttons;
 }
 
 export function drawPlay(
@@ -570,11 +707,14 @@ export function drawPlay(
   const layout = boardLayout(level.size);
   const legalSet = new Set(legal.map((p) => `${p.c},${p.r}`));
 
-  // Axis highlight
-  if (session.last && session.axis) {
+  // Axis highlight — top row on open, then locked column / row.
+  if (!session.ended) {
     ctx.save();
     ctx.fillStyle = theme.legalGlow;
-    if (session.axis === "row") {
+    if (!session.last || session.axis === null) {
+      const y = layout.originY - 4;
+      ctx.fillRect(layout.originX - 6, y, level.size * (layout.cell + layout.gap), layout.cell + 8);
+    } else if (session.axis === "row") {
       const y =
         layout.originY + session.last.r * (layout.cell + layout.gap) - 4;
       ctx.fillRect(layout.originX - 6, y, level.size * (layout.cell + layout.gap), layout.cell + 8);
@@ -657,7 +797,7 @@ export function drawPlay(
   }
 
   const buttons = playButtons(session);
-  for (const b of buttons) drawButton(ctx, b, { primary: b.id === "confirm" });
+  for (const b of buttons) drawButton(ctx, b);
 
   if (shake > 0) ctx.restore();
   return { buttons, layout };
@@ -666,28 +806,18 @@ export function drawPlay(
 function drawBreachTimer(ctx: CanvasRenderingContext2D, session: Session): void {
   const running = session.timerStarted && !session.ended;
   const urgent = session.timeLeft <= 5;
-  const label = session.timerStarted ? "BREACH TIME REMAINING" : "BREACH TIME — PLAN";
+  const label = "BREACH TIME REMAINING";
   const secs = Math.max(0, session.timeLeft);
   const text = secs.toFixed(2);
 
-  ctx.fillStyle = !session.timerStarted
-    ? theme.muted
-    : urgent
-      ? theme.fail
-      : theme.accent;
+  ctx.fillStyle = urgent ? theme.fail : theme.accent;
   ctx.font = "700 14px 'Chakra Petch', sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillText(label, PAD, 26);
 
   ctx.font = "800 32px 'JetBrains Mono', monospace";
-  ctx.fillStyle = !session.timerStarted
-    ? theme.text
-    : urgent
-      ? theme.fail
-      : running
-        ? theme.accent
-        : theme.dim;
+  ctx.fillStyle = urgent ? theme.fail : running ? theme.accent : theme.dim;
   ctx.fillText(text, PAD, 56);
 
   const barW = 160;
@@ -743,41 +873,66 @@ function drawBuffer(ctx: CanvasRenderingContext2D, session: Session): void {
 }
 
 function drawDaemons(ctx: CanvasRenderingContext2D, session: Session): void {
-  const y0 = 168;
+  const y0 = 164;
   const flashes = new Set(getFlashes().map((f) => f.id));
-  // Fixed columns: name | codes (stacked) | rewards
   const nameX = PAD;
   const seqX0 = PAD + 168;
   const rewardX = PAD + 400;
+  const tokW = 40;
+  const tokH = 28;
   const tokStep = 44;
 
   session.daemons.forEach((d, i) => {
-    const y = y0 + i * 36;
+    const y = y0 + i * 40;
     const pay = DATAMINE_PAYOUT[d.tier];
     const chips: string[] = [];
     if (pay.scrap > 0) chips.push(`+${pay.scrap} SCRAP`);
     if (pay.components > 0) chips.push(`+${pay.components} COMP`);
+    const possible = sequenceStillPossible(
+      session.buffer,
+      session.remaining,
+      d.sequence,
+      d.completed,
+    );
+    const failed = !d.completed && !possible;
+
+    ctx.save();
+    ctx.globalAlpha = failed ? 0.28 : 1;
 
     ctx.fillStyle = d.completed
       ? theme.ok
       : flashes.has(d.id)
         ? theme.warn
-        : theme.muted;
+        : failed
+          ? theme.dim
+          : theme.muted;
     ctx.font = "700 16px 'Chakra Petch', sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(d.name, nameX, y);
 
-    d.sequence.forEach((tok, si) => {
-      const lit = d.completed || si < d.matched;
-      ctx.fillStyle = lit ? theme.accent : theme.dim;
-      ctx.font = "700 18px 'JetBrains Mono', monospace";
-      ctx.textAlign = "left";
-      ctx.fillText(tok, seqX0 + si * tokStep, y);
+    const remaining = d.completed ? [] : d.sequence.slice(d.matched);
+    remaining.forEach((tok, vi) => {
+      const x = seqX0 + vi * tokStep;
+      const nextNeeded = vi === 0 && !failed;
+      roundRect(ctx, x, y - tokH / 2, tokW, tokH, 5);
+      ctx.fillStyle = nextNeeded ? "#243830" : theme.bg2;
+      ctx.fill();
+      if (nextNeeded) {
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.fillStyle = failed ? theme.dim : nextNeeded ? theme.accent : theme.text;
+      ctx.font = "700 15px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(tok, x + tokW / 2, y + 1);
     });
 
     let chipX = rewardX;
     ctx.font = "700 12px 'Chakra Petch', sans-serif";
+    ctx.textAlign = "center";
     for (const chip of chips) {
       const chipW = ctx.measureText(chip).width + 16;
       roundRect(ctx, chipX, y - 12, chipW, 24, 4);
@@ -785,10 +940,10 @@ function drawDaemons(ctx: CanvasRenderingContext2D, session: Session): void {
       ctx.fill();
       ctx.fillStyle = d.completed ? theme.bg0 : theme.muted;
       ctx.font = "700 12px 'Chakra Petch', sans-serif";
-      ctx.textAlign = "center";
       ctx.fillText(chip, chipX + chipW / 2, y + 1);
       chipX += chipW + 8;
     }
+    ctx.restore();
   });
 }
 
@@ -835,6 +990,7 @@ export function drawResult(
   session: Session,
   progress: Progress,
   stars: number,
+  worldRank: number | null,
 ): UiButton[] {
   drawBackground(ctx, t);
 
@@ -866,7 +1022,16 @@ export function drawResult(
   ctx.font = "700 28px 'Chakra Petch', sans-serif";
   ctx.fillText(stars > 0 ? "★".repeat(stars) : "—", W / 2, 280);
 
-  let lootY = 330;
+  ctx.fillStyle = theme.text;
+  ctx.font = "700 28px 'JetBrains Mono', monospace";
+  ctx.fillText(String(session.score).padStart(6, "0"), W / 2, 320);
+  if (worldRank) {
+    ctx.fillStyle = theme.accent;
+    ctx.font = "700 18px 'Chakra Petch', sans-serif";
+    ctx.fillText(`WORLD #${worldRank}`, W / 2, 348);
+  }
+
+  let lootY = worldRank ? 390 : 360;
   if (loot.scrap > 0 || loot.components > 0) {
     ctx.fillStyle = theme.text;
     ctx.font = "700 24px 'Chakra Petch', sans-serif";

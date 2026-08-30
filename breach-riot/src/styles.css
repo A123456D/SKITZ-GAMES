@@ -36,3 +36,53 @@ body {
   max-height: 100%;
   touch-action: none;
 }
+
+#stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+#handle-wrap {
+  position: absolute;
+  left: 8%;
+  top: 42%;
+  width: 84%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+#handle-wrap.hidden {
+  display: none;
+}
+
+#handle-wrap span {
+  font-family: "Chakra Petch", sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  color: #8a9e93;
+}
+
+#handle-input {
+  width: 100%;
+  padding: 16px 18px;
+  border: 2px solid #9dffb0;
+  border-radius: 10px;
+  background: #151c19;
+  color: #9dffb0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  outline: none;
+  touch-action: manipulation;
+  user-select: text;
+  -webkit-user-select: text;
+}

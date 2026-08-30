@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   matchProgress,
   sequenceCompleted,
+  sequenceStillPossible,
   refreshDaemons,
   bufferCost,
 } from "./buffer";
@@ -18,8 +19,6 @@ import {
   tryPick,
   starsFor,
   tickTimer,
-  canConfirm,
-  confirmEarly,
 } from "./session";
 import { LEVELS } from "./levels";
 import type { DatamineProgress, Token } from "./types";
@@ -65,9 +64,15 @@ describe("path rules", () => {
     ).toBe(true);
   });
 
-  it("alternates row then col", () => {
-    expect(nextAxis(1)).toBe("row");
-    expect(nextAxis(2)).toBe("col");
+  it("alternates column then row after the top-row opener", () => {
+    expect(nextAxis(1)).toBe("col");
+    expect(nextAxis(2)).toBe("row");
+    expect(nextAxis(3)).toBe("col");
+  });
+
+  it("rejects a same-row second pick", () => {
+    expect(isLegalPick(m, { c: 2, r: 0 }, { c: 0, r: 0 }, "col")).toBe(false);
+    expect(isLegalPick(m, { c: 0, r: 2 }, { c: 0, r: 0 }, "col")).toBe(true);
   });
 });
 
@@ -80,7 +85,7 @@ describe("tutorial level 1", () => {
     if (!r.ok) return;
     session = r.session;
     expect(session.matrix[0]![0]!.used).toBe(true);
-    r = tryPick(session, { c: 2, r: 0 });
+    r = tryPick(session, { c: 0, r: 4 });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     session = r.session;
@@ -144,46 +149,51 @@ describe("loot", () => {
 });
 
 describe("breach timer", () => {
-  it("does not tick before first pick", () => {
+  it("ticks as soon as the matrix is up", () => {
     const level = LEVELS[0]!;
     let session = startSession(level, emptyDeck);
     session = tickTimer(session, 5);
-    expect(session.timeLeft).toBe(level.timeLimit);
+    expect(session.timeLeft).toBe(level.timeLimit - 5);
   });
 
   it("expires to timeout fail with no loot", () => {
     const level = LEVELS[0]!;
     let session = startSession(level, emptyDeck);
-    const r = tryPick(session, { c: 0, r: 0 });
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    session = tickTimer(r.session, level.timeLimit + 0.1);
+    session = tickTimer(session, level.timeLimit + 0.1);
     expect(session.timedOut).toBe(true);
     expect(session.loot.scrap).toBe(0);
     expect(starsFor(session)).toBe(0);
   });
 });
 
-describe("confirm and upload", () => {
-  it("allows UPLOAD after first Datamine and pays loot", () => {
+describe("buffer fill ends the breach", () => {
+  it("keeps going after a Datamine until the buffer is full", () => {
     const level = LEVELS[0]!;
     let session = startSession(level, emptyDeck);
-    expect(canConfirm(session)).toBe(false);
     const r1 = tryPick(session, { c: 0, r: 0 });
     expect(r1.ok).toBe(true);
     if (!r1.ok) return;
     session = r1.session;
-    const r2 = tryPick(session, { c: 2, r: 0 });
+    const r2 = tryPick(session, { c: 0, r: 4 });
     expect(r2.ok).toBe(true);
     if (!r2.ok) return;
     session = r2.session;
     expect(session.daemons[0]!.completed).toBe(true);
-    expect(canConfirm(session)).toBe(true);
-    if (!session.ended) {
-      session = confirmEarly(session);
-    }
-    expect(session.ended).toBe(true);
-    expect(session.loot.scrap).toBeGreaterThan(0);
+    expect(session.ended).toBe(false);
+    expect(session.remaining).toBe(level.buffer - 2);
+  });
+});
+
+describe("sequence still possible", () => {
+  it("disables when remaining slots cannot finish the run", () => {
+    expect(sequenceStillPossible(["7A"], 0, ["7A", "BD"], false)).toBe(false);
+    expect(sequenceStillPossible(["7A"], 1, ["7A", "BD"], false)).toBe(true);
+  });
+
+  it("stays live if already uploaded", () => {
+    expect(sequenceStillPossible(["7A", "BD"], 0, ["7A", "BD"], true)).toBe(
+      true,
+    );
   });
 });
 
@@ -201,5 +211,15 @@ describe("refreshDaemons", () => {
     ];
     const out = refreshDaemons(["BD", "1C", "55", "FF"], daemons);
     expect(out[0]!.completed).toBe(true);
+  });
+});
+
+describe("usernames", () => {
+  it("rejects short handles", async () => {
+    const { isValidHandle, sanitizeRun } = await import("./board");
+    expect(isValidHandle("AB")).toBe(false);
+    expect(isValidHandle("ACE")).toBe(true);
+    expect(sanitizeRun({ name: "x", score: 10, level: 1, stars: 1, time: 1 })).toBeNull();
+    expect(sanitizeRun({ name: "ACE", score: 10, level: 1, stars: 1, time: 1 })?.name).toBe("ACE");
   });
 });

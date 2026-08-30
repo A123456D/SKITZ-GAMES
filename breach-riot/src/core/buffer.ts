@@ -43,6 +43,21 @@ export function refreshDaemons(
   });
 }
 
+/**
+ * CP2077: if remaining buffer slots cannot finish this sequence
+ * from current suffix progress, the daemon disables.
+ */
+export function sequenceStillPossible(
+  buffer: Token[],
+  remaining: number,
+  seq: Token[],
+  completed: boolean,
+): boolean {
+  if (completed || sequenceCompleted(buffer, seq)) return true;
+  const matched = matchProgress(buffer, seq);
+  return remaining >= seq.length - matched;
+}
+
 export function bufferCost(kind: "code" | "jam" | "sticky"): number {
   if (kind === "sticky") return 2;
   return 1;

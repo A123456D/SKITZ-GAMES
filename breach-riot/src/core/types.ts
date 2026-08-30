@@ -15,7 +15,7 @@ export type Cell = {
 
 export type Matrix = Cell[][];
 
-/** Axis the player must pick along next. null = free first pick (top row). */
+/** Axis the player must pick along next. null = first pick (top row only). */
 export type Axis = "row" | "col" | null;
 
 /** Datamine tier — Basic / Advanced / Expert. */
@@ -93,7 +93,17 @@ export type Deck = {
   compTime: number;
 };
 
+export type ScoreRun = {
+  score: number;
+  level: number;
+  stars: number;
+  time: number;
+  at: number;
+};
+
 export type Progress = {
+  handle: string;
+  named: boolean;
   unlocked: number;
   stars: Record<number, number>;
   sound: boolean;
@@ -102,6 +112,9 @@ export type Progress = {
   deck: Deck;
   /** Highest district unlocked (0-based). */
   district: number;
+  games: number;
+  bestScore: number;
+  runs: ScoreRun[];
 };
 
 export function keyPos(p: Pos): string {
