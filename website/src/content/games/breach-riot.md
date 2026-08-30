@@ -19,6 +19,6 @@ webPlayPath: web/index.html
 downloads: {}
 ---
 
-**Breach Riot** is a SKITZ take on Cyberpunk-style access-point hacking: top-row start, blanking codes, breach timer after first pick, and three Datamine sequences that stack Scrap and Components.
+**Breach Riot** is a SKITZ take on Cyberpunk-style access-point hacking: claim a username, snake the code matrix from the top row, then column / row, and upload overlapping Datamine sequences before the buffer fills.
 
-**Free to play** online. Spend loot on cyberdeck buffer/time upgrades and unlock the next district on the access map.
+**Free to play** online. Campaign progress and scores save to your username. Spend loot on cyberdeck upgrades and unlock the next district on the access map.

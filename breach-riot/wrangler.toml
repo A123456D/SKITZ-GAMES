@@ -1,0 +1,9 @@
+name = "breach-riot-scores"
+main = "scores-worker.js"
+compatibility_date = "2026-08-01"
+
+# wrangler kv namespace create BOARD
+# then paste the id and deploy.
+# [[kv_namespaces]]
+# binding = "BOARD"
+# id = "YOUR_KV_ID"

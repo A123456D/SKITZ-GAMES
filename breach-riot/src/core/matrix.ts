@@ -63,27 +63,15 @@ export function cloneMatrix(m: Matrix): Matrix {
 }
 
 /**
- * After picking `last`, the next axis is the opposite of the one just used.
- * First pick: axis stays null until we know which direction they commit to
- * — CP2077 style: first pick free, then you choose a cell in the same row OR
- * same column... wait, classic Breach Protocol:
- * - First selection: any cell (often any in first row in some UIs, but game allows any)
- * - After first: you must pick in the SAME ROW, then SAME COLUMN alternating.
- *
- * Actually CP2077: Start by selecting a code in the Code Matrix. After that,
- * you alternate between selecting codes from the same ROW then same COLUMN.
- * So after first pick at (c,r), next must be same ROW (any other col), then
- * same COLUMN as the second pick, etc.
- *
- * So: first pick free. After pick N, if N is odd (1-based), next is row-locked
- * to last.r; if N is even, next is col-locked to last.c.
- * Pick 1 -> next axis = row (same row as pick 1)
- * Pick 2 -> next axis = col (same col as pick 2)
- * Pick 3 -> next axis = row
+ * Cyberpunk 2077 Breach Protocol:
+ * - Pick 1: any unused cell on the top row.
+ * - Pick 2: same COLUMN as pick 1.
+ * - Pick 3: same ROW as pick 2.
+ * - Then column, row, column… for the rest of the buffer.
  */
 export function nextAxis(pickCount: number): Axis {
   if (pickCount === 0) return null;
-  return pickCount % 2 === 1 ? "row" : "col";
+  return pickCount % 2 === 1 ? "col" : "row";
 }
 
 export function isLegalPick(
@@ -318,12 +306,11 @@ function forcedSnakePath(
   let c = 0;
   let r = firstRowOnly ? 0 : 0;
   path.push({ c, r });
-  let axis: Axis = "row";
+  let axis: Axis = "col";
   while (path.length < len) {
     if (axis === "row") {
       const nextC = (c + 1) % size;
       if (path.some((p) => p.c === nextC && p.r === r)) {
-        // step down in column
         axis = "col";
         continue;
       }

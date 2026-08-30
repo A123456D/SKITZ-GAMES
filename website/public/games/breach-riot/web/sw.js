@@ -1,6 +1,6 @@
-/* Breach Riot — offline cache (breach-riot-v3).
+/* Breach Riot — offline cache (breach-riot-v4).
  * Network-first shell. Never cache text/html as an image/audio asset. */
-const CACHE = "breach-riot-v3";
+const CACHE = "breach-riot-v4";
 const SKIP_PATHS = ["/music/","/audio/","/playlist/"];
 const BINARY_EXTRA = [];
 const PRECACHE = ["./","./index.html","./manifest.webmanifest","./icon-192.png","./icon-512.png"];

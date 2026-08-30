@@ -21,7 +21,7 @@ cpSync(dist, dest, { recursive: true });
 writeFileSync(
   join(dest, "sw.js"),
   buildGameSw({
-    cacheName: "breach-riot-v3",
+    cacheName: "breach-riot-v4",
     label: "Breach Riot",
     precache: ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"],
   }),

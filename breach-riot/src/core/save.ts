@@ -8,10 +8,11 @@ import {
   COMP_TIME_COST,
   COMP_TIME_SECONDS,
 } from "./economy";
-import type { Deck, Progress } from "./types";
+import { MAX_LOCAL_RUNS, isValidHandle, sanitizeName } from "./board";
+import type { Deck, Progress, ScoreRun } from "./types";
 import { MAX_BUFFER_BONUS, MAX_TIME_BONUS } from "./types";
 
-const KEY = "breach-riot-progress-v2";
+const KEY = "breach-riot-progress-v3";
 
 const DEFAULT_DECK: Deck = {
   bufferBonus: 0,
@@ -21,6 +22,8 @@ const DEFAULT_DECK: Deck = {
 };
 
 const DEFAULT: Progress = {
+  handle: "",
+  named: false,
   unlocked: 1,
   stars: {},
   sound: true,
@@ -28,6 +31,9 @@ const DEFAULT: Progress = {
   components: 0,
   deck: { ...DEFAULT_DECK },
   district: 0,
+  games: 0,
+  bestScore: 0,
+  runs: [],
 };
 
 function normalizeDeck(raw: Partial<Deck> | undefined): Deck {
@@ -49,10 +55,18 @@ export function loadProgress(): Progress {
   try {
     const raw =
       localStorage.getItem(KEY) ??
+      localStorage.getItem("breach-riot-progress-v2") ??
       localStorage.getItem("breach-riot-progress-v1");
-    if (!raw) return { ...DEFAULT, stars: {}, deck: { ...DEFAULT_DECK } };
+    if (!raw) return { ...DEFAULT, stars: {}, deck: { ...DEFAULT_DECK }, runs: [] };
     const parsed = JSON.parse(raw) as Partial<Progress>;
+    const runs = Array.isArray(parsed.runs)
+      ? parsed.runs.filter(validRun).slice(0, MAX_LOCAL_RUNS)
+      : [];
+    const handle = sanitizeName(parsed.handle);
+    const named = parsed.named === true && isValidHandle(handle);
     return {
+      handle: named ? handle : "",
+      named,
       unlocked: Math.max(1, Number(parsed.unlocked) || 1),
       stars:
         parsed.stars && typeof parsed.stars === "object" ? parsed.stars : {},
@@ -61,10 +75,95 @@ export function loadProgress(): Progress {
       components: Math.max(0, Number(parsed.components) || 0),
       deck: normalizeDeck(parsed.deck),
       district: Math.max(0, Number(parsed.district) || 0),
+      games: Math.max(0, Number(parsed.games) || 0),
+      bestScore: Math.max(0, Number(parsed.bestScore) || 0),
+      runs,
     };
   } catch {
-    return { ...DEFAULT, stars: {}, deck: { ...DEFAULT_DECK } };
+    return { ...DEFAULT, stars: {}, deck: { ...DEFAULT_DECK }, runs: [] };
   }
+}
+
+function validRun(row: unknown): row is ScoreRun {
+  if (!row || typeof row !== "object") return false;
+  const r = row as ScoreRun;
+  return (
+    Number.isFinite(r.score) &&
+    Number.isFinite(r.level) &&
+    Number.isFinite(r.stars) &&
+    Number.isFinite(r.time) &&
+    Number.isFinite(r.at)
+  );
+}
+
+export function setHandle(progress: Progress, name: string): Progress | null {
+  if (!isValidHandle(name)) return null;
+  const next = { ...progress, handle: sanitizeName(name), named: true };
+  saveProgress(next);
+  return next;
+}
+
+export function hasUsername(progress: Progress): boolean {
+  return progress.named && isValidHandle(progress.handle);
+}
+
+export function recordRun(
+  progress: Progress,
+  run: { score: number; level: number; stars: number; time: number },
+): Progress {
+  const entry: ScoreRun = {
+    score: run.score,
+    level: run.level,
+    stars: run.stars,
+    time: run.time,
+    at: Date.now(),
+  };
+  const runs = [...progress.runs, entry]
+    .sort((a, b) => b.score - a.score || b.stars - a.stars || a.time - b.time)
+    .slice(0, MAX_LOCAL_RUNS);
+  const next = {
+    ...progress,
+    games: progress.games + 1,
+    bestScore: Math.max(progress.bestScore, run.score),
+    runs,
+  };
+  saveProgress(next);
+  return next;
+}
+
+export function applyCloud(
+  local: Progress,
+  cloud: {
+    unlocked: number;
+    district: number;
+    scrap: number;
+    components: number;
+    stars: Record<number, number>;
+    deck: Deck;
+    bestScore: number;
+    games: number;
+  },
+): Progress {
+  return {
+    ...local,
+    unlocked: cloud.unlocked,
+    district: cloud.district,
+    scrap: cloud.scrap,
+    components: cloud.components,
+    stars: cloud.stars,
+    deck: normalizeDeck(cloud.deck),
+    bestScore: Math.max(local.bestScore, cloud.bestScore),
+    games: Math.max(local.games, cloud.games),
+  };
+}
+
+export function hasCampaign(progress: Progress): boolean {
+  return (
+    progress.games > 0 ||
+    progress.unlocked > 1 ||
+    progress.scrap > 0 ||
+    Object.keys(progress.stars).length > 0
+  );
 }
 
 export function saveProgress(p: Progress): void {
