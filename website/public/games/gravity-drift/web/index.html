@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#050218" />
+    <title>Gravity Drift</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Gravity Drift" />
+    <script type="module" crossorigin src="./assets/index-sIs3CIGe.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CktlKImD.css">
+  <link rel="manifest" href="./manifest.webmanifest"></head>
+  <body>
+    <div id="app">
+      <canvas id="well"></canvas>
+      <div id="screen-flash"></div>
+      <div id="combo-pop"></div>
+      <div class="hud">
+        <div class="brand">GRAVITY DRIFT</div>
+        <div class="core-label">GRAVITY CORE</div>
+        <aside class="panel stats">
+          <div class="stat"><label>SCORE</label><b id="score">000000</b></div>
+          <div class="stat"><label>LEVEL</label><b id="level">1</b></div>
+          <div class="stat"><label>LINES</label><b id="lines">0</b></div>
+          <div class="stat"><label>TIME</label><b id="time">0:00</b></div>
+        </aside>
+        <aside class="panel next">
+          <h2>NEXT</h2>
+          <canvas></canvas>
+          <canvas></canvas>
+          <canvas></canvas>
+        </aside>
+        <p class="help">
+          <kbd>A/D</kbd> aim · <kbd>Space</kbd> release · <kbd>W/Q</kbd> rotate<br />
+          <kbd>S</kbd> hard drop · <kbd>R</kbd> restart · <kbd>Esc</kbd> menu
+        </p>
+        <button type="button" class="pause-btn" id="pause-btn">MENU</button>
+        <div class="touch">
+          <button id="btn-left" type="button">◀</button>
+          <button id="btn-rot" type="button">↻</button>
+          <button id="btn-right" type="button">▶</button>
+          <button id="btn-drop" type="button">DROP</button>
+          <button id="btn-hard" type="button">HARD</button>
+        </div>
+      </div>
+      <nav id="menu" class="menu">
+        <section class="menu-card" data-panel="home">
+          <p class="menu-kicker">SKITZ</p>
+          <h1>GRAVITY DRIFT</h1>
+          <p class="menu-tag">Aim the rim. Fall to the core. Clear the rings.</p>
+          <label class="pilot">
+            USERNAME
+            <input
+              id="pilot-name"
+              maxlength="16"
+              minlength="3"
+              required
+              autocomplete="username"
+              spellcheck="false"
+              placeholder="3+ LETTERS OR NUMBERS"
+            />
+          </label>
+          <p id="name-error" class="pilot-error hidden">Pick a username before you play.</p>
+          <div class="menu-stats" id="home-stats"></div>
+          <div class="menu-actions">
+            <button type="button" class="btn primary" id="play-btn" data-go="play">PLAY</button>
+            <button type="button" class="btn" data-go="scores">SCORES</button>
+            <button type="button" class="btn" data-go="howto">HOW TO PLAY</button>
+          </div>
+        </section>
+        <section class="menu-card hidden" data-panel="scores">
+          <h2>SCORES</h2>
+          <div class="score-tabs">
+            <button type="button" class="score-tab on" data-board="world">WORLD</button>
+            <button type="button" class="score-tab" data-board="local">THIS DEVICE</button>
+          </div>
+          <p id="score-status" class="score-status"></p>
+          <ol id="score-list" class="score-list"></ol>
+          <button type="button" class="btn" data-go="home">BACK</button>
+        </section>
+        <section class="menu-card hidden" data-panel="howto">
+          <h2>HOW TO PLAY</h2>
+          <ul class="howto">
+            <li>Pieces spawn on the rim. <kbd>A/D</kbd> aims around the well.</li>
+            <li><kbd>Space</kbd> releases. They fall inward toward the gravity core.</li>
+            <li><kbd>W/Q</kbd> rotate. <kbd>S</kbd> hard drops.</li>
+            <li>Fill a whole ring to clear it. The stack collapses in.</li>
+            <li>Top out when a new piece cannot spawn on the rim.</li>
+          </ul>
+          <button type="button" class="btn" data-go="home">BACK</button>
+        </section>
+        <section class="menu-card hidden" data-panel="pause">
+          <h2>PAUSED</h2>
+          <div class="menu-actions">
+            <button type="button" class="btn primary" data-go="resume">RESUME</button>
+            <button type="button" class="btn" data-go="play">RESTART</button>
+            <button type="button" class="btn" data-go="home">MENU</button>
+          </div>
+        </section>
+      </nav>
+      <div id="overlay" class="overlay hidden">
+        <div class="card">
+          <h1>CORE BREACH</h1>
+          <p id="over-summary">—</p>
+          <p id="over-best" class="over-best hidden">NEW BEST</p>
+          <div class="menu-actions">
+            <button type="button" class="btn primary" id="retry-btn">RETRY</button>
+            <button type="button" class="btn" id="over-menu-btn">MENU</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
