@@ -2,24 +2,23 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#050218" />
     <title>Gravity Drift</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon-192.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Gravity Drift" />
-    <script type="module" crossorigin src="./assets/index-sIs3CIGe.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CktlKImD.css">
+    <script type="module" crossorigin src="./assets/index-C25Z2Dy4.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-kjtnffV9.css">
   <link rel="manifest" href="./manifest.webmanifest"></head>
   <body>
     <div id="app">
-      <canvas id="well"></canvas>
-      <div id="screen-flash"></div>
-      <div id="combo-pop"></div>
-      <div class="hud">
+      <header class="chrome">
         <div class="brand">GRAVITY DRIFT</div>
-        <div class="core-label">GRAVITY CORE</div>
+        <button type="button" class="pause-btn" id="pause-btn">MENU</button>
+      </header>
+      <div class="rail">
         <aside class="panel stats">
           <div class="stat"><label>SCORE</label><b id="score">000000</b></div>
           <div class="stat"><label>LEVEL</label><b id="level">1</b></div>
@@ -32,18 +31,23 @@
           <canvas></canvas>
           <canvas></canvas>
         </aside>
+      </div>
+      <main class="stage">
+        <canvas id="well"></canvas>
+        <div id="gpu-error" class="gpu-error hidden"></div>
+        <div id="screen-flash"></div>
+        <div id="combo-pop"></div>
         <p class="help">
           <kbd>A/D</kbd> aim · <kbd>Space</kbd> release · <kbd>W/Q</kbd> rotate<br />
           <kbd>S</kbd> hard drop · <kbd>R</kbd> restart · <kbd>Esc</kbd> menu
         </p>
-        <button type="button" class="pause-btn" id="pause-btn">MENU</button>
-        <div class="touch">
-          <button id="btn-left" type="button">◀</button>
-          <button id="btn-rot" type="button">↻</button>
-          <button id="btn-right" type="button">▶</button>
-          <button id="btn-drop" type="button">DROP</button>
-          <button id="btn-hard" type="button">HARD</button>
-        </div>
+      </main>
+      <div class="dock">
+        <button id="btn-left" type="button">◀</button>
+        <button id="btn-rot" type="button">↻</button>
+        <button id="btn-right" type="button">▶</button>
+        <button id="btn-drop" type="button">DROP</button>
+        <button id="btn-hard" type="button">HARD</button>
       </div>
       <nav id="menu" class="menu">
         <section class="menu-card" data-panel="home">
