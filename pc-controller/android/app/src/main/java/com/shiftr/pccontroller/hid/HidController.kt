@@ -125,7 +125,7 @@ class HidController(private val context: Context) {
                     if (pluggedDevice != null && !isConnectedTo(pluggedDevice)) {
                         connectTo(pluggedDevice, fromAuto = true)
                     } else if (hostDevice == null) {
-                        tryAutoConnectBonded()
+                        tryAutoConnectLastHost()
                     }
                 } else if (intentionalStop) {
                     hostDevice = null
@@ -145,6 +145,7 @@ class HidController(private val context: Context) {
                     BluetoothProfile.STATE_CONNECTED -> {
                         hostDevice = device
                         recoverAttempts = 0
+                        rememberHost(device?.address)
                         emit(
                             HidConnectionState.Connected,
                             hostName = safeName(device),
@@ -292,7 +293,7 @@ class HidController(private val context: Context) {
                 intentionalStop = false
                 start()
             },
-            400L,
+            1_200L,
         )
     }
 
@@ -460,8 +461,8 @@ class HidController(private val context: Context) {
         }
     }
 
-    fun sendMouse(dx: Int, dy: Int, buttons: Int = mouseButtons, wheel: Int = 0): Boolean {
-        mouseButtons = buttons and 0x03
+    fun sendMouse(dx: Int, dy: Int, buttons: Int = mouseButtons, wheel: Int = 0, pan: Int = 0): Boolean {
+        mouseButtons = buttons and 0x1F
         val host = hostDevice
         val hid = hidDevice
         // Hot path: skip getConnectionState — it adds lag under high-rate moves.
@@ -476,7 +477,7 @@ class HidController(private val context: Context) {
                 (y and 0xff).toByte(),
                 ((y shr 8) and 0xff).toByte(),
                 clampByte(wheel),
-                0,
+                clampByte(pan),
             )
         return try {
             hid.sendReport(host, HidDescriptors.MOUSE_REPORT_ID, report)
@@ -492,6 +493,7 @@ class HidController(private val context: Context) {
             when (button) {
                 0 -> 0x01
                 1 -> 0x02
+                2 -> 0x04
                 else -> 0x00
             }
         mouseButtons =
@@ -504,6 +506,7 @@ class HidController(private val context: Context) {
     }
 
     fun keyEvent(domCode: String, down: Boolean): Boolean {
+        if (typing) return false
         val (usage, mod) = HidKeys.fromDomCode(domCode)
         if (mod.toInt() != 0) {
             modifierByte =
@@ -571,6 +574,93 @@ class HidController(private val context: Context) {
         return flushConsumer()
     }
 
+    // ---- Type-on-host: paced HID keystrokes for real text entry ----
+
+    private val typeExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    @Volatile
+    private var typing = false
+
+    /** True while a text burst is mid-flight; keycaps pause so reports never interleave. */
+    fun isTyping(): Boolean = typing
+
+    fun typeText(text: String) {
+        if (text.isEmpty()) return
+        typeExecutor.execute {
+            typing = true
+            try {
+                val hid = hidDevice ?: return@execute
+                val host = hostDevice ?: return@execute
+                for (c in text) {
+                    if (hostDevice?.address != host.address) return@execute
+                    val mapped = charToHid(c)
+                    if (mapped == null) {
+                        if (c == '\u000D') continue
+                        Thread.sleep(24)
+                        continue
+                    }
+                    val (usage, mods) = mapped
+                    hid.sendReport(host, HidDescriptors.KEYBOARD_REPORT_ID, byteArrayOf(mods, 0, usage, 0, 0, 0, 0, 0))
+                    Thread.sleep(12)
+                    hid.sendReport(host, HidDescriptors.KEYBOARD_REPORT_ID, ByteArray(8))
+                    Thread.sleep(24)
+                }
+            } catch (_: Exception) {
+            } finally {
+                typing = false
+            }
+        }
+    }
+
+    /** US-QWERTY scancode for a char; null = unsupported (skipped with a beat). */
+    private fun charToHid(c: Char): Pair<Byte, Byte>? {
+        val usage: Int
+        val mods: Int
+        when (c) {
+            in 'a'..'z' -> { usage = 0x04 + (c - 'a'); mods = 0 }
+            in 'A'..'Z' -> { usage = 0x04 + (c - 'A'); mods = HidKeys.MOD_LEFT_SHIFT.toInt() }
+            in '1'..'9' -> { usage = 0x1E + (c - '1'); mods = 0 }
+            '0' -> { usage = 0x27; mods = 0 }
+            ' ' -> { usage = 0x2C; mods = 0 }
+            '\u000A' -> { usage = 0x28; mods = 0 }
+            '\u0009' -> { usage = 0x2B; mods = 0 }
+            '!' -> { usage = 0x1E; mods = 2 }
+            '@' -> { usage = 0x1F; mods = 2 }
+            '#' -> { usage = 0x20; mods = 2 }
+            '$' -> { usage = 0x21; mods = 2 }
+            '%' -> { usage = 0x22; mods = 2 }
+            '^' -> { usage = 0x23; mods = 2 }
+            '&' -> { usage = 0x24; mods = 2 }
+            '*' -> { usage = 0x25; mods = 2 }
+            '(' -> { usage = 0x26; mods = 2 }
+            ')' -> { usage = 0x27; mods = 2 }
+            '-' -> { usage = 0x2D; mods = 0 }
+            '_' -> { usage = 0x2D; mods = 2 }
+            '=' -> { usage = 0x2E; mods = 0 }
+            '+' -> { usage = 0x2E; mods = 2 }
+            '[' -> { usage = 0x2F; mods = 0 }
+            '{' -> { usage = 0x2F; mods = 2 }
+            ']' -> { usage = 0x30; mods = 0 }
+            '}' -> { usage = 0x30; mods = 2 }
+            '\\' -> { usage = 0x31; mods = 0 }
+            '|' -> { usage = 0x31; mods = 2 }
+            ';' -> { usage = 0x33; mods = 0 }
+            ':' -> { usage = 0x33; mods = 2 }
+            '\'' -> { usage = 0x34; mods = 0 }
+            '"' -> { usage = 0x34; mods = 2 }
+            '`' -> { usage = 0x35; mods = 0 }
+            '~' -> { usage = 0x35; mods = 2 }
+            ',' -> { usage = 0x36; mods = 0 }
+            '<' -> { usage = 0x36; mods = 2 }
+            '.' -> { usage = 0x37; mods = 0 }
+            '>' -> { usage = 0x37; mods = 2 }
+            '/' -> { usage = 0x38; mods = 0 }
+            '?' -> { usage = 0x38; mods = 2 }
+            else -> return null
+        }
+        return usage.toByte() to mods.toByte()
+    }
+
     private fun flushKeyboard(): Boolean {
         val host = hostDevice
         val hid = hidDevice
@@ -635,7 +725,7 @@ class HidController(private val context: Context) {
             clearTimeout()
             emit(
                 HidConnectionState.Error,
-                message = "Could not register HID — force-stop other BT remotes, keep app open, Restart HID",
+                message = "Could not register HID — turn Bluetooth off/on, keep this screen open, Restart HID",
             )
             return
         }
@@ -664,17 +754,30 @@ class HidController(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    private fun tryAutoConnectBonded() {
+    private fun tryAutoConnectLastHost() {
         val hid = hidDevice ?: return
-        for (device in bondedDevices()) {
-            try {
-                if (hid.getConnectionState(device) == BluetoothProfile.STATE_DISCONNECTED) {
-                    connectTo(device, fromAuto = true)
-                    return
-                }
-            } catch (_: Exception) {
+        val last = lastHostAddress() ?: return
+        val device = bondedDevices().firstOrNull { it.address.equals(last, ignoreCase = true) } ?: return
+        try {
+            if (hid.getConnectionState(device) == BluetoothProfile.STATE_DISCONNECTED) {
+                connectTo(device, fromAuto = true)
             }
+        } catch (_: Exception) {
         }
+    }
+
+    private fun rememberHost(address: String?) {
+        if (address.isNullOrBlank()) return
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(PREF_LAST_HOST, address)
+            .apply()
+    }
+
+    private fun lastHostAddress(): String? {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(PREF_LAST_HOST, null)
+            ?.takeIf { it.isNotBlank() }
     }
 
     @SuppressLint("MissingPermission")
@@ -809,4 +912,9 @@ class HidController(private val context: Context) {
     }
 
     private fun clampByte(v: Int): Byte = max(-127, min(127, v)).toByte()
+
+    companion object {
+        private const val PREFS = "pc_controller_hid"
+        private const val PREF_LAST_HOST = "last_host_address"
+    }
 }

@@ -55,6 +55,23 @@ object HidKeys {
     const val COMMA: Byte = 0x36
     const val DOT: Byte = 0x37
     const val SLASH: Byte = 0x38
+    const val CAPS_LOCK: Byte = 0x39
+    const val F1: Byte = 0x3A
+    const val F2: Byte = 0x3B
+    const val F3: Byte = 0x3C
+    const val F4: Byte = 0x3D
+    const val F5: Byte = 0x3E
+    const val F6: Byte = 0x3F
+    const val F7: Byte = 0x40
+    const val F8: Byte = 0x41
+    const val F9: Byte = 0x42
+    const val F10: Byte = 0x43
+    const val F11: Byte = 0x44
+    const val F12: Byte = 0x45
+    const val HOME: Byte = 0x4A
+    const val PAGE_UP: Byte = 0x4B
+    const val END: Byte = 0x4D
+    const val PAGE_DOWN: Byte = 0x4E
     const val DELETE: Byte = 0x4C
     const val RIGHT: Byte = 0x4F
     const val LEFT: Byte = 0x50
@@ -130,6 +147,22 @@ object HidKeys {
             "ArrowDown" -> DOWN to 0
             "ArrowLeft" -> LEFT to 0
             "ArrowRight" -> RIGHT to 0
+            "F1" -> F1 to 0
+            "F2" -> F2 to 0
+            "F3" -> F3 to 0
+            "F4" -> F4 to 0
+            "F5" -> F5 to 0
+            "F6" -> F6 to 0
+            "F7" -> F7 to 0
+            "F8" -> F8 to 0
+            "F9" -> F9 to 0
+            "F10" -> F10 to 0
+            "F11" -> F11 to 0
+            "F12" -> F12 to 0
+            "Home" -> HOME to 0
+            "End" -> END to 0
+            "PageUp" -> PAGE_UP to 0
+            "PageDown" -> PAGE_DOWN to 0
             "ShiftLeft" -> NONE to MOD_LEFT_SHIFT
             "ShiftRight" -> NONE to MOD_RIGHT_SHIFT
             "ControlLeft" -> NONE to MOD_LEFT_CTRL

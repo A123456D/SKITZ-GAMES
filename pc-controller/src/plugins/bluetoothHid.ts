@@ -38,6 +38,8 @@ export interface BluetoothHidPlugin {
   tapKey(options: { code: string; shift?: boolean }): Promise<void>
   setKeyboardVisible(options: { visible: boolean }): Promise<void>
   consumer(options: { action: string; down: boolean }): Promise<void>
+  typeText(options: { text: string }): Promise<void>
+  isTyping(): Promise<{ typing: boolean }>
   addListener(
     eventName: 'hidState',
     listenerFunc: (state: HidNativeState) => void,

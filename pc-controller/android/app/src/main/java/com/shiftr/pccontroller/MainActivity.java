@@ -15,6 +15,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(BluetoothHidPlugin.class);
         registerPlugin(TvRemotePlugin.class);
         super.onCreate(savedInstanceState);
+        // HID sessions die when the screen sleeps mid-use — keep it awake while open.
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         hideSystemBars();
     }
 

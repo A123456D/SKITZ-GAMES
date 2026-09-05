@@ -2,7 +2,7 @@ package com.shiftr.pccontroller.hid
 
 /**
  * Combo mouse + keyboard descriptor (Kontroller / WearMouse layout Windows accepts).
- * Report IDs: 4 = mouse, 6 = feature, 8 = keyboard, 3 = consumer.
+ * Report IDs: 4 = mouse (5 buttons), 6 = feature, 8 = keyboard, 3 = consumer.
  */
 object HidDescriptors {
     const val MOUSE_REPORT_ID = 4
@@ -24,14 +24,14 @@ object HidDescriptors {
             0xa1.toByte(), 0x00,
             0x05, 0x09,
             0x19, 0x01,
-            0x29, 0x02,
+            0x29, 0x05,
             0x15, 0x00,
             0x25, 0x01,
             0x75, 0x01,
-            0x95.toByte(), 0x02,
+            0x95.toByte(), 0x05,
             0x81.toByte(), 0x02,
             0x95.toByte(), 0x01,
-            0x75, 0x06,
+            0x75, 0x03,
             0x81.toByte(), 0x03,
             0x05, 0x01,
             0x09, 0x30,

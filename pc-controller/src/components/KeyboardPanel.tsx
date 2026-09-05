@@ -116,6 +116,11 @@ const SYMBOLS: KeyDef[][] = [
   ],
 ]
 
+/** Function-row keys — valid DomCodes ride HidKeys.fromDomCode natively. */
+const FKEYS: KeyDef[] = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'].map(
+  (c) => ({ label: c, code: c, className: 'fn' }),
+)
+
 const LAYOUTS: Record<Layout, KeyDef[][]> = {
   letters: LETTERS,
   numbers: NUMBERS,
@@ -204,7 +209,7 @@ export function KeyboardPanel({ transport }: Props) {
     }
   }
 
-  const rows = LAYOUTS[layout]
+  const rows = [FKEYS.slice(0, 6), FKEYS.slice(6, 12), ...LAYOUTS[layout]]
 
   return (
     <div

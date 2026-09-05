@@ -23,4 +23,5 @@ export type Transport = {
   key: (code: string, down: boolean) => void
   tapKey: (code: string, shift?: boolean) => void
   consumer: (action: string, down: boolean) => void
+  typeText: (text: string) => void
 }

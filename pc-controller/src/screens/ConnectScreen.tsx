@@ -41,7 +41,7 @@ export function ConnectScreen({ transport, devices, onScan, onConnect, onClose }
           <h1 className="headline">{native ? 'Connect' : 'Pair a screen.'}</h1>
           <p className="sub">
             {native
-              ? 'Optional. Use the pad offline — link a PC (Bluetooth) or TV (Wi‑Fi) when you want.'
+              ? 'Keep this screen open. Pair from the PC: Add Bluetooth device → Pc Controller. Do not pair from phone settings.'
               : 'Demo mode lists sample targets. On phone, Bluetooth + Wi‑Fi TV protocols are live.'}
           </p>
         </div>

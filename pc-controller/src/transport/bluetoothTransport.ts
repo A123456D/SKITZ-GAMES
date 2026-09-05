@@ -384,5 +384,10 @@ export function createBluetoothTransport(): Transport & {
       if (native) native.consumer(action, down)
       else void BluetoothHid.consumer({ action, down })
     },
+
+    typeText(text: string) {
+      if (link !== 'bluetooth' || !text) return
+      void BluetoothHid.typeText({ text })
+    },
   }
 }

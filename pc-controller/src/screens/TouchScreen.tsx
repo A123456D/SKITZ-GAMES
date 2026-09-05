@@ -1,5 +1,6 @@
 import { useRef, useState, type PointerEvent } from 'react'
 import { KeyboardPanel } from '../components/KeyboardPanel'
+import { TypeBar } from '../components/TypeBar'
 import { SensSlider } from '../components/SensSlider'
 import { accel, coalesced } from '../pointer'
 import { loadInputSettings, saveInputSettings, type InputSettings } from '../settings'
@@ -11,6 +12,16 @@ type Props = {
 
 /** Base scroll px → HID wheel units (before user multiplier). */
 const SCROLL_BASE = 0.28
+
+/** Consumer actions on the touch screen — works for both PC and TV links. */
+const MEDIA_ACTIONS = [
+  { action: 'prev', label: '⏮' },
+  { action: 'play', label: '▶❚❚' },
+  { action: 'next', label: '⏭' },
+  { action: 'volDown', label: 'Vol−' },
+  { action: 'mute', label: 'Mute' },
+  { action: 'volUp', label: 'Vol+' },
+] as const
 const SWIPE_OPEN = 56
 const SWIPE_CLOSE = 48
 
@@ -48,7 +59,9 @@ export function TouchScreen({ transport }: Props) {
   const gesture = useRef<PadGesture | null>(null)
   const secondaryPtr = useRef<number | null>(null)
   const secondaryLastY = useRef(0)
+  const secondaryLastX = useRef(0)
   const multiScrollY = useRef(0)
+  const multiScrollX = useRef(0)
   const multiMoved = useRef(false)
   const awaitSecondTap = useRef(false)
   const lastTapUp = useRef(0)
@@ -97,7 +110,9 @@ export function TouchScreen({ transport }: Props) {
     if (gesture.current && secondaryPtr.current == null && e.pointerId !== gesture.current.pointerId) {
       secondaryPtr.current = e.pointerId
       secondaryLastY.current = e.clientY
+      secondaryLastX.current = e.clientX
       multiScrollY.current = 0
+      multiScrollX.current = 0
       multiMoved.current = false
       gesture.current.dragArmed = false
       if (gesture.current.dragging) {
@@ -134,6 +149,7 @@ export function TouchScreen({ transport }: Props) {
     }
     secondaryPtr.current = null
     multiScrollY.current = 0
+    multiScrollX.current = 0
     multiMoved.current = false
     setActive(true)
     updateGlint(e)
@@ -153,22 +169,33 @@ export function TouchScreen({ transport }: Props) {
     if (secondaryPtr.current != null) {
       if (e.pointerId !== g.pointerId && e.pointerId !== secondaryPtr.current) return
       let moveY = 0
+      let moveX = 0
       if (e.pointerId === g.pointerId) {
         moveY = e.clientY - g.lastY
+        moveX = e.clientX - g.lastX
         g.lastX = e.clientX
         g.lastY = e.clientY
       } else {
         moveY = e.clientY - secondaryLastY.current
+        moveX = e.clientX - secondaryLastX.current
         secondaryLastY.current = e.clientY
+        secondaryLastX.current = e.clientX
       }
       multiScrollY.current += moveY
-      if (Math.abs(moveY) > 2) multiMoved.current = true
+      multiScrollX.current += moveX
+      if (Math.abs(moveY) > 2 || Math.abs(moveX) > 2) multiMoved.current = true
       const gain = SCROLL_BASE * sensRef.current.scroll
       const step = 20
       while (Math.abs(multiScrollY.current) >= step) {
         const dir = multiScrollY.current > 0 ? 1 : -1
         transport.mouseScroll(0, dir * step * gain)
         multiScrollY.current -= dir * step
+      }
+      // Two-finger horizontal = AC Pan (horizontal scroll)
+      while (Math.abs(multiScrollX.current) >= step) {
+        const dirX = multiScrollX.current > 0 ? 1 : -1
+        transport.mouseScroll(dirX * step * gain, 0)
+        multiScrollX.current -= dirX * step
       }
       return
     }
@@ -223,7 +250,7 @@ export function TouchScreen({ transport }: Props) {
     // Secondary finger up — maybe two-finger right-click
     if (secondaryPtr.current != null && e.pointerId === secondaryPtr.current) {
       secondaryPtr.current = null
-      if (!multiMoved.current && Math.abs(multiScrollY.current) < 24) {
+      if (!multiMoved.current && Math.abs(multiScrollY.current) < 24 && Math.abs(multiScrollX.current) < 24) {
         clickRight()
         awaitSecondTap.current = false
       }
@@ -237,6 +264,7 @@ export function TouchScreen({ transport }: Props) {
     if (secondaryPtr.current != null) {
       secondaryPtr.current = null
       multiScrollY.current = 0
+      multiScrollX.current = 0
       gesture.current = null
       setActive(false)
       return
@@ -426,7 +454,27 @@ export function TouchScreen({ transport }: Props) {
           </div>
         </div>
 
-        <div className="mouse-actions two">
+        <TypeBar transport={transport} />
+
+        <div className="mouse-actions media-row">
+          {MEDIA_ACTIONS.map(({ action, label }) => (
+            <button
+              key={action}
+              type="button"
+              className={`action-key media${down[action] ? ' down' : ''}`}
+              onPointerDown={(e) => {
+                e.preventDefault()
+                press(action, () => transport.consumer(action, true))
+              }}
+              onPointerUp={() => release(action, () => transport.consumer(action, false))}
+              onPointerLeave={() => down[action] && release(action, () => transport.consumer(action, false))}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mouse-actions three">
           <button
             type="button"
             className={`action-key${down.left ? ' down' : ''}`}
@@ -438,6 +486,18 @@ export function TouchScreen({ transport }: Props) {
             onPointerLeave={() => down.left && release('left', () => transport.mouseButton('left', false))}
           >
             Left
+          </button>
+          <button
+            type="button"
+            className={`action-key${down.middle ? ' down' : ''}`}
+            onPointerDown={(e) => {
+              e.preventDefault()
+              press('middle', () => transport.mouseButton('middle', true))
+            }}
+            onPointerUp={() => release('middle', () => transport.mouseButton('middle', false))}
+            onPointerLeave={() => down.middle && release('middle', () => transport.mouseButton('middle', false))}
+          >
+            Mid
           </button>
           <button
             type="button"

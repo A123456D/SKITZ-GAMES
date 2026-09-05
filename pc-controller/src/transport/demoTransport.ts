@@ -88,6 +88,9 @@ export function createDemoTransport(): Transport & { subscribe: (fn: Listener) =
         log('consumer', { action, down })
       }
     },
+    typeText(text) {
+      log('typeText', { text })
+    },
   }
 
   return transport

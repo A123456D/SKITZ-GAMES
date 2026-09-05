@@ -68,6 +68,7 @@ class BluetoothHidPlugin : Plugin() {
     private var pendingMouseDx = 0
     private var pendingMouseDy = 0
     private var pendingMouseWheel = 0
+    private var pendingMousePan = 0
     private var mouseFlushPosted = false
     private val mouseLock = Any()
 
@@ -75,20 +76,23 @@ class BluetoothHidPlugin : Plugin() {
         val dx: Int
         val dy: Int
         val wheel: Int
+        val pan: Int
         synchronized(mouseLock) {
             dx = pendingMouseDx
             dy = pendingMouseDy
             wheel = pendingMouseWheel.coerceIn(-127, 127)
+            pan = pendingMousePan.coerceIn(-127, 127)
             pendingMouseDx = 0
             pendingMouseDy = 0
             pendingMouseWheel -= wheel
+            pendingMousePan -= pan
             mouseFlushPosted = false
         }
-        if (dx != 0 || dy != 0 || wheel != 0) {
-            controller?.sendMouse(dx, dy, wheel = wheel)
+        if (dx != 0 || dy != 0 || wheel != 0 || pan != 0) {
+            controller?.sendMouse(dx, dy, wheel = wheel, pan = pan)
         }
         synchronized(mouseLock) {
-            if ((pendingMouseDx != 0 || pendingMouseDy != 0 || pendingMouseWheel != 0) &&
+            if ((pendingMouseDx != 0 || pendingMouseDy != 0 || pendingMouseWheel != 0 || pendingMousePan != 0) &&
                 !mouseFlushPosted
             ) {
                 mouseFlushPosted = true
@@ -318,8 +322,10 @@ class BluetoothHidPlugin : Plugin() {
     @PluginMethod
     fun mouseScroll(call: PluginCall) {
         val dy = call.getInt("dy") ?: 0
+        val dx = call.getInt("dx") ?: 0
         synchronized(mouseLock) {
             pendingMouseWheel += dy
+            pendingMousePan += dx
             if (!mouseFlushPosted) {
                 mouseFlushPosted = true
                 outHandler.post { flushPendingMouse() }
@@ -362,6 +368,18 @@ class BluetoothHidPlugin : Plugin() {
         val down = call.getBoolean("down") ?: false
         controller?.consumer(action, down)
         call.resolve()
+    }
+
+    @PluginMethod
+    fun typeText(call: PluginCall) {
+        val text = call.getString("text") ?: return call.reject("text required")
+        controller?.typeText(text)
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun isTyping(call: PluginCall) {
+        call.resolve(JSObject().put("typing", controller?.isTyping() == true))
     }
 
     private fun showKeyboard() {
