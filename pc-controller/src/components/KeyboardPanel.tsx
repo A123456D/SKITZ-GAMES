@@ -221,7 +221,7 @@ export function KeyboardPanel({ transport }: Props) {
         <div
           key={`${layout}-${i}`}
           className="key-row"
-          style={{ gridTemplateColumns: `repeat(${row.length}, 1fr)` }}
+          style={{ gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))` }}
         >
           {row.map((key, j) => {
             if (isLayoutKey(key)) {

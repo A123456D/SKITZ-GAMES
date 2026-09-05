@@ -600,6 +600,7 @@ button.status-pill:active {
 
 .manual-select,
 .manual-input {
+  min-width: 0;
   min-height: 44px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -618,6 +619,10 @@ button.status-pill:active {
   flex: 1;
   min-height: 0;
   display: grid;
+  /* Explicit single column: an implicit 'auto' column would size to the widest
+   * child's min-content (the sens sliders), inflating every row past narrow
+   * viewports / large system font scales and clipping them on the right. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr auto;
   gap: 10px;
   padding-bottom: 32px;
@@ -639,7 +644,9 @@ button.status-pill:active {
 
 .sens-row {
   display: grid;
-  grid-template-columns: 88px 1fr;
+  /* minmax(0, 1fr) lets the range input shrink under large font scales
+   * instead of pushing the row wider than the screen. */
+  grid-template-columns: 88px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
 }
@@ -777,20 +784,20 @@ button.status-pill:active {
 
 .mouse-actions {
   display: grid;
-  grid-template-columns: 1.4fr 0.8fr 1.4fr;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
   gap: 8px;
 }
 
 .mouse-actions.two {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .mouse-actions.three {
-  grid-template-columns: 1.4fr 0.8fr 1.4fr;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
 }
 
 .mouse-actions.media-row {
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -863,6 +870,7 @@ button.status-pill:active {
 }
 
 .action-key {
+  min-width: 0;
   min-height: 56px;
   border-radius: 14px;
   background: var(--bg-2);
@@ -951,6 +959,7 @@ button.status-pill:active {
 }
 
 .keycap {
+  min-width: 0;
   min-height: 42px;
   border-radius: 10px;
   background: var(--bg-2);
@@ -1025,7 +1034,7 @@ button.status-pill:active {
 .media-row,
 .color-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   flex-shrink: 0;
 }
@@ -1084,19 +1093,19 @@ button.status-pill:active {
 
 .tv-num-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
 .tv-abc-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
 }
 
 .tv-abc-extras {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -1152,7 +1161,7 @@ button.status-pill:active {
 
 .game-shoulders {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1335,7 +1344,7 @@ button.status-pill:active {
 .look-mouse-buttons {
   grid-area: mouse;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
 }
 
@@ -1421,8 +1430,8 @@ button.status-pill:active {
   aspect-ratio: 1;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
