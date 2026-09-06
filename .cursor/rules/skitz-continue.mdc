@@ -1,0 +1,14 @@
+---
+description: Continue SKITZ/SHIFTR from the Hermes handoff — git, Pages, catalog
+alwaysApply: true
+---
+
+# Continue SKITZ
+
+You are picking up the whole SKITZ catalog, not a single toy folder.
+
+1. Read root `AGENTS.md`, then `docs/HERMES_HANDOFF.md`, before edits.
+2. Canonical repo: `C:\Users\PC\Projects\SHIFTR` → `A123456D/SKITZ-GAMES` `main`. Live: `https://skitz-games.pages.dev`.
+3. Pushing `main` deploys Cloudflare Pages (`website` root, `npm run build`, `dist`, `NODE_VERSION=22`). Commit/push only when asked.
+4. Ship games with `npm run ship` (or Gravity Drift `build.sh`) into `website/public/`. Then smoke `website` `npm run smoke:assets` after Functions/routing changes.
+5. Bind KV `BOARD` on Pages before treating world scores as live. Never catch-all Pages Functions. Never delete `.git`.

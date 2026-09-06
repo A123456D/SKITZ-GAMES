@@ -1,0 +1,13 @@
+---
+description: All SKITZ/SHIFTR rendering must target the GPU
+alwaysApply: true
+---
+
+# GPU-first
+
+Everything we ship that draws on screen targets the GPU.
+
+- Browser games: **WebGPU** (not Canvas 2D). Native: **wgpu**.
+- Simulation may be CPU. Render passes, particles, and post must be GPU/WGSL.
+- Never use `getContext("2d")` for gameplay or world rendering.
+- Missing GPU API: hard error, no Canvas 2D fallback.

@@ -2,6 +2,7 @@
 
 | Document | Purpose |
 | --- | --- |
+| [HERMES_HANDOFF.md](./HERMES_HANDOFF.md) | **Whole SKITZ catalog continuation** — git, Cloudflare Pages, games/apps, pending ops |
 | [RUNNING.md](./RUNNING.md) | Godot path, F5 / helpers (run_game.ps1, run_tests.ps1) |
 | [GDD_SHIFTR.md](./GDD_SHIFTR.md) | **Source of truth** â€” full Game Design Document (gameplay, economy, UX, audio, tech) |
 | [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md) | Repository layout and architectural placement rules |
