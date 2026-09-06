@@ -20,13 +20,13 @@ There are **no** first-party `.github/workflows`. Production is **Cloudflare Pag
 
 **Do not** add `website/functions/[[path]].js` or `_routes.json` include `/*`. That blanked every game’s art (2026-08-09).
 
-### Cloudflare KV (blocked)
+### Cloudflare KV (DONE 2026-09-06)
 
-`website/wrangler.toml` Pages project name: **`skitz-games`**. Binding **`BOARD`** is commented (no id).
+Namespace **`BOARD`** id `0c82534c02f64e8d937c0cb4d569ff9c` is created and bound to Pages `skitz-games` (production + preview) — both in project settings and uncommented in `website/wrangler.toml`. Verified on production: POST/GET on `/api/gravity-drift/scores`, `/api/scores`, `/api/progress` all 200; forged runs 400; verification rows deleted from KV afterwards.
 
-Pages Functions (`website/functions/api/scores.js`, `progress.js`, `gravity-drift/scores.js`) return **503 `board offline`** on POST when `env.BOARD` is missing. GET returns empty scores so the UI looks fine.
+Gotcha learned: with `pages_build_output_dir` in `wrangler.toml`, **wrangler.toml is the source of truth on direct deploys** — a dashboard-only binding is dropped the next time `wrangler pages deploy` runs. Keep the `[[kv_namespaces]]` block.
 
-To go live (user must log in to Cloudflare): create KV namespace `BOARD`, bind it to Pages → `skitz-games` → Functions, or uncomment `[[kv_namespaces]]` with the real id and redeploy. Same pattern exists in `breach-riot/wrangler.toml` (`breach-riot-scores` worker) — also unbound.
+Bound + deployed 2026-09-06: `breach-riot-scores` worker at `https://breach-riot-scores.arnoldvisser1.workers.dev`, its own namespace `breach-riot-BOARD` (`d455497b20824a89aecc6ebf5785cd02`), binding name still `BOARD`. Client defaults to site `/api/scores`, so worker is a standalone/fallback board.
 
 ---
 
@@ -100,7 +100,7 @@ Waves and card text live under `oculum/docs/` (`RULES.md`, `CARD_TEXT.md`, `ART_
 
 Rebuild from lost minified source is **done and committed** (`92cd7b2` and related). Canonical source: `website/games-src/gravity-drift/`. Legacy minified backup: `website/games-src/gravity-drift-legacy/`.
 
-Still open: **bind KV `BOARD`**, then verify POST `/api/gravity-drift/scores` on production. QA notes: `website/qa/report.md`. Do not re-init git.
+World board is **live** (KV `BOARD` bound + production-verified 2026-09-06, see KV section above). QA notes: `website/qa/report.md`. Do not re-init git.
 
 Local QA gotchas (from that HANDOFF): prefer Playwright headed Chrome with WebGPU flags; headless GPU is flaky here; Cursor browser-exec was unreliable on this machine.
 
@@ -151,7 +151,7 @@ Local chats (ids are Cursor conversation ids):
 
 ## Untracked in SKITZ-GAMES (decide with user)
 
-- `.cursor/` (gpu-first + this continuation rule) — **should be committed** so clones get it.
+- `.cursor/` (gpu-first + this continuation rule) — committed 2026-09-06.
 - `_export-mouse-kb/` nested repo — usually leave untracked or keep as its own GitHub remote.
 - `click-clack/design/` — design dump; ask before adding.
 
@@ -161,7 +161,7 @@ Local chats (ids are Cursor conversation ids):
 
 1. `cd C:\Users\PC\Projects\SHIFTR` and `git status` / `git log -5` on `main`.
 2. Confirm live site still `https://skitz-games.pages.dev`.
-3. If scores/world boards: KV `BOARD` still the first ops fix.
+3. World boards: KV `BOARD` is bound and live (done 2026-09-06).
 4. If a game: ship via that folder’s `npm run ship` (or Gravity Drift `build.sh`, or sibling copy).
 5. If site Functions/routing: smoke assets before calling it live.
 6. Commit and push **only on request**.

@@ -43,7 +43,7 @@ New titles: **WebGPU** (browser) or **wgpu** (native). No Canvas 2D gameplay ren
 
 ## Do next (ops)
 
-Production world boards POST **503 `board offline`** until KV namespace **`BOARD`** is bound on Pages project `skitz-games` (see `website/wrangler.toml`). Binding that is the highest-priority site ops task. Do not `git init` or delete `.git` — the GitHub history is real.
+KV namespace **`BOARD`** is created and bound (id `0c82534c02f64e8d937c0cb4d569ff9c`; `website/wrangler.toml` + Pages project settings, production + preview). World boards verified live 2026-09-06. Remaining: commit `website/wrangler.toml` when the user asks. Do not `git init` or delete `.git` — the GitHub history is real.
 
 ## Per-project docs
 
