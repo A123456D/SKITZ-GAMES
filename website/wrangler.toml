@@ -2,9 +2,8 @@ name = "skitz-games"
 compatibility_date = "2026-08-01"
 pages_build_output_dir = "dist"
 
-# Dashboard or:
-#   wrangler kv namespace create BOARD
-# then bind BOARD to this project so /api/scores and /api/progress persist.
-# [[kv_namespaces]]
-# binding = "BOARD"
-# id = "YOUR_KV_ID"
+# World boards (Gravity Drift + catalog scores/progress) persist here.
+# Namespace created 2026-09-06 via `wrangler kv namespace create BOARD`.
+[[kv_namespaces]]
+binding = "BOARD"
+id = "0c82534c02f64e8d937c0cb4d569ff9c"
